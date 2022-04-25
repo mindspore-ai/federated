@@ -1,0 +1,84 @@
+# Builtin Configurations(DO NOT CHANGE THESE CONFIGURATIONS unless you know exactly what you are doing)
+enable_modelarts: False
+data_url: ""
+train_url: ""
+checkpoint_url: ""
+data_path: "/cache/data"
+output_path: "/cache/train"
+load_path: "/cache/checkpoint_path"
+device_target: CPU
+enable_profiling: False
+
+# ==============================================================================
+#"""data config"""
+data_vocab_size: 184965
+train_num_of_parts: 21
+test_num_of_parts: 3
+batch_size: 1000 #0
+data_field_size: 39
+data_format: 1
+
+#"""model config"""
+data_emb_dim: 80
+deep_layer_args: [[1024, 512, 256, 128], "relu"]
+init_args: [-0.01, 0.01]
+weight_bias_init: ['normal', 'normal']
+keep_prob: 0.9
+convert_dtype: True
+
+# """train config"""
+l2_coef: 0.00008 # 8e-5
+learning_rate: 0.0005 # 5e-4
+epsilon: 0.00000005 # 5e-8
+loss_scale: 1024.0
+loss_callback: True
+train_epochs: 1
+
+# fl train config
+fl_mode: "mi" # the fl mechanism: mi or dfedasync
+num_clients: 20 # total number of clients
+num_samples: 10 # num_samples each client has
+train_ratio: 0.8 #the percent of training samples for each client
+max_round: 2 #maximum fl round
+num_client_per_round: 4 # number of clients selected each round
+cal_staleness: 1 #for dfedasync mode of cal staleness
+sigma: 10.0 #for dfedasync control the variance of distribution of training time
+
+# train.py
+dataset_path: "./data/mindrecord"
+loss_file_name: "./loss.log"
+
+---
+# Config description for each option
+enable_modelarts: 'Whether training on modelarts, default: False'
+data_url: 'Dataset url for obs'
+train_url: 'Training output url for obs'
+data_path: 'Dataset path for local'
+output_path: 'Training output path for local'
+
+device_target: "device target, support Ascend, GPU and CPU."
+dataset_path: 'Dataset path'
+batch_size: "batch size"
+ckpt_path: 'Checkpoint path'
+eval_file_name: 'Auc log file path. Default: "./auc.log"'
+loss_file_name: 'Loss log file path. Default: "./loss.log"'
+do_eval: 'Do evaluation or not, only support "True" or "False". Default: "True"'
+checkpoint_path: 'Checkpoint file path'
+device_id: "Device id"
+ckpt_file: "Checkpoint file path."
+file_name: "output file name."
+file_format: "file format"
+result_path: 'Result path'
+# result_path: "./result_Files" # 'result path'
+label_path: 'label path'
+
+dense_dim: 'The number of your continues fields'
+slot_dim: 'The number of your sparse fields, it can also be called catelogy features.'
+threshold: 'Word frequency below this will be regarded as OOV. It aims to reduce the vocab size'
+train_line_count: 'The number of examples in your dataset'
+skip_id_convert: 'Skip the id convert, regarding the original id as the final id.'
+---
+device_target: ['Ascend', 'GPU', 'CPU']
+file_format: ["AIR", "ONNX", "MINDIR"]
+freeze_layer: ["", "none", "backbone"]
+skip_id_convert: [0, 1]
