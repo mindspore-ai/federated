@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-#include "fl/armour/cipher/cipher_init.h"
+#include "ccsrc/armour/cipher/cipher_init.h"
 
-#include "fl/armour/cipher/cipher_meta_storage.h"
-#include "fl/server/common.h"
-#include "fl/server/model_store.h"
+#include "ccsrc/armour/cipher/cipher_meta_storage.h"
+#include "common/common.h"
+#include "server/model_store.h"
 
 namespace mindspore {
+namespace fl {
 namespace armour {
 bool CipherInit::Init(const CipherPublicPara &param, size_t time_out_mutex, size_t cipher_exchange_keys_cnt,
                       size_t cipher_get_keys_cnt, size_t cipher_share_secrets_cnt, size_t cipher_get_secrets_cnt,
@@ -61,23 +62,23 @@ bool CipherInit::Init(const CipherPublicPara &param, size_t time_out_mutex, size
   publicparam_.sign_global_lr = param.sign_global_lr;
   publicparam_.sign_dim_out = param.sign_dim_out;
 
-  if (param.encrypt_type == mindspore::ps::kDPEncryptType) {
+  if (param.encrypt_type == mindspore::fl::kDPEncryptType) {
     MS_LOG(INFO) << "DP parameters init, dp_eps: " << param.dp_eps << ", dp_delta: " << param.dp_delta
                  << ", dp_norm_clip: " << param.dp_norm_clip;
   }
 
-  if (param.encrypt_type == mindspore::ps::kDSEncryptType) {
+  if (param.encrypt_type == mindspore::fl::kDSEncryptType) {
     MS_LOG(INFO) << "Sign parameters init, sign_k: " << param.sign_k << ", sign_eps: " << param.sign_eps
                  << ", sign_thr_ratio: " << param.sign_thr_ratio << ", sign_global_lr: " << param.sign_global_lr
                  << ", sign_dim_out: " << param.sign_dim_out;
   }
 
-  if (param.encrypt_type == mindspore::ps::kPWEncryptType) {
+  if (param.encrypt_type == kPWEncryptType) {
     cipher_meta_storage_.RegisterClass();
     const std::string new_prime(reinterpret_cast<const char *>(param.prime), PRIME_MAX_LEN);
     new_prime_ = new_prime;
-    cipher_meta_storage_.RegisterPrime(fl::server::kCtxCipherPrimer, new_prime);
-    if (!cipher_meta_storage_.GetPrimeFromServer(fl::server::kCtxCipherPrimer, publicparam_.prime)) {
+    cipher_meta_storage_.RegisterPrime(kCtxCipherPrimer, new_prime);
+    if (!cipher_meta_storage_.GetPrimeFromServer(kCtxCipherPrimer, publicparam_.prime)) {
       MS_LOG(ERROR) << "Cipher Param Update is invalid.";
       return false;
     }
@@ -96,7 +97,7 @@ bool CipherInit::Init(const CipherPublicPara &param, size_t time_out_mutex, size
     }
     MS_LOG(INFO) << " CipherInit::Init Success";
   }
-  if (param.encrypt_type == mindspore::ps::kStablePWEncryptType) {
+  if (param.encrypt_type == kStablePWEncryptType) {
     cipher_meta_storage_.RegisterStablePWClass();
     MS_LOG(INFO) << "Register metadata for StablePWEncrypt is finished.";
   }
@@ -104,10 +105,10 @@ bool CipherInit::Init(const CipherPublicPara &param, size_t time_out_mutex, size
 }
 
 bool CipherInit::ReInitForScaling() {
-  if (ps::PSContext::instance()->encrypt_type() == mindspore::ps::kPWEncryptType) {
+  if (FLContext::instance()->encrypt_type() == kPWEncryptType) {
     cipher_meta_storage_.RegisterClass();
-    cipher_meta_storage_.RegisterPrime(fl::server::kCtxCipherPrimer, new_prime_);
-    if (!cipher_meta_storage_.GetPrimeFromServer(fl::server::kCtxCipherPrimer, publicparam_.prime)) {
+    cipher_meta_storage_.RegisterPrime(kCtxCipherPrimer, new_prime_);
+    if (!cipher_meta_storage_.GetPrimeFromServer(kCtxCipherPrimer, publicparam_.prime)) {
       MS_LOG(ERROR) << "Cipher Param Update is invalid.";
       return false;
     }
@@ -134,4 +135,5 @@ bool CipherInit::Check_Parames() {
   return true;
 }
 }  // namespace armour
+}  // namespace fl
 }  // namespace mindspore

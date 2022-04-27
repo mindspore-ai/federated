@@ -19,11 +19,11 @@
 #include <string>
 #include <vector>
 #include <memory>
-#include "fl/server/common.h"
-#include "fl/server/kernel/round/round_kernel.h"
-#include "fl/server/kernel/round/round_kernel_factory.h"
-#include "fl/armour/cipher/cipher_init.h"
-#include "fl/server/executor.h"
+#include "common/common.h"
+#include "server/kernel/round/round_kernel.h"
+#include "server/kernel/round/round_kernel_factory.h"
+#include "armour/cipher/cipher_init.h"
+#include "server/executor.h"
 
 namespace mindspore {
 namespace fl {
@@ -37,17 +37,17 @@ class ClientListKernel : public RoundKernel {
   ClientListKernel() = default;
   ~ClientListKernel() override = default;
   void InitKernel(size_t required_cnt) override;
-  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<ps::core::MessageHandler> &message) override;
+  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<fl::core::MessageHandler> &message) override;
   bool Reset() override;
-  void BuildClientListRsp(const std::shared_ptr<server::FBBuilder> &fbb, const schema::ResponseCode retcode,
-                          const string &reason, std::vector<std::string> clients, const string &next_req_time,
+  void BuildClientListRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
+                          const std::string &reason, std::vector<std::string> clients, const std::string &next_req_time,
                           const size_t iteration);
 
  private:
   armour::CipherInit *cipher_init_;
   sigVerifyResult VerifySignature(const schema::GetClientList *get_clients_req);
   bool DealClient(const size_t iter_num, const schema::GetClientList *get_clients_req,
-                  const std::shared_ptr<server::FBBuilder> &fbb);
+                  const std::shared_ptr<FBBuilder> &fbb);
   Executor *executor_;
   size_t iteration_time_window_;
 };

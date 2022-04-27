@@ -31,18 +31,18 @@
 #include <atomic>
 #include <condition_variable>
 
-#include "ps/core/cluster_config.h"
-#include "utils/convert_utils_base.h"
-#include "ps/core/comm_util.h"
-#include "ps/core/communicator/ssl_client.h"
-#include "ps/core/communicator/ssl_wrapper.h"
-#include "ps/constants.h"
-#include "ps/ps_context.h"
-#include "ps/core/communicator/tcp_message_handler.h"
-#include "ps/core/file_configuration.h"
+#include "common/core/cluster_config.h"
+#include "common/utils/convert_utils_base.h"
+#include "common/core/comm_util.h"
+#include "common/communicator/ssl_client.h"
+#include "common/communicator/ssl_wrapper.h"
+#include "common/constants.h"
+#include "python/fl_context.h"
+#include "common/communicator/tcp_message_handler.h"
+#include "common/core/file_configuration.h"
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 class TcpClient {
  public:
@@ -61,7 +61,7 @@ class TcpClient {
   void set_disconnected_callback(const OnDisconnected &disconnected);
   void set_connected_callback(const OnConnected &connected);
   bool WaitConnected(
-    const uint32_t &connected_timeout = PSContext::instance()->cluster_config().cluster_available_timeout);
+    const uint32_t &connected_timeout = FLContext::instance()->cluster_config().cluster_available_timeout);
   void Init();
   void StartWithDelay(int seconds);
   void Stop();
@@ -117,6 +117,6 @@ class TcpClient {
   Configuration *config_;
 };
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_CLIENT_H_

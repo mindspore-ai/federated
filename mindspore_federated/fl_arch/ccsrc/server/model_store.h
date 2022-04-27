@@ -22,11 +22,11 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include "fl/server/common.h"
-#include "fl/server/memory_register.h"
-#include "fl/server/executor.h"
-#include "fl/compression/encode_executor.h"
-#include "fl/server/local_meta_store.h"
+#include "common/common.h"
+#include "server/memory_register.h"
+#include "server/executor.h"
+#include "compression/encode_executor.h"
+#include "server/local_meta_store.h"
 
 namespace mindspore {
 namespace fl {

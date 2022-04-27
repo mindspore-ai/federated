@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "fl/server/kernel/round/push_weight_kernel.h"
+#include "server/kernel/round/push_weight_kernel.h"
 
 namespace mindspore {
 namespace fl {
@@ -31,7 +31,7 @@ void PushWeightKernel::InitKernel(size_t) {
 }
 
 bool PushWeightKernel::Launch(const uint8_t *req_data, size_t len,
-                              const std::shared_ptr<ps::core::MessageHandler> &message) {
+                              const std::shared_ptr<fl::core::MessageHandler> &message) {
   MS_LOG(INFO) << "Launching PushWeightKernel kernel.";
   std::shared_ptr<FBBuilder> fbb = std::make_shared<FBBuilder>();
   if (fbb == nullptr || req_data == nullptr) {
@@ -73,8 +73,8 @@ bool PushWeightKernel::Reset() {
   return true;
 }
 
-void PushWeightKernel::OnLastCountEvent(const std::shared_ptr<ps::core::MessageHandler> &) {
-  if (ps::PSContext::instance()->resetter_round() == ps::ResetterRound::kPushWeight) {
+void PushWeightKernel::OnLastCountEvent(const std::shared_ptr<fl::core::MessageHandler> &) {
+  if (FLContext::instance()->resetter_round() == ResetterRound::kPushWeight) {
     FinishIteration(true);
   }
   return;
@@ -110,8 +110,7 @@ ResultCode PushWeightKernel::PushWeight(const std::shared_ptr<FBBuilder> &fbb,
   }
   MS_LOG(INFO) << "Pushing weight for iteration " << current_iter << " succeeds.";
 
-  std::string count_reason = "";
-  if (!DistributedCountService::GetInstance().Count(name_, std::to_string(local_rank_), &count_reason)) {
+  if (!DistributedCountService::GetInstance().Count(name_, std::to_string(local_rank_))) {
     std::string reason = "Count for push weight request failed.";
     BuildPushWeightRsp(fbb, schema::ResponseCode_SystemError, reason, current_iter);
     MS_LOG(ERROR) << reason;

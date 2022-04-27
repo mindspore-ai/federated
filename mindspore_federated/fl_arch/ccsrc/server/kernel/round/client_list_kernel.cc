@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "fl/server/kernel/round/client_list_kernel.h"
+#include "server/kernel/round/client_list_kernel.h"
 #include <utility>
 #include <string>
 #include <vector>
@@ -65,7 +65,7 @@ sigVerifyResult ClientListKernel::VerifySignature(const schema::GetClientList *g
   std::vector<unsigned char> src_data;
   (void)src_data.insert(src_data.end(), timestamp.begin(), timestamp.end());
   (void)src_data.insert(src_data.end(), iter_str.begin(), iter_str.end());
-  auto certVerify = mindspore::ps::server::CertVerify::GetInstance();
+  auto certVerify = CertVerify::GetInstance();
   unsigned char srcDataHash[SHA256_DIGEST_LENGTH];
   certVerify.sha256Hash(src_data.data(), SizeToInt(src_data.size()), srcDataHash, SHA256_DIGEST_LENGTH);
   if (!certVerify.verifyRSAKey(key_attestations[fl_id], srcDataHash, signature.data(), SHA256_DIGEST_LENGTH)) {
@@ -79,9 +79,9 @@ sigVerifyResult ClientListKernel::VerifySignature(const schema::GetClientList *g
 }
 
 bool ClientListKernel::DealClient(const size_t iter_num, const schema::GetClientList *get_clients_req,
-                                  const std::shared_ptr<server::FBBuilder> &fbb) {
-  std::vector<string> client_list;
-  std::vector<string> empty_client_list;
+                                  const std::shared_ptr<FBBuilder> &fbb) {
+  std::vector<std::string> client_list;
+  std::vector<std::string> empty_client_list;
   std::string fl_id = get_clients_req->fl_id()->str();
 
   if (!LocalMetaStore::GetInstance().has_value(kCtxUpdateModelThld)) {
@@ -113,7 +113,7 @@ bool ClientListKernel::DealClient(const size_t iter_num, const schema::GetClient
   }
 
   bool retcode_client =
-    cipher_init_->cipher_meta_storage_.UpdateClientToServer(fl::server::kCtxGetUpdateModelClientList, fl_id);
+    cipher_init_->cipher_meta_storage_.UpdateClientToServer(kCtxGetUpdateModelClientList, fl_id);
   if (!retcode_client) {
     std::string reason = "update get update model clients failed";
     MS_LOG(ERROR) << reason;
@@ -136,17 +136,17 @@ bool ClientListKernel::DealClient(const size_t iter_num, const schema::GetClient
 }
 
 bool ClientListKernel::Launch(const uint8_t *req_data, size_t len,
-                              const std::shared_ptr<ps::core::MessageHandler> &message) {
+                              const std::shared_ptr<fl::core::MessageHandler> &message) {
   size_t iter_num = LocalMetaStore::GetInstance().curr_iter_num();
   MS_LOG(INFO) << "Launching ClientListKernel, Iteration number is " << iter_num;
 
-  std::shared_ptr<server::FBBuilder> fbb = std::make_shared<server::FBBuilder>();
+  std::shared_ptr<FBBuilder> fbb = std::make_shared<FBBuilder>();
   if (fbb == nullptr || req_data == nullptr) {
     std::string reason = "FBBuilder builder or req_data is nullptr.";
     MS_LOG(ERROR) << reason;
     return false;
   }
-  std::vector<string> client_list;
+  std::vector<std::string> client_list;
   flatbuffers::Verifier verifier(req_data, len);
   if (!verifier.VerifyBuffer<schema::GetClientList>()) {
     std::string reason = "The schema of GetClientList is invalid.";
@@ -166,7 +166,7 @@ bool ClientListKernel::Launch(const uint8_t *req_data, size_t len,
     return true;
   }
   // verify signature
-  if (ps::PSContext::instance()->pki_verify()) {
+  if (FLContext::instance()->pki_verify()) {
     sigVerifyResult verify_result = VerifySignature(get_clients_req);
     if (verify_result == sigVerifyResult::FAILED) {
       std::string reason = "verify signature failed.";
@@ -217,9 +217,9 @@ bool ClientListKernel::Reset() {
   return true;
 }
 
-void ClientListKernel::BuildClientListRsp(const std::shared_ptr<server::FBBuilder> &fbb,
-                                          const schema::ResponseCode retcode, const string &reason,
-                                          std::vector<std::string> clients, const string &next_req_time,
+void ClientListKernel::BuildClientListRsp(const std::shared_ptr<FBBuilder> &fbb,
+                                          const schema::ResponseCode retcode, const std::string &reason,
+                                          std::vector<std::string> clients, const std::string &next_req_time,
                                           const size_t iteration) {
   auto rsp_reason = fbb->CreateString(reason);
   auto rsp_next_req_time = fbb->CreateString(next_req_time);

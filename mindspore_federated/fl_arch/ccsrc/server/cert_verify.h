@@ -29,11 +29,11 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-#include "utils/log_adapter.h"
-#include "fl/server/common.h"
+#include "common/utils/log_adapter.h"
+#include "common/common.h"
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace server {
 class CertVerify {
  public:
@@ -105,6 +105,6 @@ class CertVerify {
 #endif
 };
 }  // namespace server
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_FL_SERVER_CERT_VERIFY_H

@@ -22,10 +22,9 @@
 #include <string>
 #include <vector>
 #include <functional>
-#include "proto/ps.pb.h"
-#include "ps/ps_context.h"
-#include "ps/core/server_node.h"
-#include "fl/server/common.h"
+#include "python/fl_context.h"
+#include "common/core/server_node.h"
+#include "common/common.h"
 
 namespace mindspore {
 namespace fl {
@@ -61,19 +60,20 @@ class CollectiveOpsImpl {
     return instance;
   }
 
-  void Initialize(const std::shared_ptr<ps::core::ServerNode> &server_node);
+  void Initialize(const std::shared_ptr<fl::core::ServerNode> &server_node);
 
   template <typename T>
   bool AllReduce(const std::string &data_name, void *sendbuff, void *recvbuff, size_t count);
 
   template <typename T>
-  bool AllGather(const void *sendbuff, void *recvbuff, size_t send_count, const ps::core::AbstractNodePtr &node);
+  bool AllGather(const void *sendbuff, void *recvbuff, size_t send_count,
+                 const std::shared_ptr<fl::core::AbstractNode> &node);
 
   // Collective broadcast within the specified group. The parameter "root" is the group rank of the root process.
   // Normally 0.
   template <typename T>
   bool Broadcast(const void *sendbuff, void *recvbuff, size_t count, uint32_t root,
-                 const ps::core::AbstractNodePtr &node, const CommunicationGroupInfo &group_info);
+                 const std::shared_ptr<fl::core::AbstractNode> &node, const CommunicationGroupInfo &group_info);
 
   // Reinitialize the ring for collective communication after scaling operations are done.
   bool ReInitForScaling();
@@ -84,7 +84,7 @@ class CollectiveOpsImpl {
         rank_id_(0),
         server_num_(0),
         node_(nullptr),
-        node_role_(ps::core::NodeRole::WORKER),
+        node_role_(fl::core::NodeRole::WORKER),
         rank_size_(0) {}
   ~CollectiveOpsImpl() = default;
   CollectiveOpsImpl(const CollectiveOpsImpl &) = delete;
@@ -113,7 +113,7 @@ class CollectiveOpsImpl {
   bool Broadcast(const void *sendbuff, void *recvbuff, size_t count, uint32_t root,
                  const CommunicationGroupInfo &group_info);
 
-  std::shared_ptr<ps::core::ServerNode> server_node_;
+  std::shared_ptr<fl::core::ServerNode> server_node_;
   uint32_t rank_id_;
   uint32_t server_num_;
 
@@ -122,8 +122,8 @@ class CollectiveOpsImpl {
 
   // The abstract node could be worker or server. Only nodes which have the same role could use collective
   // communication.
-  ps::core::AbstractNodePtr node_;
-  ps::core::NodeRole node_role_;
+  std::shared_ptr<fl::core::AbstractNode> node_;
+  fl::core::NodeRole node_role_;
   uint32_t rank_size_;
 };
 }  // namespace server

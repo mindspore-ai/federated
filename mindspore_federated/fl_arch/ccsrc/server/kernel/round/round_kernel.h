@@ -17,22 +17,21 @@
 #ifndef MINDSPORE_CCSRC_FL_SERVER_KERNEL_ROUND_ROUND_KERNEL_H_
 #define MINDSPORE_CCSRC_FL_SERVER_KERNEL_ROUND_ROUND_KERNEL_H_
 
+#include <chrono>
 #include <map>
 #include <memory>
-#include <string>
-#include <vector>
 #include <mutex>
 #include <queue>
-#include <utility>
-#include <chrono>
+#include <string>
 #include <thread>
 #include <unordered_map>
-#include "kernel/common_utils.h"
-#include "plugin/device/cpu/kernel/cpu_kernel.h"
-#include "fl/server/common.h"
-#include "fl/server/local_meta_store.h"
-#include "fl/server/distributed_count_service.h"
-#include "fl/server/distributed_metadata_store.h"
+#include <utility>
+#include <vector>
+
+#include "common/common.h"
+#include "server/distributed_count_service.h"
+#include "server/distributed_metadata_store.h"
+#include "server/local_meta_store.h"
 
 namespace mindspore {
 namespace fl {
@@ -56,7 +55,7 @@ class RoundKernel {
 
   // Launch the round kernel logic to handle the message passed by the communication module.
   virtual bool Launch(const uint8_t *req_data, size_t len,
-                      const std::shared_ptr<ps::core::MessageHandler> &message) = 0;
+                      const std::shared_ptr<fl::core::MessageHandler> &message) = 0;
 
   // Some rounds could be stateful in a iteration. Reset method resets the status of this round.
   virtual bool Reset() = 0;
@@ -64,8 +63,8 @@ class RoundKernel {
   // The counter event handlers for DistributedCountService.
   // The callbacks when first message and last message for this round kernel is received.
   // These methods is called by class DistributedCountService and triggered by counting server.
-  virtual void OnFirstCountEvent(const std::shared_ptr<ps::core::MessageHandler> &message);
-  virtual void OnLastCountEvent(const std::shared_ptr<ps::core::MessageHandler> &message);
+  virtual void OnFirstCountEvent(const std::shared_ptr<fl::core::MessageHandler> &message);
+  virtual void OnLastCountEvent(const std::shared_ptr<fl::core::MessageHandler> &message);
 
   // Called when this round is finished. This round timer's Stop method will be called.
   void StopTimer() const;
@@ -100,14 +99,29 @@ class RoundKernel {
 
   float upload_loss() const;
 
-  bool verifyResponse(const std::shared_ptr<ps::core::MessageHandler> &message, const void *data, size_t len);
+  bool verifyResponse(const std::shared_ptr<fl::core::MessageHandler> &message, const void *data, size_t len);
+
+  // Record the size of send data and the time stamp
+  void RecordSendData(const std::pair<uint64_t, size_t> &send_data);
+
+  // Record the size of receive data and the time stamp
+  void RecordReceiveData(const std::pair<uint64_t, size_t> &receive_data);
+
+  // Get the info of send data
+  std::multimap<uint64_t, size_t> GetSendData();
+
+  // Get the info of receive data
+  std::multimap<uint64_t, size_t> GetReceiveData();
+
+  // Clear the send data infp
+  void ClearData();
 
  protected:
   // Send response to client, and the data can be released after the call.
-  void SendResponseMsg(const std::shared_ptr<ps::core::MessageHandler> &message, const void *data, size_t len);
+  void SendResponseMsg(const std::shared_ptr<fl::core::MessageHandler> &message, const void *data, size_t len);
   // Send response to client, and the data will be released by cb after finished send msg.
-  void SendResponseMsgInference(const std::shared_ptr<ps::core::MessageHandler> &message, const void *data, size_t len,
-                                ps::core::RefBufferRelCallback cb);
+  void SendResponseMsgInference(const std::shared_ptr<fl::core::MessageHandler> &message, const void *data, size_t len,
+                                fl::core::RefBufferRelCallback cb);
 
   // Round kernel's name.
   std::string name_;
@@ -127,6 +141,18 @@ class RoundKernel {
   std::atomic<size_t> accept_client_num_;
 
   std::atomic<float> upload_loss_;
+
+  // The mutex for send_data_and_time_
+  std::mutex send_data_rate_mutex_;
+
+  // The size of send data ant time
+  std::multimap<uint64_t, size_t> send_data_and_time_;
+
+  // The mutex for receive_data_and_time_
+  std::mutex receive_data_rate_mutex_;
+
+  // The size of receive data and time
+  std::multimap<uint64_t, size_t> receive_data_and_time_;
 };
 }  // namespace kernel
 }  // namespace server

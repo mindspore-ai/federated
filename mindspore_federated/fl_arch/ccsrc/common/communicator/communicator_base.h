@@ -23,15 +23,15 @@
 #include <functional>
 #include <thread>
 
-#include "ps/core/communicator/message_handler.h"
-#include "utils/log_adapter.h"
-#include "ps/core/communicator/http_message_handler.h"
-#include "ps/core/communicator/tcp_server.h"
-#include "ps/core/node_info.h"
-#include "ps/constants.h"
+#include "common/communicator/message_handler.h"
+#include "common/utils/log_adapter.h"
+#include "common/communicator/http_message_handler.h"
+#include "common/communicator/tcp_server.h"
+#include "common/core/node_info.h"
+#include "common/constants.h"
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 enum class TcpUserCommand {
   kPush,
@@ -71,8 +71,8 @@ class CommunicatorBase {
   using MessageCallback = std::function<void(std::shared_ptr<MessageHandler>)>;
   using HttpMsgCallback = std::function<void(std::shared_ptr<HttpMessageHandler>)>;
   using OnNodeEventCallback = std::function<void(const ClusterEvent &)>;
-  using TcpMsgCallback = std::function<void(std::shared_ptr<core::TcpConnection> conn,
-                                            std::shared_ptr<core::MessageMeta> meta, const void *data, size_t size)>;
+  using TcpMsgCallback = std::function<void(std::shared_ptr<fl::core::TcpConnection> conn,
+                                            std::shared_ptr<fl::core::MessageMeta> meta, const void *data, size_t size)>;
   CommunicatorBase() : running_(false) {}
 
   virtual ~CommunicatorBase();
@@ -95,6 +95,6 @@ class CommunicatorBase {
   bool running_;
 };
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_COMMUNICATOR_BASE_H_

@@ -19,7 +19,7 @@
 
 #include <map>
 #include <string>
-#include "utils/log_adapter.h"
+#include "common/utils/log_adapter.h"
 
 namespace mindspore {
 namespace fl {

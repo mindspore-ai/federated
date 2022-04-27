@@ -35,17 +35,18 @@
 #include <thread>
 #include <atomic>
 
-#include "ps/core/communicator/tcp_message_handler.h"
-#include "ps/core/communicator/ssl_wrapper.h"
-#include "ps/core/cluster_config.h"
-#include "utils/convert_utils_base.h"
-#include "ps/core/comm_util.h"
-#include "ps/constants.h"
-#include "ps/ps_context.h"
-#include "ps/core/file_configuration.h"
+#include "common/communicator/tcp_message_handler.h"
+#include "common/communicator/ssl_wrapper.h"
+#include "common/core/cluster_config.h"
+#include "common/utils/convert_utils_base.h"
+#include "common/core/comm_util.h"
+#include "common/constants.h"
+#include "python/fl_context.h"
+#include "common/core/configuration.h"
+#include "common/core/file_configuration.h"
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 class TcpServer;
 class TcpConnection {
@@ -143,6 +144,6 @@ class TcpServer {
   int64_t max_connection_;
 };
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_SERVER_H_

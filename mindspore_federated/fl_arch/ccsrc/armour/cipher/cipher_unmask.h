@@ -20,13 +20,13 @@
 #include <vector>
 #include <string>
 #include <map>
-#include "fl/armour/secure_protocol/secret_sharing.h"
-#include "proto/ps.pb.h"
-#include "utils/log_adapter.h"
-#include "fl/armour/cipher/cipher_init.h"
-#include "fl/armour/cipher/cipher_meta_storage.h"
+#include "armour/secure_protocol/secret_sharing.h"
+#include "common/utils/log_adapter.h"
+#include "armour/cipher/cipher_init.h"
+#include "armour/cipher/cipher_meta_storage.h"
 
 namespace mindspore {
+namespace fl {
 namespace armour {
 
 class CipherUnmask {
@@ -41,6 +41,7 @@ class CipherUnmask {
   CipherInit *cipher_init_;  // the parameter of the secure aggregation
 };
 }  // namespace armour
+}  // namespace fl
 }  // namespace mindspore
 
 #endif  // MINDSPORE_CCSRC_ARMOUR_CIPHER_UNMASK_H

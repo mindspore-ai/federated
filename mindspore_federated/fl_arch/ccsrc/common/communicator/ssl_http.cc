@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-#include "ps/core/communicator/ssl_http.h"
+#include "common/communicator/ssl_http.h"
 
 #include <sys/time.h>
 #include <openssl/pem.h>
@@ -29,7 +29,7 @@
 #include <sstream>
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 SSLHTTP::SSLHTTP() : ssl_ctx_(nullptr) { InitSSL(); }
 
@@ -59,7 +59,7 @@ void SSLHTTP::InitSSL() {
   }
 
   std::unique_ptr<Configuration> config_ =
-    std::make_unique<FileConfiguration>(PSContext::instance()->config_file_path());
+    std::make_unique<FileConfiguration>(FLContext::instance()->config_file_path());
   MS_EXCEPTION_IF_NULL(config_);
   if (!config_->Initialize()) {
     MS_LOG(EXCEPTION) << "The config file is empty.";
@@ -74,7 +74,7 @@ void SSLHTTP::InitSSL() {
   server_cert = path;
 
   // 2. Parse the server password.
-  std::string server_password = PSContext::instance()->server_password();
+  std::string server_password = FLContext::instance()->server_password();
   if (server_password.empty()) {
     MS_LOG(EXCEPTION) << "The client password's value is empty.";
   }
@@ -132,11 +132,10 @@ void SSLHTTP::CleanSSL() {
   }
   ERR_free_strings();
   EVP_cleanup();
-  ERR_remove_thread_state(nullptr);
   CRYPTO_cleanup_all_ex_data();
 }
 
 SSL_CTX *SSLHTTP::GetSSLCtx() const { return ssl_ctx_; }
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore

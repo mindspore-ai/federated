@@ -14,32 +14,36 @@
  * limitations under the License.
  */
 
-#include "ps/scheduler.h"
+#include "scheduler.h"
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 Scheduler &Scheduler::GetInstance() {
   static Scheduler instance{};
   return instance;
 }
 
-void Scheduler::Run() {
+bool Scheduler::Run() {
   MS_LOG(INFO) << "Start scheduler.";
-  PSContext::instance()->cluster_config().scheduler_host = PSContext::instance()->scheduler_host();
-  PSContext::instance()->cluster_config().scheduler_port = PSContext::instance()->scheduler_port();
-  PSContext::instance()->cluster_config().initial_worker_num = PSContext::instance()->initial_worker_num();
-  PSContext::instance()->cluster_config().initial_server_num = PSContext::instance()->initial_server_num();
+  FLContext::instance()->cluster_config().scheduler_ip = FLContext::instance()->scheduler_ip();
+  FLContext::instance()->cluster_config().scheduler_port = FLContext::instance()->scheduler_port();
+  FLContext::instance()->cluster_config().initial_worker_num = FLContext::instance()->initial_worker_num();
+  FLContext::instance()->cluster_config().initial_server_num = FLContext::instance()->initial_server_num();
   if (!scheduler_node_->Start()) {
     MS_LOG(WARNING) << "Scheduler start failed.";
+    return false;
   }
 
   if (!scheduler_node_->Finish()) {
     MS_LOG(WARNING) << "Scheduler finish failed.";
+    return false;
   }
 
   if (!scheduler_node_->Stop()) {
     MS_LOG(WARNING) << "Scheduler stop failed.";
+    return false;
   }
+  return true;
 }
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore

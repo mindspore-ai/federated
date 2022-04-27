@@ -14,14 +14,15 @@
  * limitations under the License.
  */
 
-#include "fl/armour/cipher/cipher_keys.h"
-#include "fl/armour/cipher/cipher_meta_storage.h"
+#include "armour/cipher/cipher_keys.h"
+#include "armour/cipher/cipher_meta_storage.h"
 
 namespace mindspore {
+namespace fl {
 namespace armour {
 bool CipherKeys::GetKeys(const size_t cur_iterator, const std::string &next_req_time,
                          const schema::GetExchangeKeys *get_exchange_keys_req,
-                         const std::shared_ptr<fl::server::FBBuilder> &fbb) {
+                         const std::shared_ptr<FBBuilder> &fbb) {
   MS_LOG(INFO) << "CipherMgr::GetKeys START";
   if (get_exchange_keys_req == nullptr) {
     MS_LOG(ERROR) << "Request is nullptr";
@@ -34,11 +35,11 @@ bool CipherKeys::GetKeys(const size_t cur_iterator, const std::string &next_req_
   }
   // get clientlist from memory server.
   std::map<std::string, std::vector<std::vector<uint8_t>>> client_public_keys;
-  std::string encrypt_type = ps::PSContext::instance()->encrypt_type();
-  if (encrypt_type == ps::kPWEncryptType) {
-    cipher_init_->cipher_meta_storage_.GetClientKeysFromServer(fl::server::kCtxClientsKeys, &client_public_keys);
+  std::string encrypt_type = FLContext::instance()->encrypt_type();
+  if (encrypt_type == kPWEncryptType) {
+    cipher_init_->cipher_meta_storage_.GetClientKeysFromServer(kCtxClientsKeys, &client_public_keys);
   } else {
-    cipher_init_->cipher_meta_storage_.GetStableClientKeysFromServer(fl::server::kCtxClientsKeys, &client_public_keys);
+    cipher_init_->cipher_meta_storage_.GetStableClientKeysFromServer(kCtxClientsKeys, &client_public_keys);
   }
 
   size_t cur_exchange_clients_num = client_public_keys.size();
@@ -58,7 +59,7 @@ bool CipherKeys::GetKeys(const size_t cur_iterator, const std::string &next_req_
     return false;
   }
 
-  bool ret = cipher_init_->cipher_meta_storage_.UpdateClientToServer(fl::server::kCtxGetKeysClientList, fl_id);
+  bool ret = cipher_init_->cipher_meta_storage_.UpdateClientToServer(kCtxGetKeysClientList, fl_id);
   if (!ret) {
     MS_LOG(ERROR) << "Update get keys clients failed";
     BuildGetKeysRsp(fbb, schema::ResponseCode_OutOfTime, cur_iterator, next_req_time, false);
@@ -66,7 +67,7 @@ bool CipherKeys::GetKeys(const size_t cur_iterator, const std::string &next_req_
   }
 
   MS_LOG(INFO) << "GetKeys client list: ";
-  if (encrypt_type == ps::kPWEncryptType && ps::PSContext::instance()->pki_verify()) {
+  if (encrypt_type == kPWEncryptType && FLContext::instance()->pki_verify()) {
     MS_LOG(INFO) << "Build get_keys response in pki_verify mode.";
     BuildPkiVerifyGetKeysRsp(fbb, schema::ResponseCode_SUCCEED, cur_iterator, next_req_time, true);
   } else {
@@ -77,7 +78,7 @@ bool CipherKeys::GetKeys(const size_t cur_iterator, const std::string &next_req_
 
 bool CipherKeys::ExchangeKeys(const size_t cur_iterator, const std::string &next_req_time,
                               const schema::RequestExchangeKeys *exchange_keys_req,
-                              const std::shared_ptr<fl::server::FBBuilder> &fbb) {
+                              const std::shared_ptr<FBBuilder> &fbb) {
   MS_LOG(INFO) << "CipherMgr::ExchangeKeys START";
   // step 0: judge if the input param is legal.
   if (exchange_keys_req == nullptr) {
@@ -93,7 +94,7 @@ bool CipherKeys::ExchangeKeys(const size_t cur_iterator, const std::string &next
   }
   std::string fl_id = exchange_keys_req->fl_id()->str();
   mindspore::fl::PBMetadata device_metas =
-    fl::server::DistributedMetadataStore::GetInstance().GetMetadata(fl::server::kCtxDeviceMetas);
+    fl::server::DistributedMetadataStore::GetInstance().GetMetadata(kCtxDeviceMetas);
   mindspore::fl::FLIdToDeviceMeta fl_id_to_meta = device_metas.device_metas();
   MS_LOG(INFO) << "exchange key for fl id " << fl_id;
   if (fl_id_to_meta.fl_id_to_meta().count(fl_id) == 0) {
@@ -106,13 +107,13 @@ bool CipherKeys::ExchangeKeys(const size_t cur_iterator, const std::string &next
   // step 1: get clientlist and client keys from memory server.
   std::map<std::string, std::vector<std::vector<uint8_t>>> client_public_keys;
   std::vector<std::string> client_list;
-  cipher_init_->cipher_meta_storage_.GetClientListFromServer(fl::server::kCtxExChangeKeysClientList, &client_list);
+  cipher_init_->cipher_meta_storage_.GetClientListFromServer(kCtxExChangeKeysClientList, &client_list);
 
-  std::string encrypt_type = ps::PSContext::instance()->encrypt_type();
-  if (encrypt_type == ps::kPWEncryptType) {
-    cipher_init_->cipher_meta_storage_.GetClientKeysFromServer(fl::server::kCtxClientsKeys, &client_public_keys);
+  std::string encrypt_type = FLContext::instance()->encrypt_type();
+  if (encrypt_type == kPWEncryptType) {
+    cipher_init_->cipher_meta_storage_.GetClientKeysFromServer(kCtxClientsKeys, &client_public_keys);
   } else {
-    cipher_init_->cipher_meta_storage_.GetStableClientKeysFromServer(fl::server::kCtxClientsKeys, &client_public_keys);
+    cipher_init_->cipher_meta_storage_.GetStableClientKeysFromServer(kCtxClientsKeys, &client_public_keys);
   }
 
   // step2: process new item data. and update new item data to memory server.
@@ -136,16 +137,16 @@ bool CipherKeys::ExchangeKeys(const size_t cur_iterator, const std::string &next
   }
 
   bool retcode_key;
-  if (encrypt_type == ps::kPWEncryptType) {
+  if (encrypt_type == kPWEncryptType) {
     retcode_key =
-      cipher_init_->cipher_meta_storage_.UpdateClientKeyToServer(fl::server::kCtxClientsKeys, exchange_keys_req);
+      cipher_init_->cipher_meta_storage_.UpdateClientKeyToServer(kCtxClientsKeys, exchange_keys_req);
   } else {
     retcode_key =
-      cipher_init_->cipher_meta_storage_.UpdateStableClientKeyToServer(fl::server::kCtxClientsKeys, exchange_keys_req);
+      cipher_init_->cipher_meta_storage_.UpdateStableClientKeyToServer(kCtxClientsKeys, exchange_keys_req);
   }
 
   bool retcode_client =
-    cipher_init_->cipher_meta_storage_.UpdateClientToServer(fl::server::kCtxExChangeKeysClientList, fl_id);
+    cipher_init_->cipher_meta_storage_.UpdateClientToServer(kCtxExChangeKeysClientList, fl_id);
   if (retcode_key && retcode_client) {
     MS_LOG(INFO) << "The client " << fl_id << " CipherMgr::ExchangeKeys Success";
     BuildExchangeKeysRsp(fbb, schema::ResponseCode_SUCCEED, "Success, but the server is not ready yet.", next_req_time,
@@ -157,9 +158,9 @@ bool CipherKeys::ExchangeKeys(const size_t cur_iterator, const std::string &next
                          cur_iterator);
     return false;
   }
-}  // namespace armour
+}
 
-void CipherKeys::BuildExchangeKeysRsp(const std::shared_ptr<fl::server::FBBuilder> &fbb,
+void CipherKeys::BuildExchangeKeysRsp(const std::shared_ptr<FBBuilder> &fbb,
                                       const schema::ResponseCode retcode, const std::string &reason,
                                       const std::string &next_req_time, const size_t iteration) {
   auto rsp_reason = fbb->CreateString(reason);
@@ -175,7 +176,7 @@ void CipherKeys::BuildExchangeKeysRsp(const std::shared_ptr<fl::server::FBBuilde
   return;
 }
 
-void CipherKeys::BuildGetKeysRsp(const std::shared_ptr<fl::server::FBBuilder> &fbb, const schema::ResponseCode retcode,
+void CipherKeys::BuildGetKeysRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
                                  const size_t iteration, const std::string &next_req_time, bool is_good) {
   if (!is_good) {
     auto fbs_next_req_time = fbb->CreateString(next_req_time);
@@ -189,7 +190,7 @@ void CipherKeys::BuildGetKeysRsp(const std::shared_ptr<fl::server::FBBuilder> &f
   }
 
   const fl::PBMetadata &clients_keys_pb_out =
-    fl::server::DistributedMetadataStore::GetInstance().GetMetadata(fl::server::kCtxClientsKeys);
+    fl::server::DistributedMetadataStore::GetInstance().GetMetadata(kCtxClientsKeys);
   const fl::ClientKeys &clients_keys_pb = clients_keys_pb_out.client_keys();
   std::vector<flatbuffers::Offset<schema::ClientPublicKeys>> public_keys_list;
   for (auto iter = clients_keys_pb.client_keys().begin(); iter != clients_keys_pb.client_keys().end(); ++iter) {
@@ -201,8 +202,8 @@ void CipherKeys::BuildGetKeysRsp(const std::shared_ptr<fl::server::FBBuilder> &f
     std::vector<uint8_t> pw_salt(keys_pb.pw_salt().begin(), keys_pb.pw_salt().end());
     auto fbs_pw_salt = fbb->CreateVector(pw_salt.data(), pw_salt.size());
 
-    std::string encrypt_type = ps::PSContext::instance()->encrypt_type();
-    if (encrypt_type == ps::kPWEncryptType) {
+    std::string encrypt_type = FLContext::instance()->encrypt_type();
+    if (encrypt_type == kPWEncryptType) {
       std::vector<uint8_t> cpk(keys_pb.key(0).begin(), keys_pb.key(0).end());
       std::vector<uint8_t> spk(keys_pb.key(1).begin(), keys_pb.key(1).end());
       auto fbs_c_pk = fbb->CreateVector(cpk.data(), cpk.size());
@@ -230,7 +231,7 @@ void CipherKeys::BuildGetKeysRsp(const std::shared_ptr<fl::server::FBBuilder> &f
   return;
 }
 
-void CipherKeys::BuildPkiVerifyGetKeysRsp(const std::shared_ptr<fl::server::FBBuilder> &fbb,
+void CipherKeys::BuildPkiVerifyGetKeysRsp(const std::shared_ptr<FBBuilder> &fbb,
                                           const schema::ResponseCode retcode, const size_t iteration,
                                           const std::string &next_req_time, bool is_good) {
   if (!is_good) {
@@ -244,7 +245,7 @@ void CipherKeys::BuildPkiVerifyGetKeysRsp(const std::shared_ptr<fl::server::FBBu
     return;
   }
   const fl::PBMetadata &clients_keys_pb_out =
-    fl::server::DistributedMetadataStore::GetInstance().GetMetadata(fl::server::kCtxClientsKeys);
+    fl::server::DistributedMetadataStore::GetInstance().GetMetadata(kCtxClientsKeys);
   const fl::ClientKeys &clients_keys_pb = clients_keys_pb_out.client_keys();
   std::vector<flatbuffers::Offset<schema::ClientPublicKeys>> public_keys_list;
   for (auto iter = clients_keys_pb.client_keys().begin(); iter != clients_keys_pb.client_keys().end(); ++iter) {
@@ -295,9 +296,10 @@ void CipherKeys::BuildPkiVerifyGetKeysRsp(const std::shared_ptr<fl::server::FBBu
 }
 
 void CipherKeys::ClearKeys() {
-  fl::server::DistributedMetadataStore::GetInstance().ResetMetadata(fl::server::kCtxExChangeKeysClientList);
-  fl::server::DistributedMetadataStore::GetInstance().ResetMetadata(fl::server::kCtxClientsKeys);
-  fl::server::DistributedMetadataStore::GetInstance().ResetMetadata(fl::server::kCtxGetKeysClientList);
+  fl::server::DistributedMetadataStore::GetInstance().ResetMetadata(kCtxExChangeKeysClientList);
+  fl::server::DistributedMetadataStore::GetInstance().ResetMetadata(kCtxClientsKeys);
+  fl::server::DistributedMetadataStore::GetInstance().ResetMetadata(kCtxGetKeysClientList);
 }
 }  // namespace armour
+}  // namespace fl
 }  // namespace mindspore

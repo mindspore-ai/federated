@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-#include "ps/core/communicator/communicator_base.h"
+#include "common/communicator/communicator_base.h"
 #include <memory>
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 CommunicatorBase::~CommunicatorBase() {
   running_ = false;
@@ -45,5 +45,5 @@ void CommunicatorBase::Join() {
 
 bool CommunicatorBase::running() const { return running_; }
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore

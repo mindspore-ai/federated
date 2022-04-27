@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "ps/core/communicator/http_message_handler.h"
+#include "common/communicator/http_message_handler.h"
 
 #include <event2/event.h>
 #include <event2/buffer.h>
@@ -35,7 +35,7 @@
 #include <functional>
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 void HttpMessageHandler::InitHttpMessage() {
   MS_EXCEPTION_IF_NULL(event_request_);
@@ -389,5 +389,5 @@ RequestProcessResult HttpMessageHandler::ParseNodeIdsFromKey(const std::string &
   return result;
 }
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore

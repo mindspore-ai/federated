@@ -18,11 +18,11 @@
 #define MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_HTTP_MSG_HANDLER_H_
 
 #include <memory>
-#include "ps/core/communicator/http_message_handler.h"
-#include "ps/core/communicator/message_handler.h"
+#include "common/communicator/http_message_handler.h"
+#include "common/communicator/message_handler.h"
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 constexpr int kHttpSuccess = 200;
 class HttpMsgHandler : public MessageHandler {
@@ -41,6 +41,6 @@ class HttpMsgHandler : public MessageHandler {
   size_t len_;
 };
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_HTTP_MSG_HANDLER_H_

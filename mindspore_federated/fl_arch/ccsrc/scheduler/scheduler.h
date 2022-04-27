@@ -14,33 +14,29 @@
  * limitations under the License.
  */
 
-#ifndef MINDSPORE_CCSRC_PS_SCHEDULER_H_
-#define MINDSPORE_CCSRC_PS_SCHEDULER_H_
+#ifndef MINDSPORE_FEDERATED_FL_ARCH_CCSRC_SCHEDULER_SCHEDULER_H_
+#define MINDSPORE_FEDERATED_FL_ARCH_CCSRC_SCHEDULER_SCHEDULER_H_
 
 #include <memory>
-#include "ps/core/scheduler_node.h"
-#include "ps/core/ps_scheduler_node.h"
-#include "ps/util.h"
-#include "ps/ps_context.h"
-#include "include/backend/visible.h"
+#include "common/core/scheduler_node.h"
+#include "python/fl_context.h"
+#include "common/utils/visible.h"
 
 namespace mindspore {
-namespace ps {
-class BACKEND_EXPORT Scheduler {
+namespace fl {
+class MS_EXPORT Scheduler {
  public:
   static Scheduler &GetInstance();
 
-  void Run();
+  bool Run();
 
  private:
   Scheduler() {
     if (scheduler_node_ == nullptr) {
-      bool is_fl_mode = PSContext::instance()->server_mode() == ps::kServerModeFL ||
-                        PSContext::instance()->server_mode() == ps::kServerModeHybrid;
+      bool is_fl_mode = FLContext::instance()->server_mode() == kServerModeFL ||
+                        FLContext::instance()->server_mode() == kServerModeHybrid;
       if (is_fl_mode) {
-        scheduler_node_ = std::make_unique<core::SchedulerNode>();
-      } else {
-        scheduler_node_ = std::make_unique<core::PSSchedulerNode>();
+        scheduler_node_ = std::make_unique<fl::core::SchedulerNode>();
       }
     }
   }
@@ -48,8 +44,8 @@ class BACKEND_EXPORT Scheduler {
   ~Scheduler() = default;
   Scheduler(const Scheduler &) = delete;
   Scheduler &operator=(const Scheduler &) = delete;
-  std::unique_ptr<core::SchedulerNode> scheduler_node_;
+  std::unique_ptr<fl::core::SchedulerNode> scheduler_node_;
 };
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_SCHEDULER_H_

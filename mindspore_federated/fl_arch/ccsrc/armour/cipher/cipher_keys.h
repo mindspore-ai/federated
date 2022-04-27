@@ -21,14 +21,14 @@
 #include <string>
 #include <memory>
 #include <map>
-#include "fl/armour/secure_protocol/secret_sharing.h"
-#include "proto/ps.pb.h"
-#include "utils/log_adapter.h"
-#include "fl/armour/cipher/cipher_init.h"
-#include "fl/armour/cipher/cipher_meta_storage.h"
-#include "fl/server/common.h"
+#include "armour/secure_protocol/secret_sharing.h"
+#include "common/utils/log_adapter.h"
+#include "armour/cipher/cipher_init.h"
+#include "armour/cipher/cipher_meta_storage.h"
+#include "common/common.h"
 
 namespace mindspore {
+namespace fl {
 namespace armour {
 
 // The process of exchange keys and get keys in the secure aggregation
@@ -45,23 +45,23 @@ class CipherKeys {
 
   // handle the client's request of get keys.
   bool GetKeys(const size_t cur_iterator, const std::string &next_req_time,
-               const schema::GetExchangeKeys *get_exchange_keys_req, const std::shared_ptr<fl::server::FBBuilder> &fbb);
+               const schema::GetExchangeKeys *get_exchange_keys_req, const std::shared_ptr<FBBuilder> &fbb);
 
   // handle the client's request of exchange keys.
   bool ExchangeKeys(const size_t cur_iterator, const std::string &next_req_time,
                     const schema::RequestExchangeKeys *exchange_keys_req,
-                    const std::shared_ptr<fl::server::FBBuilder> &fbb);
+                    const std::shared_ptr<FBBuilder> &fbb);
 
   // build response code of get keys.
-  void BuildGetKeysRsp(const std::shared_ptr<fl::server::FBBuilder> &fbb, const schema::ResponseCode retcode,
+  void BuildGetKeysRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
                        const size_t iteration, const std::string &next_req_time, bool is_good);
 
   // build response code of get keys in pki_verify mode.
-  void BuildPkiVerifyGetKeysRsp(const std::shared_ptr<fl::server::FBBuilder> &fbb, const schema::ResponseCode retcode,
+  void BuildPkiVerifyGetKeysRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
                                 const size_t iteration, const std::string &next_req_time, bool is_good);
 
   // build response code of exchange keys.
-  void BuildExchangeKeysRsp(const std::shared_ptr<fl::server::FBBuilder> &fbb, const schema::ResponseCode retcode,
+  void BuildExchangeKeysRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
                             const std::string &reason, const std::string &next_req_time, const size_t iteration);
   // clear the shared memory.
   void ClearKeys();
@@ -70,6 +70,7 @@ class CipherKeys {
   CipherInit *cipher_init_;  // the parameter of the secure aggregation
 };
 }  // namespace armour
+}  // namespace fl
 }  // namespace mindspore
 
 #endif  // MINDSPORE_CCSRC_ARMOUR_CIPHER_KEYS_H

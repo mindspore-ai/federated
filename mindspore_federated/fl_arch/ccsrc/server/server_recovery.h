@@ -23,11 +23,11 @@
 #include <string>
 #include <vector>
 #include <mutex>
-#include "fl/server/common.h"
-#include "ps/core/recovery_base.h"
-#include "ps/core/file_configuration.h"
-#include "ps/core/communicator/tcp_communicator.h"
-#include "ps/ps_context.h"
+#include "common/common.h"
+#include "common/core/recovery_base.h"
+#include "common/core/file_configuration.h"
+#include "common/communicator/tcp_communicator.h"
+#include "python/fl_context.h"
 
 namespace mindspore {
 namespace fl {
@@ -35,9 +35,9 @@ namespace server {
 constexpr auto kServerRecovery = "server_recovery";
 
 // The class helps server node to do recovery operation.
-// Different from the recovery process in ps/core/node_recovery.*, this class focus on recovery of the server data. For
+// Different from the recovery process in node_recovery.*, this class focus on recovery of the server data. For
 // example, current iteration number, learning rate, etc.
-class ServerRecovery : public ps::core::RecoveryBase {
+class ServerRecovery : public fl::core::RecoveryBase {
  public:
   ServerRecovery() : config_(nullptr), server_recovery_file_path_("") {}
   ~ServerRecovery() override = default;
@@ -49,11 +49,11 @@ class ServerRecovery : public ps::core::RecoveryBase {
   bool Save(uint64_t current_iter, InstanceState instance_state);
 
   // If this server recovers, need to notify cluster to reach consistency.
-  bool SyncAfterRecovery(const std::shared_ptr<ps::core::TcpCommunicator> &communicator, uint32_t rank_id);
+  bool SyncAfterRecovery(const std::shared_ptr<fl::core::TcpCommunicator> &communicator, uint32_t rank_id);
 
  private:
-  // This is the main config file set by ps context.
-  std::unique_ptr<ps::core::FileConfiguration> config_;
+  // This is the main config file set by fl context.
+  std::unique_ptr<fl::core::FileConfiguration> config_;
 
   // The server recovery file path.
   std::string server_recovery_file_path_;

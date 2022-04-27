@@ -22,23 +22,19 @@
 #include <vector>
 #include <utility>
 #include <unordered_map>
-#include "fl/server/common.h"
-#include "fl/server/kernel/params_info.h"
+#include "common/common.h"
+#include "server/kernel/params_info.h"
 
 namespace mindspore {
 namespace fl {
 namespace server {
 namespace kernel {
-// KernelFactory is used to select and build kernels in server. It's the base class of OptimizerKernelFactory
-// and AggregationKernelFactory.
-
+// KernelFactory is used to select and build kernels in server.
 // Unlike normal MindSpore operator kernels, the server defines multiple types of kernels. For example: Aggregation
-// Kernel, Optimizer Kernel, Forward Kernel, etc. So we define KernelFactory as a template class for register of all
+// Kernel, Forward Kernel, etc. So we define KernelFactory as a template class for register of all
 // types of kernels.
 
-// Because most information we need to create a server kernel is in func_graph passed by the front end, we create a
-// server kernel based on a cnode.
-
+// Create a server aggregation kernel
 // Typename K refers to the shared_ptr of the kernel type.
 // Typename C refers to the creator function of the kernel.
 template <typename K, typename C>
@@ -57,19 +53,16 @@ class KernelFactory {
     name_to_creator_map_[name].push_back(std::make_pair(params_info, creator));
   }
 
-  // The kernels in server are created from func_graph's kernel_node passed by the front end.
-  K Create(const std::string &name, const CNodePtr &kernel_node) {
+  K Create(const std::string &name) {
     if (name_to_creator_map_.count(name) == 0) {
       MS_LOG(ERROR) << "Creating kernel failed: " << name << " is not registered.";
     }
     for (const auto &name_type_creator : name_to_creator_map_[name]) {
       const ParamsInfo &params_info = name_type_creator.first;
       const C &creator = name_type_creator.second;
-      if (Matched(params_info, kernel_node)) {
-        auto kernel = creator();
-        kernel->set_params_info(params_info);
-        return kernel;
-      }
+      auto kernel = creator();
+      kernel->set_params_info(params_info);
+      return kernel;
     }
     return nullptr;
   }
@@ -79,7 +72,7 @@ class KernelFactory {
   KernelFactory &operator=(const KernelFactory &) = delete;
 
   // Judge whether the server kernel can be created according to registered ParamsInfo.
-  virtual bool Matched(const ParamsInfo &params_info, const CNodePtr &kernel_node) { return true; }
+  virtual bool Matched(const ParamsInfo &params_info) { return true; }
 
   // Generally, a server kernel can correspond to several ParamsInfo which is registered by the method 'Register' in
   // server kernel's *.cc files.

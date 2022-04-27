@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "fl/server/kernel/round/round_kernel_factory.h"
+#include "server/kernel/round/round_kernel_factory.h"
 
 namespace mindspore {
 namespace fl {

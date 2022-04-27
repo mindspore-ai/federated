@@ -20,17 +20,14 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "ps/core/communicator/communicator_base.h"
-#include "ps/core/communicator/tcp_communicator.h"
-#include "ps/core/communicator/task_executor.h"
-#include "ps/core/file_configuration.h"
-#ifdef ENABLE_ARMOUR
-#include "fl/armour/cipher/cipher_init.h"
-#endif
-#include "fl/server/common.h"
-#include "fl/server/executor.h"
-#include "fl/server/iteration.h"
-#include "include/backend/visible.h"
+#include "common/communicator/communicator_base.h"
+#include "common/communicator/tcp_communicator.h"
+#include "common/communicator/task_executor.h"
+#include "common/core/file_configuration.h"
+#include "armour/cipher/cipher_init.h"
+#include "common/common.h"
+#include "server/executor.h"
+#include "server/iteration.h"
 
 namespace mindspore {
 namespace fl {
@@ -39,12 +36,12 @@ namespace server {
 constexpr uint32_t kServerSleepTimeForNetworking = 1000;
 constexpr uint64_t kDefaultReplayAttackTimeDiff = 600000;
 // Class Server is the entrance of MindSpore's parameter server training mode and federated learning.
-class BACKEND_EXPORT Server {
+class MS_EXPORT Server {
  public:
   static Server &GetInstance();
 
   void Initialize(bool use_tcp, bool use_http, uint16_t http_port, const std::vector<RoundConfig> &rounds_config,
-                  const CipherConfig &cipher_config, const FuncGraphPtr &func_graph, size_t executor_threshold);
+                  const CipherConfig &cipher_config, size_t executor_threshold);
 
   // According to the current MindSpore framework, method Run is a step of the server pipeline. This method will be
   // blocked until the server is finalized.
@@ -117,7 +114,7 @@ class BACKEND_EXPORT Server {
   Server(const Server &) = delete;
   Server &operator=(const Server &) = delete;
 
-  // Load variables which is set by ps_context.
+  // Load variables which is set by fl_context.
   void InitServerContext();
 
   // Initialize the server cluster, server node and communicators.
@@ -125,7 +122,7 @@ class BACKEND_EXPORT Server {
   bool InitCommunicatorWithServer();
   bool InitCommunicatorWithWorker();
 
-  // Initialize iteration with rounds. Which rounds to use could be set by ps_context as well.
+  // Initialize iteration with rounds. Which rounds to use could be set by fl_context as well.
   void InitIteration();
 
   // Register all message and event callbacks for communicators(TCP and HTTP). This method must be called before
@@ -133,10 +130,10 @@ class BACKEND_EXPORT Server {
   void RegisterCommCallbacks();
 
   // Register cluster exception callbacks. This method is called in RegisterCommCallbacks.
-  void RegisterExceptionEventCallback(const std::shared_ptr<ps::core::TcpCommunicator> &communicator);
+  void RegisterExceptionEventCallback(const std::shared_ptr<fl::core::TcpCommunicator> &communicator);
 
   // Register message callbacks. These messages are mainly from scheduler.
-  void RegisterMessageCallback(const std::shared_ptr<ps::core::TcpCommunicator> &communicator);
+  void RegisterMessageCallback(const std::shared_ptr<fl::core::TcpCommunicator> &communicator);
 
   // Initialize executor according to the server mode.
   void InitExecutor();
@@ -167,26 +164,26 @@ class BACKEND_EXPORT Server {
   void ProcessAfterScalingIn();
 
   // Handlers for enableFLS/disableFLS requests from the scheduler.
-  void HandleEnableServerRequest(const std::shared_ptr<ps::core::MessageHandler> &message);
-  void HandleDisableServerRequest(const std::shared_ptr<ps::core::MessageHandler> &message);
+  void HandleEnableServerRequest(const std::shared_ptr<fl::core::MessageHandler> &message);
+  void HandleDisableServerRequest(const std::shared_ptr<fl::core::MessageHandler> &message);
 
   // Finish current instance and start a new one. FLPlan could be changed in this method.
-  void HandleNewInstanceRequest(const std::shared_ptr<ps::core::MessageHandler> &message);
+  void HandleNewInstanceRequest(const std::shared_ptr<fl::core::MessageHandler> &message);
 
   // Query current instance information.
-  void HandleQueryInstanceRequest(const std::shared_ptr<ps::core::MessageHandler> &message);
+  void HandleQueryInstanceRequest(const std::shared_ptr<fl::core::MessageHandler> &message);
 
   // Synchronize after recovery is completed to ensure consistency.
-  void HandleSyncAfterRecoveryRequest(const std::shared_ptr<ps::core::MessageHandler> &message);
+  void HandleSyncAfterRecoveryRequest(const std::shared_ptr<fl::core::MessageHandler> &message);
 
-  void HandleQueryNodeScaleStateRequest(const std::shared_ptr<ps::core::MessageHandler> &message);
+  void HandleQueryNodeScaleStateRequest(const std::shared_ptr<fl::core::MessageHandler> &message);
 
   // The server node is initialized in Server.
-  std::shared_ptr<ps::core::ServerNode> server_node_;
+  std::shared_ptr<fl::core::ServerNode> server_node_;
 
   // The task executor of the communicators. This helps server to handle network message concurrently. The tasks
   // submitted to this task executor is asynchronous.
-  std::shared_ptr<ps::core::TaskExecutor> task_executor_;
+  std::shared_ptr<fl::core::TaskExecutor> task_executor_;
 
   // Which protocol should communicators use.
   bool use_tcp_;
@@ -197,20 +194,17 @@ class BACKEND_EXPORT Server {
   std::vector<RoundConfig> rounds_config_;
   CipherConfig cipher_config_;
 
-  // The graph passed by the frontend without backend optimizing.
-  FuncGraphWeakPtr func_graph_;
-
   // The threshold count for executor to do aggregation or optimizing.
   size_t executor_threshold_;
 
   // Server need a tcp communicator to communicate with other servers for counting, metadata storing, collective
   // operations, etc.
-  std::shared_ptr<ps::core::CommunicatorBase> communicator_with_server_;
+  std::shared_ptr<fl::core::CommunicatorBase> communicator_with_server_;
 
   // The communication with workers(including mobile devices), has multiple protocol types: HTTP and TCP.
   // In some cases, both types should be supported in one distributed training job. So here we may have multiple
   // communicators.
-  std::vector<std::shared_ptr<ps::core::CommunicatorBase>> communicators_with_worker_;
+  std::vector<std::shared_ptr<fl::core::CommunicatorBase>> communicators_with_worker_;
 
   // Mutex for scaling operations.
   std::mutex scaling_mtx_;
@@ -226,9 +220,8 @@ class BACKEND_EXPORT Server {
   std::shared_ptr<ServerRecovery> server_recovery_;
 
   // Variables set by ps context.
-#ifdef ENABLE_ARMOUR
   armour::CipherInit *cipher_init_;
-#endif
+ 
   std::string scheduler_ip_;
   uint16_t scheduler_port_;
   uint32_t server_num_;

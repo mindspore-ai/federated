@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-#include "fl/armour/secure_protocol/masking.h"
+#include "armour/secure_protocol/masking.h"
 
 namespace mindspore {
+namespace fl {
 namespace armour {
 #ifdef _WIN32
 int Masking::GetMasking(std::vector<float> *noise, int noise_len, const uint8_t *seed, int seed_len,
@@ -58,4 +59,5 @@ int Masking::GetMasking(std::vector<float> *noise, int noise_len, const uint8_t 
 }
 #endif
 }  // namespace armour
+}  // namespace fl
 }  // namespace mindspore

@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-#include "ps/core/communicator/ssl_wrapper.h"
+#include "common/communicator/ssl_wrapper.h"
 
 #include <sys/time.h>
 #include <openssl/pem.h>
@@ -29,7 +29,7 @@
 #include <sstream>
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 SSLWrapper::SSLWrapper()
     : ssl_ctx_(nullptr),
@@ -42,7 +42,18 @@ SSLWrapper::SSLWrapper()
 SSLWrapper::~SSLWrapper() { CleanSSL(); }
 
 void SSLWrapper::InitSSL() {
-  CommUtil::InitOpensslLib();
+  if (!SSL_library_init()) {
+    MS_LOG(EXCEPTION) << "SSL_library_init failed.";
+  }
+  if (!ERR_load_crypto_strings()) {
+    MS_LOG(EXCEPTION) << "ERR_load_crypto_strings failed.";
+  }
+  if (!SSL_load_error_strings()) {
+    MS_LOG(EXCEPTION) << "SSL_load_error_strings failed.";
+  }
+  if (!OpenSSL_add_all_algorithms()) {
+    MS_LOG(EXCEPTION) << "OpenSSL_add_all_algorithms failed.";
+  }
   ssl_ctx_ = SSL_CTX_new(SSLv23_server_method());
   if (!ssl_ctx_) {
     MS_LOG(EXCEPTION) << "SSL_CTX_new failed";
@@ -53,22 +64,24 @@ void SSLWrapper::InitSSL() {
     MS_LOG(EXCEPTION) << "X509_STORE_set_default_paths failed";
   }
   std::unique_ptr<Configuration> config_ =
-    std::make_unique<FileConfiguration>(PSContext::instance()->config_file_path());
+    std::make_unique<FileConfiguration>(FLContext::instance()->config_file_path());
   MS_EXCEPTION_IF_NULL(config_);
   if (!config_->Initialize()) {
     MS_LOG(EXCEPTION) << "The config file is empty.";
   }
 
   // 1.Parse the server's certificate and the ciphertext of key.
+  std::string server_cert = kCertificateChain;
   std::string path = CommUtil::ParseConfig(*(config_), kServerCertPath);
   if (!CommUtil::IsFileExists(path)) {
     MS_LOG(EXCEPTION) << "The key:" << kServerCertPath << "'s value is not exist.";
   }
-  std::string server_cert = path;
+  server_cert = path;
+
   MS_LOG(INFO) << "The server cert path:" << server_cert;
 
   // 2. Parse the server password.
-  std::string server_password = PSContext::instance()->server_password();
+  std::string server_password = FLContext::instance()->server_password();
   if (server_password.empty()) {
     MS_LOG(EXCEPTION) << "The client password's value is empty.";
   }
@@ -94,7 +107,15 @@ void SSLWrapper::InitSSL() {
     MS_LOG(EXCEPTION) << "SSL use set cipher list failed!";
   }
 
-  // 3. load ca cert.
+  std::string crl_path = CommUtil::ParseConfig(*(config_), kCrlPath);
+  if (crl_path.empty()) {
+    MS_LOG(INFO) << "The crl path is empty.";
+  } else if (!CommUtil::checkCRLTime(crl_path)) {
+    MS_LOG(EXCEPTION) << "check crl time failed";
+  } else if (!CommUtil::VerifyCRL(cert, crl_path)) {
+    MS_LOG(EXCEPTION) << "Verify crl failed.";
+  }
+
   std::string ca_path = CommUtil::ParseConfig(*config_, kCaCertPath);
   if (!CommUtil::IsFileExists(ca_path)) {
     MS_LOG(WARNING) << "The key:" << kCaCertPath << "'s value is not exist.";
@@ -102,34 +123,22 @@ void SSLWrapper::InitSSL() {
   BIO *ca_bio = BIO_new_file(ca_path.c_str(), "r");
   MS_EXCEPTION_IF_NULL(ca_bio);
   X509 *caCert = PEM_read_bio_X509(ca_bio, nullptr, nullptr, nullptr);
-  X509_CRL *crl = nullptr;
-  std::string crl_path = CommUtil::ParseConfig(*(config_), kCrlPath);
-  if (crl_path.empty()) {
-    MS_LOG(INFO) << "The crl path is empty.";
-  } else if (!CommUtil::checkCRLTime(crl_path)) {
-    MS_LOG(EXCEPTION) << "check crl time failed";
-  } else if (!CommUtil::VerifyCRL(caCert, crl_path, &crl)) {
-    MS_LOG(EXCEPTION) << "Verify crl failed.";
-  }
 
   CommUtil::verifyCertPipeline(caCert, cert);
 
-  SSL_CTX_set_verify(ssl_ctx_, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, 0);
+  SSL_CTX_set_verify(ssl_ctx_, SSL_VERIFY_PEER, 0);
   if (!SSL_CTX_load_verify_locations(ssl_ctx_, ca_path.c_str(), nullptr)) {
     MS_LOG(EXCEPTION) << "SSL load ca location failed!";
   }
 
-  InitSSLCtx(cert, pkey, crl);
+  InitSSLCtx(cert, pkey);
   StartCheckCertTime(*config_, cert, ca_path);
 
   EVP_PKEY_free(pkey);
-  BIO_vfree(ca_bio);
-  if (crl != nullptr) {
-    X509_CRL_free(crl);
-  }
+  (void)BIO_free(ca_bio);
 }
 
-void SSLWrapper::InitSSLCtx(const X509 *cert, const EVP_PKEY *pkey, X509_CRL *crl) {
+void SSLWrapper::InitSSLCtx(const X509 *cert, const EVP_PKEY *pkey) {
   if (!SSL_CTX_use_certificate(ssl_ctx_, const_cast<X509 *>(cert))) {
     MS_LOG(EXCEPTION) << "SSL use certificate chain file failed!";
   }
@@ -148,24 +157,6 @@ void SSLWrapper::InitSSLCtx(const X509 *cert, const EVP_PKEY *pkey, X509_CRL *cr
   if (!SSL_CTX_set_mode(ssl_ctx_, SSL_MODE_AUTO_RETRY)) {
     MS_LOG(EXCEPTION) << "SSL set mode auto retry failed!";
   }
-
-  if (crl != nullptr) {
-    // Load CRL into the `X509_STORE`
-    X509_STORE *x509_store = SSL_CTX_get_cert_store(ssl_ctx_);
-    if (X509_STORE_add_crl(x509_store, crl) != 1) {
-      MS_LOG(EXCEPTION) << "ssl server X509_STORE add crl failed!";
-    }
-
-    // Enable CRL checking
-    X509_VERIFY_PARAM *param = SSL_CTX_get0_param(ssl_ctx_);
-    if (param == nullptr) {
-      MS_LOG(EXCEPTION) << "ssl server X509_VERIFY_PARAM is nullptr!";
-    }
-    if (X509_VERIFY_PARAM_set_flags(param, X509_V_FLAG_CRL_CHECK) != 1) {
-      MS_LOG(EXCEPTION) << "ssl server X509_VERIFY_PARAM set flag X509_V_FLAG_CRL_CHECK failed!";
-    }
-  }
-
   SSL_CTX_set_security_level(ssl_ctx_, kSecurityLevel);
 }
 
@@ -175,7 +166,6 @@ void SSLWrapper::CleanSSL() {
   }
   ERR_free_strings();
   EVP_cleanup();
-  ERR_remove_thread_state(nullptr);
   CRYPTO_cleanup_all_ex_data();
   StopCheckCertTime();
 }
@@ -271,5 +261,5 @@ void SSLWrapper::StopCheckCertTime() {
 
 SSL_CTX *SSLWrapper::GetSSLCtx(bool) { return ssl_ctx_; }
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore

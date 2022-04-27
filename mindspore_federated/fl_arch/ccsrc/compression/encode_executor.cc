@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "fl/compression/encode_executor.h"
+#include "compression/encode_executor.h"
 
 #include <arpa/inet.h>
 #include <cstdio>
@@ -26,7 +26,7 @@
 #include <map>
 #include <utility>
 #include <vector>
-#include "fl/server/common.h"
+#include "common/common.h"
 
 namespace mindspore {
 namespace fl {
@@ -85,7 +85,7 @@ bool CompressExecutor::quant_min_max(std::map<std::string, CompressWeight> *comp
 schema::CompressType CompressExecutor::GetCompressType(const flatbuffers::Vector<int8_t> *download_compress_types) {
   schema::CompressType compressType = schema::CompressType_NO_COMPRESS;
   schema::CompressType context_compress_type;
-  if (ps::PSContext::instance()->download_compress_type() == fl::server::kQuant) {
+  if (FLContext::instance()->download_compress_type() == kQuant) {
     context_compress_type = schema::CompressType_QUANT;
   } else {
     context_compress_type = schema::CompressType_NO_COMPRESS;

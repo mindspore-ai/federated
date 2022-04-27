@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-#include "fl/server/kernel/round/get_model_kernel.h"
+#include "server/kernel/round/get_model_kernel.h"
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
-#include "fl/server/iteration.h"
-#include "fl/server/model_store.h"
+#include "server/iteration.h"
+#include "server/model_store.h"
 
 namespace mindspore {
 namespace fl {
@@ -40,7 +40,7 @@ void GetModelKernel::InitKernel(size_t) {
 }
 
 bool GetModelKernel::Launch(const uint8_t *req_data, size_t len,
-                            const std::shared_ptr<ps::core::MessageHandler> &message) {
+                            const std::shared_ptr<fl::core::MessageHandler> &message) {
   std::shared_ptr<FBBuilder> fbb = std::make_shared<FBBuilder>();
   if (fbb == nullptr || req_data == nullptr) {
     std::string reason = "FBBuilder builder or req_data is nullptr.";
@@ -83,7 +83,7 @@ bool GetModelKernel::Reset() {
 }
 
 void GetModelKernel::GetModel(const schema::RequestGetModel *get_model_req,
-                              const std::shared_ptr<ps::core::MessageHandler> &message) {
+                              const std::shared_ptr<fl::core::MessageHandler> &message) {
   std::shared_ptr<FBBuilder> fbb = std::make_shared<FBBuilder>();
   if (fbb == nullptr) {
     std::string reason = "FBBuilder builder is nullptr.";
@@ -186,8 +186,8 @@ void GetModelKernel::BuildGetModelRsp(const std::shared_ptr<FBBuilder> &fbb, con
   // construct compress feature maps with fbs
   std::vector<flatbuffers::Offset<schema::CompressFeatureMap>> fbs_compress_feature_maps;
   for (const auto &compress_feature_map : compress_feature_maps) {
-    if (compress_feature_map.first.find(kMinVal) != string::npos ||
-        compress_feature_map.first.find(kMaxVal) != string::npos) {
+    if (compress_feature_map.first.find(kMinVal) != std::string::npos ||
+        compress_feature_map.first.find(kMaxVal) != std::string::npos) {
       continue;
     }
     auto fbs_compress_weight_fullname = fbb->CreateString(compress_feature_map.first);

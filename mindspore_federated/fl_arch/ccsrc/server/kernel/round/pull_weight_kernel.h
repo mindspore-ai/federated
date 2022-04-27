@@ -21,10 +21,10 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "fl/server/common.h"
-#include "fl/server/kernel/round/round_kernel.h"
-#include "fl/server/kernel/round/round_kernel_factory.h"
-#include "fl/server/executor.h"
+#include "common/common.h"
+#include "server/kernel/round/round_kernel.h"
+#include "server/kernel/round/round_kernel_factory.h"
+#include "server/executor.h"
 
 namespace mindspore {
 namespace fl {
@@ -37,7 +37,7 @@ class PullWeightKernel : public RoundKernel {
   ~PullWeightKernel() override = default;
 
   void InitKernel(size_t required_cnt) override;
-  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<ps::core::MessageHandler> &message) override;
+  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<fl::core::MessageHandler> &message) override;
   bool Reset() override;
 
  private:

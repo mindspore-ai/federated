@@ -24,7 +24,7 @@
 #include <iostream>
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 enum class RequestProcessResultCode { kSuccess = 0, kSystemError = 1, kInvalidInputs = 2 };
 class LogStream {
@@ -97,6 +97,6 @@ class RequestProcessResult {
   std::string msg_;
 };
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_REQUEST_PROCESS_RESULT_CODE_H_

@@ -15,7 +15,7 @@
  */
 
 include "cipher.fbs";
-namespace federated.schema;
+namespace mindspore.fl.schema;
 
 file_identifier "FLJ0";
 file_extension "fl";

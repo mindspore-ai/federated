@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "ps/core/communicator/tcp_message_handler.h"
+#include "common/communicator/tcp_message_handler.h"
 
 #include <arpa/inet.h>
 #include <iostream>
@@ -22,7 +22,7 @@
 #include <memory>
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 void TcpMessageHandler::SetCallback(const messageReceive &message_receive) { message_callback_ = message_receive; }
 
@@ -107,5 +107,5 @@ void TcpMessageHandler::Reset() {
   remaining_length_ = 0;
 }
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore

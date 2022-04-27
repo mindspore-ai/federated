@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "fl/server/executor.h"
+#include "server/executor.h"
 #include <set>
 #include <memory>
 #include <string>
@@ -23,8 +23,7 @@
 namespace mindspore {
 namespace fl {
 namespace server {
-void Executor::Initialize(const FuncGraphPtr &func_graph, size_t aggregation_count) {
-  MS_EXCEPTION_IF_NULL(func_graph);
+void Executor::Initialize(size_t aggregation_count) {
   MS_LOG(INFO) << "Start Initialize Executor.";
   if (aggregation_count == 0) {
     MS_LOG(EXCEPTION) << "Server aggregation count must be greater than 0";
@@ -34,7 +33,7 @@ void Executor::Initialize(const FuncGraphPtr &func_graph, size_t aggregation_cou
 
   // Initialize each trainable parameter's aggregator, including memory register, aggregation algorithms and
   // optimizers.
-  bool ret = InitParamAggregator(func_graph);
+  bool ret = InitParamAggregator();
   if (!ret) {
     MS_LOG(EXCEPTION) << "Initializing parameter aggregators failed.";
     return;
@@ -214,19 +213,15 @@ std::map<std::string, AddressPtr> Executor::GetModel() {
 const std::vector<std::string> &Executor::param_names() const { return param_names_; }
 
 bool Executor::Unmask() {
-#ifdef ENABLE_ARMOUR
   auto model = GetModel();
   return cipher_unmask_.UnMask(model);
-#else
-  return false;
-#endif
 }
 
 void Executor::set_unmasked(bool unmasked) { unmasked_ = unmasked; }
 
 bool Executor::unmasked() const {
-  std::string encrypt_type = ps::PSContext::instance()->encrypt_type();
-  if (encrypt_type == ps::kPWEncryptType) {
+  std::string encrypt_type = FLContext::instance()->encrypt_type();
+  if (encrypt_type == kPWEncryptType) {
     return unmasked_.load();
   } else {
     // If the algorithm of mind armour is not enabled, consider unmasked_ flag as true.
@@ -234,30 +229,10 @@ bool Executor::unmasked() const {
   }
 }
 
-std::string Executor::GetTrainableParamName(const CNodePtr &cnode) {
-  MS_EXCEPTION_IF_NULL(cnode);
-  std::string cnode_name = common::AnfAlgo::GetCNodeName(cnode);
-  if (kNameToIdxMap.count(cnode_name) == 0) {
-    return "";
-  }
-  const OptimParamNameToIndex &index_info = kNameToIdxMap.at(cnode_name);
-  size_t weight_idx = index_info.at("inputs").at(kWeight);
-  AnfNodePtr weight_node =
-    common::AnfAlgo::VisitKernelWithReturnType(common::AnfAlgo::GetInputNode(cnode, weight_idx), 0).first;
-  MS_EXCEPTION_IF_NULL(weight_node);
-  if (!weight_node->isa<Parameter>()) {
-    MS_LOG(EXCEPTION) << weight_idx << " input of " << cnode_name << " is not a Parameter.";
-    return "";
-  }
-  return weight_node->fullname_with_scope();
-}
-
-bool Executor::InitParamAggregator(const FuncGraphPtr &func_graph) {
-  MS_EXCEPTION_IF_NULL(func_graph);
-  const auto &cnodes = func_graph->GetOrderedCnodes();
-  for (const auto &cnode : cnodes) {
-    MS_EXCEPTION_IF_NULL(cnode);
-    const std::string &param_name = GetTrainableParamName(cnode);
+bool Executor::InitParamAggregator() {
+  const auto &feature_maps = FLContext::instance()->feature_maps();
+  for (const auto &feature_map : feature_maps) {
+    const std::string &param_name = feature_map.first;
     if (param_name.empty()) {
       continue;
     }
@@ -265,13 +240,11 @@ bool Executor::InitParamAggregator(const FuncGraphPtr &func_graph) {
       MS_LOG(WARNING) << param_name << " already has parameter aggregator registered.";
       continue;
     }
-
     std::shared_ptr<ParameterAggregator> param_aggr = std::make_shared<ParameterAggregator>();
-    MS_EXCEPTION_IF_NULL(param_aggr);
     param_names_.push_back(param_name);
     param_aggrs_[param_name] = param_aggr;
     parameter_mutex_[param_name];
-    if (!param_aggr->Init(cnode, aggregation_count_)) {
+    if (!param_aggr->Init(param_name, aggregation_count_)) {
       MS_LOG(EXCEPTION) << "Initializing parameter aggregator for param_name " << param_name << " failed.";
       return false;
     }

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "fl/server/iteration_timer.h"
+#include "server/iteration_timer.h"
 
 namespace mindspore {
 namespace fl {
@@ -26,7 +26,7 @@ IterationTimer::~IterationTimer() {
       monitor_thread_.join();
     }
   } catch (std::exception &e) {
-    MS_LOG(ERROR) << "monitor thread join failed: " << e.what();
+    MS_LOG(ERROR) << "Catch exception: " << e.what();
   }
 }
 

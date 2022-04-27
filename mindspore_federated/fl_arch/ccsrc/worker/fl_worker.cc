@@ -18,9 +18,8 @@
 #include <string>
 #include <vector>
 #include <utility>
-#include "fl/worker/fl_worker.h"
-#include "fl/armour/secure_protocol/key_agreement.h"
-#include "utils/ms_exception.h"
+#include "worker/fl_worker.h"
+#include "armour/secure_protocol/key_agreement.h"
 
 namespace mindspore {
 namespace fl {
@@ -30,40 +29,40 @@ FLWorker &FLWorker::GetInstance() {
   return instance;
 }
 
-void FLWorker::Run() {
+bool FLWorker::Run() {
   if (running_.load()) {
-    return;
+    return false;
   }
   running_ = true;
-  worker_num_ = ps::PSContext::instance()->worker_num();
-  server_num_ = ps::PSContext::instance()->server_num();
-  scheduler_ip_ = ps::PSContext::instance()->scheduler_ip();
-  scheduler_port_ = ps::PSContext::instance()->scheduler_port();
-  worker_step_num_per_iteration_ = ps::PSContext::instance()->worker_step_num_per_iteration();
-  ps::PSContext::instance()->cluster_config().scheduler_host = scheduler_ip_;
-  ps::PSContext::instance()->cluster_config().scheduler_port = scheduler_port_;
-  ps::PSContext::instance()->cluster_config().initial_worker_num = worker_num_;
-  ps::PSContext::instance()->cluster_config().initial_server_num = server_num_;
+  worker_num_ = FLContext::instance()->initial_worker_num();
+  server_num_ = FLContext::instance()->initial_server_num();
+  scheduler_ip_ = FLContext::instance()->scheduler_ip();
+  scheduler_port_ = FLContext::instance()->scheduler_port();
+  worker_step_num_per_iteration_ = FLContext::instance()->worker_step_num_per_iteration();
+  FLContext::instance()->cluster_config().scheduler_ip = scheduler_ip_;
+  FLContext::instance()->cluster_config().scheduler_port = scheduler_port_;
+  FLContext::instance()->cluster_config().initial_worker_num = worker_num_;
+  FLContext::instance()->cluster_config().initial_server_num = server_num_;
   MS_LOG(INFO) << "Initialize cluster config for worker. Worker number:" << worker_num_
                << ", Server number:" << server_num_ << ", Scheduler ip:" << scheduler_ip_
                << ", Scheduler port:" << scheduler_port_
                << ", Worker training step per iteration:" << worker_step_num_per_iteration_;
 
-  worker_node_ = std::make_shared<ps::core::WorkerNode>();
+  worker_node_ = std::make_shared<fl::core::WorkerNode>();
   MS_EXCEPTION_IF_NULL(worker_node_);
 
   worker_node_->SetCancelSafeModeCallBack([this]() -> void { safemode_ = false; });
-  worker_node_->RegisterEventCallback(ps::core::ClusterEvent::SCHEDULER_TIMEOUT, [this]() {
+  worker_node_->RegisterEventCallback(fl::core::ClusterEvent::SCHEDULER_TIMEOUT, [this]() {
     Finalize();
     running_ = false;
     try {
       MS_LOG(EXCEPTION)
         << "Event SCHEDULER_TIMEOUT is captured. This is because scheduler node is finalized or crashed.";
     } catch (std::exception &e) {
-      MsException::Instance().SetException();
+      MS_LOG(ERROR) << "Catch exception: " << e.what();
     }
   });
-  worker_node_->RegisterEventCallback(ps::core::ClusterEvent::NODE_TIMEOUT, [this]() {
+  worker_node_->RegisterEventCallback(fl::core::ClusterEvent::NODE_TIMEOUT, [this]() {
     Finalize();
     running_ = false;
     try {
@@ -71,19 +70,19 @@ void FLWorker::Run() {
         << "Event NODE_TIMEOUT is captured. This is because some server nodes are finalized or crashed after the "
            "network building phase.";
     } catch (std::exception &e) {
-      MsException::Instance().SetException();
+      MS_LOG(ERROR) << "Catch exception: " << e.what();
     }
   });
 
   InitializeFollowerScaler();
   if (!worker_node_->Start()) {
     MS_LOG(EXCEPTION) << "Starting worker node failed.";
-    return;
+    return false;
   }
   rank_id_ = worker_node_->rank_id();
 
   std::this_thread::sleep_for(std::chrono::milliseconds(kWorkerSleepTimeForNetworking));
-  return;
+  return true;
 }
 
 void FLWorker::Finalize() {
@@ -102,7 +101,7 @@ void FLWorker::Finalize() {
   }
 }
 
-bool FLWorker::SendToServer(uint32_t server_rank, const void *data, size_t size, ps::core::TcpUserCommand command,
+bool FLWorker::SendToServer(uint32_t server_rank, const void *data, size_t size, fl::core::TcpUserCommand command,
                             std::shared_ptr<std::vector<unsigned char>> *output) {
   MS_EXCEPTION_IF_NULL(data);
   // If the worker is in safemode, do not communicate with server.
@@ -111,7 +110,7 @@ bool FLWorker::SendToServer(uint32_t server_rank, const void *data, size_t size,
   }
   if (output != nullptr) {
     while (true) {
-      if (!worker_node_->Send(ps::core::NodeRole::SERVER, server_rank, data, size, static_cast<int>(command), output,
+      if (!worker_node_->Send(fl::core::NodeRole::SERVER, server_rank, data, size, static_cast<int>(command), output,
                               kWorkerTimeout)) {
         MS_LOG(ERROR) << "Sending message to server " << server_rank << " failed.";
         return false;
@@ -122,7 +121,7 @@ bool FLWorker::SendToServer(uint32_t server_rank, const void *data, size_t size,
       }
 
       std::string response_str = std::string(reinterpret_cast<char *>((*output)->data()), (*output)->size());
-      if (response_str == ps::kClusterSafeMode || response_str == ps::kJobNotAvailable) {
+      if (response_str == kClusterSafeMode || response_str == kJobNotAvailable) {
         MS_LOG(INFO) << "The server " << server_rank << " is in safemode or finished.";
         std::this_thread::sleep_for(std::chrono::milliseconds(kWorkerRetryDurationForSafeMode));
       } else {
@@ -130,7 +129,7 @@ bool FLWorker::SendToServer(uint32_t server_rank, const void *data, size_t size,
       }
     }
   } else {
-    if (!worker_node_->Send(ps::core::NodeRole::SERVER, server_rank, data, size, static_cast<int>(command), nullptr,
+    if (!worker_node_->Send(fl::core::NodeRole::SERVER, server_rank, data, size, static_cast<int>(command), nullptr,
                             kWorkerTimeout)) {
       MS_LOG(ERROR) << "Sending message to server " << server_rank << " failed.";
       return false;
@@ -185,7 +184,7 @@ std::vector<uint8_t> FLWorker::pw_iv() const { return pw_iv_; }
 
 std::vector<EncryptPublicKeys> FLWorker::public_keys_list() const { return public_keys_list_; }
 
-std::string FLWorker::fl_name() const { return ps::kServerModeFL; }
+std::string FLWorker::fl_name() const { return kServerModeFL; }
 
 std::string FLWorker::fl_id() const { return std::to_string(rank_id_); }
 
@@ -207,9 +206,9 @@ void FLWorker::InitializeFollowerScaler() {
                                                            std::bind(&FLWorker::ProcessAfterScalingOut, this));
   worker_node_->RegisterFollowerScalerHandlerAfterScaleIn("WorkerPipeline",
                                                           std::bind(&FLWorker::ProcessAfterScalingIn, this));
-  worker_node_->RegisterCustomEventCallback(static_cast<uint32_t>(ps::UserDefineEvent::kIterationRunning),
+  worker_node_->RegisterCustomEventCallback(static_cast<uint32_t>(UserDefineEvent::kIterationRunning),
                                             std::bind(&FLWorker::HandleIterationRunningEvent, this));
-  worker_node_->RegisterCustomEventCallback(static_cast<uint32_t>(ps::UserDefineEvent::kIterationCompleted),
+  worker_node_->RegisterCustomEventCallback(static_cast<uint32_t>(UserDefineEvent::kIterationCompleted),
                                             std::bind(&FLWorker::HandleIterationCompletedEvent, this));
 }
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "fl/server/kernel/round/exchange_keys_kernel.h"
+#include "server/kernel/round/exchange_keys_kernel.h"
 #include <vector>
 #include <utility>
 #include <memory>
@@ -98,8 +98,8 @@ sigVerifyResult ExchangeKeysKernel::VerifySignature(const schema::RequestExchang
   size_t cpk_len = fbs_cpk->size();
   std::vector<uint8_t> cpk(cpk_len);
   std::vector<uint8_t> spk(spk_len);
-  bool ret_create_code_cpk = mindspore::armour::CreateArray<uint8_t>(&cpk, *fbs_cpk);
-  bool ret_create_code_spk = mindspore::armour::CreateArray<uint8_t>(&spk, *fbs_spk);
+  bool ret_create_code_cpk = armour::CreateArray<uint8_t>(&cpk, *fbs_cpk);
+  bool ret_create_code_spk = armour::CreateArray<uint8_t>(&spk, *fbs_spk);
   if (!(ret_create_code_cpk && ret_create_code_spk)) {
     MS_LOG(ERROR) << "create array for public keys failed";
     return sigVerifyResult::FAILED;
@@ -110,7 +110,7 @@ sigVerifyResult ExchangeKeysKernel::VerifySignature(const schema::RequestExchang
   (void)src_data.insert(src_data.end(), spk.begin(), spk.end());
   (void)src_data.insert(src_data.end(), timestamp.begin(), timestamp.end());
   (void)src_data.insert(src_data.end(), iter_str.begin(), iter_str.end());
-  auto certVerify = mindspore::ps::server::CertVerify::GetInstance();
+  auto certVerify = CertVerify::GetInstance();
   unsigned char srcDataHash[SHA256_DIGEST_LENGTH];
   certVerify.sha256Hash(src_data.data(), SizeToInt(src_data.size()), srcDataHash, SHA256_DIGEST_LENGTH);
   if (!certVerify.verifyRSAKey(key_attestations[fl_id], srcDataHash, signature.data(), SHA256_DIGEST_LENGTH)) {
@@ -124,12 +124,12 @@ sigVerifyResult ExchangeKeysKernel::VerifySignature(const schema::RequestExchang
 }
 
 bool ExchangeKeysKernel::Launch(const uint8_t *req_data, size_t len,
-                                const std::shared_ptr<ps::core::MessageHandler> &message) {
+                                const std::shared_ptr<fl::core::MessageHandler> &message) {
   size_t iter_num = LocalMetaStore::GetInstance().curr_iter_num();
   MS_LOG(INFO) << "Launching ExchangeKey kernel, ITERATION NUMBER IS : " << iter_num;
   bool response = false;
 
-  std::shared_ptr<server::FBBuilder> fbb = std::make_shared<server::FBBuilder>();
+  std::shared_ptr<FBBuilder> fbb = std::make_shared<FBBuilder>();
   if (fbb == nullptr || req_data == nullptr) {
     std::string reason = "FBBuilder builder or req_data is nullptr.";
     MS_LOG(ERROR) << reason;
@@ -161,7 +161,7 @@ bool ExchangeKeysKernel::Launch(const uint8_t *req_data, size_t len,
   }
 
   // verify signature
-  if (ps::PSContext::instance()->pki_verify()) {
+  if (FLContext::instance()->pki_verify()) {
     sigVerifyResult verify_result = VerifySignature(exchange_keys_req);
     if (verify_result == sigVerifyResult::FAILED) {
       std::string reason = "verify signature failed.";

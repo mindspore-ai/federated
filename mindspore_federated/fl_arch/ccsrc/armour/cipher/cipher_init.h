@@ -19,14 +19,14 @@
 
 #include <vector>
 #include <string>
-#include "fl/armour/secure_protocol/secret_sharing.h"
-#include "proto/ps.pb.h"
-#include "utils/log_adapter.h"
+#include "armour/secure_protocol/secret_sharing.h"
+#include "common/utils/log_adapter.h"
 #include "schema/fl_job_generated.h"
 #include "schema/cipher_generated.h"
-#include "fl/armour/cipher/cipher_meta_storage.h"
+#include "armour/cipher/cipher_meta_storage.h"
 
 namespace mindspore {
+namespace fl {
 namespace armour {
 
 // Initialization of secure aggregation.
@@ -78,6 +78,7 @@ class CipherInit {
   std::string new_prime_;
 };
 }  // namespace armour
+}  // namespace fl
 }  // namespace mindspore
 
 #endif  // MINDSPORE_CCSRC_ARMOUR_CIPHER_COMMON_H

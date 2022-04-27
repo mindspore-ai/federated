@@ -30,9 +30,9 @@
 #include <utility>
 #include "schema/fl_job_generated.h"
 #include "schema/cipher_generated.h"
-#include "fl/server/model_store.h"
-#include "fl/server/common.h"
-#include "ps/ps_context.h"
+#include "server/model_store.h"
+#include "common/common.h"
+#include "python/fl_context.h"
 
 namespace mindspore {
 namespace fl {

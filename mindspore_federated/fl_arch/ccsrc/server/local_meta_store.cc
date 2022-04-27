@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "fl/server/local_meta_store.h"
+#include "server/local_meta_store.h"
 
 namespace mindspore {
 namespace fl {

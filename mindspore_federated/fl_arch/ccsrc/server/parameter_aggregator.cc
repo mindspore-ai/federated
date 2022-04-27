@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "fl/server/parameter_aggregator.h"
+#include "server/parameter_aggregator.h"
 #include <map>
 #include <memory>
 #include <string>
@@ -25,23 +25,17 @@
 namespace mindspore {
 namespace fl {
 namespace server {
-bool ParameterAggregator::Init(const CNodePtr &cnode, size_t threshold_count) {
-  MS_EXCEPTION_IF_NULL(cnode);
+bool ParameterAggregator::Init(const std::string &param_name, size_t threshold_count) {
   memory_register_ = std::make_shared<MemoryRegister>();
-  MS_EXCEPTION_IF_NULL(memory_register_);
 
   required_push_count_ = threshold_count;
   // The required_pull_count_ is the count for Pull, which should be the same as required_push_count_.
   // required_pull_count_ normally used in parameter server training mode.
   required_pull_count_ = threshold_count;
 
-  MS_LOG(INFO) << "Start initializing kernels for " << common::AnfAlgo::GetCNodeName(cnode);
-  if (!InitAggregationKernels(cnode)) {
+  MS_LOG(INFO) << "Start initializing kernels for " << param_name;
+  if (!InitAggregationKernels(param_name)) {
     MS_LOG(EXCEPTION) << "Initializing aggregation kernels failed.";
-    return false;
-  }
-  if (!InitOptimizerKernels(cnode)) {
-    MS_LOG(EXCEPTION) << "Initializing optimizer kernels failed.";
     return false;
   }
   return true;
@@ -133,8 +127,6 @@ void ParameterAggregator::ResetAggregationStatus() {
   return;
 }
 
-void ParameterAggregator::ResetOptimizingStatus() { optimizing_done_ = false; }
-
 void ParameterAggregator::ResetPullingStatus() {
   pulling_done_ = false;
   current_pull_count_ = 0;
@@ -163,34 +155,24 @@ bool ParameterAggregator::RunAggregation() {
   return true;
 }
 
-bool ParameterAggregator::IsOptimizingDone() const { return optimizing_done_; }
-
 bool ParameterAggregator::IsPullingDone() const { return pulling_done_; }
 
 bool ParameterAggregator::requires_aggr() const { return requires_aggr_; }
 
-bool ParameterAggregator::InitAggregationKernels(const CNodePtr &cnode) {
-  MS_EXCEPTION_IF_NULL(cnode);
-  if (!JudgeRequiredAggr(cnode)) {
-    MS_LOG(WARNING) << "Aggregation for weight of kernel " << common::AnfAlgo::GetCNodeName(cnode)
-                    << " is not required.";
-  }
-
-  std::vector<std::string> aggr_kernel_names = SelectAggregationAlgorithm(cnode);
+bool ParameterAggregator::InitAggregationKernels(const std::string &param_name) {
+  std::vector<std::string> aggr_kernel_names = SelectAggregationAlgorithm();
   for (const std::string &name : aggr_kernel_names) {
-    auto aggr_kernel = kernel::AggregationKernelFactory::GetInstance().Create(name, cnode);
+    auto aggr_kernel = kernel::AggregationKernelFactory::GetInstance().Create(name);
     if (aggr_kernel == nullptr) {
-      MS_LOG(EXCEPTION) << "Fail to create aggregation kernel " << name << " for "
-                        << common::AnfAlgo::GetCNodeName(cnode);
+      MS_LOG(EXCEPTION) << "Fail to create aggregation kernel " << name ;
       return false;
     }
 
     // set_done_count must be called before InitKernel because InitKernel may use this count.
     aggr_kernel->set_done_count(required_push_count_);
-    aggr_kernel->InitKernel(cnode);
+    aggr_kernel->InitKernel(param_name);
 
-    const ReuseKernelNodeInfo &reuse_kernel_node_inputs_info = aggr_kernel->reuse_kernel_node_inputs_info();
-    if (!AssignMemory(aggr_kernel, cnode, reuse_kernel_node_inputs_info, memory_register_)) {
+    if (!AssignMemory(param_name, aggr_kernel, memory_register_)) {
       MS_LOG(EXCEPTION) << "Assigning memory for kernel " << name << " failed.";
       return false;
     }
@@ -203,59 +185,36 @@ bool ParameterAggregator::InitAggregationKernels(const CNodePtr &cnode) {
   return true;
 }
 
-bool ParameterAggregator::InitOptimizerKernels(const CNodePtr &) {
-  if (ps::PSContext::instance()->server_mode() == ps::kServerModeFL ||
-      ps::PSContext::instance()->server_mode() == ps::kServerModeHybrid) {
-    MS_LOG(INFO) << "Federated learning mode doesn't need optimizer kernel.";
-    return true;
-  }
-  return false;
-}
-
-template <typename K>
-bool ParameterAggregator::AssignMemory(const K server_kernel, const CNodePtr &cnode,
-                                       const ReuseKernelNodeInfo &reuse_kernel_node_inputs_info,
+bool ParameterAggregator::AssignMemory(const std::string &param_name, std::shared_ptr<kernel::AggregationKernelMod> server_kernel,
                                        const std::shared_ptr<MemoryRegister> &memory_register) {
   MS_EXCEPTION_IF_NULL(server_kernel);
-  MS_EXCEPTION_IF_NULL(cnode);
   MS_EXCEPTION_IF_NULL(memory_register);
-
-  const std::vector<std::string> &input_names = server_kernel->input_names();
   const std::vector<size_t> &input_size_list = server_kernel->GetInputSizeList();
-  if (input_names.size() != input_size_list.size()) {
-    MS_LOG(EXCEPTION) << "Server kernel " << typeid(server_kernel.get()).name()
-                      << " input number is not matched: input_names size is " << input_names.size()
-                      << ", input_size_list size is " << input_size_list.size();
-    return false;
-  }
-
-  if (reuse_kernel_node_inputs_info.size() > input_names.size()) {
-    MS_LOG(EXCEPTION) << "The reuse kernel node information number is invalid: got "
-                      << reuse_kernel_node_inputs_info.size() << ", but input_names size is " << input_names.size();
-    return false;
-  }
+  const std::vector<std::string> &input_names = server_kernel->input_names();
+  MS_LOG(INFO) << "The input names are " << input_names;
+  auto &feature_maps = FLContext::instance()->feature_maps();
 
   for (size_t i = 0; i < input_names.size(); i++) {
-    const std::string &name = input_names[i];
-    if (memory_register->addresses().count(name) != 0) {
-      MS_LOG(DEBUG) << "The memory for " << name << " is already assigned.";
+    const std::string &input_name = input_names[i];
+    if (memory_register->addresses().count(input_name) != 0) {
+      MS_LOG(DEBUG) << "The memory for " << input_name << " is already assigned.";
       continue;
     }
-    if (reuse_kernel_node_inputs_info.count(name) != 0) {
-      // Reusing memory of the kernel node means the memory of the input is already assigned by the front end, which
-      // is to say, the input node is a parameter node.
-      size_t index = reuse_kernel_node_inputs_info.at(name);
-      MS_LOG(INFO) << "Try to reuse memory of kernel node " << common::AnfAlgo::GetCNodeName(cnode) << " for parameter "
-                   << name << ", kernel node index " << index;
-      AddressPtr input_addr = GenerateParameterNodeAddrPtr(cnode, index);
-      MS_EXCEPTION_IF_NULL(input_addr);
-      memory_register->RegisterAddressPtr(name, input_addr);
-    } else {
-      MS_LOG(INFO) << "Assign new memory for " << name;
-      auto input_addr = std::make_unique<char[]>(input_size_list[i]);
-      MS_EXCEPTION_IF_NULL(input_addr);
-      memory_register->RegisterArray(name, &input_addr, input_size_list[i]);
+    size_t size = input_size_list[i];
+    auto input_addr = std::make_unique<char[]>(size);
+    if (input_name == kWeight) {
+      const auto& feature_map = feature_maps[param_name];
+      const auto& weight_data = feature_map.weight_data;
+      float data[weight_data.size()];
+      std::copy(weight_data.begin(), weight_data.end(), data);
+      int ret = memcpy_s(input_addr.get(), size, data, size);
+      if (ret != 0) {
+        MS_LOG(ERROR) << "memcpy_s error, errorno(" << ret << ")";
+        return false;
+      }
     }
+    memory_register->RegisterArray(input_name, &input_addr, size);
+    MS_LOG(INFO) << "Assign new memory for " << input_name;
   }
   return true;
 }
@@ -284,54 +243,16 @@ bool ParameterAggregator::GenerateAggregationKernelParams(
   return true;
 }
 
-std::vector<std::string> ParameterAggregator::SelectAggregationAlgorithm(const CNodePtr &) {
+std::vector<std::string> ParameterAggregator::SelectAggregationAlgorithm() {
   std::vector<std::string> aggregation_algorithm = {};
-  if (ps::PSContext::instance()->server_mode() == ps::kServerModeFL ||
-      ps::PSContext::instance()->server_mode() == ps::kServerModeHybrid) {
-    (void)aggregation_algorithm.emplace_back("FedAvg");
-  } else if (ps::PSContext::instance()->server_mode() == ps::kServerModePS) {
-    (void)aggregation_algorithm.emplace_back("DenseGradAccum");
-  } else {
-    MS_LOG(EXCEPTION) << "Server doesn't support mode " << ps::PSContext::instance()->server_mode();
-    return aggregation_algorithm;
-  }
-
+  (void)aggregation_algorithm.emplace_back("FedAvg");
   MS_LOG(INFO) << "Aggregation algorithm selection result: " << aggregation_algorithm;
   return aggregation_algorithm;
 }
 
-bool ParameterAggregator::JudgeRequiredAggr(const CNodePtr &cnode) {
-  MS_EXCEPTION_IF_NULL(cnode);
-  std::string cnode_name = common::AnfAlgo::GetCNodeName(cnode);
-  if (kNameToIdxMap.count(cnode_name) == 0 || kNameToIdxMap.at(cnode_name).count("inputs") == 0 ||
-      kNameToIdxMap.at(cnode_name).at("inputs").count("weight") == 0) {
-    MS_LOG(EXCEPTION) << "Can't find index info of weight for kernel " << cnode_name;
-    return false;
-  }
-  size_t cnode_weight_idx = kNameToIdxMap.at(cnode_name).at("inputs").at("weight");
-  auto weight_node =
-    common::AnfAlgo::VisitKernelWithReturnType(common::AnfAlgo::GetInputNode(cnode, cnode_weight_idx), 0).first;
-  MS_EXCEPTION_IF_NULL(weight_node);
-
-  if (!weight_node->isa<Parameter>()) {
-    MS_LOG(EXCEPTION) << weight_node->fullname_with_scope() << " is not a parameter.";
-    return false;
-  }
-  auto param_info = weight_node->cast<ParameterPtr>()->param_info();
-  MS_EXCEPTION_IF_NULL(param_info);
-  requires_aggr_ = param_info->requires_aggr();
-  return requires_aggr_;
+bool ParameterAggregator::JudgeRequiredAggr() {
+  return true;
 }
-
-template bool ParameterAggregator::AssignMemory(std::shared_ptr<kernel::OptimizerKernelMod> server_kernel,
-                                                const CNodePtr &cnode,
-                                                const ReuseKernelNodeInfo &reuse_kernel_node_inputs_info,
-                                                const std::shared_ptr<MemoryRegister> &memory_register);
-
-template bool ParameterAggregator::AssignMemory(std::shared_ptr<kernel::AggregationKernelMod> server_kernel,
-                                                const CNodePtr &cnode,
-                                                const ReuseKernelNodeInfo &reuse_kernel_node_inputs_info,
-                                                const std::shared_ptr<MemoryRegister> &memory_register);
 }  // namespace server
 }  // namespace fl
 }  // namespace mindspore

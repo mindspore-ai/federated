@@ -34,14 +34,14 @@
 #include <memory>
 #include <vector>
 
-#include "ps/core/comm_util.h"
-#include "utils/log_adapter.h"
-#include "ps/core/communicator/request_process_result_code.h"
+#include "common/core/comm_util.h"
+#include "common/utils/log_adapter.h"
+#include "common/communicator/request_process_result_code.h"
 #include "nlohmann/json.hpp"
-#include "ps/constants.h"
+#include "common/constants.h"
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 using HttpHeaders = std::map<std::string, std::list<std::string>>;
 
@@ -135,6 +135,6 @@ class HttpMessageHandler {
   nlohmann::json request_message_;
 };
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_HTTP_MESSAGE_HANDLER_H_

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-namespace federated.schema;
+namespace mindspore.fl.schema;
 
 table PWParams {
   t:int;

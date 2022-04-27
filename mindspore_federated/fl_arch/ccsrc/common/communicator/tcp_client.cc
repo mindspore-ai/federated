@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "ps/core/communicator/tcp_client.h"
+#include "common/communicator/tcp_client.h"
 
 #include <arpa/inet.h>
 #include <event2/buffer.h>
@@ -31,7 +31,7 @@
 #include <utility>
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 event_base *TcpClient::event_base_ = nullptr;
 std::mutex TcpClient::event_base_mutex_;
@@ -120,7 +120,7 @@ void TcpClient::Init() {
   sin.sin_addr.s_addr = inet_addr(server_address_.c_str());
   sin.sin_port = htons(server_port_);
 
-  if (!PSContext::instance()->enable_ssl()) {
+  if (!FLContext::instance()->enable_ssl()) {
     MS_LOG(INFO) << "SSL is disable.";
     buffer_event_ = bufferevent_socket_new(event_base_, -1, BEV_OPT_CLOSE_ON_FREE | BEV_OPT_THREADSAFE);
   } else {
@@ -275,20 +275,10 @@ void TcpClient::EventCallbackInner(struct bufferevent *bev, std::int16_t events)
     MS_LOG(INFO) << "Client connected! Peer " << PeerRoleName() << " ip: " << server_address_
                  << ", port: " << server_port_;
   } else if (events & BEV_EVENT_ERROR) {
-    if (PSContext::instance()->enable_ssl()) {
-      uint64_t err = bufferevent_get_openssl_error(bev);
-      const uint64_t server_not_start_err = 5;
-      if (err != server_not_start_err) {
-        MS_LOG(WARNING) << "The error number is:" << err << ", error message:" << ERR_reason_error_string(err)
-                        << ", the error lib:" << ERR_lib_error_string(err)
-                        << ", the error func:" << ERR_func_error_string(err);
-        return;
-      }
-    }
+    MS_LOG(WARNING) << "The client will retry to connect to the server! Peer " << PeerRoleName()
+                    << " ip: " << server_address_ << ", port: " << server_port_;
     connection_status_ = -1;
     if (disconnected_callback_) {
-      MS_LOG(WARNING) << "The client will retry to connect to the server! Peer " << PeerRoleName()
-                      << " ip: " << server_address_ << ", port: " << server_port_;
       disconnected_callback_();
     }
   } else if (events & BEV_EVENT_EOF) {
@@ -397,5 +387,5 @@ void TcpClient::set_timer_callback(const OnTimer &timer) { on_timer_callback_ = 
 
 const event_base &TcpClient::eventbase() const { return *event_base_; }
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore

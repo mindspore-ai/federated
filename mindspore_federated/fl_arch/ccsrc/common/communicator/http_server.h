@@ -17,7 +17,7 @@
 #ifndef MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_HTTP_SERVER_H_
 #define MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_HTTP_SERVER_H_
 
-#include "ps/core/communicator/http_message_handler.h"
+#include "common/communicator/http_message_handler.h"
 
 #include <event2/buffer.h>
 #include <event2/event.h>
@@ -39,10 +39,10 @@
 #include <unordered_map>
 #include <vector>
 
-#include "ps/core/communicator/http_request_handler.h"
+#include "common/communicator/http_request_handler.h"
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 
 class HttpServer {
@@ -82,6 +82,6 @@ class HttpServer {
   int fd_;
 };
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_HTTP_SERVER_H_

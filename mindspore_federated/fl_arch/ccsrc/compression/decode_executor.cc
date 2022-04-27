@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "fl/compression/decode_executor.h"
+#include "compression/decode_executor.h"
 
 namespace mindspore {
 namespace fl {

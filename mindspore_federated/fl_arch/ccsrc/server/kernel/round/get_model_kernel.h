@@ -21,11 +21,11 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "fl/server/common.h"
-#include "fl/server/executor.h"
-#include "fl/server/kernel/round/round_kernel.h"
-#include "fl/server/kernel/round/round_kernel_factory.h"
-#include "fl/compression/encode_executor.h"
+#include "common/common.h"
+#include "server/executor.h"
+#include "server/kernel/round/round_kernel.h"
+#include "server/kernel/round/round_kernel_factory.h"
+#include "compression/encode_executor.h"
 
 namespace mindspore {
 namespace fl {
@@ -38,11 +38,11 @@ class GetModelKernel : public RoundKernel {
   ~GetModelKernel() override = default;
 
   void InitKernel(size_t) override;
-  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<ps::core::MessageHandler> &message) override;
+  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<fl::core::MessageHandler> &message) override;
   bool Reset() override;
 
  private:
-  void GetModel(const schema::RequestGetModel *get_model_req, const std::shared_ptr<ps::core::MessageHandler> &message);
+  void GetModel(const schema::RequestGetModel *get_model_req, const std::shared_ptr<fl::core::MessageHandler> &message);
   void BuildGetModelRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
                         const std::string &reason, const size_t iter,
                         const std::map<std::string, AddressPtr> &feature_maps, const std::string &timestamp,

@@ -14,33 +14,31 @@
  * limitations under the License.
  */
 
-#include "fl/server/server.h"
+#include "server/server.h"
 #include <memory>
 #include <string>
 #include <csignal>
-#ifdef ENABLE_ARMOUR
-#include "fl/armour/secure_protocol/secret_sharing.h"
-#include "fl/armour/cipher/cipher_init.h"
-#endif
-#include "fl/server/round.h"
-#include "fl/server/model_store.h"
-#include "fl/server/iteration.h"
-#include "fl/server/collective_ops_impl.h"
-#include "fl/server/distributed_metadata_store.h"
-#include "fl/server/distributed_count_service.h"
-#include "fl/server/kernel/round/round_kernel_factory.h"
-#include "ps/core/comm_util.h"
+#include "armour/secure_protocol/secret_sharing.h"
+#include "armour/cipher/cipher_init.h"
+#include "server/round.h"
+#include "server/model_store.h"
+#include "server/iteration.h"
+#include "server/collective_ops_impl.h"
+#include "server/distributed_metadata_store.h"
+#include "server/distributed_count_service.h"
+#include "server/kernel/round/round_kernel_factory.h"
+#include "common/core/comm_util.h"
 
 namespace mindspore {
 namespace fl {
 namespace server {
 // The handler to capture the signal of SIGTERM. Normally this signal is triggered by cloud cluster manager like K8S.
-std::shared_ptr<ps::core::CommunicatorBase> g_communicator_with_server = nullptr;
-std::vector<std::shared_ptr<ps::core::CommunicatorBase>> g_communicators_with_worker = {};
+std::shared_ptr<fl::core::CommunicatorBase> g_communicator_with_server = nullptr;
+std::vector<std::shared_ptr<fl::core::CommunicatorBase>> g_communicators_with_worker = {};
 void SignalHandler(int signal) {
   MS_LOG(WARNING) << "SIGTERM captured: " << signal;
   (void)std::for_each(g_communicators_with_worker.begin(), g_communicators_with_worker.end(),
-                      [](const std::shared_ptr<ps::core::CommunicatorBase> &communicator) {
+                      [](const std::shared_ptr<fl::core::CommunicatorBase> &communicator) {
                         MS_ERROR_IF_NULL_WO_RET_VAL(communicator);
                         (void)communicator->Stop();
                       });
@@ -55,10 +53,7 @@ Server &Server::GetInstance() {
 }
 
 void Server::Initialize(bool use_tcp, bool use_http, uint16_t http_port, const std::vector<RoundConfig> &rounds_config,
-                        const CipherConfig &cipher_config, const FuncGraphPtr &func_graph, size_t executor_threshold) {
-  MS_EXCEPTION_IF_NULL(func_graph);
-  func_graph_ = func_graph;
-
+                        const CipherConfig &cipher_config, size_t executor_threshold) {
   if (rounds_config.empty()) {
     MS_LOG(EXCEPTION) << "Rounds are empty.";
     return;
@@ -83,14 +78,15 @@ void Server::Run() {
   RegisterCommCallbacks();
   StartCommunicator();
   InitExecutor();
-  std::string encrypt_type = ps::PSContext::instance()->encrypt_type();
-  if (encrypt_type != ps::kNotEncryptType) {
+  std::string encrypt_type = FLContext::instance()->encrypt_type();
+  if (encrypt_type != kNotEncryptType) {
     InitCipher();
     MS_LOG(INFO) << "Parameters for secure aggregation have been initiated.";
   }
   RegisterRoundKernel();
   InitMetrics();
   Recover();
+  iteration_->StartThreadToRecordDataRate();
   MS_LOG(INFO) << "Server started successfully.";
   safemode_ = false;
   is_ready_ = true;
@@ -98,23 +94,23 @@ void Server::Run() {
 
   // Wait communicators to stop so the main thread is blocked.
   (void)std::for_each(communicators_with_worker_.begin(), communicators_with_worker_.end(),
-                      [](const std::shared_ptr<ps::core::CommunicatorBase> &communicator) {
+                      [](const std::shared_ptr<fl::core::CommunicatorBase> &communicator) {
                         MS_EXCEPTION_IF_NULL(communicator);
                         communicator->Join();
                       });
   MS_EXCEPTION_IF_NULL(communicator_with_server_);
   communicator_with_server_->Join();
-  MsException::Instance().CheckException();
+  //  MsException::Instance().CheckException();
 }
 
 void Server::InitPkiCertificate() {
-  if (ps::PSContext::instance()->pki_verify()) {
-    root_first_ca_path_ = ps::PSContext::instance()->root_first_ca_path();
-    root_second_ca_path_ = ps::PSContext::instance()->root_second_ca_path();
-    equip_crl_path_ = ps::PSContext::instance()->equip_crl_path();
-    replay_attack_time_diff_ = ps::PSContext::instance()->replay_attack_time_diff();
+  if (FLContext::instance()->pki_verify()) {
+    root_first_ca_path_ = FLContext::instance()->root_first_ca_path();
+    root_second_ca_path_ = FLContext::instance()->root_second_ca_path();
+    equip_crl_path_ = FLContext::instance()->equip_crl_path();
+    replay_attack_time_diff_ = FLContext::instance()->replay_attack_time_diff();
 
-    bool ret = mindspore::ps::server::CertVerify::initRootCertAndCRL(root_first_ca_path_, root_second_ca_path_,
+    bool ret = CertVerify::initRootCertAndCRL(root_first_ca_path_, root_second_ca_path_,
                                                                      equip_crl_path_, replay_attack_time_diff_);
     if (!ret) {
       MS_LOG(EXCEPTION) << "init root cert and crl failed.";
@@ -143,19 +139,19 @@ void Server::WaitExitSafeMode() const {
 }
 
 void Server::InitServerContext() {
-  ps::PSContext::instance()->GenerateResetterRound();
-  scheduler_ip_ = ps::PSContext::instance()->scheduler_host();
-  scheduler_port_ = ps::PSContext::instance()->scheduler_port();
-  worker_num_ = ps::PSContext::instance()->initial_worker_num();
-  server_num_ = ps::PSContext::instance()->initial_server_num();
+  FLContext::instance()->GenerateResetterRound();
+  scheduler_ip_ = FLContext::instance()->scheduler_ip();
+  scheduler_port_ = FLContext::instance()->scheduler_port();
+  worker_num_ = FLContext::instance()->initial_worker_num();
+  server_num_ = FLContext::instance()->initial_server_num();
   return;
 }
 
 void Server::InitCluster() {
-  server_node_ = std::make_shared<ps::core::ServerNode>();
+  server_node_ = std::make_shared<fl::core::ServerNode>();
   MS_EXCEPTION_IF_NULL(server_node_);
   server_node_->SetCancelSafeModeCallBack([this]() -> void { CancelSafeMode(); });
-  task_executor_ = std::make_shared<ps::core::TaskExecutor>(kExecutorThreadPoolSize);
+  task_executor_ = std::make_shared<fl::core::TaskExecutor>(kExecutorThreadPoolSize);
   MS_EXCEPTION_IF_NULL(task_executor_);
   if (!InitCommunicatorWithServer()) {
     MS_LOG(EXCEPTION) << "Initializing cross-server communicator failed.";
@@ -201,7 +197,7 @@ bool Server::InitCommunicatorWithWorker() {
   if (use_http_) {
     std::string server_ip = "";
     std::string interface = "";
-    ps::core::CommUtil::GetAvailableInterfaceAndIP(&interface, &server_ip);
+    fl::core::CommUtil::GetAvailableInterfaceAndIP(&interface, &server_ip);
     auto http_comm = server_node_->GetOrCreateHttpComm(server_ip, http_port_, task_executor_);
     MS_EXCEPTION_IF_NULL(http_comm);
     communicators_with_worker_.push_back(http_comm);
@@ -226,9 +222,8 @@ void Server::InitIteration() {
     iteration_->AddRound(round);
   }
 
-#ifdef ENABLE_ARMOUR
-  std::string encrypt_type = ps::PSContext::instance()->encrypt_type();
-  if (encrypt_type == ps::kPWEncryptType) {
+  std::string encrypt_type = FLContext::instance()->encrypt_type();
+  if (encrypt_type == kPWEncryptType) {
     cipher_exchange_keys_cnt_ = cipher_config_.exchange_keys_threshold;
     cipher_get_keys_cnt_ = cipher_config_.get_keys_threshold;
     cipher_share_secrets_cnt_ = cipher_config_.share_secrets_threshold;
@@ -252,7 +247,6 @@ void Server::InitIteration() {
                  << " minimum_secret_shares_for_reconstruct: " << minimum_secret_shares_for_reconstruct
                  << " cipher_time_window_: " << cipher_time_window_;
   }
-#endif
 
   // 2.Initialize all the rounds.
   TimeOutCb time_out_cb = std::bind(&Iteration::NotifyNext, iteration_, std::placeholders::_1, std::placeholders::_2);
@@ -261,27 +255,34 @@ void Server::InitIteration() {
   iteration_->InitRounds(communicators_with_worker_, time_out_cb, finish_iter_cb);
 
   iteration_->InitGlobalIterTimer(time_out_cb);
+  auto file_config_ptr = std::make_shared<fl::core::FileConfiguration>(FLContext::instance()->config_file_path());
+  MS_EXCEPTION_IF_NULL(file_config_ptr);
+  if (!file_config_ptr->Initialize()) {
+    MS_LOG(WARNING) << "Initializing for Config file path failed!" << FLContext::instance()->config_file_path()
+                    << " may be invalid or not exist.";
+    return;
+  }
+  iteration_->SetFileConfig(file_config_ptr);
   return;
 }
 
 void Server::InitCipher() {
-#ifdef ENABLE_ARMOUR
   cipher_init_ = &armour::CipherInit::GetInstance();
 
   int cipher_t = SizeToInt(minimum_secret_shares_for_reconstruct);
   unsigned char cipher_p[SECRET_MAX_LEN] = {0};
   const int cipher_g = 1;
-  float dp_eps = ps::PSContext::instance()->dp_eps();
-  float dp_delta = ps::PSContext::instance()->dp_delta();
-  float dp_norm_clip = ps::PSContext::instance()->dp_norm_clip();
-  std::string encrypt_type = ps::PSContext::instance()->encrypt_type();
-  float sign_k = ps::PSContext::instance()->sign_k();
-  float sign_eps = ps::PSContext::instance()->sign_eps();
-  float sign_thr_ratio = ps::PSContext::instance()->sign_thr_ratio();
-  float sign_global_lr = ps::PSContext::instance()->sign_global_lr();
-  int sign_dim_out = ps::PSContext::instance()->sign_dim_out();
+  float dp_eps = FLContext::instance()->dp_eps();
+  float dp_delta = FLContext::instance()->dp_delta();
+  float dp_norm_clip = FLContext::instance()->dp_norm_clip();
+  std::string encrypt_type = FLContext::instance()->encrypt_type();
+  float sign_k = FLContext::instance()->sign_k();
+  float sign_eps = FLContext::instance()->sign_eps();
+  float sign_thr_ratio = FLContext::instance()->sign_thr_ratio();
+  float sign_global_lr = FLContext::instance()->sign_global_lr();
+  int sign_dim_out = FLContext::instance()->sign_dim_out();
 
-  mindspore::armour::CipherPublicPara param;
+  armour::CipherPublicPara param;
   param.g = cipher_g;
   param.t = cipher_t;
   int ret = memcpy_s(param.p, SECRET_MAX_LEN, cipher_p, sizeof(cipher_p));
@@ -303,7 +304,7 @@ void Server::InitCipher() {
     MS_LOG(EXCEPTION) << "new bn failed.";
     ret = -1;
   } else {
-    ret = mindspore::armour::GetPrime(prim);
+    ret = armour::GetPrime(prim);
   }
   if (ret == 0) {
     (void)BN_bn2bin(prim, reinterpret_cast<uint8_t *>(param.prime));
@@ -318,7 +319,6 @@ void Server::InitCipher() {
                           cipher_get_list_sign_cnt_, minimum_clients_for_reconstruct)) {
     MS_LOG(EXCEPTION) << "cipher init fail.";
   }
-#endif
 }
 
 void Server::RegisterCommCallbacks() {
@@ -327,7 +327,7 @@ void Server::RegisterCommCallbacks() {
   MS_EXCEPTION_IF_NULL(server_node_);
   MS_EXCEPTION_IF_NULL(iteration_);
 
-  auto tcp_comm = std::dynamic_pointer_cast<ps::core::TcpCommunicator>(communicator_with_server_);
+  auto tcp_comm = std::dynamic_pointer_cast<fl::core::TcpCommunicator>(communicator_with_server_);
   MS_EXCEPTION_IF_NULL(tcp_comm);
 
   // Set message callbacks for server-to-server communication.
@@ -357,13 +357,13 @@ void Server::RegisterCommCallbacks() {
                                                           std::bind(&Server::ProcessAfterScalingIn, this));
 }
 
-void Server::RegisterExceptionEventCallback(const std::shared_ptr<ps::core::TcpCommunicator> &communicator) {
+void Server::RegisterExceptionEventCallback(const std::shared_ptr<fl::core::TcpCommunicator> &communicator) {
   MS_EXCEPTION_IF_NULL(communicator);
-  communicator->RegisterEventCallback(ps::core::ClusterEvent::SCHEDULER_TIMEOUT, [&]() {
+  communicator->RegisterEventCallback(fl::core::ClusterEvent::SCHEDULER_TIMEOUT, [&]() {
     MS_LOG(ERROR) << "Event SCHEDULER_TIMEOUT is captured. This is because scheduler node is finalized or crashed.";
     safemode_ = true;
     (void)std::for_each(communicators_with_worker_.begin(), communicators_with_worker_.end(),
-                        [](const std::shared_ptr<ps::core::CommunicatorBase> &communicator) {
+                        [](const std::shared_ptr<fl::core::CommunicatorBase> &communicator) {
                           MS_ERROR_IF_NULL_WO_RET_VAL(communicator);
                           (void)communicator->Stop();
                         });
@@ -372,13 +372,13 @@ void Server::RegisterExceptionEventCallback(const std::shared_ptr<ps::core::TcpC
     (void)communicator_with_server_->Stop();
   });
 
-  communicator->RegisterEventCallback(ps::core::ClusterEvent::NODE_TIMEOUT, [&]() {
+  communicator->RegisterEventCallback(fl::core::ClusterEvent::NODE_TIMEOUT, [&]() {
     MS_LOG(ERROR)
       << "Event NODE_TIMEOUT is captured. This is because some server nodes are finalized or crashed after the "
          "network building phase.";
     safemode_ = true;
     (void)std::for_each(communicators_with_worker_.begin(), communicators_with_worker_.end(),
-                        [](const std::shared_ptr<ps::core::CommunicatorBase> &communicator) {
+                        [](const std::shared_ptr<fl::core::CommunicatorBase> &communicator) {
                           MS_ERROR_IF_NULL_WO_RET_VAL(communicator);
                           (void)communicator->Stop();
                         });
@@ -388,7 +388,7 @@ void Server::RegisterExceptionEventCallback(const std::shared_ptr<ps::core::TcpC
   });
 }
 
-void Server::RegisterMessageCallback(const std::shared_ptr<ps::core::TcpCommunicator> &communicator) {
+void Server::RegisterMessageCallback(const std::shared_ptr<fl::core::TcpCommunicator> &communicator) {
   MS_EXCEPTION_IF_NULL(communicator);
   // Register handler for restful requests receviced by scheduler.
   communicator->RegisterMsgCallBack("enableFLS",
@@ -410,12 +410,10 @@ void Server::InitExecutor() {
     MS_LOG(EXCEPTION) << "The executor's threshold should greater than 0.";
     return;
   }
-  auto func_graph = func_graph_.lock();
-  MS_EXCEPTION_IF_NULL(func_graph);
   // The train engine instance is used in both push-type and pull-type kernels,
   // so the required_cnt of these kernels must be the same as executor_threshold_.
   MS_LOG(INFO) << "Required count for push-type and pull-type kernels is " << executor_threshold_;
-  Executor::GetInstance().Initialize(func_graph, executor_threshold_);
+  Executor::GetInstance().Initialize(executor_threshold_);
   ModelStore::GetInstance().Initialize(server_node_->rank_id());
   // init weight memory to 0 after get model
   Executor::GetInstance().ResetAggregationStatus();
@@ -454,7 +452,7 @@ void Server::InitMetrics() {
   if (server_node_->rank_id() == kLeaderServerRank) {
     MS_EXCEPTION_IF_NULL(iteration_);
     std::shared_ptr<IterationMetrics> iteration_metrics =
-      std::make_shared<IterationMetrics>(ps::PSContext::instance()->config_file_path());
+      std::make_shared<IterationMetrics>(FLContext::instance()->config_file_path());
     if (!iteration_metrics->Initialize()) {
       MS_LOG(WARNING) << "Initializing metrics failed.";
       return;
@@ -471,10 +469,10 @@ void Server::StartCommunicator() {
 
   MS_LOG(INFO) << "Start communicator with worker.";
   (void)std::for_each(communicators_with_worker_.begin(), communicators_with_worker_.end(),
-                      [](const std::shared_ptr<ps::core::CommunicatorBase> &communicator) {
+                      [](const std::shared_ptr<fl::core::CommunicatorBase> &communicator) {
                         MS_ERROR_IF_NULL_WO_RET_VAL(communicator);
                         const auto &ptr = *communicator.get();
-                        if (typeid(ptr) != typeid(ps::core::TcpCommunicator)) {
+                        if (typeid(ptr) != typeid(fl::core::TcpCommunicator)) {
                           if (!communicator->Start()) {
                             MS_LOG(EXCEPTION) << "Starting communicator with worker failed.";
                           }
@@ -499,14 +497,14 @@ void Server::Recover() {
   MS_EXCEPTION_IF_NULL(server_recovery_);
 
   // Try to recovery from persistent storage.
-  if (!server_recovery_->Initialize(ps::PSContext::instance()->config_file_path())) {
+  if (!server_recovery_->Initialize(FLContext::instance()->config_file_path())) {
     MS_LOG(WARNING) << "Initializing server recovery failed. Do not recover for this server.";
     return;
   }
 
   if (server_recovery_->Recover()) {
     // If this server recovers, need to notify cluster to reach consistency.
-    auto tcp_comm = std::dynamic_pointer_cast<ps::core::TcpCommunicator>(communicator_with_server_);
+    auto tcp_comm = std::dynamic_pointer_cast<fl::core::TcpCommunicator>(communicator_with_server_);
     MS_ERROR_IF_NULL_WO_RET_VAL(tcp_comm);
     MS_LOG(INFO) << "Synchronize with leader server after recovery.";
     if (!server_recovery_->SyncAfterRecovery(tcp_comm, server_node_->rank_id())) {
@@ -555,11 +553,9 @@ void Server::ProcessAfterScalingOut() {
   if (!Executor::GetInstance().ReInitForScaling()) {
     MS_LOG(WARNING) << "Executor reinitializing failed.";
   }
-#ifdef ENABLE_ARMOUR
   if (!armour::CipherInit::GetInstance().ReInitForScaling()) {
     MS_LOG(WARNING) << "CipherInit reinitializing failed.";
   }
-#endif
   std::this_thread::sleep_for(std::chrono::milliseconds(kServerSleepTimeForNetworking));
   safemode_ = false;
 }
@@ -588,19 +584,17 @@ void Server::ProcessAfterScalingIn() {
   if (!Executor::GetInstance().ReInitForScaling()) {
     MS_LOG(WARNING) << "Executor reinitializing failed.";
   }
-#ifdef ENABLE_ARMOUR
   if (!armour::CipherInit::GetInstance().ReInitForScaling()) {
     MS_LOG(WARNING) << "CipherInit reinitializing failed.";
   }
-#endif
   std::this_thread::sleep_for(std::chrono::milliseconds(kServerSleepTimeForNetworking));
   safemode_ = false;
 }
 
-void Server::HandleEnableServerRequest(const std::shared_ptr<ps::core::MessageHandler> &message) {
+void Server::HandleEnableServerRequest(const std::shared_ptr<fl::core::MessageHandler> &message) {
   MS_ERROR_IF_NULL_WO_RET_VAL(iteration_);
   MS_ERROR_IF_NULL_WO_RET_VAL(communicator_with_server_);
-  auto tcp_comm = std::dynamic_pointer_cast<ps::core::TcpCommunicator>(communicator_with_server_);
+  auto tcp_comm = std::dynamic_pointer_cast<fl::core::TcpCommunicator>(communicator_with_server_);
   MS_ERROR_IF_NULL_WO_RET_VAL(tcp_comm);
 
   std::string result_message = "";
@@ -614,10 +608,10 @@ void Server::HandleEnableServerRequest(const std::shared_ptr<ps::core::MessageHa
   }
 }
 
-void Server::HandleDisableServerRequest(const std::shared_ptr<ps::core::MessageHandler> &message) {
+void Server::HandleDisableServerRequest(const std::shared_ptr<fl::core::MessageHandler> &message) {
   MS_ERROR_IF_NULL_WO_RET_VAL(iteration_);
   MS_ERROR_IF_NULL_WO_RET_VAL(communicator_with_server_);
-  auto tcp_comm = std::dynamic_pointer_cast<ps::core::TcpCommunicator>(communicator_with_server_);
+  auto tcp_comm = std::dynamic_pointer_cast<fl::core::TcpCommunicator>(communicator_with_server_);
   MS_ERROR_IF_NULL_WO_RET_VAL(tcp_comm);
 
   std::string result_message = "";
@@ -631,11 +625,11 @@ void Server::HandleDisableServerRequest(const std::shared_ptr<ps::core::MessageH
   }
 }
 
-void Server::HandleNewInstanceRequest(const std::shared_ptr<ps::core::MessageHandler> &message) {
+void Server::HandleNewInstanceRequest(const std::shared_ptr<fl::core::MessageHandler> &message) {
   MS_ERROR_IF_NULL_WO_RET_VAL(message);
   MS_ERROR_IF_NULL_WO_RET_VAL(iteration_);
   MS_ERROR_IF_NULL_WO_RET_VAL(communicator_with_server_);
-  auto tcp_comm = std::dynamic_pointer_cast<ps::core::TcpCommunicator>(communicator_with_server_);
+  auto tcp_comm = std::dynamic_pointer_cast<fl::core::TcpCommunicator>(communicator_with_server_);
   MS_ERROR_IF_NULL_WO_RET_VAL(tcp_comm);
 
   std::string hyper_params_str(static_cast<const char *>(message->data()), message->len());
@@ -662,19 +656,19 @@ void Server::HandleNewInstanceRequest(const std::shared_ptr<ps::core::MessageHan
   }
 }
 
-void Server::HandleQueryInstanceRequest(const std::shared_ptr<ps::core::MessageHandler> &message) {
+void Server::HandleQueryInstanceRequest(const std::shared_ptr<fl::core::MessageHandler> &message) {
   MS_ERROR_IF_NULL_WO_RET_VAL(message);
   nlohmann::basic_json<std::map, std::vector, std::string, bool, int64_t, uint64_t, float> response;
-  response["start_fl_job_threshold"] = ps::PSContext::instance()->start_fl_job_threshold();
-  response["start_fl_job_time_window"] = ps::PSContext::instance()->start_fl_job_time_window();
-  response["update_model_ratio"] = ps::PSContext::instance()->update_model_ratio();
-  response["update_model_time_window"] = ps::PSContext::instance()->update_model_time_window();
-  response["fl_iteration_num"] = ps::PSContext::instance()->fl_iteration_num();
-  response["client_epoch_num"] = ps::PSContext::instance()->client_epoch_num();
-  response["client_batch_size"] = ps::PSContext::instance()->client_batch_size();
-  response["client_learning_rate"] = ps::PSContext::instance()->client_learning_rate();
-  response["global_iteration_time_window"] = ps::PSContext::instance()->global_iteration_time_window();
-  auto tcp_comm = std::dynamic_pointer_cast<ps::core::TcpCommunicator>(communicator_with_server_);
+  response["start_fl_job_threshold"] = FLContext::instance()->start_fl_job_threshold();
+  response["start_fl_job_time_window"] = FLContext::instance()->start_fl_job_time_window();
+  response["update_model_ratio"] = FLContext::instance()->update_model_ratio();
+  response["update_model_time_window"] = FLContext::instance()->update_model_time_window();
+  response["fl_iteration_num"] = FLContext::instance()->fl_iteration_num();
+  response["client_epoch_num"] = FLContext::instance()->client_epoch_num();
+  response["client_batch_size"] = FLContext::instance()->client_batch_size();
+  response["client_learning_rate"] = FLContext::instance()->client_learning_rate();
+  response["global_iteration_time_window"] = FLContext::instance()->global_iteration_time_window();
+  auto tcp_comm = std::dynamic_pointer_cast<fl::core::TcpCommunicator>(communicator_with_server_);
   MS_ERROR_IF_NULL_WO_RET_VAL(tcp_comm);
   if (!tcp_comm->SendResponse(response.dump().c_str(), response.dump().size(), message)) {
     MS_LOG(ERROR) << "Sending response failed.";
@@ -682,11 +676,11 @@ void Server::HandleQueryInstanceRequest(const std::shared_ptr<ps::core::MessageH
   }
 }
 
-void Server::HandleSyncAfterRecoveryRequest(const std::shared_ptr<ps::core::MessageHandler> &message) {
+void Server::HandleSyncAfterRecoveryRequest(const std::shared_ptr<fl::core::MessageHandler> &message) {
   MS_ERROR_IF_NULL_WO_RET_VAL(message);
   MS_ERROR_IF_NULL_WO_RET_VAL(iteration_);
   MS_ERROR_IF_NULL_WO_RET_VAL(communicator_with_server_);
-  auto tcp_comm = std::dynamic_pointer_cast<ps::core::TcpCommunicator>(communicator_with_server_);
+  auto tcp_comm = std::dynamic_pointer_cast<fl::core::TcpCommunicator>(communicator_with_server_);
   MS_ERROR_IF_NULL_WO_RET_VAL(tcp_comm);
 
   MS_LOG(INFO) << "Receive SyncAfterRecover request from other server.";
@@ -707,13 +701,13 @@ void Server::HandleSyncAfterRecoveryRequest(const std::shared_ptr<ps::core::Mess
   }
 }
 
-void Server::HandleQueryNodeScaleStateRequest(const std::shared_ptr<ps::core::MessageHandler> &message) {
+void Server::HandleQueryNodeScaleStateRequest(const std::shared_ptr<fl::core::MessageHandler> &message) {
   MS_ERROR_IF_NULL_WO_RET_VAL(message);
 
   nlohmann::basic_json<std::map, std::vector, std::string> response;
   response["node_scale_state"] = server_node_->node_scale_state_str();
 
-  auto tcp_comm = std::dynamic_pointer_cast<ps::core::TcpCommunicator>(communicator_with_server_);
+  auto tcp_comm = std::dynamic_pointer_cast<fl::core::TcpCommunicator>(communicator_with_server_);
   MS_ERROR_IF_NULL_WO_RET_VAL(tcp_comm);
   if (!tcp_comm->SendResponse(response.dump().c_str(), response.dump().size(), message)) {
     MS_LOG(ERROR) << "Sending response failed.";

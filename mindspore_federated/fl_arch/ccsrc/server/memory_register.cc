@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "fl/server/memory_register.h"
+#include "server/memory_register.h"
 #include <utility>
 
 namespace mindspore {

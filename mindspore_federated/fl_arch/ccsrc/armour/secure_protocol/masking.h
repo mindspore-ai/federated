@@ -19,9 +19,10 @@
 
 #include <random>
 #include <vector>
-#include "fl/armour/secure_protocol/encrypt.h"
+#include "armour/secure_protocol/encrypt.h"
 
 namespace mindspore {
+namespace fl {
 namespace armour {
 
 class Masking {
@@ -30,5 +31,6 @@ class Masking {
                         const uint8_t *ivec, int ivec_size);
 };
 }  // namespace armour
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_ARMOUR_RANDOM_H

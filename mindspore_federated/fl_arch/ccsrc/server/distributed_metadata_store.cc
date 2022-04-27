@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-#include "fl/server/distributed_metadata_store.h"
+#include "server/distributed_metadata_store.h"
 #include <memory>
 #include <string>
 #include <vector>
-#include "fl/server/iteration.h"
+#include "server/iteration.h"
 
 namespace mindspore {
 namespace fl {
 namespace server {
-void DistributedMetadataStore::Initialize(const std::shared_ptr<ps::core::ServerNode> &server_node) {
+void DistributedMetadataStore::Initialize(const std::shared_ptr<fl::core::ServerNode> &server_node) {
   MS_EXCEPTION_IF_NULL(server_node);
   server_node_ = server_node;
   local_rank_ = server_node_->rank_id();
@@ -32,7 +32,7 @@ void DistributedMetadataStore::Initialize(const std::shared_ptr<ps::core::Server
   return;
 }
 
-void DistributedMetadataStore::RegisterMessageCallback(const std::shared_ptr<ps::core::TcpCommunicator> &communicator) {
+void DistributedMetadataStore::RegisterMessageCallback(const std::shared_ptr<fl::core::TcpCommunicator> &communicator) {
   MS_EXCEPTION_IF_NULL(communicator);
   communicator_ = communicator;
   communicator_->RegisterMsgCallBack(
@@ -86,7 +86,7 @@ void DistributedMetadataStore::ResetMetadata(const std::string &name) {
   return;
 }
 
-bool DistributedMetadataStore::UpdateMetadata(const std::string &name, const PBMetadata &meta, std::string *reason) {
+bool DistributedMetadataStore::UpdateMetadata(const std::string &name, const PBMetadata &meta) {
   if (router_ == nullptr) {
     MS_LOG(WARNING) << "The consistent hash ring is not initialized yet.";
     return false;
@@ -104,13 +104,10 @@ bool DistributedMetadataStore::UpdateMetadata(const std::string &name, const PBM
     metadata_with_name.set_name(name);
     *metadata_with_name.mutable_metadata() = meta;
     std::shared_ptr<std::vector<unsigned char>> update_meta_rsp_msg = nullptr;
-    if (!communicator_->SendPbRequest(metadata_with_name, stored_rank, ps::core::TcpUserCommand::kUpdateMetadata,
+    if (!communicator_->SendPbRequest(metadata_with_name, stored_rank, fl::core::TcpUserCommand::kUpdateMetadata,
                                       &update_meta_rsp_msg)) {
       MS_LOG(WARNING) << "Sending updating metadata message to server " << stored_rank << " failed.";
-      if (reason != nullptr) {
-        *reason = kNetworkError;
-      }
-      Iteration::GetInstance().NotifyNext(false, *reason);
+      Iteration::GetInstance().NotifyNext(false, kNetworkError);
       return false;
     }
 
@@ -141,7 +138,7 @@ PBMetadata DistributedMetadataStore::GetMetadata(const std::string &name) {
     PBMetadata get_metadata_rsp;
 
     std::shared_ptr<std::vector<unsigned char>> get_meta_rsp_msg = nullptr;
-    if (!communicator_->SendPbRequest(get_metadata_req, stored_rank, ps::core::TcpUserCommand::kGetMetadata,
+    if (!communicator_->SendPbRequest(get_metadata_req, stored_rank, fl::core::TcpUserCommand::kGetMetadata,
                                       &get_meta_rsp_msg)) {
       MS_LOG(WARNING) << "Sending getting metadata message to server " << stored_rank << " failed.";
       return get_metadata_rsp;
@@ -168,7 +165,7 @@ bool DistributedMetadataStore::GetOneDeviceMeta(const std::string &fl_id, Device
     get_metadata_req.set_fl_id(fl_id);
 
     std::shared_ptr<std::vector<unsigned char>> get_meta_rsp_msg = nullptr;
-    if (!communicator_->SendPbRequest(get_metadata_req, stored_rank, ps::core::TcpUserCommand::kGetOneDeviceMeta,
+    if (!communicator_->SendPbRequest(get_metadata_req, stored_rank, fl::core::TcpUserCommand::kGetOneDeviceMeta,
                                       &get_meta_rsp_msg)) {
       MS_LOG(WARNING) << "Sending getting one client metadata message to server " << stored_rank << " failed.";
       return false;
@@ -220,7 +217,7 @@ void DistributedMetadataStore::InitHashRing() {
   return;
 }
 
-void DistributedMetadataStore::HandleUpdateMetadataRequest(const std::shared_ptr<ps::core::MessageHandler> &message) {
+void DistributedMetadataStore::HandleUpdateMetadataRequest(const std::shared_ptr<fl::core::MessageHandler> &message) {
   MS_ERROR_IF_NULL_WO_RET_VAL(message);
   PBMetadataWithName meta_with_name;
   (void)meta_with_name.ParseFromArray(message->data(), SizeToInt(message->len()));
@@ -241,7 +238,7 @@ void DistributedMetadataStore::HandleUpdateMetadataRequest(const std::shared_ptr
   return;
 }
 
-void DistributedMetadataStore::HandleGetMetadataRequest(const std::shared_ptr<ps::core::MessageHandler> &message) {
+void DistributedMetadataStore::HandleGetMetadataRequest(const std::shared_ptr<fl::core::MessageHandler> &message) {
   MS_ERROR_IF_NULL_WO_RET_VAL(message);
   GetMetadataRequest get_metadata_req;
   (void)get_metadata_req.ParseFromArray(message->data(), SizeToInt(message->len()));
@@ -262,7 +259,7 @@ void DistributedMetadataStore::HandleGetMetadataRequest(const std::shared_ptr<ps
   return;
 }
 
-void DistributedMetadataStore::HandleGetOneDeviceMetaRequest(const std::shared_ptr<ps::core::MessageHandler> &message) {
+void DistributedMetadataStore::HandleGetOneDeviceMetaRequest(const std::shared_ptr<fl::core::MessageHandler> &message) {
   MS_ERROR_IF_NULL_WO_RET_VAL(message);
   GetOneDeviceMetaRequest get_one_metadata_req;
   GetOneDeviceMetaResponse response;
@@ -422,7 +419,7 @@ bool DistributedMetadataStore::UpdatePairClientShares(const std::string &name, c
   auto &client_shares_map = *metadata_[name].mutable_client_shares()->mutable_client_secret_shares();
   auto &fl_id = meta.pair_client_shares().fl_id();
   auto &client_shares = meta.pair_client_shares().client_shares();
-  // google::protobuf::Map< std::string, mindspore::fl::ps::core::SharesPb >::const_iterator iter;
+  // google::protobuf::Map< std::string, mindspore::fl::fl::core::SharesPb >::const_iterator iter;
   // Check whether the new item already exists.
   bool add_flag = true;
   for (auto iter = client_shares_map.begin(); iter != client_shares_map.end(); ++iter) {

@@ -22,15 +22,15 @@
 #include <memory>
 #include <map>
 #include <utility>
-#include "fl/armour/secure_protocol/secret_sharing.h"
-#include "proto/ps.pb.h"
-#include "utils/log_adapter.h"
-#include "fl/armour/cipher/cipher_init.h"
-#include "fl/armour/cipher/cipher_meta_storage.h"
+#include "armour/secure_protocol/secret_sharing.h"
+#include "common/utils/log_adapter.h"
+#include "armour/cipher/cipher_init.h"
+#include "armour/cipher/cipher_meta_storage.h"
 
 #define IV_NUM 3
 
 namespace mindspore {
+namespace fl {
 namespace armour {
 // The process of reconstruct secret mask in the secure aggregation
 class CipherReconStruct {
@@ -47,11 +47,11 @@ class CipherReconStruct {
   // reconstruct secret mask
   bool ReconstructSecrets(const int cur_iterator, const std::string &next_req_time,
                           const schema::SendReconstructSecret *reconstruct_secret_req,
-                          const std::shared_ptr<fl::server::FBBuilder> &fbb,
+                          const std::shared_ptr<FBBuilder> &fbb,
                           const std::vector<std::string> &client_list);
 
   // build response code of reconstruct secret.
-  void BuildReconstructSecretsRsp(const std::shared_ptr<fl::server::FBBuilder> &fbb, const schema::ResponseCode retcode,
+  void BuildReconstructSecretsRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
                                   const std::string &reason, const int iteration, const std::string &next_req_time);
 
   // clear the shared memory.
@@ -64,7 +64,7 @@ class CipherReconStruct {
   // get suv noise by computing shares result.
   bool GetSuvNoise(const std::vector<std::string> &clients_share_list,
                    const std::map<std::string, std::vector<std::vector<uint8_t>>> &record_public_keys,
-                   const std::map<std::string, std::vector<std::vector<uint8_t>>> &client_ivs, const string &fl_id,
+                   const std::map<std::string, std::vector<std::vector<uint8_t>>> &client_ivs, const std::string &fl_id,
                    std::vector<float> *noise, const uint8_t *secret, size_t length);
   // malloc shares.
   bool MallocShares(std::vector<Share *> *shares_tmp, size_t shares_size);
@@ -74,7 +74,7 @@ class CipherReconStruct {
   bool ConvertSharesToShares(const std::map<std::string, std::vector<clientshare_str>> &src,
                              std::map<std::string, std::vector<clientshare_str>> *des);
   // generate noise from shares.
-  bool ReconstructSecretsGenNoise(const std::vector<string> &client_list);
+  bool ReconstructSecretsGenNoise(const std::vector<std::string> &client_list);
   // get noise masks sum.
   bool GetNoiseMasksSum(std::vector<float> *result, const std::map<std::string, std::vector<float>> &client_noise);
 
@@ -83,15 +83,16 @@ class CipherReconStruct {
                    const std::vector<std::string> &clients_share_list,
                    const std::map<std::string, std::vector<std::vector<unsigned char>>> &record_public_keys,
                    const std::map<std::string, std::vector<clientshare_str>> &reconstruct_secret_list,
-                   const std::vector<string> &client_list,
+                   const std::vector<std::string> &client_list,
                    const std::map<std::string, std::vector<std::vector<unsigned char>>> &client_ivs);
   std::vector<uint8_t> GetIndiIV(const std::string fl_id,
                                  const std::map<std::string, std::vector<std::vector<uint8_t>>> &client_ivs) const;
   bool CheckInputs(const schema::SendReconstructSecret *reconstruct_secret_req,
-                   const std::shared_ptr<fl::server::FBBuilder> &fbb, const int cur_iterator,
+                   const std::shared_ptr<FBBuilder> &fbb, const int cur_iterator,
                    const std::string &next_req_time);
 };
 }  // namespace armour
+}  // namespace fl
 }  // namespace mindspore
 
 #endif  // MINDSPORE_CCSRC_ARMOUR_CIPHER_KEYS_H

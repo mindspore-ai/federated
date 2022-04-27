@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-#include "fl/server/kernel/round/pull_weight_kernel.h"
+#include "server/kernel/round/pull_weight_kernel.h"
 #include <map>
 #include <memory>
 #include <string>
 #include <vector>
-#include "fl/server/model_store.h"
+#include "server/model_store.h"
 
 namespace mindspore {
 namespace fl {
@@ -35,7 +35,7 @@ void PullWeightKernel::InitKernel(size_t) {
 }
 
 bool PullWeightKernel::Launch(const uint8_t *req_data, size_t len,
-                              const std::shared_ptr<ps::core::MessageHandler> &message) {
+                              const std::shared_ptr<fl::core::MessageHandler> &message) {
   MS_LOG(DEBUG) << "Launching PullWeightKernel kernel.";
   std::shared_ptr<FBBuilder> fbb = std::make_shared<FBBuilder>();
   if (fbb == nullptr || req_data == nullptr) {

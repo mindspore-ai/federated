@@ -14,16 +14,15 @@
  * limitations under the License.
  */
 
-#include "fl/server/server_recovery.h"
-#include "fl/server/local_meta_store.h"
-#include "include/common/debug/common.h"
+#include "server/server_recovery.h"
+#include "server/local_meta_store.h"
 
 namespace mindspore {
 namespace fl {
 namespace server {
 bool ServerRecovery::Initialize(const std::string &config_file) {
   std::unique_lock<std::mutex> lock(server_recovery_file_mtx_);
-  config_ = std::make_unique<ps::core::FileConfiguration>(config_file);
+  config_ = std::make_unique<fl::core::FileConfiguration>(config_file);
   MS_EXCEPTION_IF_NULL(config_);
   if (!config_->Initialize()) {
     MS_LOG(EXCEPTION) << "Initializing for server recovery failed. Config file path " << config_file
@@ -46,14 +45,14 @@ bool ServerRecovery::Initialize(const std::string &config_file) {
     }
 
     // Parse the storage type.
-    uint32_t storage_type = JsonGetKeyWithException<uint32_t>(value_json, ps::kStoreType);
-    if (std::to_string(storage_type) != ps::kFileStorage) {
+    uint32_t storage_type = JsonGetKeyWithException<uint32_t>(value_json, kStoreType);
+    if (std::to_string(storage_type) != kFileStorage) {
       MS_LOG(EXCEPTION) << "Storage type " << storage_type << " is not supported.";
       return false;
     }
 
     // Parse storage file path.
-    server_recovery_file_path_ = JsonGetKeyWithException<std::string>(value_json, ps::kStoreFilePath);
+    server_recovery_file_path_ = JsonGetKeyWithException<std::string>(value_json, kStoreFilePath);
     MS_LOG(INFO) << "Server recovery file path is " << server_recovery_file_path_;
   }
   return true;
@@ -103,7 +102,7 @@ bool ServerRecovery::Save(uint64_t current_iter, InstanceState instance_state) {
   return true;
 }
 
-bool ServerRecovery::SyncAfterRecovery(const std::shared_ptr<ps::core::TcpCommunicator> &communicator,
+bool ServerRecovery::SyncAfterRecovery(const std::shared_ptr<fl::core::TcpCommunicator> &communicator,
                                        uint32_t rank_id) {
   std::unique_lock<std::mutex> lock(server_recovery_file_mtx_);
   // If this server is follower server, notify leader server that this server has recovered.
@@ -112,7 +111,7 @@ bool ServerRecovery::SyncAfterRecovery(const std::shared_ptr<ps::core::TcpCommun
     SyncAfterRecover sync_after_recover_req;
     sync_after_recover_req.set_current_iter_num(LocalMetaStore::GetInstance().curr_iter_num());
     if (!communicator->SendPbRequest(sync_after_recover_req, kLeaderServerRank,
-                                     ps::core::TcpUserCommand::kSyncAfterRecover)) {
+                                     fl::core::TcpUserCommand::kSyncAfterRecover)) {
       MS_LOG(ERROR) << "Sending sync after recovery message to leader server failed.";
       return false;
     }

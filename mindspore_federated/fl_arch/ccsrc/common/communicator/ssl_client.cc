@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-#include "ps/core/communicator/ssl_client.h"
+#include "common/communicator/ssl_client.h"
 
 #include <sys/time.h>
 #include <openssl/pem.h>
@@ -29,7 +29,7 @@
 #include <sstream>
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 SSLClient::SSLClient() : ssl_ctx_(nullptr), check_time_thread_(nullptr), running_(false), is_ready_(false) {
   InitSSL();
@@ -38,34 +38,46 @@ SSLClient::SSLClient() : ssl_ctx_(nullptr), check_time_thread_(nullptr), running
 SSLClient::~SSLClient() { CleanSSL(); }
 
 void SSLClient::InitSSL() {
-  CommUtil::InitOpensslLib();
+  if (!SSL_library_init()) {
+    MS_LOG(EXCEPTION) << "SSL_library_init failed.";
+  }
+  if (!ERR_load_crypto_strings()) {
+    MS_LOG(EXCEPTION) << "ERR_load_crypto_strings failed.";
+  }
+  if (!SSL_load_error_strings()) {
+    MS_LOG(EXCEPTION) << "SSL_load_error_strings failed.";
+  }
+  if (!OpenSSL_add_all_algorithms()) {
+    MS_LOG(EXCEPTION) << "OpenSSL_add_all_algorithms failed.";
+  }
   ssl_ctx_ = SSL_CTX_new(SSLv23_client_method());
   if (!ssl_ctx_) {
     MS_LOG(EXCEPTION) << "SSL_CTX_new failed";
   }
   std::unique_ptr<Configuration> config_ =
-    std::make_unique<FileConfiguration>(PSContext::instance()->config_file_path());
+    std::make_unique<FileConfiguration>(FLContext::instance()->config_file_path());
   MS_EXCEPTION_IF_NULL(config_);
   if (!config_->Initialize()) {
     MS_LOG(EXCEPTION) << "The config file is empty.";
   }
 
   // 1.Parse the client's certificate and the ciphertext of key.
+  std::string client_cert = kCertificateChain;
   std::string path = CommUtil::ParseConfig(*config_, kClientCertPath);
   if (!CommUtil::IsFileExists(path)) {
     MS_LOG(EXCEPTION) << "The key:" << kClientCertPath << "'s value is not exist.";
   }
-  std::string client_cert = path;
-  MS_LOG(INFO) << "client cert: " << client_cert;
+  client_cert = path;
 
   // 2. Parse the client password.
-  std::string client_password = PSContext::instance()->client_password();
+  std::string client_password = FLContext::instance()->client_password();
   if (client_password.empty()) {
     MS_LOG(EXCEPTION) << "The client password's value is empty.";
   }
   EVP_PKEY *pkey = nullptr;
   X509 *cert = nullptr;
   STACK_OF(X509) *ca_stack = nullptr;
+  MS_LOG(INFO) << "cliet cert: " << client_cert;
   BIO *bio = BIO_new_file(client_cert.c_str(), "rb");
   MS_EXCEPTION_IF_NULL(bio);
   PKCS12 *p12 = d2i_PKCS12_bio(bio, nullptr);
@@ -91,14 +103,12 @@ void SSLClient::InitSSL() {
   BIO *ca_bio = BIO_new_file(ca_path.c_str(), "r");
   MS_EXCEPTION_IF_NULL(ca_bio);
   X509 *caCert = PEM_read_bio_X509(ca_bio, nullptr, nullptr, nullptr);
-
-  X509_CRL *crl = nullptr;
   std::string crl_path = CommUtil::ParseConfig(*(config_), kCrlPath);
   if (crl_path.empty()) {
     MS_LOG(INFO) << "The crl path is empty.";
   } else if (!CommUtil::checkCRLTime(crl_path)) {
     MS_LOG(EXCEPTION) << "check crl time failed";
-  } else if (!CommUtil::VerifyCRL(caCert, crl_path, &crl)) {
+  } else if (!CommUtil::VerifyCRL(cert, crl_path)) {
     MS_LOG(EXCEPTION) << "Verify crl failed.";
   }
 
@@ -117,17 +127,14 @@ void SSLClient::InitSSL() {
   if (!SSL_CTX_set_cipher_list(ssl_ctx_, default_cipher_list.c_str())) {
     MS_LOG(EXCEPTION) << "SSL use set cipher list failed!";
   }
-  InitSSLCtx(cert, pkey, crl);
+  InitSSLCtx(cert, pkey);
   StartCheckCertTime(*config_, cert);
 
   EVP_PKEY_free(pkey);
-  BIO_vfree(ca_bio);
-  if (crl != nullptr) {
-    X509_CRL_free(crl);
-  }
+  (void)BIO_free(ca_bio);
 }
 
-void SSLClient::InitSSLCtx(const X509 *cert, const EVP_PKEY *pkey, X509_CRL *crl) {
+void SSLClient::InitSSLCtx(const X509 *cert, const EVP_PKEY *pkey) {
   if (!SSL_CTX_use_certificate(ssl_ctx_, const_cast<X509 *>(cert))) {
     MS_LOG(EXCEPTION) << "SSL use certificate chain file failed!";
   }
@@ -149,23 +156,6 @@ void SSLClient::InitSSLCtx(const X509 *cert, const EVP_PKEY *pkey, X509_CRL *crl
     MS_LOG(EXCEPTION) << "SSL set mode auto retry failed!";
   }
 
-  if (crl != nullptr) {
-    // Load CRL into the `X509_STORE`
-    X509_STORE *x509_store = SSL_CTX_get_cert_store(ssl_ctx_);
-    if (X509_STORE_add_crl(x509_store, crl) != 1) {
-      MS_LOG(EXCEPTION) << "ssl client X509_STORE add crl failed!";
-    }
-
-    // Enable CRL checking
-    X509_VERIFY_PARAM *param = SSL_CTX_get0_param(ssl_ctx_);
-    if (param == nullptr) {
-      MS_LOG(EXCEPTION) << "ssl client X509_VERIFY_PARAM is nullptr!";
-    }
-    if (X509_VERIFY_PARAM_set_flags(param, X509_V_FLAG_CRL_CHECK) != 1) {
-      MS_LOG(EXCEPTION) << "ssl client X509_VERIFY_PARAM set flag X509_V_FLAG_CRL_CHECK failed!";
-    }
-  }
-
   SSL_CTX_set_security_level(ssl_ctx_, kSecurityLevel);
 }
 
@@ -175,7 +165,6 @@ void SSLClient::CleanSSL() {
   }
   ERR_free_strings();
   EVP_cleanup();
-  ERR_remove_thread_state(nullptr);
   CRYPTO_cleanup_all_ex_data();
   StopCheckCertTime();
 }
@@ -222,5 +211,5 @@ void SSLClient::StopCheckCertTime() {
 
 SSL_CTX *SSLClient::GetSSLCtx() const { return ssl_ctx_; }
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore

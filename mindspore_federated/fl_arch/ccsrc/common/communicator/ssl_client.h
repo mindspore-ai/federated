@@ -33,14 +33,14 @@
 #include <mutex>
 #include <atomic>
 
-#include "utils/log_adapter.h"
-#include "ps/core/comm_util.h"
-#include "ps/constants.h"
-#include "ps/core/file_configuration.h"
-#include "ps/ps_context.h"
+#include "common/utils/log_adapter.h"
+#include "common/core/comm_util.h"
+#include "common/constants.h"
+#include "common/core/file_configuration.h"
+#include "python/fl_context.h"
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 class SSLClient {
  public:
@@ -61,7 +61,7 @@ class SSLClient {
 
   void StartCheckCertTime(const Configuration &config, const X509 *cert);
   void StopCheckCertTime();
-  void InitSSLCtx(const X509 *cert, const EVP_PKEY *pkey, X509_CRL *crl);
+  void InitSSLCtx(const X509 *cert, const EVP_PKEY *pkey);
 
   SSL_CTX *ssl_ctx_;
   std::unique_ptr<std::thread> check_time_thread_;
@@ -71,6 +71,6 @@ class SSLClient {
   std::condition_variable cond_;
 };
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_SSL_CLIENT_H_
