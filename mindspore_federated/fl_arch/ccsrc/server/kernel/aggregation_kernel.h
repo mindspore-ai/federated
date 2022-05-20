@@ -20,10 +20,9 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "plugin/device/cpu/kernel/cpu_kernel.h"
-#include "fl/server/common.h"
-#include "fl/server/memory_register.h"
-#include "fl/server/kernel/params_info.h"
+#include "common/common.h"
+#include "server/memory_register.h"
+#include "server/kernel/params_info.h"
 
 namespace mindspore {
 namespace fl {
@@ -33,14 +32,14 @@ namespace kernel {
 // For example, dense gradients accumulation, federated average, etc.
 // Normally the aggregation process in AggregationKernelMod is like a finite-state machine:
 // Initial->Aggregating->Aggregation done->Initial.
-class AggregationKernelMod : public DeprecatedNativeCpuKernelMod {
+class AggregationKernelMod {
  public:
   AggregationKernelMod() : name_(""), done_(false), done_count_(0), accum_count_(0) {}
   virtual ~AggregationKernelMod() = default;
 
-  // InitKernel and Launch methods are inherited from pure virtual function of DeprecatedNativeCpuKernelMod so it must
-  // have implementation.
-  virtual void InitKernel(const CNodePtr &kernel_node) {}
+  // InitKernel and Launch methods are inherited from pure virtual function of NativeCpuKernelMod so it must have
+  // implementation.
+  virtual void InitKernel(const std::string &param_name) {}
   virtual bool Launch(const std::vector<AddressPtr> &inputs, const std::vector<AddressPtr> &workspace,
                       const std::vector<AddressPtr> &outputs) {
     return true;
@@ -76,12 +75,9 @@ class AggregationKernelMod : public DeprecatedNativeCpuKernelMod {
   const std::vector<std::string> &input_names() { return params_info_.inputs_names(); }
   const std::vector<std::string> &workspace_names() { return params_info_.workspace_names(); }
   const std::vector<std::string> &output_names() { return params_info_.outputs_names(); }
-
-  // Returns information about whether some inputs should reuse kernel node inputs memory.
-  const ReuseKernelNodeInfo &reuse_kernel_node_inputs_info() { return reuse_kernel_node_inputs_info_; }
+  const std::vector<size_t> &GetInputSizeList() const { return input_size_list_; }
 
  protected:
-  virtual void GenerateReuseKernelNodeInfo() = 0;
   // Aggregation kernel's name which is set by kernel register function.
   std::string name_;
 
@@ -97,9 +93,7 @@ class AggregationKernelMod : public DeprecatedNativeCpuKernelMod {
   // Parameters information used for kernel register, memory assignment, etc.
   ParamsInfo params_info_;
 
-  // Information about server kernel reusing kernel node inputs memory from the front end.
-  // Key refers to the server kernel's input index. Value refers to the kernel node's input index.
-  ReuseKernelNodeInfo reuse_kernel_node_inputs_info_;
+  std::vector<size_t> input_size_list_;
 };
 }  // namespace kernel
 }  // namespace server

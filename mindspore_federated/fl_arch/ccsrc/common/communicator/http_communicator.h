@@ -20,15 +20,14 @@
 #include <string>
 #include <memory>
 #include <unordered_map>
-#include "ps/core/communicator/http_server.h"
-#include "ps/core/communicator/http_message_handler.h"
-#include "ps/core/communicator/task_executor.h"
-#include "ps/core/communicator/communicator_base.h"
-#include "ps/core/communicator/http_msg_handler.h"
-#include "utils/ms_exception.h"
+#include "common/communicator/http_server.h"
+#include "common/communicator/http_message_handler.h"
+#include "common/communicator/task_executor.h"
+#include "common/communicator/communicator_base.h"
+#include "common/communicator/http_msg_handler.h"
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 class HttpCommunicator : public CommunicatorBase {
  public:
@@ -52,6 +51,6 @@ class HttpCommunicator : public CommunicatorBase {
   uint16_t port_;
 };
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_HTTP_COMMUNICATOR_H_

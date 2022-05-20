@@ -22,7 +22,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
-#include "fl/server/common.h"
+#include "common/common.h"
 
 namespace mindspore {
 namespace fl {
@@ -30,14 +30,6 @@ namespace server {
 // LocalMetaStore class is used for metadata storage of this server process.
 // For example, the current iteration number, time windows for round kernels, etc.
 // LocalMetaStore is threadsafe.
-
-struct Feature {
-  std::vector<size_t> weight_shape;
-  std::string weight_type;
-  size_t weight_size;
-  std::vector<float> weight_data;
-};
-
 class LocalMetaStore {
  public:
   static LocalMetaStore &GetInstance() {

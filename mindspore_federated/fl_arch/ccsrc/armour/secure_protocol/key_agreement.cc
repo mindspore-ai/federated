@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 
-#include "fl/armour/secure_protocol/key_agreement.h"
-#include "fl/server/common.h"
+#include "armour/secure_protocol/key_agreement.h"
+#include "common/common.h"
 
 namespace mindspore {
+namespace fl {
 namespace armour {
 #ifdef _WIN32
 PrivateKey *KeyAgreement::GeneratePrivKey() {
@@ -230,4 +231,5 @@ int KeyAgreement::ComputeSharedKey(PrivateKey *privKey, PublicKey *peerPublicKey
 }
 #endif
 }  // namespace armour
+}  // namespace fl
 }  // namespace mindspore

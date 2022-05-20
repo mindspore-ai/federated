@@ -22,13 +22,12 @@
 #include <utility>
 #include <vector>
 #include <functional>
-#include "plugin/device/cpu/kernel/cpu_kernel.h"
-#include "fl/server/common.h"
-#include "fl/server/collective_ops_impl.h"
-#include "fl/server/distributed_count_service.h"
-#include "fl/server/local_meta_store.h"
-#include "fl/server/kernel/aggregation_kernel.h"
-#include "fl/server/kernel/aggregation_kernel_factory.h"
+#include "common/common.h"
+#include "server/collective_ops_impl.h"
+#include "server/distributed_count_service.h"
+#include "server/local_meta_store.h"
+#include "server/kernel/aggregation_kernel.h"
+#include "server/kernel/aggregation_kernel_factory.h"
 
 namespace mindspore {
 namespace fl {
@@ -43,48 +42,27 @@ constexpr size_t kFedAvgInputsNum = 4;
 template <typename T, typename S>
 class FedAvgKernel : public AggregationKernelMod {
  public:
-  FedAvgKernel()
-      : cnode_weight_idx_(0),
+  FedAvgKernel() :
         weight_addr_(nullptr),
         data_size_addr_(nullptr),
         new_weight_addr_(nullptr),
         new_data_size_addr_(nullptr) {}
   ~FedAvgKernel() override = default;
 
-  void InitKernel(const CNodePtr &kernel_node) override {
-    MS_EXCEPTION_IF_NULL(kernel_node);
-    std::string cnode_name = common::AnfAlgo::GetCNodeName(kernel_node);
-    if (kNameToIdxMap.count(cnode_name) == 0 || kNameToIdxMap.at(cnode_name).count("inputs") == 0 ||
-        kNameToIdxMap.at(cnode_name).at("inputs").count("weight") == 0) {
-      MS_LOG(EXCEPTION) << "Can't find index info of weight for kernel " << cnode_name;
-      return;
-    }
-    cnode_weight_idx_ = kNameToIdxMap.at(cnode_name).at("inputs").at("weight");
-    std::vector<size_t> weight_shape = common::AnfAlgo::GetPrevNodeOutputInferShape(kernel_node, cnode_weight_idx_);
-    size_t weight_size =
-      std::accumulate(weight_shape.begin(), weight_shape.end(), sizeof(T), std::multiplies<size_t>());
-    size_t new_weight_size = weight_size;
+  void InitKernel(const std::string &param_name) override {
+    auto &feature_maps = FLContext::instance()->feature_maps();
+    const auto& feature_map = feature_maps[param_name];
 
-    Feature feature;
-    feature.weight_shape = weight_shape;
-    feature.weight_size = weight_size;
-    feature.weight_type = GetTypeIdByte(kNumberTypeFloat32);
+    size_t weight_size = feature_map.weight_size;
+    size_t new_weight_size = weight_size;
 
     input_size_list_.push_back(weight_size);
     input_size_list_.push_back(sizeof(size_t));
     input_size_list_.push_back(new_weight_size);
     input_size_list_.push_back(sizeof(size_t));
 
-    auto weight_node =
-      common::AnfAlgo::VisitKernelWithReturnType(common::AnfAlgo::GetInputNode(kernel_node, cnode_weight_idx_), 0)
-        .first;
-    MS_EXCEPTION_IF_NULL(weight_node);
-    name_ = cnode_name + "." + weight_node->fullname_with_scope();
-
-    LocalMetaStore::GetInstance().put_aggregation_feature_map(weight_node->fullname_with_scope(), feature);
-    MS_LOG(INFO) << "Aggregate Weight full name is " << weight_node->fullname_with_scope() << ", weight byte size is "
-                 << weight_size;
-    GenerateReuseKernelNodeInfo();
+    LocalMetaStore::GetInstance().put_aggregation_feature_map(param_name, feature_maps[param_name]);
+    MS_LOG(INFO) << "Aggregate Weight full name is " << param_name;
     return;
   }
 
@@ -174,13 +152,6 @@ class FedAvgKernel : public AggregationKernelMod {
   }
 
  private:
-  void GenerateReuseKernelNodeInfo() override {
-    MS_LOG(INFO) << "FedAvg reuse 'weight' of the kernel node.";
-    // Only the trainable parameter is reused for federated average.
-    (void)reuse_kernel_node_inputs_info_.insert(std::make_pair(kWeight, cnode_weight_idx_));
-    return;
-  }
-
   // In some cases, the Launch method is not called and the weights involved in AllReduce should be set to 0.
   void ClearWeightAndDataSize() {
     MS_ERROR_IF_NULL_WO_RET_VAL(weight_addr_);
@@ -199,9 +170,6 @@ class FedAvgKernel : public AggregationKernelMod {
     }
     return;
   }
-
-  // The trainable parameter index of the kernel node which is parsed from the frontend func_graph.
-  size_t cnode_weight_idx_;
 
   // The address pointer of the inputs.
   AddressPtr weight_addr_;

@@ -22,13 +22,14 @@
 #include <openssl/pem.h>
 #include <openssl/evp.h>
 #endif
-#include "utils/log_adapter.h"
+#include "common/utils/log_adapter.h"
 
 #define KEY_LEN 32
 #define SALT_LEN 32
 #define ITERATION 10000
 
 namespace mindspore {
+namespace fl {
 namespace armour {
 
 #ifdef _WIN32
@@ -65,5 +66,6 @@ class KeyAgreement {
 };
 
 }  // namespace armour
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_KEY_AGREEMENT_H

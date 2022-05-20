@@ -20,7 +20,7 @@
 #include <utility>
 #include <string>
 #include <vector>
-#include "ir/dtype/type_id.h"
+#include "common/common.h"
 
 namespace mindspore {
 namespace fl {

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "fl/server/kernel/fed_avg_kernel.h"
+#include "server/kernel/fed_avg_kernel.h"
 
 namespace mindspore {
 namespace fl {

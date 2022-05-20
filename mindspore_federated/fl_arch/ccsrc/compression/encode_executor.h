@@ -23,12 +23,12 @@
 #include <map>
 #include "schema/fl_job_generated.h"
 #include "schema/cipher_generated.h"
-#include "fl/armour/secure_protocol/key_agreement.h"
-#include "ps/ps_context.h"
-#include "ps/core/worker_node.h"
-#include "ps/core/cluster_metadata.h"
-#include "ps/core/communicator/tcp_communicator.h"
-#include "fl/server/common.h"
+#include "armour/secure_protocol/key_agreement.h"
+#include "python/fl_context.h"
+#include "common/core/worker_node.h"
+#include "common/core/cluster_metadata.h"
+#include "common/communicator/tcp_communicator.h"
+#include "common/common.h"
 
 namespace mindspore {
 namespace fl {

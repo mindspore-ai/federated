@@ -24,11 +24,9 @@
 #include <vector>
 #include <mutex>
 #include <condition_variable>
-#ifdef ENABLE_ARMOUR
-#include "fl/armour/cipher/cipher_unmask.h"
-#endif
-#include "fl/server/common.h"
-#include "fl/server/parameter_aggregator.h"
+#include "armour/cipher/cipher_unmask.h"
+#include "common/common.h"
+#include "server/parameter_aggregator.h"
 
 namespace mindspore {
 namespace fl {
@@ -42,11 +40,7 @@ class Executor {
     return instance;
   }
 
-  // FuncGraphPtr func_graph is the graph compiled by the frontend. aggregation_count is the number which will
-  // be used for aggregators.
-  // As noted in header file parameter_aggregator.h, we create aggregators by trainable parameters, which is the
-  // optimizer cnode's input. So we need to initialize server executor using func_graph.
-  void Initialize(const FuncGraphPtr &func_graph, size_t aggregation_count);
+  void Initialize(size_t aggregation_count);
 
   // Reinitialize parameter aggregators after scaling operations are done.
   bool ReInitForScaling();
@@ -95,12 +89,9 @@ class Executor {
   Executor(const Executor &) = delete;
   Executor &operator=(const Executor &) = delete;
 
-  // Returns the trainable parameter name parsed from this cnode.
-  std::string GetTrainableParamName(const CNodePtr &cnode);
-
   // Server's graph is basically the same as Worker's graph, so we can get all information from func_graph for later
   // computations. Including forward and backward propagation, aggregation, optimizing, etc.
-  bool InitParamAggregator(const FuncGraphPtr &func_graph);
+  bool InitParamAggregator();
 
   bool initialized_;
   size_t aggregation_count_;
@@ -118,9 +109,7 @@ class Executor {
   // acquire lock before calling its method.
   std::map<std::string, std::mutex> parameter_mutex_;
 
-#ifdef ENABLE_ARMOUR
   armour::CipherUnmask cipher_unmask_;
-#endif
 
   // The flag refers to the unmasking status
   std::atomic<bool> unmasked_;

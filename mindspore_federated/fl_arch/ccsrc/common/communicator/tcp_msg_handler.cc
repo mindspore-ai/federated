@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-#include "ps/core/communicator/tcp_msg_handler.h"
+#include "common/communicator/tcp_msg_handler.h"
 #include <memory>
 #include <utility>
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
-TcpMsgHandler::TcpMsgHandler(AbstractNode *abstract_node, const std::shared_ptr<core::TcpConnection> &conn,
+TcpMsgHandler::TcpMsgHandler(AbstractNode *abstract_node, const std::shared_ptr<fl::core::TcpConnection> &conn,
                              const std::shared_ptr<MessageMeta> &meta, DataPtr data, size_t size)
     : abstract_node_(abstract_node), tcp_conn_(conn), meta_(meta), data_(nullptr), len_(size) {
   data_ptr_ = std::move(data);
@@ -46,5 +46,5 @@ bool TcpMsgHandler::SendResponse(const void *data, const size_t &len) {
   return true;
 }
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore

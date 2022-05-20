@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "fl/server/kernel/round/get_list_sign_kernel.h"
+#include "server/kernel/round/get_list_sign_kernel.h"
 #include <utility>
 #include <string>
 #include <vector>
@@ -65,7 +65,7 @@ sigVerifyResult GetListSignKernel::VerifySignature(const schema::RequestAllClien
   std::vector<unsigned char> src_data;
   (void)src_data.insert(src_data.end(), timestamp.begin(), timestamp.end());
   (void)src_data.insert(src_data.end(), iter_str.begin(), iter_str.end());
-  auto certVerify = mindspore::ps::server::CertVerify::GetInstance();
+  auto certVerify = CertVerify::GetInstance();
   unsigned char srcDataHash[SHA256_DIGEST_LENGTH];
   certVerify.sha256Hash(src_data.data(), SizeToInt(src_data.size()), srcDataHash, SHA256_DIGEST_LENGTH);
   if (!certVerify.verifyRSAKey(key_attestations[fl_id], srcDataHash, signature.data(), SHA256_DIGEST_LENGTH)) {
@@ -79,10 +79,10 @@ sigVerifyResult GetListSignKernel::VerifySignature(const schema::RequestAllClien
 }
 
 bool GetListSignKernel::Launch(const uint8_t *req_data, size_t len,
-                               const std::shared_ptr<ps::core::MessageHandler> &message) {
+                               const std::shared_ptr<fl::core::MessageHandler> &message) {
   size_t iter_num = LocalMetaStore::GetInstance().curr_iter_num();
   MS_LOG(INFO) << "Launching GetListSign kernel,  Iteration number is " << iter_num;
-  std::shared_ptr<server::FBBuilder> fbb = std::make_shared<server::FBBuilder>();
+  std::shared_ptr<FBBuilder> fbb = std::make_shared<FBBuilder>();
   if (fbb == nullptr || req_data == nullptr) {
     std::string reason = "FBBuilder builder or req_data is nullptr.";
     MS_LOG(ERROR) << reason;
@@ -110,7 +110,7 @@ bool GetListSignKernel::Launch(const uint8_t *req_data, size_t len,
   }
 
   // verify signature
-  if (ps::PSContext::instance()->pki_verify()) {
+  if (FLContext::instance()->pki_verify()) {
     sigVerifyResult verify_result = VerifySignature(get_list_sign_req);
     if (verify_result == sigVerifyResult::FAILED) {
       std::string reason = "verify signature failed.";
@@ -153,9 +153,8 @@ bool GetListSignKernel::Launch(const uint8_t *req_data, size_t len,
     SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
     return true;
   }
-  std::string count_reason = "";
-  if (!DistributedCountService::GetInstance().Count(name_, fl_id, &count_reason)) {
-    std::string reason = "Counting for get list sign request failed. Please retry later. " + count_reason;
+  if (!DistributedCountService::GetInstance().Count(name_, fl_id)) {
+    std::string reason = "Counting for get list sign request failed for fl id " + fl_id + ". Please retry later. ";
     BuildGetListSignKernelRsp(fbb, schema::ResponseCode_OutOfTime, reason, std::to_string(CURRENT_TIME_MILLI.count()),
                               iter_num, list_signs);
     MS_LOG(ERROR) << reason;
@@ -167,7 +166,7 @@ bool GetListSignKernel::Launch(const uint8_t *req_data, size_t len,
 
 bool GetListSignKernel::GetListSign(const size_t cur_iterator, const std::string &next_req_time,
                                     const schema::RequestAllClientListSign *get_list_sign_req,
-                                    const std::shared_ptr<fl::server::FBBuilder> &fbb) {
+                                    const std::shared_ptr<FBBuilder> &fbb) {
   MS_LOG(INFO) << "CipherMgr::SendClientListSign START";
   std::map<std::string, std::vector<unsigned char>> client_list_signs_empty;
   std::map<std::string, std::vector<unsigned char>> client_list_signs_all;
@@ -183,7 +182,7 @@ bool GetListSignKernel::GetListSign(const size_t cur_iterator, const std::string
     return false;
   }
 
-  std::vector<string> update_model_clients;
+  std::vector<std::string> update_model_clients;
   const PBMetadata update_model_clients_pb_out =
     DistributedMetadataStore::GetInstance().GetMetadata(kCtxUpdateModelClientList);
   const UpdateModelClientList &update_model_clients_pb = update_model_clients_pb_out.client_list();
@@ -239,9 +238,9 @@ bool GetListSignKernel::Reset() {
   return true;
 }
 
-void GetListSignKernel::BuildGetListSignKernelRsp(const std::shared_ptr<server::FBBuilder> &fbb,
-                                                  const schema::ResponseCode retcode, const string &reason,
-                                                  const string &next_req_time, const size_t iteration,
+void GetListSignKernel::BuildGetListSignKernelRsp(const std::shared_ptr<FBBuilder> &fbb,
+                                                  const schema::ResponseCode retcode, const std::string &reason,
+                                                  const std::string &next_req_time, const size_t iteration,
                                                   const std::map<std::string, std::vector<unsigned char>> &list_signs) {
   auto rsp_reason = fbb->CreateString(reason);
   auto rsp_next_req_time = fbb->CreateString(next_req_time);

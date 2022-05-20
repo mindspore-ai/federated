@@ -20,15 +20,15 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include "proto/comm.pb.h"
+#include "common/protos/comm.pb.h"
 #include "schema/fl_job_generated.h"
 #include "schema/cipher_generated.h"
-#include "fl/armour/secure_protocol/key_agreement.h"
-#include "ps/ps_context.h"
-#include "ps/core/worker_node.h"
-#include "ps/core/cluster_metadata.h"
-#include "ps/core/communicator/tcp_communicator.h"
-#include "include/backend/visible.h"
+#include "armour/secure_protocol/key_agreement.h"
+#include "python/fl_context.h"
+#include "common/core/worker_node.h"
+#include "common/core/cluster_metadata.h"
+#include "common/communicator/tcp_communicator.h"
+#include "common/common.h"
 
 struct EncryptPublicKeys {
   std::string flID;
@@ -52,9 +52,6 @@ constexpr uint32_t kWorkerSleepTimeForNetworking = 1000;
 // The time duration between retrying when server is in safemode.
 constexpr uint32_t kWorkerRetryDurationForSafeMode = 500;
 
-// The leader server rank.
-constexpr uint32_t kLeaderServerRank = 0;
-
 // The timeout for worker sending message to server in case of network jitter.
 constexpr uint32_t kWorkerTimeout = 30;
 
@@ -68,12 +65,12 @@ enum class IterationState {
 namespace worker {
 // This class is used for hybrid training mode for now. In later version, parameter server mode will also use this class
 // as worker.
-class BACKEND_EXPORT FLWorker {
+class MS_EXPORT FLWorker {
  public:
   static FLWorker &GetInstance();
-  void Run();
+  bool Run();
   void Finalize();
-  bool SendToServer(uint32_t server_rank, const void *data, size_t size, ps::core::TcpUserCommand command,
+  bool SendToServer(uint32_t server_rank, const void *data, size_t size, fl::core::TcpUserCommand command,
                     std::shared_ptr<std::vector<unsigned char>> *output = nullptr);
 
   uint32_t server_num() const;
@@ -152,7 +149,7 @@ class BACKEND_EXPORT FLWorker {
   uint32_t worker_num_;
   std::string scheduler_ip_;
   uint16_t scheduler_port_;
-  std::shared_ptr<ps::core::WorkerNode> worker_node_;
+  std::shared_ptr<fl::core::WorkerNode> worker_node_;
   uint32_t rank_id_;
 
   // The federated learning iteration number.

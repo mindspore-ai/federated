@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-#include "fl/armour/cipher/cipher_meta_storage.h"
+#include "armour/cipher/cipher_meta_storage.h"
 
 namespace mindspore {
+namespace fl {
 namespace armour {
 void CipherMetaStorage::GetClientSharesFromServer(
   const char *list_name, std::map<std::string, std::vector<clientshare_str>> *clients_shares_list) {
@@ -344,7 +345,7 @@ bool CipherMetaStorage::UpdateClientNoiseToServer(const char *list_name, const s
 
 bool CipherMetaStorage::UpdateClientShareToServer(
   const char *list_name, const std::string &fl_id,
-  const flatbuffers::Vector<flatbuffers::Offset<mindspore::schema::ClientShare>> *shares) {
+  const flatbuffers::Vector<flatbuffers::Offset<schema::ClientShare>> *shares) {
   if (shares == nullptr) {
     return false;
   }
@@ -372,48 +373,49 @@ bool CipherMetaStorage::UpdateClientShareToServer(
 
 void CipherMetaStorage::RegisterClass() {
   fl::PBMetadata exchange_keys_client_list;
-  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(fl::server::kCtxExChangeKeysClientList,
+  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(kCtxExChangeKeysClientList,
                                                                        exchange_keys_client_list);
   fl::PBMetadata get_keys_client_list;
-  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(fl::server::kCtxGetKeysClientList,
+  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(kCtxGetKeysClientList,
                                                                        get_keys_client_list);
   fl::PBMetadata clients_keys;
-  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(fl::server::kCtxClientsKeys, clients_keys);
+  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(kCtxClientsKeys, clients_keys);
   fl::PBMetadata reconstruct_client_list;
-  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(fl::server::kCtxReconstructClientList,
+  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(kCtxReconstructClientList,
                                                                        reconstruct_client_list);
   fl::PBMetadata clients_reconstruct_shares;
-  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(fl::server::kCtxClientsReconstructShares,
+  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(kCtxClientsReconstructShares,
                                                                        clients_reconstruct_shares);
   fl::PBMetadata share_secretes_client_list;
-  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(fl::server::kCtxShareSecretsClientList,
+  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(kCtxShareSecretsClientList,
                                                                        share_secretes_client_list);
   fl::PBMetadata get_secretes_client_list;
-  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(fl::server::kCtxGetSecretsClientList,
+  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(kCtxGetSecretsClientList,
                                                                        get_secretes_client_list);
   fl::PBMetadata clients_encrypt_shares;
-  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(fl::server::kCtxClientsEncryptedShares,
+  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(kCtxClientsEncryptedShares,
                                                                        clients_encrypt_shares);
   fl::PBMetadata get_update_clients_list;
-  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(fl::server::kCtxGetUpdateModelClientList,
+  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(kCtxGetUpdateModelClientList,
                                                                        get_update_clients_list);
   fl::PBMetadata client_noises;
-  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(fl::server::kCtxClientNoises, client_noises);
+  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(kCtxClientNoises, client_noises);
 
   fl::PBMetadata clients_list_signs;
-  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(fl::server::kCtxClientListSigns,
+  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(kCtxClientListSigns,
                                                                        clients_list_signs);
 }
 
 void CipherMetaStorage::RegisterStablePWClass() {
   fl::PBMetadata exchange_keys_client_list;
-  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(fl::server::kCtxExChangeKeysClientList,
+  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(kCtxExChangeKeysClientList,
                                                                        exchange_keys_client_list);
   fl::PBMetadata get_keys_client_list;
-  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(fl::server::kCtxGetKeysClientList,
+  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(kCtxGetKeysClientList,
                                                                        get_keys_client_list);
   fl::PBMetadata clients_keys;
-  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(fl::server::kCtxClientsKeys, clients_keys);
+  fl::server::DistributedMetadataStore::GetInstance().RegisterMetadata(kCtxClientsKeys, clients_keys);
 }
 }  // namespace armour
+}  // namespace fl
 }  // namespace mindspore

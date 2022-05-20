@@ -22,19 +22,18 @@
 #include <string>
 #include <memory>
 #include <unordered_map>
-#include "proto/ps.pb.h"
-#include "ps/core/server_node.h"
-#include "ps/core/cluster_metadata.h"
-#include "ps/core/cluster_config.h"
-#include "ps/ps_context.h"
-#include "ps/core/communicator/task_executor.h"
-#include "ps/core/communicator/communicator_base.h"
-#include "ps/core/communicator/tcp_msg_handler.h"
-#include "ps/core/comm_util.h"
-#include "ps/constants.h"
+#include "common/core/server_node.h"
+#include "common/core/cluster_metadata.h"
+#include "common/core/cluster_config.h"
+#include "python/fl_context.h"
+#include "common/communicator/task_executor.h"
+#include "common/communicator/communicator_base.h"
+#include "common/communicator/tcp_msg_handler.h"
+#include "common/core/comm_util.h"
+#include "common/constants.h"
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 const std::unordered_map<TcpUserCommand, std::string> kUserCommandToMsgType = {
   {TcpUserCommand::kPush, "push"},
@@ -76,7 +75,7 @@ class TcpCommunicator : public CommunicatorBase {
   bool Stop() override;
 
   void RegisterMsgCallBack(const std::string &msg_type, const MessageCallback &cb) override;
-  void RegisterEventCallback(const core::ClusterEvent &event, const EventCallback &event_cb);
+  void RegisterEventCallback(const fl::core::ClusterEvent &event, const EventCallback &event_cb);
 
   template <class T>
   bool SendPbRequest(const T &pb_msg, const uint32_t &rank_id, TcpUserCommand command,
@@ -98,6 +97,6 @@ class TcpCommunicator : public CommunicatorBase {
   AbstractNode *abstrace_node_;
 };
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_COMMUNICATOR_H_

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#include "fl/server/kernel/params_info.h"
-#include "utils/log_adapter.h"
+#include "server/kernel/params_info.h"
+#include "common/utils/log_adapter.h"
 
 namespace mindspore {
 namespace fl {

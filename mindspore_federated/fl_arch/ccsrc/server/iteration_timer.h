@@ -21,7 +21,7 @@
 #include <atomic>
 #include <thread>
 #include <functional>
-#include "fl/server/common.h"
+#include "common/common.h"
 
 namespace mindspore {
 namespace fl {

@@ -20,8 +20,8 @@
 #include <memory>
 #include <string>
 #include <utility>
-#include "fl/server/kernel/kernel_factory.h"
-#include "fl/server/kernel/aggregation_kernel.h"
+#include "server/kernel/kernel_factory.h"
+#include "server/kernel/aggregation_kernel.h"
 
 namespace mindspore {
 namespace fl {
@@ -42,7 +42,7 @@ class AggregationKernelFactory : public KernelFactory<std::shared_ptr<Aggregatio
   AggregationKernelFactory &operator=(const AggregationKernelFactory &) = delete;
 
   // Judge whether the server aggregation kernel can be created according to registered ParamsInfo.
-  bool Matched(const ParamsInfo &params_info, const CNodePtr &kernel_node) override;
+  bool Matched(const ParamsInfo &params_info) override;
 };
 
 class AggregationKernelRegister {

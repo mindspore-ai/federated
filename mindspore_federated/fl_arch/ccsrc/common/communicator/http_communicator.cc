@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-#include "ps/core/communicator/http_communicator.h"
+#include "common/communicator/http_communicator.h"
 #include <memory>
-#include "include/common/thread_pool.h"
+#include "common/communicator/thread_pool.h"
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 bool HttpCommunicator::Start() {
   MS_EXCEPTION_IF_NULL(http_server_);
@@ -74,7 +74,7 @@ void HttpCommunicator::RegisterMsgCallBack(const std::string &msg_type, const Me
     }
   };
 
-  std::string url = ps::PSContext::instance()->http_url_prefix();
+  std::string url = FLContext::instance()->http_url_prefix();
   url += "/";
   url += msg_type;
   MS_EXCEPTION_IF_NULL(http_server_);
@@ -85,5 +85,5 @@ void HttpCommunicator::RegisterMsgCallBack(const std::string &msg_type, const Me
   return;
 }
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore

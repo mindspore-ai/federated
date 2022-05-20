@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "fl/server/kernel/round/reconstruct_secrets_kernel.h"
+#include "server/kernel/round/reconstruct_secrets_kernel.h"
 #include <string>
 #include <vector>
 #include <memory>
@@ -29,15 +29,15 @@ void ReconstructSecretsKernel::InitKernel(size_t required_cnt) {
   if (LocalMetaStore::GetInstance().has_value(kCtxTotalTimeoutDuration)) {
     iteration_time_window_ = LocalMetaStore::GetInstance().value<size_t>(kCtxTotalTimeoutDuration);
   }
-  auto last_cnt_handler = [&](std::shared_ptr<ps::core::MessageHandler>) {
-    if (ps::PSContext::instance()->resetter_round() == ps::ResetterRound::kReconstructSeccrets) {
+  auto last_cnt_handler = [&](std::shared_ptr<fl::core::MessageHandler>) {
+    if (FLContext::instance()->resetter_round() == ResetterRound::kReconstructSeccrets) {
       MS_LOG(INFO) << "start FinishIteration";
       FinishIteration(true);
       MS_LOG(INFO) << "end FinishIteration";
     }
     return;
   };
-  auto first_cnt_handler = [&](std::shared_ptr<ps::core::MessageHandler>) { return; };
+  auto first_cnt_handler = [&](std::shared_ptr<fl::core::MessageHandler>) { return; };
   name_unmask_ = "UnMaskKernel";
   MS_LOG(INFO) << "ReconstructSecretsKernel Init, ITERATION NUMBER IS : "
                << LocalMetaStore::GetInstance().curr_iter_num();
@@ -77,7 +77,7 @@ sigVerifyResult ReconstructSecretsKernel::VerifySignature(const schema::SendReco
   std::vector<unsigned char> src_data;
   (void)src_data.insert(src_data.end(), timestamp.begin(), timestamp.end());
   (void)src_data.insert(src_data.end(), iter_str.begin(), iter_str.end());
-  auto certVerify = mindspore::ps::server::CertVerify::GetInstance();
+  auto certVerify = CertVerify::GetInstance();
   unsigned char srcDataHash[SHA256_DIGEST_LENGTH];
   certVerify.sha256Hash(src_data.data(), SizeToInt(src_data.size()), srcDataHash, SHA256_DIGEST_LENGTH);
   if (!certVerify.verifyRSAKey(key_attestations[fl_id], srcDataHash, signature.data(), SHA256_DIGEST_LENGTH)) {
@@ -91,12 +91,12 @@ sigVerifyResult ReconstructSecretsKernel::VerifySignature(const schema::SendReco
 }
 
 bool ReconstructSecretsKernel::Launch(const uint8_t *req_data, size_t len,
-                                      const std::shared_ptr<ps::core::MessageHandler> &message) {
+                                      const std::shared_ptr<fl::core::MessageHandler> &message) {
   bool response = false;
   size_t iter_num = LocalMetaStore::GetInstance().curr_iter_num();
   MS_LOG(INFO) << "Launching ReconstructSecrets Kernel, Iteration number is " << iter_num;
 
-  std::shared_ptr<server::FBBuilder> fbb = std::make_shared<server::FBBuilder>();
+  std::shared_ptr<FBBuilder> fbb = std::make_shared<FBBuilder>();
   if (fbb == nullptr || req_data == nullptr) {
     std::string reason = "FBBuilder builder or req_data is nullptr.";
     MS_LOG(ERROR) << reason;
@@ -104,7 +104,7 @@ bool ReconstructSecretsKernel::Launch(const uint8_t *req_data, size_t len,
   }
 
   // get client list from memory server.
-  std::vector<string> update_model_clients;
+  std::vector<std::string> update_model_clients;
   const PBMetadata update_model_clients_pb_out =
     DistributedMetadataStore::GetInstance().GetMetadata(kCtxUpdateModelClientList);
   const UpdateModelClientList &update_model_clients_pb = update_model_clients_pb_out.client_list();
@@ -132,7 +132,7 @@ bool ReconstructSecretsKernel::Launch(const uint8_t *req_data, size_t len,
     return true;
   }
   // verify signature
-  if (ps::PSContext::instance()->pki_verify()) {
+  if (FLContext::instance()->pki_verify()) {
     sigVerifyResult verify_result = VerifySignature(reconstruct_secret_req);
     if (verify_result == sigVerifyResult::FAILED) {
       std::string reason = "verify signature failed.";
@@ -188,9 +188,9 @@ bool ReconstructSecretsKernel::Launch(const uint8_t *req_data, size_t len,
   return true;
 }
 
-void ReconstructSecretsKernel::OnLastCountEvent(const std::shared_ptr<ps::core::MessageHandler> &) {
+void ReconstructSecretsKernel::OnLastCountEvent(const std::shared_ptr<fl::core::MessageHandler> &) {
   MS_LOG(INFO) << "ITERATION NUMBER IS : " << LocalMetaStore::GetInstance().curr_iter_num();
-  if (ps::PSContext::instance()->encrypt_type() == ps::kPWEncryptType) {
+  if (FLContext::instance()->encrypt_type() == kPWEncryptType) {
     int sleep_time = 5;
     while (!Executor::GetInstance().IsAllWeightAggregationDone()) {
       std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time));

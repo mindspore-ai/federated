@@ -27,14 +27,14 @@
 #include <memory>
 #include <unordered_map>
 
-#include "utils/log_adapter.h"
-#include "ps/core/communicator/http_message_handler.h"
-#include "ps/core/communicator/ssl_http.h"
-#include "ps/constants.h"
-#include "ps/ps_context.h"
+#include "common/utils/log_adapter.h"
+#include "common/communicator/http_message_handler.h"
+#include "common/communicator/ssl_http.h"
+#include "common/constants.h"
+#include "python/fl_context.h"
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 using OnRequestReceive = std::function<void(std::shared_ptr<HttpMessageHandler>)>;
 
@@ -55,6 +55,6 @@ class HttpRequestHandler {
   struct event_base *evbase_;
 };
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_HTTP_REQUEST_HANDLER_H_

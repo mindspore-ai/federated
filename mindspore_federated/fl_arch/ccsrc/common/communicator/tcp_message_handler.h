@@ -23,15 +23,14 @@
 #include <memory>
 #include <vector>
 
-#include "utils/log_adapter.h"
-#include "ps/core/communicator/message.h"
-#include "proto/comm.pb.h"
-#include "proto/ps.pb.h"
-#include "utils/convert_utils_base.h"
-#include "ps/constants.h"
+#include "common/utils/log_adapter.h"
+#include "common/communicator/message.h"
+#include "common/protos/comm.pb.h"
+#include "common/utils/convert_utils_base.h"
+#include "common/constants.h"
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 using messageReceive =
   std::function<void(const std::shared_ptr<MessageMeta> &, const Protos &, const void *, size_t size)>;
@@ -58,7 +57,7 @@ class TcpMessageHandler {
   MessageHeader message_header_;
 };
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore
 
 #endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_MESSAGE_HANDLER_H_

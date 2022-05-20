@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-#include "ps/core/communicator/http_msg_handler.h"
+#include "common/communicator/http_msg_handler.h"
 #include <memory>
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 HttpMsgHandler::HttpMsgHandler(const std::shared_ptr<HttpMessageHandler> &http_msg, uint8_t *const data, size_t len)
     : http_msg_(http_msg), data_(data), len_(len) {}
@@ -42,5 +42,5 @@ bool HttpMsgHandler::SendResponseInference(const void *data, const size_t &len, 
   return true;
 }
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore

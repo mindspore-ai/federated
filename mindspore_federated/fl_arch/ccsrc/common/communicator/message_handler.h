@@ -18,7 +18,7 @@
 #define MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_MESSAGE_HANDLER_H_
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 typedef void (*RefBufferRelCallback)(const void *data, size_t datalen, void *extra);
 // MessageHandler class is used to handle requests from clients and send response from server.
@@ -44,6 +44,6 @@ class MessageHandler {
   }
 };
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_MESSAGE_HANDLER_H_

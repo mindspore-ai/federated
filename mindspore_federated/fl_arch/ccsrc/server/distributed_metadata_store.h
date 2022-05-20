@@ -20,11 +20,10 @@
 #include <string>
 #include <memory>
 #include <unordered_map>
-#include "proto/ps.pb.h"
-#include "fl/server/common.h"
-#include "ps/core/server_node.h"
-#include "ps/core/communicator/tcp_communicator.h"
-#include "fl/server/consistent_hash_ring.h"
+#include "common/common.h"
+#include "common/core/server_node.h"
+#include "common/communicator/tcp_communicator.h"
+#include "server/consistent_hash_ring.h"
 
 namespace mindspore {
 namespace fl {
@@ -44,10 +43,10 @@ class DistributedMetadataStore {
   }
 
   // Initialize metadata storage with the server node because communication is needed.
-  void Initialize(const std::shared_ptr<ps::core::ServerNode> &server_node);
+  void Initialize(const std::shared_ptr<fl::core::ServerNode> &server_node);
 
   // Register callbacks for the server to handle update/get metadata messages from other servers.
-  void RegisterMessageCallback(const std::shared_ptr<ps::core::TcpCommunicator> &communicator);
+  void RegisterMessageCallback(const std::shared_ptr<fl::core::TcpCommunicator> &communicator);
 
   // Register metadata for the name with the initial value. This method should be only called once for each name.
   void RegisterMetadata(const std::string &name, const PBMetadata &meta);
@@ -55,8 +54,8 @@ class DistributedMetadataStore {
   // Reset the metadata value for the name.
   void ResetMetadata(const std::string &name);
 
-  // Update the metadata for the name. Parameter 'reason' is the reason why updating meta data failed.
-  bool UpdateMetadata(const std::string &name, const PBMetadata &meta, std::string *reason = nullptr);
+  // Update the metadata for the name.
+  bool UpdateMetadata(const std::string &name, const PBMetadata &meta);
 
   // Get the metadata for the name.
   PBMetadata GetMetadata(const std::string &name);
@@ -82,13 +81,13 @@ class DistributedMetadataStore {
   void InitHashRing();
 
   // Callback for updating metadata request sent to the server.
-  void HandleUpdateMetadataRequest(const std::shared_ptr<ps::core::MessageHandler> &message);
+  void HandleUpdateMetadataRequest(const std::shared_ptr<fl::core::MessageHandler> &message);
 
   // Callback for getting metadata request sent to the server.
-  void HandleGetMetadataRequest(const std::shared_ptr<ps::core::MessageHandler> &message);
+  void HandleGetMetadataRequest(const std::shared_ptr<fl::core::MessageHandler> &message);
 
   // Callback for getting metadata item request sent to the server.
-  void HandleGetOneDeviceMetaRequest(const std::shared_ptr<ps::core::MessageHandler> &message);
+  void HandleGetOneDeviceMetaRequest(const std::shared_ptr<fl::core::MessageHandler> &message);
 
   // Do updating metadata in the server where the metadata for the name is stored.
   bool DoUpdateMetadata(const std::string &name, const PBMetadata &meta);
@@ -105,8 +104,8 @@ class DistributedMetadataStore {
   bool UpdatePairClientShares(const std::string &name, const PBMetadata &meta);
 
   // Members for the communication between servers.
-  std::shared_ptr<ps::core::ServerNode> server_node_;
-  std::shared_ptr<ps::core::TcpCommunicator> communicator_;
+  std::shared_ptr<fl::core::ServerNode> server_node_;
+  std::shared_ptr<fl::core::TcpCommunicator> communicator_;
   uint32_t local_rank_;
   uint32_t server_num_;
 

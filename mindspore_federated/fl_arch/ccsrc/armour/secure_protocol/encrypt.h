@@ -20,13 +20,14 @@
 #ifndef _WIN32
 #include <openssl/evp.h>
 #endif
-#include "utils/log_adapter.h"
+#include "common/utils/log_adapter.h"
 
 #define AES_IV_SIZE 16
 #define KEY_LENGTH_32 32
 #define KEY_LENGTH_16 16
 
 namespace mindspore {
+namespace fl {
 namespace armour {
 class Encrypt {};
 enum AES_MODE {
@@ -55,5 +56,6 @@ class AESEncrypt : public SymmetricEncrypt {
 };
 
 }  // namespace armour
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_ARMOUR_ENCRYPT_H

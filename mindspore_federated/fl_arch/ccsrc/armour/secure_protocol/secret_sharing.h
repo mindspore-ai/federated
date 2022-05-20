@@ -21,10 +21,11 @@
 #endif
 #include <string>
 #include <vector>
-#include "utils/log_adapter.h"
-#include "fl/server/common.h"
+#include "common/utils/log_adapter.h"
+#include "common/common.h"
 
 namespace mindspore {
+namespace fl {
 namespace armour {
 #define SECRET_MAX_LEN 32
 #define PRIME_MAX_LEN 33
@@ -69,5 +70,6 @@ class SecretSharing {
 #endif
 
 }  // namespace armour
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_SECRET_SHARING_H

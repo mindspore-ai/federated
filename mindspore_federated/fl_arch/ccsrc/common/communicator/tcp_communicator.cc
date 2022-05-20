@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-#include "ps/core/communicator/tcp_communicator.h"
+#include "common/communicator/tcp_communicator.h"
 #include <memory>
 #include <utility>
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 bool TcpCommunicator::Start() {
   if (running_) {
@@ -30,7 +30,7 @@ bool TcpCommunicator::Start() {
 
   // Set message callback. For example, message of push/pull, etc.
   tcp_msg_callback_ = std::bind(
-    [&](std::shared_ptr<core::TcpConnection> conn, std::shared_ptr<core::MessageMeta> meta, const void *data,
+    [&](std::shared_ptr<fl::core::TcpConnection> conn, std::shared_ptr<fl::core::MessageMeta> meta, const void *data,
         size_t size) -> void {
       MS_ERROR_IF_NULL_WO_RET_VAL(conn);
       MS_ERROR_IF_NULL_WO_RET_VAL(meta);
@@ -108,10 +108,10 @@ void TcpCommunicator::RegisterMsgCallBack(const std::string &msg_type, const Mes
   return;
 }
 
-void TcpCommunicator::RegisterEventCallback(const core::ClusterEvent &event, const EventCallback &event_cb) {
+void TcpCommunicator::RegisterEventCallback(const fl::core::ClusterEvent &event, const EventCallback &event_cb) {
   MS_EXCEPTION_IF_NULL(abstrace_node_);
   abstrace_node_->RegisterEventCallback(event, event_cb);
 }
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore

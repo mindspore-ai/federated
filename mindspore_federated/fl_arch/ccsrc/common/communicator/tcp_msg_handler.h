@@ -18,17 +18,16 @@
 #define MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_MSG_HANDLER_H_
 
 #include <memory>
-#include "proto/ps.pb.h"
-#include "ps/core/abstract_node.h"
-#include "ps/core/communicator/message_handler.h"
-#include "ps/constants.h"
+#include "common/core/abstract_node.h"
+#include "common/communicator/message_handler.h"
+#include "common/constants.h"
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 class TcpMsgHandler : public MessageHandler {
  public:
-  TcpMsgHandler(AbstractNode *abstract_node, const std::shared_ptr<core::TcpConnection> &conn,
+  TcpMsgHandler(AbstractNode *abstract_node, const std::shared_ptr<fl::core::TcpConnection> &conn,
                 const std::shared_ptr<MessageMeta> &meta, DataPtr data, size_t size);
   ~TcpMsgHandler() override = default;
 
@@ -39,7 +38,7 @@ class TcpMsgHandler : public MessageHandler {
  private:
   AbstractNode *abstract_node_;
   std::shared_ptr<TcpConnection> tcp_conn_;
-  // core::MessageMeta is used for server to get the user command and to find communication peer when responding.
+  // fl::core::MessageMeta is used for server to get the user command and to find communication peer when responding.
   std::shared_ptr<MessageMeta> meta_;
   // We use data of shared_ptr array so that the raw pointer won't be released until the reference is 0.
   DataPtr data_ptr_;
@@ -47,6 +46,6 @@ class TcpMsgHandler : public MessageHandler {
   size_t len_;
 };
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_MSG_HANDLER_H_

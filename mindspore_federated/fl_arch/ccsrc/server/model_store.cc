@@ -14,13 +14,12 @@
  * limitations under the License.
  */
 
-#include "fl/server/model_store.h"
+#include "server/model_store.h"
 #include <map>
 #include <string>
 #include <memory>
-#include "fl/server/executor.h"
-#include "pipeline/jit/parse/parse.h"
-#include "include/common/utils/python_adapter.h"
+#include "server/executor.h"
+#include "common/utils/python_adapter.h"
 
 namespace mindspore {
 namespace fl {
@@ -39,7 +38,7 @@ void ModelStore::Initialize(uint32_t rank_id, uint32_t max_count) {
     iteration_to_compress_model_[kInitIterationNum][item.first] = AssignNewCompressModelMemory(item.first, model);
   }
   model_size_ = ComputeModelSize();
-  MS_LOG(INFO) << "Model store checkpoint dir is: " << ps::PSContext::instance()->checkpoint_dir();
+  MS_LOG(INFO) << "Model store checkpoint dir is: " << FLContext::instance()->checkpoint_dir();
 }
 
 void ModelStore::StoreModelByIterNum(size_t iteration, const std::map<std::string, AddressPtr> &new_model) {
@@ -180,7 +179,7 @@ std::shared_ptr<MemoryRegister> ModelStore::AssignNewCompressModelMemory(
     MS_LOG(EXCEPTION) << "Model feature map is empty.";
     return nullptr;
   }
-  std::map<string, std::vector<float>> feature_maps;
+  std::map<std::string, std::vector<float>> feature_maps;
   for (auto &feature_map : model) {
     auto weight_fullname = feature_map.first;
     auto weight_data = reinterpret_cast<float *>(feature_map.second->addr);
@@ -285,7 +284,7 @@ void ModelStore::RelModelResponseCache(const void *data, size_t datalen, void *e
   }
 }
 
-std::shared_ptr<std::vector<uint8_t>> ModelStore::GetModelResponseCache(const string &round_name,
+std::shared_ptr<std::vector<uint8_t>> ModelStore::GetModelResponseCache(const std::string &round_name,
                                                                         size_t cur_iteration_num,
                                                                         size_t model_iteration_num,
                                                                         const std::string &compress_type) {
@@ -304,7 +303,7 @@ std::shared_ptr<std::vector<uint8_t>> ModelStore::GetModelResponseCache(const st
   return it->cache;
 }
 
-std::shared_ptr<std::vector<uint8_t>> ModelStore::StoreModelResponseCache(const string &round_name,
+std::shared_ptr<std::vector<uint8_t>> ModelStore::StoreModelResponseCache(const std::string &round_name,
                                                                           size_t cur_iteration_num,
                                                                           size_t model_iteration_num,
                                                                           const std::string &compress_type,
@@ -366,7 +365,7 @@ void ModelStore::SaveCheckpoint(size_t iteration, const std::map<std::string, Ad
   std::unordered_map<std::string, Feature> &aggregation_feature_map =
     LocalMetaStore::GetInstance().aggregation_feature_map();
 
-  namespace python_adapter = mindspore::python_adapter;
+  namespace python_adapter = mindspore::fl::python_adapter;
   py::module mod = python_adapter::GetPyModule(PYTHON_MOD_SERIALIZE_MODULE);
 
   py::dict dict_data = py::dict();
@@ -386,8 +385,8 @@ void ModelStore::SaveCheckpoint(size_t iteration, const std::map<std::string, Ad
     dict_data[py::str(weight_fullname)] = data_list;
   }
 
-  std::string checkpoint_dir = ps::PSContext::instance()->checkpoint_dir();
-  std::string fl_name = ps::PSContext::instance()->fl_name();
+  std::string checkpoint_dir = FLContext::instance()->checkpoint_dir();
+  std::string fl_name = FLContext::instance()->fl_name();
 
   python_adapter::CallPyModFn(mod, PYTHON_MOD_SAFE_WEIGHT, py::str(checkpoint_dir), py::str(fl_name),
                               py::str(std::to_string(iteration)), dict_data);

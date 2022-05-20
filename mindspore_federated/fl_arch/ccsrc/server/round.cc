@@ -14,11 +14,14 @@
  * limitations under the License.
  */
 
-#include "fl/server/round.h"
+#include "server/round.h"
+
 #include <memory>
 #include <string>
-#include "fl/server/server.h"
-#include "fl/server/iteration.h"
+
+#include "server/iteration.h"
+#include "server/kernel/round/update_model_kernel.h"
+#include "server/server.h"
 
 namespace mindspore {
 namespace fl {
@@ -39,11 +42,11 @@ Round::Round(const std::string &name, bool check_timeout, size_t time_window, bo
       threshold_count_(threshold_count),
       server_num_as_threshold_(server_num_as_threshold) {}
 
-void Round::RegisterMsgCallBack(const std::shared_ptr<ps::core::CommunicatorBase> &communicator) {
+void Round::RegisterMsgCallBack(const std::shared_ptr<fl::core::CommunicatorBase> &communicator) {
   MS_EXCEPTION_IF_NULL(communicator);
   MS_LOG(INFO) << "Round " << name_ << " register message callback.";
   communicator->RegisterMsgCallBack(
-    name_, [this](std::shared_ptr<ps::core::MessageHandler> message) { LaunchRoundKernel(message); });
+    name_, [this](std::shared_ptr<fl::core::MessageHandler> message) { LaunchRoundKernel(message); });
 }
 
 void Round::Initialize(const TimeOutCb &timeout_cb, const FinishIterCb &finish_iteration_cb) {
@@ -124,7 +127,7 @@ void Round::BindRoundKernel(const std::shared_ptr<kernel::RoundKernel> &kernel) 
   return;
 }
 
-void Round::LaunchRoundKernel(const std::shared_ptr<ps::core::MessageHandler> &message) {
+void Round::LaunchRoundKernel(const std::shared_ptr<fl::core::MessageHandler> &message) {
   MS_ERROR_IF_NULL_WO_RET_VAL(message);
   std::string reason = "";
   if (!IsServerAvailable(&reason)) {
@@ -143,6 +146,8 @@ void Round::LaunchRoundKernel(const std::shared_ptr<ps::core::MessageHandler> &m
     MS_LOG(DEBUG) << "Launching round kernel of round " + name_ + " failed.";
   }
   (void)(Iteration::GetInstance().running_round_num_--);
+  auto time = fl::core::CommUtil::GetNowTime().time_stamp;
+  kernel_->RecordReceiveData(std::make_pair(time, message->len()));
   return;
 }
 
@@ -159,7 +164,7 @@ bool Round::check_timeout() const { return check_timeout_; }
 
 size_t Round::time_window() const { return time_window_; }
 
-void Round::OnFirstCountEvent(const std::shared_ptr<ps::core::MessageHandler> &message) {
+void Round::OnFirstCountEvent(const std::shared_ptr<fl::core::MessageHandler> &message) {
   MS_ERROR_IF_NULL_WO_RET_VAL(kernel_);
   MS_LOG(INFO) << "Round " << name_ << " first count event is triggered.";
   // The timer starts only after the first count event is triggered by DistributedCountService.
@@ -173,7 +178,7 @@ void Round::OnFirstCountEvent(const std::shared_ptr<ps::core::MessageHandler> &m
   return;
 }
 
-void Round::OnLastCountEvent(const std::shared_ptr<ps::core::MessageHandler> &message) {
+void Round::OnLastCountEvent(const std::shared_ptr<fl::core::MessageHandler> &message) {
   MS_ERROR_IF_NULL_WO_RET_VAL(kernel_);
   MS_LOG(INFO) << "Round " << name_ << " last count event is triggered.";
   // Same as the first count event, the timer must be stopped by DistributedCountService.
@@ -200,7 +205,7 @@ bool Round::IsServerAvailable(std::string *reason) {
       kJobNotReadyPrintTimes = 0;
     }
     kJobNotReadyPrintTimes += 1;
-    *reason = ps::kJobNotReady;
+    *reason = kJobNotReady;
     return false;
   }
 
@@ -212,7 +217,7 @@ bool Round::IsServerAvailable(std::string *reason) {
       kJobNotAvailablePrintTimes = 0;
     }
     kJobNotAvailablePrintTimes += 1;
-    *reason = ps::kJobNotAvailable;
+    *reason = kJobNotAvailable;
     return false;
   }
 
@@ -223,7 +228,7 @@ bool Round::IsServerAvailable(std::string *reason) {
       kClusterSafeModePrintTimes = 0;
     }
     kClusterSafeModePrintTimes += 1;
-    *reason = ps::kClusterSafeMode;
+    *reason = kClusterSafeMode;
     return false;
   }
   return true;
@@ -245,6 +250,32 @@ void Round::InitkernelClientVisitedNum() { kernel_->InitClientVisitedNum(); }
 void Round::InitkernelClientUploadLoss() { kernel_->InitClientUploadLoss(); }
 
 float Round::kernel_upload_loss() const { return kernel_->upload_loss(); }
+
+std::vector<std::pair<uint64_t, uint32_t>> Round::GetUpdateModelCompleteInfo() const {
+  if (name_ == "updateModel") {
+    auto update_model_model_ptr = std::dynamic_pointer_cast<kernel::UpdateModelKernel>(kernel_);
+    MS_EXCEPTION_IF_NULL(update_model_model_ptr);
+    return update_model_model_ptr->GetCompletePeriodRecord();
+  } else {
+    MS_LOG(EXCEPTION) << "The kernel is not updateModel";
+    return {};
+  }
+}
+
+void Round::ResetParticipationTimeAndNum() {
+  if (name_ == "updateModel") {
+    auto update_model_kernel_ptr = std::dynamic_pointer_cast<kernel::UpdateModelKernel>(kernel_);
+    MS_ERROR_IF_NULL_WO_RET_VAL(update_model_kernel_ptr);
+    update_model_kernel_ptr->ResetParticipationTimeAndNum();
+  }
+  return;
+}
+
+std::multimap<uint64_t, size_t> Round::GetSendData() const { return kernel_->GetSendData(); }
+
+std::multimap<uint64_t, size_t> Round::GetReceiveData() const { return kernel_->GetReceiveData(); }
+
+void Round::ClearData() { return kernel_->ClearData(); }
 }  // namespace server
 }  // namespace fl
 }  // namespace mindspore

@@ -21,15 +21,17 @@
 #include <string>
 #include <memory>
 #include <fstream>
-#include "ps/ps_context.h"
-#include "ps/core/configuration.h"
-#include "ps/core/file_configuration.h"
-#include "fl/server/local_meta_store.h"
-#include "fl/server/iteration.h"
+#include "python/fl_context.h"
+#include "common/core/configuration.h"
+#include "common/core/file_configuration.h"
+#include "server/local_meta_store.h"
+#include "server/iteration.h"
+#include "common/core/comm_util.h"
 
 namespace mindspore {
 namespace fl {
 namespace server {
+constexpr auto kInstanceName = "instanceName";
 constexpr auto kFLName = "flName";
 constexpr auto kInstanceStatus = "instanceStatus";
 constexpr auto kFLIterationNum = "flIterationNum";
@@ -40,6 +42,9 @@ constexpr auto kIterExecutionTime = "iterationExecutionTime";
 constexpr auto kMetrics = "metrics";
 constexpr auto kClientVisitedInfo = "clientVisitedInfo";
 constexpr auto kIterationResult = "iterationResult";
+constexpr auto kStartTime = "startTime";
+constexpr auto kEndTime = "endTime";
+constexpr auto kDataRate = "dataRate";
 
 const std::map<InstanceState, std::string> kInstanceStateName = {
   {InstanceState::kRunning, "running"}, {InstanceState::kDisable, "disable"}, {InstanceState::kFinish, "finish"}};
@@ -80,11 +85,14 @@ class IterationMetrics {
   void set_iteration_time_cost(uint64_t iteration_time_cost);
   void set_round_client_num_map(const std::map<std::string, size_t> round_client_num_map);
   void set_iteration_result(IterationResult iteration_result);
+  void SetStartTime(const fl::core::Time &start_time);
+  void SetEndTime(const fl::core::Time &end_time);
+  void SetInstanceName(const std::string &instance_name);
 
  private:
-  // This is the main config file set by ps context.
+  // This is the main config file set by fl context.
   std::string config_file_path_;
-  std::unique_ptr<ps::core::FileConfiguration> config_;
+  std::unique_ptr<fl::core::FileConfiguration> config_;
 
   // The metrics file object.
   std::fstream metrics_file_;
@@ -95,10 +103,10 @@ class IterationMetrics {
   // Json object of metrics data.
   nlohmann::basic_json<std::map, std::vector, std::string, bool, int64_t, uint64_t, float> js_;
 
-  // The federated learning job name. Set by ps_context.
+  // The federated learning job name. Set by fl_context.
   std::string fl_name_;
 
-  // Federated learning iteration number. Set by ps_context.
+  // Federated learning iteration number. Set by fl_context.
   // If this number of iterations are completed, one instance is finished.
   size_t fl_iteration_num_;
 
@@ -122,6 +130,11 @@ class IterationMetrics {
 
   // Current iteration running result.
   IterationResult iteration_result_;
+
+  fl::core::Time start_time_;
+  fl::core::Time end_time_;
+
+  std::string instance_name_;
 };
 }  // namespace server
 }  // namespace fl

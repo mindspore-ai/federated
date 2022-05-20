@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-#include "fl/server/collective_ops_impl.h"
-#include "fl/server/local_meta_store.h"
-#include "fl/server/iteration.h"
-#include "utils/ms_context.h"
+#include "server/collective_ops_impl.h"
+#include "server/local_meta_store.h"
+#include "server/iteration.h"
 
 namespace mindspore {
 namespace fl {
@@ -29,7 +28,7 @@ const char kCollectivePhaseReduce[] = "reduce";
 const char kCollectivePhaseBroadcast[] = "broadcast";
 }  // namespace
 
-void CollectiveOpsImpl::Initialize(const std::shared_ptr<ps::core::ServerNode> &server_node) {
+void CollectiveOpsImpl::Initialize(const std::shared_ptr<fl::core::ServerNode> &server_node) {
   MS_EXCEPTION_IF_NULL(server_node);
   server_node_ = server_node;
   rank_id_ = server_node_->rank_id();
@@ -88,14 +87,14 @@ bool CollectiveOpsImpl::RunRingAllReduce(const std::string &data_name, uint32_t 
   MS_ERROR_IF_NULL_W_RET_VAL(server_node_, false);
   MS_ERROR_IF_NULL_W_RET_VAL(output_buff, false);
   auto curr_iteration_num = LocalMetaStore::GetInstance().curr_iter_num();
-  ps::core::CollectiveMessageMeta send_meta;
+  fl::core::CollectiveMessageMeta send_meta;
   send_meta.set_enable_flag(true);
   send_meta.set_send_rank_id(rank_id_);
   send_meta.set_recv_rank_id(send_to_rank);
   send_meta.set_iteration(curr_iteration_num);
   send_meta.set_weight_name(data_name);
 
-  ps::core::CollectiveMessageMeta recv_meta;
+  fl::core::CollectiveMessageMeta recv_meta;
   recv_meta.set_enable_flag(true);
   recv_meta.set_send_rank_id(recv_from_rank);
   recv_meta.set_recv_rank_id(rank_id_);
@@ -211,7 +210,7 @@ bool CollectiveOpsImpl::ReduceBroadcastAllReduce(const std::string &data_name, c
   T *output_buff = reinterpret_cast<T *>(recvbuff);
   // Reduce data to rank 0 process.
   auto curr_iteration_num = LocalMetaStore::GetInstance().curr_iter_num();
-  ps::core::CollectiveMessageMeta send_meta;
+  fl::core::CollectiveMessageMeta send_meta;
   send_meta.set_enable_flag(true);
   send_meta.set_send_rank_id(rank_id_);
   send_meta.set_iteration(curr_iteration_num);
@@ -219,7 +218,7 @@ bool CollectiveOpsImpl::ReduceBroadcastAllReduce(const std::string &data_name, c
   send_meta.set_chunk_index(0);
   send_meta.set_for_index(0);
 
-  ps::core::CollectiveMessageMeta recv_meta;
+  fl::core::CollectiveMessageMeta recv_meta;
   recv_meta.set_enable_flag(true);
   recv_meta.set_recv_rank_id(rank_id_);
   recv_meta.set_iteration(curr_iteration_num);
@@ -324,11 +323,7 @@ bool CollectiveOpsImpl::RingAllGather(const void *sendbuff, void *recvbuff, size
     return false;
   }
 
-  auto context_ptr = MsContext::GetInstance();
-  MS_EXCEPTION_IF_NULL(context_ptr);
-  // If enable recovery, set timeout 300s to prevent networking flapping.
-  uint32_t collective_comm_timeout =
-    context_ptr->get_param<bool>(MS_CTX_ENABLE_RECOVERY) ? kCollectiveCommMaxTimeout : kCollectiveCommTimeout;
+  uint32_t collective_comm_timeout = kCollectiveCommMaxTimeout;
 
   // Ring AllGather.
   for (size_t i = 0; i < rank_size_ - 1; i++) {
@@ -442,7 +437,7 @@ bool CollectiveOpsImpl::AllReduce(const std::string &data_name, void *sendbuff, 
 
 template <typename T>
 bool CollectiveOpsImpl::AllGather(const void *sendbuff, void *recvbuff, size_t send_count,
-                                  const ps::core::AbstractNodePtr &node) {
+                                  const std::shared_ptr<fl::core::AbstractNode> &node) {
   std::unique_lock<std::mutex> lock(mtx_);
   MS_ERROR_IF_NULL_W_RET_VAL(node, false);
   MS_ERROR_IF_NULL_W_RET_VAL(recvbuff, false);
@@ -453,10 +448,10 @@ bool CollectiveOpsImpl::AllGather(const void *sendbuff, void *recvbuff, size_t s
   node_role_ = node_->role();
   rank_id_ = node_->rank_id();
   switch (node_role_) {
-    case ps::core::WORKER:
+    case fl::core::WORKER:
       rank_size_ = node_->worker_num();
       break;
-    case ps::core::SERVER:
+    case fl::core::SERVER:
       rank_size_ = node_->server_num();
       break;
     default:
@@ -477,7 +472,8 @@ bool CollectiveOpsImpl::AllGather(const void *sendbuff, void *recvbuff, size_t s
 
 template <typename T>
 bool CollectiveOpsImpl::Broadcast(const void *sendbuff, void *recvbuff, size_t count, uint32_t root,
-                                  const ps::core::AbstractNodePtr &node, const CommunicationGroupInfo &group_info) {
+                                  const std::shared_ptr<fl::core::AbstractNode> &node,
+                                  const CommunicationGroupInfo &group_info) {
   std::unique_lock<std::mutex> lock(mtx_);
   MS_ERROR_IF_NULL_W_RET_VAL(node, false);
   MS_ERROR_IF_NULL_W_RET_VAL(recvbuff, false);
@@ -522,13 +518,13 @@ template bool CollectiveOpsImpl::AllReduce<int>(const std::string &data_name, vo
                                                 size_t count);
 
 template bool CollectiveOpsImpl::AllGather<float>(const void *sendbuff, void *recvbuff, size_t send_count,
-                                                  const ps::core::AbstractNodePtr &node);
+                                                  const std::shared_ptr<fl::core::AbstractNode> &node);
 template bool CollectiveOpsImpl::AllGather<uint64_t>(const void *sendbuff, void *recvbuff, size_t send_count,
-                                                     const ps::core::AbstractNodePtr &node);
+                                                     const std::shared_ptr<fl::core::AbstractNode> &node);
 template bool CollectiveOpsImpl::AllGather<int>(const void *sendbuff, void *recvbuff, size_t send_count,
-                                                const ps::core::AbstractNodePtr &node);
+                                                const std::shared_ptr<fl::core::AbstractNode> &node);
 template bool CollectiveOpsImpl::AllGather<char>(const void *sendbuff, void *recvbuff, size_t send_count,
-                                                 const ps::core::AbstractNodePtr &node);
+                                                 const std::shared_ptr<fl::core::AbstractNode> &node);
 
 template bool CollectiveOpsImpl::RingAllGather<float>(const void *sendbuff, void *recvbuff, size_t send_count);
 template bool CollectiveOpsImpl::RingAllGather<uint64_t>(const void *sendbuff, void *recvbuff, size_t send_count);
@@ -536,16 +532,16 @@ template bool CollectiveOpsImpl::RingAllGather<int>(const void *sendbuff, void *
 template bool CollectiveOpsImpl::RingAllGather<char>(const void *sendbuff, void *recvbuff, size_t send_count);
 
 template bool CollectiveOpsImpl::Broadcast<float>(const void *sendbuff, void *recvbuff, size_t count, uint32_t root,
-                                                  const ps::core::AbstractNodePtr &node,
+                                                  const std::shared_ptr<fl::core::AbstractNode> &node,
                                                   const CommunicationGroupInfo &group_info);
 template bool CollectiveOpsImpl::Broadcast<uint64_t>(const void *sendbuff, void *recvbuff, size_t count, uint32_t root,
-                                                     const ps::core::AbstractNodePtr &node,
+                                                     const std::shared_ptr<fl::core::AbstractNode> &node,
                                                      const CommunicationGroupInfo &group_info);
 template bool CollectiveOpsImpl::Broadcast<int>(const void *sendbuff, void *recvbuff, size_t count, uint32_t root,
-                                                const ps::core::AbstractNodePtr &node,
+                                                const std::shared_ptr<fl::core::AbstractNode> &node,
                                                 const CommunicationGroupInfo &group_info);
 template bool CollectiveOpsImpl::Broadcast<char>(const void *sendbuff, void *recvbuff, size_t count, uint32_t root,
-                                                 const ps::core::AbstractNodePtr &node,
+                                                 const std::shared_ptr<fl::core::AbstractNode> &node,
                                                  const CommunicationGroupInfo &group_info);
 
 template bool CollectiveOpsImpl::Broadcast<float>(const void *sendbuff, void *recvbuff, size_t count, uint32_t root,

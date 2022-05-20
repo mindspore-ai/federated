@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "ps/core/communicator/tcp_server.h"
+#include "common/communicator/tcp_server.h"
 
 #include <arpa/inet.h>
 #include <event2/buffer.h>
@@ -30,7 +30,7 @@
 #include <utility>
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 TcpConnection::~TcpConnection() {
   MS_LOG(WARNING) << "TcpConnection is destructed! fd is " << fd_;
@@ -145,7 +145,7 @@ void TcpServer::SetServerCallback(const OnConnected &client_conn, const OnDiscon
 }
 
 void TcpServer::Init() {
-  if (PSContext::instance()->enable_ssl()) {
+  if (FLContext::instance()->enable_ssl()) {
     MS_LOG(INFO) << "Init ssl.";
     SSLWrapper::GetInstance().InitSSL();
   }
@@ -276,7 +276,7 @@ void TcpServer::ListenerCallbackInner(evutil_socket_t fd, struct sockaddr *socka
 
   struct bufferevent *bev = nullptr;
 
-  if (!PSContext::instance()->enable_ssl()) {
+  if (!FLContext::instance()->enable_ssl()) {
     MS_LOG(INFO) << "SSL is disable.";
     bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE | BEV_OPT_THREADSAFE);
   } else {
@@ -299,8 +299,8 @@ void TcpServer::ListenerCallbackInner(evutil_socket_t fd, struct sockaddr *socka
   MS_EXCEPTION_IF_NULL(conn);
   SetTcpNoDelay(fd);
   server->AddConnection(fd, conn);
-  if (PSContext::instance()->server_mode() == kServerModeHybrid ||
-      PSContext::instance()->server_mode() == kServerModeFL) {
+  if (FLContext::instance()->server_mode() == kServerModeHybrid ||
+      FLContext::instance()->server_mode() == kServerModeFL) {
     conn->InitConnection(
       [fd, server](const std::shared_ptr<MessageMeta> &meta, const Protos &protos, const void *data, size_t size) {
         OnServerReceiveMessage on_server_receive = server->GetServerReceive();
@@ -412,7 +412,7 @@ void TcpServer::EventCallbackInner(struct bufferevent *bev, std::int16_t events,
     srv->RemoveConnection(conn->GetFd());
   } else if (events & BEV_EVENT_ERROR) {
     MS_LOG(WARNING) << "BEV_EVENT_ERROR event is trigger!";
-    if (PSContext::instance()->enable_ssl()) {
+    if (FLContext::instance()->enable_ssl()) {
       uint64_t err = bufferevent_get_openssl_error(bev);
       MS_LOG(WARNING) << "The error number is:" << err;
 
@@ -472,5 +472,5 @@ const std::map<evutil_socket_t, std::shared_ptr<TcpConnection>> &TcpServer::Conn
 
 void TcpServer::SetMessageCallback(const OnServerReceiveMessage &cb) { message_callback_ = cb; }
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore

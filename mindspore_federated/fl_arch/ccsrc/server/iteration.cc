@@ -14,29 +14,42 @@
  * limitations under the License.
  */
 
-#include "fl/server/iteration.h"
+#include "server/iteration.h"
+
 #include <memory>
-#include <vector>
-#include <string>
 #include <numeric>
+#include <string>
 #include <unordered_map>
-#include "fl/server/model_store.h"
-#include "fl/server/server.h"
+#include <vector>
+
+#include "server/model_store.h"
+#include "server/server.h"
+#include "common/core/comm_util.h"
 
 namespace mindspore {
 namespace fl {
 namespace server {
+namespace {
+const size_t kParticipationTimeLevelNum = 3;
+const size_t kIndexZero = 0;
+const size_t kIndexOne = 1;
+const size_t kIndexTwo = 2;
+const size_t kLastSecond = 59;
+}  // namespace
 class Server;
 
 Iteration::~Iteration() {
   move_to_next_thread_running_ = false;
+  is_date_rate_thread_running_ = false;
   next_iteration_cv_.notify_all();
   if (move_to_next_thread_.joinable()) {
     move_to_next_thread_.join();
   }
+  if (data_rate_thread_.joinable()) {
+    data_rate_thread_.join();
+  }
 }
-
-void Iteration::RegisterMessageCallback(const std::shared_ptr<ps::core::TcpCommunicator> &communicator) {
+void Iteration::RegisterMessageCallback(const std::shared_ptr<fl::core::TcpCommunicator> &communicator) {
   MS_EXCEPTION_IF_NULL(communicator);
   communicator_ = communicator;
   MS_EXCEPTION_IF_NULL(communicator_);
@@ -53,12 +66,12 @@ void Iteration::RegisterMessageCallback(const std::shared_ptr<ps::core::TcpCommu
                                      std::bind(&Iteration::HandleEndLastIterRequest, this, std::placeholders::_1));
 }
 
-void Iteration::RegisterEventCallback(const std::shared_ptr<ps::core::ServerNode> &server_node) {
+void Iteration::RegisterEventCallback(const std::shared_ptr<fl::core::ServerNode> &server_node) {
   MS_EXCEPTION_IF_NULL(server_node);
   server_node_ = server_node;
-  server_node->RegisterCustomEventCallback(static_cast<uint32_t>(ps::UserDefineEvent::kIterationRunning),
+  server_node->RegisterCustomEventCallback(static_cast<uint32_t>(UserDefineEvent::kIterationRunning),
                                            std::bind(&Iteration::ProcessIterationRunningEvent, this));
-  server_node->RegisterCustomEventCallback(static_cast<uint32_t>(ps::UserDefineEvent::kIterationCompleted),
+  server_node->RegisterCustomEventCallback(static_cast<uint32_t>(UserDefineEvent::kIterationCompleted),
                                            std::bind(&Iteration::ProcessIterationEndEvent, this));
 }
 
@@ -67,7 +80,7 @@ void Iteration::AddRound(const std::shared_ptr<Round> &round) {
   rounds_.push_back(round);
 }
 
-void Iteration::InitRounds(const std::vector<std::shared_ptr<ps::core::CommunicatorBase>> &communicators,
+void Iteration::InitRounds(const std::vector<std::shared_ptr<fl::core::CommunicatorBase>> &communicators,
                            const TimeOutCb &timeout_cb, const FinishIterCb &finish_iteration_cb) {
   if (communicators.empty()) {
     MS_LOG(EXCEPTION) << "Communicators for rounds is empty.";
@@ -149,7 +162,7 @@ void Iteration::SetIterationRunning() {
   MS_ERROR_IF_NULL_WO_RET_VAL(server_node_);
   if (server_node_->rank_id() == kLeaderServerRank) {
     // This event helps worker/server to be consistent in iteration state.
-    server_node_->BroadcastEvent(static_cast<uint32_t>(ps::UserDefineEvent::kIterationRunning));
+    server_node_->BroadcastEvent(static_cast<uint32_t>(UserDefineEvent::kIterationRunning));
     if (server_recovery_ != nullptr) {
       // Save data to the persistent storage in case the recovery happens at the beginning.
       if (!server_recovery_->Save(iteration_num_, instance_state_)) {
@@ -160,8 +173,13 @@ void Iteration::SetIterationRunning() {
 
   std::unique_lock<std::mutex> lock(iteration_state_mtx_);
   iteration_state_ = IterationState::kRunning;
-  start_timestamp_ = LongToUlong(CURRENT_TIME_MILLI.count());
+  start_time_ = fl::core::CommUtil::GetNowTime();
   MS_LOG(INFO) << "Iteratoin " << iteration_num_ << " start global timer.";
+  instance_name_ = FLContext::instance()->instance_name();
+  if (instance_name_.empty()) {
+    MS_LOG(WARNING) << "instance name is empty";
+    instance_name_ = "instance_" + start_time_.time_str_second;
+  }
   global_iter_timer_->Start(std::chrono::milliseconds(global_iteration_time_window_));
 }
 
@@ -170,12 +188,12 @@ void Iteration::SetIterationEnd() {
   MS_ERROR_IF_NULL_WO_RET_VAL(server_node_);
   if (server_node_->rank_id() == kLeaderServerRank) {
     // This event helps worker/server to be consistent in iteration state.
-    server_node_->BroadcastEvent(static_cast<uint32_t>(ps::UserDefineEvent::kIterationCompleted));
+    server_node_->BroadcastEvent(static_cast<uint32_t>(UserDefineEvent::kIterationCompleted));
   }
 
   std::unique_lock<std::mutex> lock(iteration_state_mtx_);
   iteration_state_ = IterationState::kCompleted;
-  complete_timestamp_ = LongToUlong(CURRENT_TIME_MILLI.count());
+  complete_time_ = fl::core::CommUtil::GetNowTime();
 }
 
 void Iteration::ScalingBarrier() {
@@ -364,7 +382,7 @@ bool Iteration::SyncIteration(uint32_t rank) {
   sync_iter_req.set_rank(rank);
 
   std::shared_ptr<std::vector<unsigned char>> sync_iter_rsp_msg = nullptr;
-  if (!communicator_->SendPbRequest(sync_iter_req, kLeaderServerRank, ps::core::TcpUserCommand::kSyncIteration,
+  if (!communicator_->SendPbRequest(sync_iter_req, kLeaderServerRank, fl::core::TcpUserCommand::kSyncIteration,
                                     &sync_iter_rsp_msg)) {
     MS_LOG(ERROR) << "Sending sync iter message to leader server failed.";
     return false;
@@ -378,7 +396,7 @@ bool Iteration::SyncIteration(uint32_t rank) {
   return true;
 }
 
-void Iteration::HandleSyncIterationRequest(const std::shared_ptr<ps::core::MessageHandler> &message) {
+void Iteration::HandleSyncIterationRequest(const std::shared_ptr<fl::core::MessageHandler> &message) {
   MS_ERROR_IF_NULL_WO_RET_VAL(message);
   MS_ERROR_IF_NULL_WO_RET_VAL(communicator_);
 
@@ -415,7 +433,7 @@ bool Iteration::NotifyLeaderMoveToNextIteration(bool is_last_iter_valid, const s
   notify_leader_to_next_iter_req.set_iter_num(iteration_num_);
   notify_leader_to_next_iter_req.set_reason(reason);
   while (communicator_->running() && !communicator_->SendPbRequest(notify_leader_to_next_iter_req, kLeaderServerRank,
-                                                                   ps::core::TcpUserCommand::kNotifyLeaderToNextIter)) {
+                                                                   fl::core::TcpUserCommand::kNotifyLeaderToNextIter)) {
     MS_LOG(WARNING) << "Sending notify leader server to proceed next iteration request to leader server 0 failed.";
     std::this_thread::sleep_for(std::chrono::milliseconds(kRetryDurationForPrepareForNextIter));
   }
@@ -423,7 +441,7 @@ bool Iteration::NotifyLeaderMoveToNextIteration(bool is_last_iter_valid, const s
   return true;
 }
 
-void Iteration::HandleNotifyLeaderMoveToNextIterRequest(const std::shared_ptr<ps::core::MessageHandler> &message) {
+void Iteration::HandleNotifyLeaderMoveToNextIterRequest(const std::shared_ptr<fl::core::MessageHandler> &message) {
   MS_ERROR_IF_NULL_WO_RET_VAL(message);
   MS_ERROR_IF_NULL_WO_RET_VAL(communicator_);
   NotifyLeaderMoveToNextIterResponse notify_leader_to_next_iter_rsp;
@@ -474,7 +492,7 @@ bool Iteration::BroadcastPrepareForNextIterRequest(size_t last_iteration, bool i
 
   std::vector<uint32_t> offline_servers = {};
   for (uint32_t i = 1; i < server_node_->server_num(); i++) {
-    if (!communicator_->SendPbRequest(prepare_next_iter_req, i, ps::core::TcpUserCommand::kPrepareForNextIter)) {
+    if (!communicator_->SendPbRequest(prepare_next_iter_req, i, fl::core::TcpUserCommand::kPrepareForNextIter)) {
       MS_LOG(WARNING) << "Sending prepare for next iteration request to server " << i << " failed. Retry later.";
       offline_servers.push_back(i);
       continue;
@@ -485,7 +503,7 @@ bool Iteration::BroadcastPrepareForNextIterRequest(size_t last_iteration, bool i
   (void)std::for_each(offline_servers.begin(), offline_servers.end(), [&](uint32_t rank) {
     // Should avoid endless loop if the server communicator is stopped.
     while (communicator_->running() &&
-           !communicator_->SendPbRequest(prepare_next_iter_req, rank, ps::core::TcpUserCommand::kPrepareForNextIter)) {
+           !communicator_->SendPbRequest(prepare_next_iter_req, rank, fl::core::TcpUserCommand::kPrepareForNextIter)) {
       MS_LOG(WARNING) << "Retry sending prepare for next iteration request to server " << rank
                       << " failed. The server has not recovered yet.";
       std::this_thread::sleep_for(std::chrono::milliseconds(kRetryDurationForPrepareForNextIter));
@@ -496,7 +514,7 @@ bool Iteration::BroadcastPrepareForNextIterRequest(size_t last_iteration, bool i
   return true;
 }
 
-void Iteration::HandlePrepareForNextIterRequest(const std::shared_ptr<ps::core::MessageHandler> &message) {
+void Iteration::HandlePrepareForNextIterRequest(const std::shared_ptr<fl::core::MessageHandler> &message) {
   MS_ERROR_IF_NULL_WO_RET_VAL(message);
   MS_ERROR_IF_NULL_WO_RET_VAL(communicator_);
   PrepareForNextIterRequest prepare_next_iter_req;
@@ -538,7 +556,7 @@ bool Iteration::BroadcastMoveToNextIterRequest(bool is_last_iter_valid, const st
   proceed_to_next_iter_req.set_last_iter_num(iteration_num_);
   proceed_to_next_iter_req.set_reason(reason);
   for (uint32_t i = 1; i < server_node_->server_num(); i++) {
-    if (!communicator_->SendPbRequest(proceed_to_next_iter_req, i, ps::core::TcpUserCommand::kProceedToNextIter)) {
+    if (!communicator_->SendPbRequest(proceed_to_next_iter_req, i, fl::core::TcpUserCommand::kProceedToNextIter)) {
       MS_LOG(WARNING) << "Sending proceed to next iteration request to server " << i << " failed.";
       continue;
     }
@@ -548,7 +566,7 @@ bool Iteration::BroadcastMoveToNextIterRequest(bool is_last_iter_valid, const st
   return true;
 }
 
-void Iteration::HandleMoveToNextIterRequest(const std::shared_ptr<ps::core::MessageHandler> &message) {
+void Iteration::HandleMoveToNextIterRequest(const std::shared_ptr<fl::core::MessageHandler> &message) {
   MS_ERROR_IF_NULL_WO_RET_VAL(message);
   MS_ERROR_IF_NULL_WO_RET_VAL(communicator_);
 
@@ -631,6 +649,13 @@ void Iteration::Next(bool is_iteration_valid, const std::string &reason) {
       round_client_num_map_[kUpdateModelAcceptClientNum] += round->kernel_accept_client_num();
       round_client_num_map_[kUpdateModelRejectClientNum] += round->kernel_reject_client_num();
       set_loss(loss_ + round->kernel_upload_loss());
+      auto update_model_complete_info = round->GetUpdateModelCompleteInfo();
+      if (update_model_complete_info.size() != kParticipationTimeLevelNum) {
+        continue;
+      }
+      round_client_num_map_[kParticipationTimeLevel1] += update_model_complete_info[kIndexZero].second;
+      round_client_num_map_[kParticipationTimeLevel2] += update_model_complete_info[kIndexOne].second;
+      round_client_num_map_[kParticipationTimeLevel3] += update_model_complete_info[kIndexTwo].second;
     } else if (round->name() == "getModel") {
       round_client_num_map_[kGetModelTotalClientNum] += round->kernel_total_client_num();
       round_client_num_map_[kGetModelAcceptClientNum] += round->kernel_accept_client_num();
@@ -646,7 +671,7 @@ bool Iteration::BroadcastEndLastIterRequest(uint64_t last_iter_num) {
   end_last_iter_req.set_last_iter_num(last_iter_num);
   for (uint32_t i = 1; i < server_node_->server_num(); i++) {
     std::shared_ptr<std::vector<unsigned char>> client_info_rsp_msg = nullptr;
-    if (!communicator_->SendPbRequest(end_last_iter_req, i, ps::core::TcpUserCommand::kEndLastIter,
+    if (!communicator_->SendPbRequest(end_last_iter_req, i, fl::core::TcpUserCommand::kEndLastIter,
                                       &client_info_rsp_msg)) {
       MS_LOG(WARNING) << "Sending ending last iteration request to server " << i << " failed.";
       continue;
@@ -656,10 +681,17 @@ bool Iteration::BroadcastEndLastIterRequest(uint64_t last_iter_num) {
   }
 
   EndLastIter();
+  if (iteration_fail_num_ == FLContext::instance()->continuous_failure_times()) {
+    std::string node_role = "SERVER";
+    std::string event = "Iteration failed " + std::to_string(iteration_fail_num_) + " times continuously";
+    server_node_->SendFailMessageToScheduler(node_role, event);
+    // Finish sending one message, reset cout num to 0
+    iteration_fail_num_ = 0;
+  }
   return true;
 }
 
-void Iteration::HandleEndLastIterRequest(const std::shared_ptr<ps::core::MessageHandler> &message) {
+void Iteration::HandleEndLastIterRequest(const std::shared_ptr<fl::core::MessageHandler> &message) {
   MS_ERROR_IF_NULL_WO_RET_VAL(message);
   MS_ERROR_IF_NULL_WO_RET_VAL(communicator_);
   EndLastIterRequest end_last_iter_req;
@@ -695,6 +727,14 @@ void Iteration::HandleEndLastIterRequest(const std::shared_ptr<ps::core::Message
       end_last_iter_rsp.set_updatemodel_accept_client_num(round->kernel_accept_client_num());
       end_last_iter_rsp.set_updatemodel_reject_client_num(round->kernel_reject_client_num());
       end_last_iter_rsp.set_upload_loss(round->kernel_upload_loss());
+      auto update_model_complete_info = round->GetUpdateModelCompleteInfo();
+      if (update_model_complete_info.size() != kParticipationTimeLevelNum) {
+        MS_LOG(EXCEPTION) << "update_model_complete_info size is not equal 3";
+        continue;
+      }
+      end_last_iter_rsp.set_participation_time_level1_num(update_model_complete_info[kIndexZero].second);
+      end_last_iter_rsp.set_participation_time_level2_num(update_model_complete_info[kIndexOne].second);
+      end_last_iter_rsp.set_participation_time_level3_num(update_model_complete_info[kIndexTwo].second);
     } else if (round->name() == "getModel") {
       end_last_iter_rsp.set_getmodel_total_client_num(round->kernel_total_client_num());
       end_last_iter_rsp.set_getmodel_accept_client_num(round->kernel_accept_client_num());
@@ -712,9 +752,9 @@ void Iteration::HandleEndLastIterRequest(const std::shared_ptr<ps::core::Message
 
 void Iteration::EndLastIter() {
   MS_LOG(INFO) << "End the last iteration " << iteration_num_;
-  if (iteration_num_ == ps::PSContext::instance()->fl_iteration_num()) {
+  if (iteration_num_ == FLContext::instance()->fl_iteration_num()) {
     MS_LOG(INFO) << "Iteration loop " << iteration_loop_count_
-                 << " is completed. Iteration number: " << ps::PSContext::instance()->fl_iteration_num();
+                 << " is completed. Iteration number: " << FLContext::instance()->fl_iteration_num();
     iteration_loop_count_++;
     instance_state_ = InstanceState::kFinish;
   }
@@ -744,15 +784,21 @@ void Iteration::EndLastIter() {
     MS_ERROR_IF_NULL_WO_RET_VAL(round);
     round->InitkernelClientVisitedNum();
     round->InitkernelClientUploadLoss();
+    round->ResetParticipationTimeAndNum();
   }
   round_client_num_map_.clear();
   set_loss(0.0f);
   Server::GetInstance().CancelSafeMode();
   iteration_state_cv_.notify_all();
-  if (iteration_num_ > ps::PSContext::instance()->fl_iteration_num()) {
+  if (iteration_num_ > FLContext::instance()->fl_iteration_num()) {
     MS_LOG(WARNING) << "The server's training job is finished.";
   } else {
     MS_LOG(INFO) << "Move to next iteration:" << iteration_num_ << "\n";
+  }
+  if (iteration_result_.load() == IterationResult::kFail) {
+    iteration_fail_num_++;
+  } else {
+    iteration_fail_num_ = 0;
   }
 }
 
@@ -768,12 +814,15 @@ bool Iteration::SummarizeIteration() {
     return true;
   }
 
-  metrics_->set_fl_name(ps::PSContext::instance()->fl_name());
-  metrics_->set_fl_iteration_num(ps::PSContext::instance()->fl_iteration_num());
+  metrics_->SetInstanceName(instance_name_);
+  metrics_->SetStartTime(start_time_);
+  metrics_->SetEndTime(complete_time_);
+  metrics_->set_fl_name(FLContext::instance()->fl_name());
+  metrics_->set_fl_iteration_num(FLContext::instance()->fl_iteration_num());
   metrics_->set_cur_iteration_num(iteration_num_);
   metrics_->set_instance_state(instance_state_.load());
   uint64_t update_model_threshold =
-    ps::PSContext::instance()->start_fl_job_threshold() * ps::PSContext::instance()->update_model_ratio();
+    FLContext::instance()->start_fl_job_threshold() * FLContext::instance()->update_model_ratio();
   if (update_model_threshold > 0) {
     metrics_->set_loss(loss_ / update_model_threshold);
   }
@@ -781,12 +830,12 @@ bool Iteration::SummarizeIteration() {
   metrics_->set_round_client_num_map(round_client_num_map_);
   metrics_->set_iteration_result(iteration_result_.load());
 
-  if (complete_timestamp_ < start_timestamp_) {
-    MS_LOG(ERROR) << "The complete_timestamp_: " << complete_timestamp_ << ", start_timestamp_: " << start_timestamp_
-                  << ". One of them is invalid.";
+  if (complete_time_.time_stamp < start_time_.time_stamp) {
+    MS_LOG(ERROR) << "The complete_timestamp_: " << complete_time_.time_stamp
+                  << ", start_timestamp_: " << start_time_.time_stamp << ". One of them is invalid.";
     metrics_->set_iteration_time_cost(UINT64_MAX);
   } else {
-    metrics_->set_iteration_time_cost(complete_timestamp_ - start_timestamp_);
+    metrics_->set_iteration_time_cost(complete_time_.time_stamp - start_time_.time_stamp);
   }
 
   if (!metrics_->Summarize()) {
@@ -800,61 +849,61 @@ bool Iteration::UpdateHyperParams(const nlohmann::json &json) {
   for (const auto &item : json.items()) {
     std::string key = item.key();
     if (key == "start_fl_job_threshold") {
-      ps::PSContext::instance()->set_start_fl_job_threshold(item.value().get<uint64_t>());
+      FLContext::instance()->set_start_fl_job_threshold(item.value().get<uint64_t>());
       continue;
     }
     if (key == "start_fl_job_time_window") {
-      ps::PSContext::instance()->set_start_fl_job_time_window(item.value().get<uint64_t>());
+      FLContext::instance()->set_start_fl_job_time_window(item.value().get<uint64_t>());
       continue;
     }
     if (key == "update_model_ratio") {
-      ps::PSContext::instance()->set_update_model_ratio(item.value().get<float>());
+      FLContext::instance()->set_update_model_ratio(item.value().get<float>());
       continue;
     }
     if (key == "update_model_time_window") {
-      ps::PSContext::instance()->set_update_model_time_window(item.value().get<uint64_t>());
+      FLContext::instance()->set_update_model_time_window(item.value().get<uint64_t>());
       continue;
     }
     if (key == "fl_iteration_num") {
-      ps::PSContext::instance()->set_fl_iteration_num(item.value().get<uint64_t>());
+      FLContext::instance()->set_fl_iteration_num(item.value().get<uint64_t>());
       continue;
     }
     if (key == "client_epoch_num") {
-      ps::PSContext::instance()->set_client_epoch_num(item.value().get<uint64_t>());
+      FLContext::instance()->set_client_epoch_num(item.value().get<uint64_t>());
       continue;
     }
     if (key == "client_batch_size") {
-      ps::PSContext::instance()->set_client_batch_size(item.value().get<uint64_t>());
+      FLContext::instance()->set_client_batch_size(item.value().get<uint64_t>());
       continue;
     }
     if (key == "client_learning_rate") {
-      ps::PSContext::instance()->set_client_learning_rate(item.value().get<float>());
+      FLContext::instance()->set_client_learning_rate(item.value().get<float>());
       continue;
     }
     if (key == "global_iteration_time_window") {
-      ps::PSContext::instance()->set_global_iteration_time_window(item.value().get<uint64_t>());
+      FLContext::instance()->set_global_iteration_time_window(item.value().get<uint64_t>());
       continue;
     }
   }
 
-  MS_LOG(INFO) << "start_fl_job_threshold: " << ps::PSContext::instance()->start_fl_job_threshold();
-  MS_LOG(INFO) << "start_fl_job_time_window: " << ps::PSContext::instance()->start_fl_job_time_window();
-  MS_LOG(INFO) << "update_model_ratio: " << ps::PSContext::instance()->update_model_ratio();
-  MS_LOG(INFO) << "update_model_time_window: " << ps::PSContext::instance()->update_model_time_window();
-  MS_LOG(INFO) << "fl_iteration_num: " << ps::PSContext::instance()->fl_iteration_num();
-  MS_LOG(INFO) << "client_epoch_num: " << ps::PSContext::instance()->client_epoch_num();
-  MS_LOG(INFO) << "client_batch_size: " << ps::PSContext::instance()->client_batch_size();
-  MS_LOG(INFO) << "client_learning_rate: " << ps::PSContext::instance()->client_learning_rate();
-  MS_LOG(INFO) << "global_iteration_time_window: " << ps::PSContext::instance()->global_iteration_time_window();
+  MS_LOG(INFO) << "start_fl_job_threshold: " << FLContext::instance()->start_fl_job_threshold();
+  MS_LOG(INFO) << "start_fl_job_time_window: " << FLContext::instance()->start_fl_job_time_window();
+  MS_LOG(INFO) << "update_model_ratio: " << FLContext::instance()->update_model_ratio();
+  MS_LOG(INFO) << "update_model_time_window: " << FLContext::instance()->update_model_time_window();
+  MS_LOG(INFO) << "fl_iteration_num: " << FLContext::instance()->fl_iteration_num();
+  MS_LOG(INFO) << "client_epoch_num: " << FLContext::instance()->client_epoch_num();
+  MS_LOG(INFO) << "client_batch_size: " << FLContext::instance()->client_batch_size();
+  MS_LOG(INFO) << "client_learning_rate: " << FLContext::instance()->client_learning_rate();
+  MS_LOG(INFO) << "global_iteration_time_window: " << FLContext::instance()->global_iteration_time_window();
   return true;
 }
 
 bool Iteration::ReInitRounds() {
-  size_t start_fl_job_threshold = ps::PSContext::instance()->start_fl_job_threshold();
-  float update_model_ratio = ps::PSContext::instance()->update_model_ratio();
+  size_t start_fl_job_threshold = FLContext::instance()->start_fl_job_threshold();
+  float update_model_ratio = FLContext::instance()->update_model_ratio();
   size_t update_model_threshold = static_cast<size_t>(std::ceil(start_fl_job_threshold * update_model_ratio));
-  uint64_t start_fl_job_time_window = ps::PSContext::instance()->start_fl_job_time_window();
-  uint64_t update_model_time_window = ps::PSContext::instance()->update_model_time_window();
+  uint64_t start_fl_job_time_window = FLContext::instance()->start_fl_job_time_window();
+  uint64_t update_model_time_window = FLContext::instance()->update_model_time_window();
   std::vector<RoundConfig> new_round_config = {
     {"startFLJob", true, start_fl_job_time_window, true, start_fl_job_threshold},
     {"updateModel", true, update_model_time_window, true, update_model_threshold}};
@@ -863,18 +912,7 @@ bool Iteration::ReInitRounds() {
     return false;
   }
 
-  size_t executor_threshold = 0;
-  const std::string &server_mode = ps::PSContext::instance()->server_mode();
-  uint32_t worker_num = ps::PSContext::instance()->initial_worker_num();
-  if (server_mode == ps::kServerModeFL || server_mode == ps::kServerModeHybrid) {
-    executor_threshold = update_model_threshold;
-  } else if (server_mode == ps::kServerModePS) {
-    executor_threshold = worker_num;
-  } else {
-    MS_LOG(ERROR) << "Server mode " << server_mode << " is not supported.";
-    return false;
-  }
-  if (!Executor::GetInstance().ReInitForUpdatingHyperParams(executor_threshold)) {
+  if (!Executor::GetInstance().ReInitForUpdatingHyperParams(update_model_threshold)) {
     MS_LOG(ERROR) << "Reinitializing executor failed.";
     return false;
   }
@@ -882,7 +920,7 @@ bool Iteration::ReInitRounds() {
 }
 
 void Iteration::InitGlobalIterTimer(const TimeOutCb &timeout_cb) {
-  global_iteration_time_window_ = ps::PSContext::instance()->global_iteration_time_window();
+  global_iteration_time_window_ = FLContext::instance()->global_iteration_time_window();
   global_iter_timer_ = std::make_shared<IterationTimer>();
 
   MS_LOG(INFO) << "Global iteration time window is: " << global_iteration_time_window_;
@@ -910,6 +948,10 @@ void Iteration::UpdateRoundClientNumMap(const std::shared_ptr<std::vector<unsign
   round_client_num_map_[kGetModelTotalClientNum] += end_last_iter_rsp.getmodel_total_client_num();
   round_client_num_map_[kGetModelAcceptClientNum] += end_last_iter_rsp.getmodel_accept_client_num();
   round_client_num_map_[kGetModelRejectClientNum] += end_last_iter_rsp.getmodel_reject_client_num();
+
+  round_client_num_map_[kParticipationTimeLevel1] += end_last_iter_rsp.participation_time_level1_num();
+  round_client_num_map_[kParticipationTimeLevel2] += end_last_iter_rsp.participation_time_level2_num();
+  round_client_num_map_[kParticipationTimeLevel3] += end_last_iter_rsp.participation_time_level3_num();
 }
 
 void Iteration::UpdateRoundClientUploadLoss(const std::shared_ptr<std::vector<unsigned char>> &client_info_rsp_msg) {
@@ -923,6 +965,90 @@ void Iteration::UpdateRoundClientUploadLoss(const std::shared_ptr<std::vector<un
 void Iteration::set_instance_state(InstanceState state) {
   instance_state_ = state;
   MS_LOG(INFO) << "Server instance state is " << GetInstanceStateStr(instance_state_);
+}
+
+void Iteration::SetFileConfig(const std::shared_ptr<fl::core::FileConfiguration> &file_configuration) {
+  file_configuration_ = file_configuration;
+}
+
+std::string Iteration::GetDataRateFilePath() {
+  fl::core::FileConfig data_rate_config;
+  if (!fl::core::CommUtil::ParseAndCheckConfigJson(file_configuration_.get(), kDataRate, &data_rate_config)) {
+    MS_LOG(EXCEPTION) << "Data rate parament in config is not correct";
+    return "";
+  }
+  return data_rate_config.storage_file_path;
+}
+
+void Iteration::StartThreadToRecordDataRate() {
+  MS_LOG(INFO) << "Start to create a thread to record data rate";
+  data_rate_thread_ = std::thread([&]() {
+    std::fstream file_stream;
+    std::string data_rate_path = GetDataRateFilePath();
+    MS_LOG(DEBUG) << "The data rate file path is " << data_rate_path;
+    uint32_t rank_id = server_node_->rank_id();
+    while (is_date_rate_thread_running_) {
+      // record data every 60 seconds
+      std::this_thread::sleep_for(std::chrono::seconds(60));
+      auto now_time = fl::core::CommUtil::GetNowTime();
+      std::string data_rate_file =
+        data_rate_path + "/" + now_time.time_str_day + "_flow_server" + std::to_string(rank_id) + ".json";
+      file_stream.open(data_rate_file, std::ios::out | std::ios::app);
+      if (!file_stream.is_open()) {
+        MS_LOG(EXCEPTION) << data_rate_file << "is not open!";
+        return;
+      }
+      std::multimap<uint64_t, size_t> send_datas;
+      std::multimap<uint64_t, size_t> receive_datas;
+      for (const auto &round : rounds_) {
+        if (round == nullptr) {
+          MS_LOG(WARNING) << "round is nullptr";
+          continue;
+        }
+        auto send_data = round->GetSendData();
+        for (const auto &it : send_data) {
+          send_datas.emplace(it);
+        }
+        auto receive_data = round->GetReceiveData();
+        for (const auto &it : receive_data) {
+          receive_datas.emplace(it);
+        }
+        round->ClearData();
+      }
+      // One minute need record 60 groups of send data
+      std::vector<size_t> send_data_rates(60, 0);
+      for (const auto &it : send_datas) {
+        uint64_t millisecond = it.first - send_datas.begin()->first;
+        uint64_t second = millisecond / 1000;
+        if (second > kLastSecond) {
+          send_data_rates[kLastSecond] = send_data_rates[kLastSecond] + it.second;
+        } else {
+          send_data_rates[second] = send_data_rates[second] + it.second;
+        }
+      }
+
+      // One minute need record 60 groups of receive data
+      std::vector<size_t> receive_data_rates(60, 0);
+      for (const auto &it : receive_datas) {
+        uint64_t millisecond = it.first - receive_datas.begin()->first;
+        uint64_t second = millisecond / 1000;
+        if (second > kLastSecond) {
+          receive_data_rates[kLastSecond] = receive_data_rates[kLastSecond] + it.second;
+        } else {
+          receive_data_rates[second] = receive_data_rates[second] + it.second;
+        }
+      }
+      nlohmann::json js;
+      auto minute_time = now_time.time_str_second;
+      js["time"] = minute_time;
+      js["send"] = send_data_rates;
+      js["receive"] = receive_data_rates;
+      file_stream << js << "\n";
+      (void)file_stream.flush();
+      file_stream.close();
+    }
+  });
+  return;
 }
 }  // namespace server
 }  // namespace fl

@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-#include "fl/armour/secure_protocol/encrypt.h"
+#include "armour/secure_protocol/encrypt.h"
 
 namespace mindspore {
+namespace fl {
 namespace armour {
 AESEncrypt::AESEncrypt(const uint8_t *key, int key_len, const uint8_t *ivec, int ivec_len, const AES_MODE mode) {
   priv_key_ = key;
@@ -219,4 +220,5 @@ int AESEncrypt::evp_aes_decrypt(const uint8_t *encrypt_data, const int len, cons
 }
 #endif
 }  // namespace armour
+}  // namespace fl
 }  // namespace mindspore

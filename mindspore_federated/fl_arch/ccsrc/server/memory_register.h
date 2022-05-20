@@ -23,8 +23,8 @@
 #include <vector>
 #include <utility>
 #include <typeinfo>
-#include "fl/server/common.h"
-#include "fl/compression/encode_executor.h"
+#include "common/common.h"
+#include "compression/encode_executor.h"
 
 namespace mindspore {
 namespace fl {

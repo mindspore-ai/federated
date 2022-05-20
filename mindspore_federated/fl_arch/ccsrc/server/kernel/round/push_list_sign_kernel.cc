@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "fl/server/kernel/round/push_list_sign_kernel.h"
+#include "server/kernel/round/push_list_sign_kernel.h"
 #include <utility>
 #include <string>
 #include <vector>
@@ -34,10 +34,10 @@ void PushListSignKernel::InitKernel(size_t) {
 }
 
 bool PushListSignKernel::Launch(const uint8_t *req_data, size_t len,
-                                const std::shared_ptr<ps::core::MessageHandler> &message) {
+                                const std::shared_ptr<fl::core::MessageHandler> &message) {
   size_t iter_num = LocalMetaStore::GetInstance().curr_iter_num();
   MS_LOG(INFO) << "Launching PushListSignKernel, Iteration number is " << iter_num;
-  std::shared_ptr<server::FBBuilder> fbb = std::make_shared<server::FBBuilder>();
+  std::shared_ptr<FBBuilder> fbb = std::make_shared<FBBuilder>();
   if (fbb == nullptr || req_data == nullptr) {
     std::string reason = "FBBuilder builder or req_data is nullptr.";
     MS_LOG(ERROR) << reason;
@@ -62,7 +62,7 @@ bool PushListSignKernel::Launch(const uint8_t *req_data, size_t len,
     return true;
   }
   // verify signature
-  if (ps::PSContext::instance()->pki_verify()) {
+  if (FLContext::instance()->pki_verify()) {
     sigVerifyResult verify_result = VerifySignature(client_list_sign_req);
     if (verify_result == sigVerifyResult::FAILED) {
       std::string reason = "verify signature failed.";
@@ -86,8 +86,8 @@ bool PushListSignKernel::Launch(const uint8_t *req_data, size_t len,
 }
 
 bool PushListSignKernel::LaunchForPushListSign(const schema::SendClientListSign *client_list_sign_req,
-                                               const size_t &iter_num, const std::shared_ptr<server::FBBuilder> &fbb,
-                                               const std::shared_ptr<ps::core::MessageHandler> &message) {
+                                               const size_t &iter_num, const std::shared_ptr<FBBuilder> &fbb,
+                                               const std::shared_ptr<fl::core::MessageHandler> &message) {
   MS_ERROR_IF_NULL_W_RET_VAL(client_list_sign_req, false);
   size_t iter_client = IntToSize(client_list_sign_req->iteration());
   if (iter_num != iter_client) {
@@ -99,7 +99,7 @@ bool PushListSignKernel::LaunchForPushListSign(const schema::SendClientListSign 
     SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
     return true;
   }
-  std::vector<string> update_model_clients;
+  std::vector<std::string> update_model_clients;
   const PBMetadata update_model_clients_pb_out =
     DistributedMetadataStore::GetInstance().GetMetadata(kCtxUpdateModelClientList);
   const UpdateModelClientList &update_model_clients_pb = update_model_clients_pb_out.client_list();
@@ -128,9 +128,8 @@ bool PushListSignKernel::LaunchForPushListSign(const schema::SendClientListSign 
     SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
     return true;
   }
-  std::string count_reason = "";
-  if (!DistributedCountService::GetInstance().Count(name_, fl_id, &count_reason)) {
-    std::string reason = "Counting for push list sign request failed. Please retry later. " + count_reason;
+  if (!DistributedCountService::GetInstance().Count(name_, fl_id)) {
+    std::string reason = "Counting for push list sign request failed for fl id " + fl_id + ". Please retry later.";
     BuildPushListSignKernelRsp(fbb, schema::ResponseCode_OutOfTime, reason, std::to_string(CURRENT_TIME_MILLI.count()),
                                iter_num);
     MS_LOG(ERROR) << reason;
@@ -173,7 +172,7 @@ sigVerifyResult PushListSignKernel::VerifySignature(const schema::SendClientList
   std::vector<unsigned char> src_data;
   (void)src_data.insert(src_data.end(), timestamp.begin(), timestamp.end());
   (void)src_data.insert(src_data.end(), iter_str.begin(), iter_str.end());
-  auto certVerify = mindspore::ps::server::CertVerify::GetInstance();
+  auto certVerify = CertVerify::GetInstance();
   unsigned char srcDataHash[SHA256_DIGEST_LENGTH];
   certVerify.sha256Hash(src_data.data(), SizeToInt(src_data.size()), srcDataHash, SHA256_DIGEST_LENGTH);
   if (!certVerify.verifyRSAKey(key_attestations[fl_id], srcDataHash, signature.data(), SHA256_DIGEST_LENGTH)) {
@@ -188,11 +187,11 @@ sigVerifyResult PushListSignKernel::VerifySignature(const schema::SendClientList
 
 bool PushListSignKernel::PushListSign(const size_t cur_iterator, const std::string &next_req_time,
                                       const schema::SendClientListSign *client_list_sign_req,
-                                      const std::shared_ptr<fl::server::FBBuilder> &fbb,
+                                      const std::shared_ptr<FBBuilder> &fbb,
                                       const std::vector<std::string> &update_model_clients) {
   MS_LOG(INFO) << "CipherMgr::PushClientListSign START";
   std::vector<std::string> get_client_list;  // the clients which get update model client list
-  cipher_init_->cipher_meta_storage_.GetClientListFromServer(fl::server::kCtxGetUpdateModelClientList,
+  cipher_init_->cipher_meta_storage_.GetClientListFromServer(kCtxGetUpdateModelClientList,
                                                              &get_client_list);
   MS_ERROR_IF_NULL_W_RET_VAL(client_list_sign_req, false);
   MS_ERROR_IF_NULL_W_RET_VAL(client_list_sign_req->fl_id(), false);
@@ -257,9 +256,9 @@ bool PushListSignKernel::Reset() {
   return true;
 }
 
-void PushListSignKernel::BuildPushListSignKernelRsp(const std::shared_ptr<server::FBBuilder> &fbb,
-                                                    const schema::ResponseCode retcode, const string &reason,
-                                                    const string &next_req_time, const size_t iteration) {
+void PushListSignKernel::BuildPushListSignKernelRsp(const std::shared_ptr<FBBuilder> &fbb,
+                                                    const schema::ResponseCode retcode, const std::string &reason,
+                                                    const std::string &next_req_time, const size_t iteration) {
   auto rsp_reason = fbb->CreateString(reason);
   auto rsp_next_req_time = fbb->CreateString(next_req_time);
   schema::ResponseClientListSignBuilder rsp_builder(*(fbb.get()));

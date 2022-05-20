@@ -21,7 +21,7 @@
 #include <memory>
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 enum class Protos : uint32_t { RAW = 0, PROTOBUF = 1, FLATBUFFERS = 2 };
 
@@ -32,7 +32,8 @@ enum class Command {
   SEND_DATA = 3,
   FETCH_METADATA = 4,
   FINISH = 5,
-  COLLECTIVE_SEND_DATA = 6
+  COLLECTIVE_SEND_DATA = 6,
+  FAILURE_EVENT = 7
 };
 
 enum class Role { SERVER = 0, WORKER = 1, SCHEDULER = 2 };
@@ -54,6 +55,6 @@ struct CommandMeta {
   int32_t rank_id = 4;
 };
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_MESSAGE_H_

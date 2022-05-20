@@ -14,25 +14,26 @@
  * limitations under the License.
  */
 
-#include "fl/armour/cipher/cipher_unmask.h"
-#include "fl/server/common.h"
-#include "fl/server/local_meta_store.h"
-#include "fl/armour/cipher/cipher_meta_storage.h"
+#include "armour/cipher/cipher_unmask.h"
+#include "common/common.h"
+#include "server/local_meta_store.h"
+#include "armour/cipher/cipher_meta_storage.h"
 
 namespace mindspore {
+namespace fl {
 namespace armour {
 bool CipherUnmask::UnMask(const std::map<std::string, AddressPtr> &data) {
   MS_LOG(INFO) << "CipherMgr::UnMask START";
   clock_t start_time = clock();
   std::vector<float> noise;
 
-  bool ret = cipher_init_->cipher_meta_storage_.GetClientNoisesFromServer(fl::server::kCtxClientNoises, &noise);
+  bool ret = cipher_init_->cipher_meta_storage_.GetClientNoisesFromServer(kCtxClientNoises, &noise);
   if (!ret || noise.size() != cipher_init_->featuremap_) {
     MS_LOG(WARNING) << "Client noises is not ready";
     return false;
   }
 
-  size_t data_size = fl::server::LocalMetaStore::GetInstance().value<size_t>(fl::server::kCtxFedAvgTotalDataSize);
+  size_t data_size = fl::server::LocalMetaStore::GetInstance().value<size_t>(kCtxFedAvgTotalDataSize);
   if (data_size == 0) {
     MS_LOG(ERROR) << "FedAvgTotalDataSize equals to 0";
     return false;
@@ -61,4 +62,5 @@ bool CipherUnmask::UnMask(const std::map<std::string, AddressPtr> &data) {
   return true;
 }
 }  // namespace armour
+}  // namespace fl
 }  // namespace mindspore

@@ -14,56 +14,36 @@
  * limitations under the License.
  */
 
-#include "fl/server/iteration_metrics.h"
-#include <string>
+#include "server/iteration_metrics.h"
+
 #include <fstream>
-#include "utils/file_utils.h"
-#include "include/common/debug/common.h"
-#include "ps/constants.h"
+#include <string>
+
+#include "common/constants.h"
+#include "common/core/comm_util.h"
 
 namespace mindspore {
 namespace fl {
 namespace server {
 bool IterationMetrics::Initialize() {
-  config_ = std::make_unique<ps::core::FileConfiguration>(config_file_path_);
+  config_ = std::make_unique<fl::core::FileConfiguration>(config_file_path_);
   MS_EXCEPTION_IF_NULL(config_);
   if (!config_->Initialize()) {
-    MS_LOG(EXCEPTION) << "Initializing for metrics failed. Config file path " << config_file_path_
+    MS_LOG(EXCEPTION) << "Initializing for Config file path failed!" << config_file_path_
                       << " may be invalid or not exist.";
-  }
-
-  // Read the metrics file path. If file is not set or not exits, create one.
-  if (!config_->Exists(kMetrics)) {
-    MS_LOG(WARNING) << "Metrics config is not set. Don't write metrics.";
     return false;
-  } else {
-    std::string value = config_->Get(kMetrics, "");
-    nlohmann::json value_json;
-    try {
-      value_json = nlohmann::json::parse(value);
-    } catch (const std::exception &e) {
-      MS_LOG(EXCEPTION) << "The hyper-parameter data is not in json format.";
-      return false;
-    }
-
-    // Parse the storage type.
-    uint32_t storage_type = JsonGetKeyWithException<uint32_t>(value_json, ps::kStoreType);
-    if (std::to_string(storage_type) != ps::kFileStorage) {
-      MS_LOG(EXCEPTION) << "Storage type " << storage_type << " is not supported.";
-      return false;
-    }
-
-    // Parse storage file path.
-    metrics_file_path_ = JsonGetKeyWithException<std::string>(value_json, ps::kStoreFilePath);
-    auto realpath = Common::CreatePrefixPath(metrics_file_path_.c_str());
-    if (!realpath.has_value()) {
-      MS_LOG(EXCEPTION) << "Creating path for " << metrics_file_path_ << " failed.";
-      return false;
-    }
-
-    metrics_file_.open(realpath.value(), std::ios::app | std::ios::out);
-    metrics_file_.close();
   }
+  fl::core::FileConfig metrics_config;
+  if (!fl::core::CommUtil::ParseAndCheckConfigJson(config_.get(), kMetrics, &metrics_config)) {
+    MS_LOG(WARNING) << "Metrics parament in config is not correct";
+    return false;
+  }
+  metrics_file_path_ = metrics_config.storage_file_path;
+  if (fl::core::CommUtil::CreateDirectory(metrics_file_path_)) {
+    MS_LOG(INFO) << "Create Directory :" << metrics_file_path_ << " success.";
+  }
+  metrics_file_.open(metrics_file_path_.c_str(), std::ios::app | std::ios::out);
+  metrics_file_.close();
   return true;
 }
 
@@ -74,6 +54,9 @@ bool IterationMetrics::Summarize() {
     return false;
   }
 
+  js_[kInstanceName] = instance_name_;
+  js_[kStartTime] = start_time_.time_str_mill;
+  js_[kEndTime] = end_time_.time_str_mill;
   js_[kFLName] = fl_name_;
   js_[kInstanceStatus] = kInstanceStateName.at(instance_state_);
   js_[kFLIterationNum] = fl_iteration_num_;
@@ -120,6 +103,12 @@ void IterationMetrics::set_round_client_num_map(const std::map<std::string, size
 }
 
 void IterationMetrics::set_iteration_result(IterationResult iteration_result) { iteration_result_ = iteration_result; }
+
+void IterationMetrics::SetStartTime(const fl::core::Time &start_time) { start_time_ = start_time; }
+
+void IterationMetrics::SetEndTime(const fl::core::Time &end_time) { end_time_ = end_time; }
+
+void IterationMetrics::SetInstanceName(const std::string &instance_name) { instance_name_ = instance_name; }
 }  // namespace server
 }  // namespace fl
 }  // namespace mindspore

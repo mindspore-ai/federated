@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-#include "ps/core/communicator/task_executor.h"
+#include "common/communicator/task_executor.h"
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 TaskExecutor::TaskExecutor(size_t thread_num, size_t max_task_num, size_t submit_timeout)
     : running_(true),
@@ -84,5 +84,5 @@ TaskExecutor::~TaskExecutor() {
   notify_thread_.join();
 }
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore

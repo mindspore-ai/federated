@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include "fl/server/cert_verify.h"
+#include "server/cert_verify.h"
 #include <sys/time.h>
 #include <iostream>
 #include <cstdio>
@@ -24,7 +24,7 @@
 #include <sstream>
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace server {
 #ifndef _WIN32
 static const int64_t certStartTimeDiff = -600;
@@ -638,5 +638,5 @@ bool CertVerify::verifyCertAndSign(const std::string &flID, const std::string &t
 }
 #endif
 }  // namespace server
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore

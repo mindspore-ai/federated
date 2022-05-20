@@ -23,19 +23,19 @@
 #include <vector>
 #include <string>
 #include <memory>
-#include "proto/ps.pb.h"
-#include "utils/log_adapter.h"
-#include "fl/armour/secure_protocol/secret_sharing.h"
+#include "common/utils/log_adapter.h"
+#include "armour/secure_protocol/secret_sharing.h"
 #include "schema/fl_job_generated.h"
 #include "schema/cipher_generated.h"
-#include "fl/server/distributed_metadata_store.h"
-#include "fl/server/common.h"
+#include "server/distributed_metadata_store.h"
+#include "common/common.h"
 
 #define IND_IV_INDEX 0
 #define PW_IV_INDEX 1
 #define PW_SALT_INDEX 2
 
 namespace mindspore {
+namespace fl {
 namespace armour {
 
 template <typename T1>
@@ -67,7 +67,7 @@ struct CipherPublicPara {
   float dp_eps;
   float dp_delta;
   float dp_norm_clip;
-  string encrypt_type;
+  std::string encrypt_type;
   float sign_k;
   float sign_eps;
   float sign_thr_ratio;
@@ -111,9 +111,10 @@ class CipherMetaStorage {
   // Update client share to shared server.
   bool UpdateClientShareToServer(
     const char *list_name, const std::string &fl_id,
-    const flatbuffers::Vector<flatbuffers::Offset<mindspore::schema::ClientShare>> *shares);
+    const flatbuffers::Vector<flatbuffers::Offset<schema::ClientShare>> *shares);
 };
 }  // namespace armour
+}  // namespace fl
 }  // namespace mindspore
 
 #endif  // MINDSPORE_CCSRC_ARMOUR_CIPHER_META_STORAGE_H

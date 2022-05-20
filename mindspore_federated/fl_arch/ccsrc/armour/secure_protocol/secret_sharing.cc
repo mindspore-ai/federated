@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-#include "fl/armour/secure_protocol/secret_sharing.h"
+#include "armour/secure_protocol/secret_sharing.h"
 
 namespace mindspore {
+namespace fl {
 namespace armour {
 void secure_zero(uint8_t *s, size_t n) {
   volatile uint8_t *p = s;
@@ -249,4 +250,5 @@ int SecretSharing::Combine(size_t k, const std::vector<Share *> &shares, uint8_t
 }
 #endif
 }  // namespace armour
+}  // namespace fl
 }  // namespace mindspore

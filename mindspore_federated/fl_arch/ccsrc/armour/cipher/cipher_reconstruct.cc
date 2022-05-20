@@ -14,20 +14,21 @@
  * limitations under the License.
  */
 
-#include "fl/armour/cipher/cipher_reconstruct.h"
-#include "fl/server/common.h"
-#include "fl/armour/secure_protocol/masking.h"
-#include "fl/armour/secure_protocol/key_agreement.h"
-#include "fl/armour/cipher/cipher_meta_storage.h"
+#include "armour/cipher/cipher_reconstruct.h"
+#include "common/common.h"
+#include "armour/secure_protocol/masking.h"
+#include "armour/secure_protocol/key_agreement.h"
+#include "armour/cipher/cipher_meta_storage.h"
 
 namespace mindspore {
+namespace fl {
 namespace armour {
 bool CipherReconStruct::CombineMask(std::vector<Share *> *shares_tmp,
                                     std::map<std::string, std::vector<float>> *client_noise,
                                     const std::vector<std::string> &clients_share_list,
                                     const std::map<std::string, std::vector<std::vector<uint8_t>>> &record_public_keys,
                                     const std::map<std::string, std::vector<clientshare_str>> &reconstruct_secret_list,
-                                    const std::vector<string> &client_list,
+                                    const std::vector<std::string> &client_list,
                                     const std::map<std::string, std::vector<std::vector<uint8_t>>> &client_ivs) {
   bool retcode = true;
 #ifdef _WIN32
@@ -138,21 +139,21 @@ std::vector<uint8_t> CipherReconStruct::GetIndiIV(
   return ind_iv;
 }
 
-bool CipherReconStruct::ReconstructSecretsGenNoise(const std::vector<string> &client_list) {
+bool CipherReconStruct::ReconstructSecretsGenNoise(const std::vector<std::string> &client_list) {
   // get reconstruct_secrets from memory server
   MS_LOG(INFO) << "CipherReconStruct::ReconstructSecretsGenNoise START";
   bool retcode = true;
   std::map<std::string, std::vector<clientshare_str>> reconstruct_secrets;
-  cipher_init_->cipher_meta_storage_.GetClientSharesFromServer(fl::server::kCtxClientsReconstructShares,
+  cipher_init_->cipher_meta_storage_.GetClientSharesFromServer(kCtxClientsReconstructShares,
                                                                &reconstruct_secrets);
   std::map<std::string, std::vector<std::vector<uint8_t>>> record_public_keys;
-  cipher_init_->cipher_meta_storage_.GetClientKeysFromServer(fl::server::kCtxClientsKeys, &record_public_keys);
+  cipher_init_->cipher_meta_storage_.GetClientKeysFromServer(kCtxClientsKeys, &record_public_keys);
 
   std::map<std::string, std::vector<std::vector<uint8_t>>> client_ivs;
-  cipher_init_->cipher_meta_storage_.GetClientIVsFromServer(fl::server::kCtxClientsKeys, &client_ivs);
+  cipher_init_->cipher_meta_storage_.GetClientIVsFromServer(kCtxClientsKeys, &client_ivs);
 
   std::vector<std::string> clients_share_list;
-  cipher_init_->cipher_meta_storage_.GetClientListFromServer(fl::server::kCtxShareSecretsClientList,
+  cipher_init_->cipher_meta_storage_.GetClientListFromServer(kCtxShareSecretsClientList,
                                                              &clients_share_list);
   if (record_public_keys.size() < cipher_init_->exchange_key_threshold ||
       clients_share_list.size() < cipher_init_->share_secrets_threshold ||
@@ -196,7 +197,7 @@ bool CipherReconStruct::ReconstructSecretsGenNoise(const std::vector<string> &cl
     client_noise.clear();
     MS_LOG(INFO) << " ReconstructSecretsGenNoise updata noise to server";
 
-    if (!cipher_init_->cipher_meta_storage_.UpdateClientNoiseToServer(fl::server::kCtxClientNoises, noise)) {
+    if (!cipher_init_->cipher_meta_storage_.UpdateClientNoiseToServer(kCtxClientNoises, noise)) {
       MS_LOG(ERROR) << " ReconstructSecretsGenNoise failed. because UpdateClientNoiseToServer failed";
       return false;
     }
@@ -208,7 +209,7 @@ bool CipherReconStruct::ReconstructSecretsGenNoise(const std::vector<string> &cl
 }
 
 bool CipherReconStruct::CheckInputs(const schema::SendReconstructSecret *reconstruct_secret_req,
-                                    const std::shared_ptr<fl::server::FBBuilder> &fbb, const int cur_iterator,
+                                    const std::shared_ptr<FBBuilder> &fbb, const int cur_iterator,
                                     const std::string &next_req_time) {
   if (reconstruct_secret_req == nullptr) {
     std::string reason = "Request is nullptr";
@@ -228,7 +229,7 @@ bool CipherReconStruct::CheckInputs(const schema::SendReconstructSecret *reconst
 // reconstruct secrets
 bool CipherReconStruct::ReconstructSecrets(const int cur_iterator, const std::string &next_req_time,
                                            const schema::SendReconstructSecret *reconstruct_secret_req,
-                                           const std::shared_ptr<fl::server::FBBuilder> &fbb,
+                                           const std::shared_ptr<FBBuilder> &fbb,
                                            const std::vector<std::string> &client_list) {
   MS_LOG(INFO) << "CipherReconStruct::ReconstructSecrets START";
   clock_t start_time = clock();
@@ -255,7 +256,7 @@ bool CipherReconStruct::ReconstructSecrets(const int cur_iterator, const std::st
   }
 
   std::vector<std::string> get_clients_list;
-  cipher_init_->cipher_meta_storage_.GetClientListFromServer(fl::server::kCtxGetUpdateModelClientList,
+  cipher_init_->cipher_meta_storage_.GetClientListFromServer(kCtxGetUpdateModelClientList,
                                                              &get_clients_list);
   // client not in get client list.
   if (find(get_clients_list.begin(), get_clients_list.end(), fl_id) == get_clients_list.end()) {
@@ -276,7 +277,7 @@ bool CipherReconStruct::ReconstructSecrets(const int cur_iterator, const std::st
   }
 
   std::map<std::string, std::vector<clientshare_str>> reconstruct_shares;
-  cipher_init_->cipher_meta_storage_.GetClientSharesFromServer(fl::server::kCtxClientsReconstructShares,
+  cipher_init_->cipher_meta_storage_.GetClientSharesFromServer(kCtxClientsReconstructShares,
                                                                &reconstruct_shares);
   size_t count_client_num = reconstruct_shares.size();
   if (reconstruct_shares.find(fl_id) != reconstruct_shares.end()) {
@@ -288,9 +289,9 @@ bool CipherReconStruct::ReconstructSecrets(const int cur_iterator, const std::st
 
   auto reconstruct_secret_shares = reconstruct_secret_req->reconstruct_secret_shares();
   bool retcode_client =
-    cipher_init_->cipher_meta_storage_.UpdateClientToServer(fl::server::kCtxReconstructClientList, fl_id);
+    cipher_init_->cipher_meta_storage_.UpdateClientToServer(kCtxReconstructClientList, fl_id);
   bool retcode_share = cipher_init_->cipher_meta_storage_.UpdateClientShareToServer(
-    fl::server::kCtxClientsReconstructShares, fl_id, reconstruct_secret_shares);
+    kCtxClientsReconstructShares, fl_id, reconstruct_secret_shares);
   if (!(retcode_client && retcode_share)) {
     BuildReconstructSecretsRsp(fbb, schema::ResponseCode_OutOfTime, "reconstruct update shares or client failed.",
                                cur_iterator, next_req_time);
@@ -308,7 +309,7 @@ bool CipherReconStruct::ReconstructSecrets(const int cur_iterator, const std::st
     return true;
   }
   const fl::PBMetadata &clients_noises_pb_out =
-    fl::server::DistributedMetadataStore::GetInstance().GetMetadata(fl::server::kCtxClientNoises);
+    fl::server::DistributedMetadataStore::GetInstance().GetMetadata(kCtxClientNoises);
   const fl::ClientNoises &clients_noises_pb = clients_noises_pb_out.client_noises();
   if (clients_noises_pb.has_one_client_noises() == false) {
     MS_LOG(INFO) << "Success, the secret will be reconstructed.";
@@ -351,13 +352,13 @@ bool CipherReconStruct::GetNoiseMasksSum(std::vector<float> *result,
 
 void CipherReconStruct::ClearReconstructSecrets() {
   MS_LOG(INFO) << "CipherReconStruct::ClearReconstructSecrets START";
-  fl::server::DistributedMetadataStore::GetInstance().ResetMetadata(fl::server::kCtxReconstructClientList);
-  fl::server::DistributedMetadataStore::GetInstance().ResetMetadata(fl::server::kCtxClientsReconstructShares);
-  fl::server::DistributedMetadataStore::GetInstance().ResetMetadata(fl::server::kCtxClientNoises);
+  fl::server::DistributedMetadataStore::GetInstance().ResetMetadata(kCtxReconstructClientList);
+  fl::server::DistributedMetadataStore::GetInstance().ResetMetadata(kCtxClientsReconstructShares);
+  fl::server::DistributedMetadataStore::GetInstance().ResetMetadata(kCtxClientNoises);
   MS_LOG(INFO) << "CipherReconStruct::ClearReconstructSecrets Success";
 }
 
-void CipherReconStruct::BuildReconstructSecretsRsp(const std::shared_ptr<fl::server::FBBuilder> &fbb,
+void CipherReconStruct::BuildReconstructSecretsRsp(const std::shared_ptr<FBBuilder> &fbb,
                                                    const schema::ResponseCode retcode, const std::string &reason,
                                                    const int iteration, const std::string &next_req_time) {
   auto fbs_reason = fbb->CreateString(reason);
@@ -375,7 +376,7 @@ void CipherReconStruct::BuildReconstructSecretsRsp(const std::shared_ptr<fl::ser
 bool CipherReconStruct::GetSuvNoise(const std::vector<std::string> &clients_share_list,
                                     const std::map<std::string, std::vector<std::vector<uint8_t>>> &record_public_keys,
                                     const std::map<std::string, std::vector<std::vector<uint8_t>>> &client_ivs,
-                                    const string &fl_id, std::vector<float> *noise, const uint8_t *secret,
+                                    const std::string &fl_id, std::vector<float> *noise, const uint8_t *secret,
                                     size_t length) {
   for (auto p_key = clients_share_list.begin(); p_key != clients_share_list.end(); ++p_key) {
     if (*p_key != fl_id) {
@@ -512,4 +513,5 @@ void CipherReconStruct::DeleteShares(std::vector<Share *> *shares_tmp) {
   return;
 }
 }  // namespace armour
+}  // namespace fl
 }  // namespace mindspore

@@ -33,13 +33,14 @@
 #include <mutex>
 #include <atomic>
 
-#include "utils/log_adapter.h"
-#include "ps/core/comm_util.h"
-#include "ps/core/file_configuration.h"
-#include "ps/constants.h"
+#include "common/utils/log_adapter.h"
+#include "common/core/comm_util.h"
+#include "common/core/configuration.h"
+#include "common/core/file_configuration.h"
+#include "common/constants.h"
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 class SSLWrapper {
  public:
@@ -60,7 +61,7 @@ class SSLWrapper {
   time_t ConvertAsn1Time(const ASN1_TIME *const time) const;
   void StartCheckCertTime(const Configuration &config, const X509 *cert, const std::string &ca_path);
   void StopCheckCertTime();
-  void InitSSLCtx(const X509 *cert, const EVP_PKEY *pkey, X509_CRL *crl);
+  void InitSSLCtx(const X509 *cert, const EVP_PKEY *pkey);
 
   SSL_CTX *ssl_ctx_;
 
@@ -76,6 +77,6 @@ class SSLWrapper {
   std::mutex verify_mutex_;
 };
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_SSL_WRAPPER_H_

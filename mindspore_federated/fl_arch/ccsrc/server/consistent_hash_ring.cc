@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "fl/server/consistent_hash_ring.h"
+#include "server/consistent_hash_ring.h"
 
 namespace mindspore {
 namespace fl {

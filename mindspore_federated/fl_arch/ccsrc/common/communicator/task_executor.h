@@ -24,11 +24,11 @@
 #include <thread>
 #include <condition_variable>
 
-#include "utils/log_adapter.h"
-#include "ps/constants.h"
+#include "common/utils/log_adapter.h"
+#include "common/constants.h"
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 /* This class can submit tasks in multiple threads
  * example:
@@ -98,6 +98,6 @@ class TaskExecutor {
   std::queue<std::function<void()>> task_queue_;
 };
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TASK_EXECUTOR_H_

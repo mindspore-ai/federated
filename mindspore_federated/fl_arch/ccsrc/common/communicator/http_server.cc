@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#include "ps/core/communicator/http_server.h"
-#include "ps/core/communicator/http_message_handler.h"
-#include "ps/core/comm_util.h"
+#include "common/communicator/http_server.h"
+#include "common/communicator/http_message_handler.h"
+#include "common/core/comm_util.h"
 
 #ifdef WIN32
 #include <WinSock2.h>
@@ -39,7 +39,7 @@
 #include <regex>
 
 namespace mindspore {
-namespace ps {
+namespace fl {
 namespace core {
 HttpServer::~HttpServer() {
   if (!Stop()) {
@@ -131,7 +131,7 @@ bool HttpServer::RegisterRoute(const std::string &url, OnRequestReceive *functio
     return false;
   }
   std::string http_url = "";
-  if (ps::PSContext::instance()->enable_ssl()) {
+  if (FLContext::instance()->enable_ssl()) {
     http_url = "https://" + server_address_ + ":" + std::to_string(server_port_) + url;
   } else {
     http_url = "http://" + server_address_ + ":" + std::to_string(server_port_) + url;
@@ -189,5 +189,5 @@ bool HttpServer::Stop() {
   return result;
 }
 }  // namespace core
-}  // namespace ps
+}  // namespace fl
 }  // namespace mindspore

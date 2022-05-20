@@ -22,10 +22,9 @@
 #include <string>
 #include <vector>
 #include <utility>
-#include "fl/server/common.h"
-#include "fl/server/memory_register.h"
-#include "fl/server/kernel/aggregation_kernel_factory.h"
-#include "fl/server/kernel/optimizer_kernel_factory.h"
+#include "common/common.h"
+#include "server/memory_register.h"
+#include "server/kernel/aggregation_kernel_factory.h"
 
 namespace mindspore {
 namespace fl {
@@ -55,15 +54,12 @@ class ParameterAggregator {
         required_pull_count_(0),
         current_pull_count_(0),
         aggregation_done_(false),
-        optimizing_done_(false),
         pulling_done_(true),
         memory_register_(nullptr),
         requires_aggr_(true) {}
   ~ParameterAggregator() = default;
 
-  // Initialize ParameterAggregator with a cnode. This cnode is normally a optimizer kernel for now.
-  // The parameter threshold_count helps ParameterAggregator to judge the current status if it's stateful.
-  bool Init(const CNodePtr &cnode, size_t threshold_count = 0);
+  bool Init(const std::string &param_name, size_t threshold_count = 0);
 
   // Reinitialize the parameter aggregator after scaling operations are done.
   bool ReInitForScaling();
@@ -75,7 +71,7 @@ class ParameterAggregator {
   // The data could have many meanings: weights, gradients, learning_rate, momentum, etc.
   bool UpdateData(const std::map<std::string, Address> &new_data);
 
-  // Launch aggregators/optimizers of this ParameterAggregator in order.
+  // Launch aggregators of this ParameterAggregator in order.
   bool LaunchAggregators();
 
   // Different from the method Pull, this method simply returns the weight of this ParameterAggregator without causing
@@ -85,13 +81,11 @@ class ParameterAggregator {
   // After aggregation/optimizing/pulling of one iteration is done, caller must reset the status to ensure the
   // correctness of the aggregation/optimizing/pulling for next iteration.
   void ResetAggregationStatus();
-  void ResetOptimizingStatus();
   void ResetPullingStatus();
 
   // Returns the aggregation/optimizing/pulling status to the caller.
   bool IsAggregationDone() const;
   bool RunAggregation();
-  bool IsOptimizingDone() const;
   bool IsPullingDone() const;
 
   bool requires_aggr() const;
@@ -99,15 +93,12 @@ class ParameterAggregator {
  private:
   // Initializing aggregation/optimizer kenerls based on the cnode. The reason of this is described in the file
   // kernel/kernel_factory.h.
-  bool InitAggregationKernels(const CNodePtr &cnode);
-  bool InitOptimizerKernels(const CNodePtr &cnode);
+  bool InitAggregationKernels(const std::string &param_name);
 
   // Assign memory for server kernel K(AggregationKernelMod/OptimizerKernelMod).
   // The memory assigned can be accessed by MemoryRegister. The memory could be weights, gradients, learning_rate,
   // momentum, etc.
-  template <typename K>
-  bool AssignMemory(const K server_kernel, const CNodePtr &cnode,
-                    const ReuseKernelNodeInfo &reuse_kernel_node_inputs_info,
+  bool AssignMemory(const std::string &param_name, std::shared_ptr<kernel::AggregationKernelMod> server_kernel,
                     const std::shared_ptr<MemoryRegister> &memory_register);
 
   // Generate kernel parameters for aggregation/optimizer kernels. All the parameters is registered and stored in
@@ -117,19 +108,18 @@ class ParameterAggregator {
 
   // The selection of the aggregation algorithm depends on multiple factors. For example, server mode, user
   // configuration, etc.
-  std::vector<std::string> SelectAggregationAlgorithm(const CNodePtr &cnode);
+  std::vector<std::string> SelectAggregationAlgorithm();
 
   // Judge whether the parameter needs to be aggregated.
-  bool JudgeRequiredAggr(const CNodePtr &cnode);
+  bool JudgeRequiredAggr();
 
   ServerMode server_mode_;
   size_t required_push_count_;
   size_t required_pull_count_;
   size_t current_pull_count_;
 
-  // The status of aggregation/optimizing/pulling.
+  // The status of aggregation/pulling.
   bool aggregation_done_;
-  bool optimizing_done_;
   bool pulling_done_;
 
   // ParameterAggregator stores all data that it needs for aggregation, optimizing, etc.
@@ -138,7 +128,6 @@ class ParameterAggregator {
   // Update could have multiple aggregation and optimizer server kernels.
   // Here stores multiple pairs of server kernels to parameters of their Launch function.
   std::vector<std::pair<std::shared_ptr<kernel::AggregationKernelMod>, KernelParams>> aggregation_kernel_parameters_;
-  std::vector<std::pair<std::shared_ptr<kernel::OptimizerKernelMod>, KernelParams>> optimizer_kernel_parameters_;
 
   // Whether this parameter needs to be aggregated.
   bool requires_aggr_;
