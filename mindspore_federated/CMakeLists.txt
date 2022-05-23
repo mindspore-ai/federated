@@ -79,15 +79,3 @@ target_link_libraries(_mindspore_federated PRIVATE federated)
 set_property(TARGET _mindspore_federated PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 
 target_link_options(federated PRIVATE -Wl,-init,mindspore_federated_log_init)
-
-# user set path
-if(ENABLE_TESTCASES)
-    include_directories(${CMAKE_SOURCE_DIR}/tests/ut/stub)
-elseif(MS_WHL_LIB_PATH)
-    include_directories(${MS_WHL_LIB_PATH}/../)
-elseif(MS_BACKEND_HEADER)
-    include_directories(${CMAKE_SOURCE_DIR}/third_party/mindspore)
-    include_directories(${CMAKE_SOURCE_DIR}/third_party/mindspore/mindspore/core)
-else()
-    message(FATAL_ERROR "Please check MindSpore path.")
-endif()
