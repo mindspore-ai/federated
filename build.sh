@@ -8,14 +8,9 @@ usage()
 {
   echo "Usage:"
   echo "    bash build.sh [-j[n]] [-d] [-S on|off] "
-  echo "    bash build.sh -p {mindspore_shared_lib}] [-j[n]] [-d] [-S on|off] "
-  echo "    bash build.sh -e gpu|ascend [-V 9.2|10.1|310|910] [-j[n]] [-d] [-S on|off] "
   echo "    bash build.sh -t on [-j[n]] [-d] [-S on|off] "
   echo ""
   echo "Options:"
-  echo "    -p {mindspore_shared_lib}, Use header files related to MindSpore(libmindspore.so) or Lite lib(libmindspore-lite.so)"
-  echo "    -e gpu|ascend, build MindSpore gpu or ascend whl package meanwhile"
-  echo "    -V Specify the device version, if -e gpu, default CUDA 10.1, if -e ascend, default Ascend 910"
   echo "    -j[n] Set the threads when building (Default: -j8)"
   echo "    -d Debug model"
   echo "    -t Build testcases."
@@ -43,9 +38,6 @@ checkopts()
   ENABLE_COVERAGE="off"
   ENABLE_ASAN="off"
   ENABLE_PYTHON="on"
-  MS_WHL_LIB_PATH=""
-  MS_BACKEND=""
-  MS_BACKEND_HEADER="on"
   MS_VERSION=""
   RUN_TESTCASES="off"
   ENABLE_GITEE="off"
@@ -56,28 +48,6 @@ checkopts()
     LOW_OPTARG=$(echo ${OPTARG} | tr '[A-Z]' '[a-z]')
 
     case "${opt}" in
-      e)
-        echo "user opt: -e"${LOW_OPTARG}
-        if [[ "$OPTARG" != "" ]]; then
-          MS_BACKEND=$OPTARG
-        fi
-        ;;
-      V)
-        echo "user opt: -V"${LOW_OPTARG}
-        if [[ "$OPTARG" != "" ]]; then
-          MS_VERSION=$OPTARG
-        fi
-        ;;
-      p)
-        if [[ "$OPTARG"  != "" ]]; then
-          MS_WHL_LIB_PATH=$OPTARG
-          MS_BACKEND_HEADER="off"
-        else
-          echo "Invalid value ${LOW_OPTARG} for option -p"
-          usage
-          exit 1
-        fi
-        ;;
       d)
         echo "user opt: -d"${LOW_OPTARG}
         DEBUG_MODE="on"
@@ -101,7 +71,6 @@ checkopts()
       t)
         echo "user opt: -t"${LOW_OPTARG}
         RUN_TESTCASES="$OPTARG"
-        MS_BACKEND_HEADER="off"
         ;;
       S)
         check_on_off $OPTARG S
@@ -137,15 +106,6 @@ build_mindspore_federated()
   fi
   if [[ "X$ENABLE_ASAN" = "Xon" ]]; then
       CMAKE_ARGS="${CMAKE_ARGS} -DENABLE_ASAN=ON"
-  fi
-  if [[ "$MS_BACKEND" != "" ]]; then
-    CMAKE_ARGS="${CMAKE_ARGS} -DMS_BACKEND=${MS_BACKEND}"
-  fi
-  if [[ "$MS_WHL_LIB_PATH" != "" ]]; then
-    CMAKE_ARGS="${CMAKE_ARGS} -DMS_WHL_LIB_PATH=${MS_WHL_LIB_PATH}"
-  fi
-  if [[ "$MS_BACKEND_HEADER" != "off" ]]; then
-    CMAKE_ARGS="${CMAKE_ARGS} -DMS_BACKEND_HEADER=${MS_BACKEND_HEADER}"
   fi
   if [[ "$MS_VERSION" != "" ]]; then
     CMAKE_ARGS="${CMAKE_ARGS} -DMS_VERSION=${MS_VERSION}"
