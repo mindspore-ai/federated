@@ -14,24 +14,17 @@
  * limitations under the License.
  */
 
-#include "ccsrc/armour/cipher/cipher_init.h"
+#include "armour/cipher/cipher_init.h"
 
-#include "ccsrc/armour/cipher/cipher_meta_storage.h"
+#include "armour/cipher/cipher_meta_storage.h"
 #include "common/common.h"
 #include "server/model_store.h"
 
 namespace mindspore {
 namespace fl {
 namespace armour {
-bool CipherInit::Init(const CipherPublicPara &param, size_t time_out_mutex, size_t cipher_exchange_keys_cnt,
-                      size_t cipher_get_keys_cnt, size_t cipher_share_secrets_cnt, size_t cipher_get_secrets_cnt,
-                      size_t cipher_get_clientlist_cnt, size_t cipher_push_list_sign_cnt,
-                      size_t cipher_get_list_sign_cnt, size_t cipher_clients_threshold_for_reconstruct) {
-  MS_LOG(INFO) << "CipherInit::Init START";
-  if (publicparam_.p == nullptr || param.p == nullptr || param.prime == nullptr || publicparam_.prime == nullptr) {
-    MS_LOG(ERROR) << "CipherInit::input data invalid.";
-    return false;
-  }
+bool CipherInit::Init(const CipherPublicPara &param, size_t time_out_mutex, const CipherConfig &cipher_config) {
+  MS_LOG(INFO) << "CipherInit::Load START";
   if (memcpy_s(publicparam_.p, SECRET_MAX_LEN, param.p, sizeof(param.p)) != 0) {
     MS_LOG(ERROR) << "CipherInit::memory copy failed.";
     return false;
@@ -42,14 +35,14 @@ bool CipherInit::Init(const CipherPublicPara &param, size_t time_out_mutex, size
   secrets_minnums_ = param.t;
   featuremap_ = fl::server::ModelStore::GetInstance().model_size() / sizeof(float);
 
-  exchange_key_threshold = cipher_exchange_keys_cnt;
-  get_key_threshold = cipher_get_keys_cnt;
-  share_secrets_threshold = cipher_share_secrets_cnt;
-  get_secrets_threshold = cipher_get_secrets_cnt;
-  client_list_threshold = cipher_get_clientlist_cnt;
-  clients_threshold_for_reconstruct = cipher_clients_threshold_for_reconstruct;
-  push_list_sign_threshold = cipher_push_list_sign_cnt;
-  get_list_sign_threshold = cipher_get_list_sign_cnt;
+  exchange_key_threshold = cipher_config.exchange_keys_threshold;
+  get_key_threshold = cipher_config.get_keys_threshold;
+  share_secrets_threshold = cipher_config.share_secrets_threshold;
+  get_secrets_threshold = cipher_config.get_secrets_threshold;
+  client_list_threshold = cipher_config.get_client_list_threshold;
+  clients_threshold_for_reconstruct = cipher_config.minimum_clients_for_reconstruct;
+  push_list_sign_threshold = cipher_config.push_list_sign_threshold;
+  get_list_sign_threshold = cipher_config.get_list_sign_threshold;
 
   time_out_mutex_ = time_out_mutex;
   publicparam_.dp_eps = param.dp_eps;
@@ -62,23 +55,22 @@ bool CipherInit::Init(const CipherPublicPara &param, size_t time_out_mutex, size
   publicparam_.sign_global_lr = param.sign_global_lr;
   publicparam_.sign_dim_out = param.sign_dim_out;
 
-  if (param.encrypt_type == mindspore::fl::kDPEncryptType) {
+  if (param.encrypt_type == kDPEncryptType) {
     MS_LOG(INFO) << "DP parameters init, dp_eps: " << param.dp_eps << ", dp_delta: " << param.dp_delta
                  << ", dp_norm_clip: " << param.dp_norm_clip;
   }
 
-  if (param.encrypt_type == mindspore::fl::kDSEncryptType) {
+  if (param.encrypt_type == kDSEncryptType) {
     MS_LOG(INFO) << "Sign parameters init, sign_k: " << param.sign_k << ", sign_eps: " << param.sign_eps
                  << ", sign_thr_ratio: " << param.sign_thr_ratio << ", sign_global_lr: " << param.sign_global_lr
                  << ", sign_dim_out: " << param.sign_dim_out;
   }
 
   if (param.encrypt_type == kPWEncryptType) {
-    cipher_meta_storage_.RegisterClass();
     const std::string new_prime(reinterpret_cast<const char *>(param.prime), PRIME_MAX_LEN);
     new_prime_ = new_prime;
-    cipher_meta_storage_.RegisterPrime(kCtxCipherPrimer, new_prime);
-    if (!cipher_meta_storage_.GetPrimeFromServer(kCtxCipherPrimer, publicparam_.prime)) {
+    cipher_meta_storage_.RegisterPrime(new_prime);
+    if (!cipher_meta_storage_.GetPrimeFromServer(publicparam_.prime)) {
       MS_LOG(ERROR) << "Cipher Param Update is invalid.";
       return false;
     }
@@ -95,20 +87,15 @@ bool CipherInit::Init(const CipherPublicPara &param, size_t time_out_mutex, size
       MS_LOG(ERROR) << "Cipher parameters are illegal.";
       return false;
     }
-    MS_LOG(INFO) << " CipherInit::Init Success";
-  }
-  if (param.encrypt_type == kStablePWEncryptType) {
-    cipher_meta_storage_.RegisterStablePWClass();
-    MS_LOG(INFO) << "Register metadata for StablePWEncrypt is finished.";
+    MS_LOG(INFO) << " CipherInit::Load Success";
   }
   return true;
 }
 
 bool CipherInit::ReInitForScaling() {
   if (FLContext::instance()->encrypt_type() == kPWEncryptType) {
-    cipher_meta_storage_.RegisterClass();
-    cipher_meta_storage_.RegisterPrime(kCtxCipherPrimer, new_prime_);
-    if (!cipher_meta_storage_.GetPrimeFromServer(kCtxCipherPrimer, publicparam_.prime)) {
+    cipher_meta_storage_.RegisterPrime(new_prime_);
+    if (!cipher_meta_storage_.GetPrimeFromServer(publicparam_.prime)) {
       MS_LOG(ERROR) << "Cipher Param Update is invalid.";
       return false;
     }

@@ -56,13 +56,20 @@ bool DecodeExecutor::DeQuantSparseDiff(std::map<std::string, std::vector<float>>
   // origin parameters
   std::vector<size_t> shape_vec;
   size_t param_num = 0;
-  const auto &iter_to_model = mindspore::fl::server::ModelStore::GetInstance().iteration_to_model();
-  size_t latest_iter_num = iter_to_model.rbegin()->first;
-  std::map<std::string, AddressPtr> feature_maps =
-    mindspore::fl::server::ModelStore::GetInstance().GetModelByIterNum(latest_iter_num);
+  auto model = mindspore::fl::server::ModelStore::GetInstance().GetLatestModel().second;
+  if (model == nullptr || model->weight_data.empty()) {
+    MS_LOG_WARNING << "Failed to get latest model";
+    return false;
+  }
+  auto weight_data_base = model->weight_data.data();
   // get shape vector and number of upload parameters
   for (const auto &name : name_vec) {
-    size_t shape = feature_maps[name]->size / sizeof(float);
+    auto it = model->weight_items.find(name);
+    if (it == model->weight_items.end()) {
+      MS_LOG_WARNING << "Failed to find parameter " << name;
+      return false;
+    }
+    size_t shape = it->second.size / sizeof(float);
     shape_vec.emplace_back(shape);
     param_num += shape;
   }
@@ -115,7 +122,7 @@ bool DecodeExecutor::DeQuantSparseDiff(std::map<std::string, std::vector<float>>
   for (size_t i = 0; i < decompress_feature_maps.size(); ++i) {
     size_t feature_size = decompress_feature_maps[i].size();
     std::string name = name_vec[i];
-    float *weight_data = reinterpret_cast<float *>(feature_maps[name]->addr);
+    float *weight_data = reinterpret_cast<float *>(weight_data_base + model->weight_items[name].offset);
     auto &weight_item = (*weight_map)[name];
     weight_item.resize(feature_size);
     for (size_t j = 0; j < feature_size; ++j) {

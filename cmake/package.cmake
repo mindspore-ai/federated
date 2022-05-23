@@ -33,10 +33,14 @@ install(FILES ${libevent_LIBPATH}/libevent_pthreads-2.1.so.7.0.1
 
 # glog
 install(FILES ${glog_LIBPATH}/libmindspore_federated_glog.so.0.4.0
-        DESTINATION ${INSTALL_LIB_DIR} RENAME libmindspore_federated_glog.so.0 COMPONENT mindspore)
+        DESTINATION ${INSTALL_LIB_DIR} RENAME libmindspore_federated_glog.so.0 COMPONENT mindspore_federated)
+
+
+install(FILES ${hiredis_LIBPATH}/libhiredis.so.1.0.0 DESTINATION ${INSTALL_LIB_DIR} COMPONENT mindspore_federated)
+install(FILES ${hiredis_LIBPATH}/libhiredis_ssl.so.1.0.0 DESTINATION ${INSTALL_LIB_DIR} COMPONENT mindspore_federated)
 
 # set python files
-file(GLOB MS_PY_LIST ${CMAKE_SOURCE_DIR}/mindspore_federated/*.py)
+file(GLOB MS_PY_LIST ${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/python/mindspore_federated/*.py)
 install(
         FILES ${MS_PY_LIST}
         DESTINATION ${INSTALL_PY_DIR}
@@ -56,7 +60,12 @@ install(
 
 install(
         DIRECTORY
-        ${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/python
+        ${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/python/mindspore_federated/aggregation
+        ${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/python/mindspore_federated/common
+        ${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/python/mindspore_federated/data_join
+        ${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/python/mindspore_federated/dataset
+        ${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/python/mindspore_federated/trainer
+        ${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/python/mindspore_federated/startup
         DESTINATION ${INSTALL_PY_DIR}
         COMPONENT mindspore_federated
 )

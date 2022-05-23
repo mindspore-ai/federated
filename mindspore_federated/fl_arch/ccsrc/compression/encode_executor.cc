@@ -85,7 +85,7 @@ bool CompressExecutor::quant_min_max(std::map<std::string, CompressWeight> *comp
 schema::CompressType CompressExecutor::GetCompressType(const flatbuffers::Vector<int8_t> *download_compress_types) {
   schema::CompressType compressType = schema::CompressType_NO_COMPRESS;
   schema::CompressType context_compress_type;
-  if (FLContext::instance()->download_compress_type() == kQuant) {
+  if (FLContext::instance()->compression_config().download_compress_type == kQuant) {
     context_compress_type = schema::CompressType_QUANT;
   } else {
     context_compress_type = schema::CompressType_NO_COMPRESS;

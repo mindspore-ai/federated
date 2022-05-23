@@ -18,21 +18,9 @@
 #include "common/communicator/http_message_handler.h"
 #include "common/core/comm_util.h"
 
-#ifdef WIN32
-#include <WinSock2.h>
-#endif
 #include <arpa/inet.h>
 #include <event.h>
-#include <event2/buffer.h>
-#include <event2/bufferevent.h>
-#include <event2/bufferevent_compat.h>
-#include <event2/http.h>
-#include <event2/http_compat.h>
-#include <event2/http_struct.h>
-#include <event2/listener.h>
-#include <event2/util.h>
 
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
@@ -40,25 +28,13 @@
 
 namespace mindspore {
 namespace fl {
-namespace core {
-HttpServer::~HttpServer() {
-  if (!Stop()) {
-    MS_LOG(WARNING) << "Stop http server failed.";
-  }
-  for (size_t i = 0; i < worker_threads_.size(); i++) {
-    if (worker_threads_[i] != nullptr && worker_threads_[i]->joinable()) {
-      worker_threads_[i]->join();
-    }
-  }
-}
+HttpServer::~HttpServer() { Stop(); }
 
 bool HttpServer::InitServer() {
   if (!CommUtil::CheckIp(server_address_)) {
     MS_LOG(ERROR) << "The http server ip:" << server_address_ << " is illegal!";
     return false;
   }
-
-  is_stop_ = false;
   int result = evthread_use_pthreads();
   if (result != 0) {
     MS_LOG(ERROR) << "Use event pthread failed!";
@@ -119,13 +95,6 @@ bool HttpServer::InitServer() {
   return true;
 }
 
-void HttpServer::SetTimeOut(int seconds) {
-  if (seconds < 0) {
-    MS_LOG(EXCEPTION) << "The timeout seconds:" << seconds << "is less than 0!";
-  }
-  request_timeout_ = seconds;
-}
-
 bool HttpServer::RegisterRoute(const std::string &url, OnRequestReceive *function) {
   if (!function || !(*function)) {
     return false;
@@ -145,6 +114,11 @@ bool HttpServer::RegisterRoute(const std::string &url, OnRequestReceive *functio
 }
 
 bool HttpServer::Start() {
+  if (!InitServer()) {
+    MS_LOG(ERROR) << "Load http server failed, server address: " << server_address_
+                  << ", server port: " << server_port_;
+    return false;
+  }
   MS_LOG(INFO) << "Start http server!";
   for (size_t i = 0; i < thread_num_; i++) {
     auto http_request_handler = std::make_shared<HttpRequestHandler>();
@@ -161,33 +135,29 @@ bool HttpServer::Start() {
   return true;
 }
 
-bool HttpServer::Wait() {
-  for (size_t i = 0; i < worker_threads_.size(); i++) {
-    worker_threads_[i]->join();
-    worker_threads_[i].reset();
+void HttpServer::Stop() {
+  MS_LOG(INFO) << "Stop http server begin!";
+  if (has_stopped_) {
+    return;
   }
-  return true;
-}
-
-bool HttpServer::Stop() {
-  MS_LOG(INFO) << "Stop http server!";
-  bool result = true;
-
-  if (!is_stop_.load()) {
-    for (size_t i = 0; i < http_request_handlers.size(); i++) {
-      bool res = http_request_handlers[i]->Stop();
-      if (res == false) {
-        result = false;
-      }
+  has_stopped_ = true;
+  for (auto &item : http_request_handlers) {
+    if (item) {
+      (void)item->Stop();
     }
-    if (fd_ != -1) {
-      close(fd_);
-      fd_ = -1;
-    }
-    is_stop_ = true;
   }
-  return result;
+  http_request_handlers.clear();
+  if (fd_ != -1) {
+    close(fd_);
+    fd_ = -1;
+  }
+  for (auto &worker_thread : worker_threads_) {
+    if (worker_thread && worker_thread->joinable()) {
+      worker_thread->join();
+    }
+  }
+  worker_threads_.clear();
+  MS_LOG(INFO) << "Stop http server end!";
 }
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore

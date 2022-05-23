@@ -15,109 +15,73 @@
  */
 
 #include "server/kernel/round/push_weight_kernel.h"
+#include "server/server.h"
 
 namespace mindspore {
 namespace fl {
 namespace server {
 namespace kernel {
-void PushWeightKernel::InitKernel(size_t) {
-  executor_ = &Executor::GetInstance();
-  MS_EXCEPTION_IF_NULL(executor_);
-  if (!executor_->initialized()) {
-    MS_LOG(EXCEPTION) << "Executor must be initialized in server pipeline.";
-    return;
-  }
-  local_rank_ = DistributedCountService::GetInstance().local_rank();
-}
+void PushWeightKernel::InitKernel(size_t) {}
 
-bool PushWeightKernel::Launch(const uint8_t *req_data, size_t len,
-                              const std::shared_ptr<fl::core::MessageHandler> &message) {
+bool PushWeightKernel::Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<MessageHandler> &message) {
   MS_LOG(INFO) << "Launching PushWeightKernel kernel.";
-  std::shared_ptr<FBBuilder> fbb = std::make_shared<FBBuilder>();
-  if (fbb == nullptr || req_data == nullptr) {
-    std::string reason = "FBBuilder builder or req_data is nullptr.";
-    MS_LOG(ERROR) << reason;
-    SendResponseMsg(message, reason.c_str(), reason.size());
+  FBBuilder fbb;
+  auto current_iter = cache::InstanceContext::Instance().iteration_num();
+  auto fl_status = OnReceiveModelWeight(req_data, len);
+  if (!fl_status.IsSuccess()) {
+    BuildPushWeightRsp(&fbb, schema::ResponseCode_RequestError, fl_status.StatusMessage(), current_iter);
+    SendResponseMsg(message, fbb.GetBufferPointer(), fbb.GetSize());
     return true;
   }
+  BuildPushWeightRsp(&fbb, schema::ResponseCode_SUCCEED, "PushWeight succeed.", current_iter);
+  SendResponseMsg(message, fbb.GetBufferPointer(), fbb.GetSize());
+  return true;
+}
 
+FlStatus PushWeightKernel::OnReceiveModelWeight(const uint8_t *req_data, size_t len) {
+  std::string reason;
+  auto current_iter = cache::InstanceContext::Instance().iteration_num();
+  if (Executor::GetInstance().IsIterationModelFinished(current_iter)) {
+    reason = "Model of iteration of " + std::to_string(current_iter) + " has finished";
+    MS_LOG(INFO) << reason;
+    return {kRequestError, reason};
+  }
+  if (req_data == nullptr) {
+    reason = "req_data is nullptr.";
+    MS_LOG(ERROR) << reason;
+    return {kRequestError, reason};
+  }
   flatbuffers::Verifier verifier(req_data, len);
   if (!verifier.VerifyBuffer<schema::RequestPushWeight>()) {
-    std::string reason = "The schema of RequestPushWeight is invalid.";
-    BuildPushWeightRsp(fbb, schema::ResponseCode_RequestError, reason, LocalMetaStore::GetInstance().curr_iter_num());
+    reason = "The schema of RequestPushWeight is invalid.";
     MS_LOG(ERROR) << reason;
-    SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
-    return true;
+    return {kRequestError, reason};
   }
-
   const schema::RequestPushWeight *push_weight_req = flatbuffers::GetRoot<schema::RequestPushWeight>(req_data);
   if (push_weight_req == nullptr) {
-    std::string reason = "Building flatbuffers schema failed for RequestPushWeight";
-    BuildPushWeightRsp(fbb, schema::ResponseCode_RequestError, reason, LocalMetaStore::GetInstance().curr_iter_num());
-    SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
-    return false;
+    reason = "Building flatbuffers schema failed for RequestPushWeight";
+    MS_LOG(ERROR) << reason;
+    return {kRequestError, reason};
   }
-
-  ResultCode result_code = PushWeight(fbb, push_weight_req);
-  SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
-  if (result_code != ResultCode::kSuccess) {
-    return false;
-  }
-  return true;
-}
-
-bool PushWeightKernel::Reset() {
-  MS_LOG(INFO) << "PushWeightKernel reset!";
-  StopTimer();
-  DistributedCountService::GetInstance().ResetCounter(name_);
-  return true;
-}
-
-void PushWeightKernel::OnLastCountEvent(const std::shared_ptr<fl::core::MessageHandler> &) {
-  if (FLContext::instance()->resetter_round() == ResetterRound::kPushWeight) {
-    FinishIteration(true);
-  }
-  return;
-}
-
-ResultCode PushWeightKernel::PushWeight(const std::shared_ptr<FBBuilder> &fbb,
-                                        const schema::RequestPushWeight *push_weight_req) {
-  MS_ERROR_IF_NULL_W_RET_VAL(fbb, ResultCode::kFail);
-  MS_ERROR_IF_NULL_W_RET_VAL(push_weight_req, ResultCode::kFail);
-  size_t iteration = IntToSize(push_weight_req->iteration());
-  size_t current_iter = LocalMetaStore::GetInstance().curr_iter_num();
+  uint64_t iteration = static_cast<uint64_t>(push_weight_req->iteration());
   if (iteration != current_iter) {
-    std::string reason = "PushWeight iteration number is invalid:" + std::to_string(iteration) +
-                         ", current iteration:" + std::to_string(current_iter);
-    BuildPushWeightRsp(fbb, schema::ResponseCode_SucNotReady, reason, current_iter);
-    MS_LOG(WARNING) << reason;
-    return ResultCode::kFail;
+    reason = "PushWeight iteration number is invalid:" + std::to_string(iteration) +
+             ", current iteration:" + std::to_string(current_iter);
+    MS_LOG(ERROR) << reason;
+    return {kRequestError, reason};
   }
-
   std::map<std::string, Address> upload_feature_map = ParseFeatureMap(push_weight_req);
   if (upload_feature_map.empty()) {
-    std::string reason = "PushWeight feature_map is empty.";
-    BuildPushWeightRsp(fbb, schema::ResponseCode_RequestError, reason, current_iter);
+    reason = "PushWeight feature map is empty.";
     MS_LOG(ERROR) << reason;
-    return ResultCode::kFail;
+    return {kRequestError, reason};
   }
-
-  if (!executor_->HandlePushWeight(upload_feature_map)) {
-    std::string reason = "Pushing weight failed.";
-    BuildPushWeightRsp(fbb, schema::ResponseCode_SucNotReady, reason, current_iter);
+  if (!Executor::GetInstance().HandlePushWeight(upload_feature_map)) {
+    reason = "Pushing weight failed.";
     MS_LOG(ERROR) << reason;
-    return ResultCode::kFail;
+    return {kRequestError, reason};
   }
-  MS_LOG(INFO) << "Pushing weight for iteration " << current_iter << " succeeds.";
-
-  if (!DistributedCountService::GetInstance().Count(name_, std::to_string(local_rank_))) {
-    std::string reason = "Count for push weight request failed.";
-    BuildPushWeightRsp(fbb, schema::ResponseCode_SystemError, reason, current_iter);
-    MS_LOG(ERROR) << reason;
-    return ResultCode::kFail;
-  }
-  BuildPushWeightRsp(fbb, schema::ResponseCode_SUCCEED, "PushWeight succeed.", current_iter);
-  return ResultCode::kSuccess;
+  return kFlSuccess;
 }
 
 std::map<std::string, Address> PushWeightKernel::ParseFeatureMap(const schema::RequestPushWeight *push_weight_req) {
@@ -126,28 +90,32 @@ std::map<std::string, Address> PushWeightKernel::ParseFeatureMap(const schema::R
   auto fbs_feature_map = push_weight_req->feature_map();
   MS_ERROR_IF_NULL_W_RET_VAL(fbs_feature_map, upload_feature_map);
   for (uint32_t i = 0; i < fbs_feature_map->size(); i++) {
-    std::string weight_full_name = fbs_feature_map->Get(i)->weight_fullname()->str();
-    float *weight_data = const_cast<float *>(fbs_feature_map->Get(i)->data()->data());
-    size_t weight_size = fbs_feature_map->Get(i)->data()->size() * sizeof(float);
+    auto feature = fbs_feature_map->Get(i);
+    if (feature == nullptr || feature->weight_fullname() == nullptr || feature->data() == nullptr) {
+      MS_LOG_WARNING << "Feature parsed from flatbuffer is invalid";
+      return {};
+    }
+    std::string weight_full_name = feature->weight_fullname()->str();
+    float *weight_data = const_cast<float *>(feature->data()->data());
+    size_t weight_size = feature->data()->size() * sizeof(float);
     upload_feature_map[weight_full_name] = {weight_data, weight_size};
   }
   return upload_feature_map;
 }
 
-void PushWeightKernel::BuildPushWeightRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
-                                          const std::string &reason, size_t iteration) {
+void PushWeightKernel::BuildPushWeightRsp(FBBuilder *fbb, const schema::ResponseCode retcode, const std::string &reason,
+                                          size_t iteration) {
   if (fbb == nullptr) {
     MS_LOG(ERROR) << "Input fbb is nullptr.";
     return;
   }
   auto fbs_reason = fbb->CreateString(reason);
-  schema::ResponsePushWeightBuilder rsp_push_weight_builder(*(fbb.get()));
+  schema::ResponsePushWeightBuilder rsp_push_weight_builder(*fbb);
   rsp_push_weight_builder.add_retcode(SizeToInt(retcode));
   rsp_push_weight_builder.add_reason(fbs_reason);
   rsp_push_weight_builder.add_iteration(SizeToInt(iteration));
   auto rsp_push_weight = rsp_push_weight_builder.Finish();
   fbb->Finish(rsp_push_weight);
-  return;
 }
 
 REG_ROUND_KERNEL(pushWeight, PushWeightKernel)

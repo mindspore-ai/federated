@@ -26,19 +26,14 @@ namespace mindspore {
 namespace fl {
 namespace server {
 namespace kernel {
-void GetSecretsKernel::InitKernel(size_t) {
-  if (LocalMetaStore::GetInstance().has_value(kCtxTotalTimeoutDuration)) {
-    iteration_time_window_ = LocalMetaStore::GetInstance().value<size_t>(kCtxTotalTimeoutDuration);
-  }
-  cipher_share_ = &armour::CipherShares::GetInstance();
-}
+void GetSecretsKernel::InitKernel(size_t) { cipher_share_ = &armour::CipherShares::GetInstance(); }
 
 bool GetSecretsKernel::CountForGetSecrets(const std::shared_ptr<FBBuilder> &fbb,
                                           const schema::GetShareSecrets *get_secrets_req, const size_t iter_num) {
   MS_ERROR_IF_NULL_W_RET_VAL(get_secrets_req, false);
   auto fbs_fl_id = get_secrets_req->fl_id();
   MS_EXCEPTION_IF_NULL(fbs_fl_id);
-  if (!DistributedCountService::GetInstance().Count(name_, fbs_fl_id->str())) {
+  if (!DistributedCountService::GetInstance().Count(name_)) {
     std::string reason = "Counting for get secrets kernel request failed. Please retry later.";
     cipher_share_->BuildGetSecretsRsp(fbb, schema::ResponseCode_OutOfTime, iter_num,
                                       std::to_string(CURRENT_TIME_MILLI.count()), nullptr);
@@ -49,53 +44,11 @@ bool GetSecretsKernel::CountForGetSecrets(const std::shared_ptr<FBBuilder> &fbb,
 }
 
 sigVerifyResult GetSecretsKernel::VerifySignature(const schema::GetShareSecrets *get_secrets_req) {
-  MS_ERROR_IF_NULL_W_RET_VAL(get_secrets_req, sigVerifyResult::FAILED);
-  MS_ERROR_IF_NULL_W_RET_VAL(get_secrets_req->fl_id(), sigVerifyResult::FAILED);
-  MS_ERROR_IF_NULL_W_RET_VAL(get_secrets_req->timestamp(), sigVerifyResult::FAILED);
-
-  std::string fl_id = get_secrets_req->fl_id()->str();
-  std::string timestamp = get_secrets_req->timestamp()->str();
-  int iteration = get_secrets_req->iteration();
-  std::string iter_str = std::to_string(iteration);
-  auto fbs_signature = get_secrets_req->signature();
-  std::vector<unsigned char> signature;
-  if (fbs_signature == nullptr) {
-    MS_LOG(ERROR) << "signature in get_secrets_req is nullptr";
-    return sigVerifyResult::FAILED;
-  }
-  signature.assign(fbs_signature->begin(), fbs_signature->end());
-  std::map<std::string, std::string> key_attestations;
-  const fl::PBMetadata &key_attestations_pb_out =
-    fl::server::DistributedMetadataStore::GetInstance().GetMetadata(kCtxClientKeyAttestation);
-  const fl::KeyAttestation &key_attestation_pb = key_attestations_pb_out.key_attestation();
-  auto iter = key_attestation_pb.key_attestations().begin();
-  for (; iter != key_attestation_pb.key_attestations().end(); ++iter) {
-    (void)key_attestations.emplace(std::pair<std::string, std::string>(iter->first, iter->second));
-  }
-  if (key_attestations.find(fl_id) == key_attestations.end()) {
-    MS_LOG(ERROR) << "can not find key attestation for fl_id: " << fl_id;
-    return sigVerifyResult::FAILED;
-  }
-
-  std::vector<unsigned char> src_data;
-  (void)src_data.insert(src_data.end(), timestamp.begin(), timestamp.end());
-  (void)src_data.insert(src_data.end(), iter_str.begin(), iter_str.end());
-  auto certVerify = CertVerify::GetInstance();
-  unsigned char srcDataHash[SHA256_DIGEST_LENGTH];
-  certVerify.sha256Hash(src_data.data(), SizeToInt(src_data.size()), srcDataHash, SHA256_DIGEST_LENGTH);
-  if (!certVerify.verifyRSAKey(key_attestations[fl_id], srcDataHash, signature.data(), SHA256_DIGEST_LENGTH)) {
-    return sigVerifyResult::FAILED;
-  }
-  if (!certVerify.verifyTimeStamp(fl_id, timestamp)) {
-    return sigVerifyResult::TIMEOUT;
-  }
-  MS_LOG(INFO) << "verify signature for fl_id: " << fl_id << " success.";
-  return sigVerifyResult::PASSED;
+  return VerifySignatureBase(get_secrets_req);
 }
 
-bool GetSecretsKernel::Launch(const uint8_t *req_data, size_t len,
-                              const std::shared_ptr<fl::core::MessageHandler> &message) {
-  size_t iter_num = LocalMetaStore::GetInstance().curr_iter_num();
+bool GetSecretsKernel::Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<MessageHandler> &message) {
+  size_t iter_num = cache::InstanceContext::Instance().iteration_num();
   std::string next_timestamp = std::to_string(CURRENT_TIME_MILLI.count());
   MS_LOG(INFO) << "Launching get secrets kernel, ITERATION NUMBER IS : " << iter_num;
   std::shared_ptr<FBBuilder> fbb = std::make_shared<FBBuilder>();
@@ -168,15 +121,6 @@ bool GetSecretsKernel::Launch(const uint8_t *req_data, size_t len,
     return true;
   }
   SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
-  return true;
-}
-
-bool GetSecretsKernel::Reset() {
-  MS_LOG(INFO) << "ITERATION NUMBER IS : " << LocalMetaStore::GetInstance().curr_iter_num();
-  MS_LOG(INFO) << "GetSecretsKernel reset!";
-  cipher_share_->ClearShareSecrets();
-  DistributedCountService::GetInstance().ResetCounter(name_);
-  StopTimer();
   return true;
 }
 

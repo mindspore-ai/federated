@@ -31,16 +31,14 @@
 
 namespace mindspore {
 namespace fl {
-namespace core {
-TcpConnection::~TcpConnection() {
-  MS_LOG(WARNING) << "TcpConnection is destructed! fd is " << fd_;
-  bufferevent_free(buffer_event_);
-}
-void TcpConnection::InitConnection(const messageReceive &callback) { tcp_message_handler_.SetCallback(callback); }
+TcpConnection::~TcpConnection() { bufferevent_free(buffer_event_); }
 
-void TcpConnection::OnReadHandler(const void *buffer, size_t num) {
-  MS_EXCEPTION_IF_NULL(buffer);
-  tcp_message_handler_.ReceiveMessage(buffer, num);
+void TcpConnection::InitConnection(const TcpMessageHandler::MessageHandleFun &callback) {
+  tcp_message_handler_.SetCallback(callback);
+}
+
+void TcpConnection::OnReadHandler(const TcpMessageHandler::ReadBufferFun &read_fun) {
+  tcp_message_handler_.ReceiveMessage(read_fun);
 }
 
 void TcpConnection::SendMessage(const void *buffer, size_t num) const {
@@ -57,43 +55,22 @@ const TcpServer *TcpConnection::GetServer() const { return server_; }
 
 const evutil_socket_t &TcpConnection::GetFd() const { return fd_; }
 
-void TcpConnection::set_callback(const Callback &callback) { callback_ = callback; }
-
-bool TcpConnection::SendMessage(const std::shared_ptr<CommMessage> &message) const {
+bool TcpConnection::SendMessage(const MessageMeta &meta, const Protos &protos, const void *data, size_t size) const {
   MS_EXCEPTION_IF_NULL(buffer_event_);
-  MS_EXCEPTION_IF_NULL(message);
-  bufferevent_lock(buffer_event_);
-  bool res = true;
-  size_t buf_size = message->ByteSizeLong();
-  if (bufferevent_write(buffer_event_, &buf_size, sizeof(buf_size)) == -1) {
-    MS_LOG(ERROR) << "Event buffer add header failed!";
-    res = false;
-  }
-  if (bufferevent_write(buffer_event_, message->SerializeAsString().data(), buf_size) == -1) {
-    MS_LOG(ERROR) << "Event buffer add protobuf data failed!";
-    res = false;
-  }
-  bufferevent_unlock(buffer_event_);
-  return res;
-}
-
-bool TcpConnection::SendMessage(const std::shared_ptr<MessageMeta> &meta, const Protos &protos, const void *data,
-                                size_t size) const {
-  MS_EXCEPTION_IF_NULL(buffer_event_);
-  MS_EXCEPTION_IF_NULL(meta);
   MS_EXCEPTION_IF_NULL(data);
   bufferevent_lock(buffer_event_);
   bool res = true;
+  std::string meta_data = meta.SerializeAsString();
   MessageHeader header;
   header.message_proto_ = protos;
-  header.message_meta_length_ = SizeToUint(meta->ByteSizeLong());
+  header.message_meta_length_ = SizeToUint(meta_data.size());
   header.message_length_ = size + header.message_meta_length_;
 
   if (bufferevent_write(buffer_event_, &header, sizeof(header)) == -1) {
     MS_LOG(ERROR) << "Event buffer add header failed!";
     res = false;
   }
-  if (bufferevent_write(buffer_event_, meta->SerializeAsString().data(), meta->ByteSizeLong()) == -1) {
+  if (bufferevent_write(buffer_event_, meta_data.data(), meta_data.size()) == -1) {
     MS_LOG(ERROR) << "Event buffer add protobuf data failed!";
     res = false;
   }
@@ -110,32 +87,33 @@ bool TcpConnection::SendMessage(const std::shared_ptr<MessageMeta> &meta, const 
   return res;
 }
 
-TcpServer::TcpServer(const std::string &address, std::uint16_t port, Configuration *const config)
-    : base_(nullptr),
-      signal_event_(nullptr),
+void TcpConnection::SimpleResponse(const MessageMeta &meta) {
+  uint64_t void_data = 0;
+  if (!SendMessage(meta, Protos::RAW, &void_data, sizeof(void_data))) {
+    MS_LOG(WARNING) << "Server response message failed.";
+  }
+}
+
+void TcpConnection::ErrorResponse(const MessageMeta &meta, const std::string &error_msg) {
+  MessageMeta new_meta = meta;
+  if (!error_msg.empty()) {
+    new_meta.set_response_error(error_msg);
+  }
+  uint64_t void_data = 0;
+  if (!SendMessage(new_meta, Protos::RAW, &void_data, sizeof(void_data))) {
+    MS_LOG(WARNING) << "Server response message failed.";
+  }
+}
+
+TcpServer::TcpServer(const std::string &address, std::uint16_t port)
+    : event_base_(nullptr),
       listener_(nullptr),
       server_address_(std::move(address)),
       server_port_(port),
       is_stop_(true),
-      config_(config),
       max_connection_(0) {}
 
-TcpServer::~TcpServer() {
-  if (signal_event_ != nullptr) {
-    event_free(signal_event_);
-    signal_event_ = nullptr;
-  }
-
-  if (listener_ != nullptr) {
-    evconnlistener_free(listener_);
-    listener_ = nullptr;
-  }
-
-  if (base_ != nullptr) {
-    event_base_free(base_);
-    base_ = nullptr;
-  }
-}
+TcpServer::~TcpServer() { Stop(); }
 
 void TcpServer::SetServerCallback(const OnConnected &client_conn, const OnDisconnected &client_disconn,
                                   const OnAccepted &client_accept) {
@@ -146,7 +124,7 @@ void TcpServer::SetServerCallback(const OnConnected &client_conn, const OnDiscon
 
 void TcpServer::Init() {
   if (FLContext::instance()->enable_ssl()) {
-    MS_LOG(INFO) << "Init ssl.";
+    MS_LOG(INFO) << "Load ssl.";
     SSLWrapper::GetInstance().InitSSL();
   }
   int result = evthread_use_pthreads();
@@ -155,16 +133,12 @@ void TcpServer::Init() {
   }
 
   is_stop_ = false;
-  base_ = event_base_new();
-  MS_EXCEPTION_IF_NULL(base_);
+  event_base_ = event_base_new();
+  MS_EXCEPTION_IF_NULL(event_base_);
   if (!CommUtil::CheckIp(server_address_)) {
     MS_LOG(EXCEPTION) << "The tcp server ip:" << server_address_ << " is illegal!";
   }
-  MS_EXCEPTION_IF_NULL(config_);
-  max_connection_ = kConnectionNumDefault;
-  if (config_->Exists(kConnectionNum)) {
-    max_connection_ = config_->GetInt(kConnectionNum, 0);
-  }
+  max_connection_ = FLContext::instance()->max_connection_num();
   MS_LOG(INFO) << "The max connection is:" << max_connection_;
 
   struct sockaddr_in sin {};
@@ -175,7 +149,7 @@ void TcpServer::Init() {
   sin.sin_port = htons(server_port_);
   sin.sin_addr.s_addr = inet_addr(server_address_.c_str());
 
-  listener_ = evconnlistener_new_bind(base_, ListenerCallback, reinterpret_cast<void *>(this),
+  listener_ = evconnlistener_new_bind(event_base_, ListenerCallback, reinterpret_cast<void *>(this),
                                       LEV_OPT_REUSEABLE | LEV_OPT_CLOSE_ON_FREE, -1,
                                       reinterpret_cast<struct sockaddr *>(&sin), sizeof(sin));
   if (listener_ == nullptr) {
@@ -193,48 +167,58 @@ void TcpServer::Init() {
     }
     server_port_ = htons(sin_bound.sin_port);
   }
+}
 
-  signal_event_ = evsignal_new(base_, SIGINT, SignalCallback, reinterpret_cast<void *>(this));
-  MS_EXCEPTION_IF_NULL(signal_event_);
-  if (event_add(signal_event_, nullptr) < 0) {
-    MS_LOG(EXCEPTION) << "Cannot create signal event.";
+void TcpServer::StartDispatch() {
+  std::lock_guard<std::mutex> lock(connection_mutex_);
+  if (is_started_) {
+    return;
   }
+  if (dispatch_thread_.joinable()) {
+    dispatch_thread_.join();
+  }
+  auto dispatch_fun = [this]() {
+    is_started_ = true;
+    auto ret = event_base_dispatch(event_base_);
+    is_started_ = false;
+    if (ret == 0) {
+      MS_LOG_INFO << "Event base dispatch and exit success!";
+    } else if (ret == 1) {
+      MS_LOG_INFO << "Event base dispatch failed with no events pending or active!";
+    } else if (ret == -1) {
+      MS_LOG_WARNING << "Event base dispatch failed with error occurred!";
+    } else if (ret < -1) {
+      MS_LOG_WARNING << "Event base dispatch with unexpected error code!";
+    }
+  };
+  dispatch_thread_ = std::thread(dispatch_fun);
 }
 
 void TcpServer::Start() {
-  MS_LOG(INFO) << "Start tcp server!";
-  MS_EXCEPTION_IF_NULL(base_);
-  int ret = event_base_dispatch(base_);
-  MSLOG_IF(INFO, ret == 0, NoExceptionType) << "Event base dispatch success!";
-  MSLOG_IF(mindspore::ERROR, ret == 1, NoExceptionType)
-    << "Event base dispatch failed with no events pending or active!";
-  MSLOG_IF(mindspore::ERROR, ret == -1, NoExceptionType) << "Event base dispatch failed with error occurred!";
-  MSLOG_IF(mindspore::EXCEPTION, ret < -1, AbortedError) << "Event base dispatch with unexpected error code!";
+  Init();
+  StartDispatch();
 }
 
 void TcpServer::Stop() {
-  MS_ERROR_IF_NULL_WO_RET_VAL(base_);
   std::lock_guard<std::mutex> lock(connection_mutex_);
   MS_LOG(INFO) << "Stop tcp server!";
-  if (event_base_got_break(base_)) {
-    MS_LOG(DEBUG) << "The event base has already been stopped!";
-    is_stop_ = true;
-    return;
-  }
-  if (!is_stop_.load()) {
-    is_stop_ = true;
-    int ret = event_base_loopbreak(base_);
+  if (is_started_ && event_base_ != nullptr) {
+    int ret = event_base_loopbreak(event_base_);
     if (ret != 0) {
       MS_LOG(ERROR) << "Event base loop break failed!";
     }
   }
-}
-
-void TcpServer::SendToAllClients(const char *data, size_t len) {
-  MS_EXCEPTION_IF_NULL(data);
-  std::lock_guard<std::mutex> lock(connection_mutex_);
-  for (auto it = connections_.begin(); it != connections_.end(); ++it) {
-    it->second->SendMessage(data, len);
+  connections_.clear();
+  if (dispatch_thread_.joinable()) {
+    dispatch_thread_.join();
+  }
+  if (listener_ != nullptr) {
+    evconnlistener_free(listener_);
+    listener_ = nullptr;
+  }
+  if (event_base_ != nullptr) {
+    event_base_free(event_base_);
+    event_base_ = nullptr;
   }
 }
 
@@ -250,27 +234,27 @@ void TcpServer::RemoveConnection(const evutil_socket_t &fd) {
   connections_.erase(fd);
 }
 
-std::shared_ptr<TcpConnection> &TcpServer::GetConnectionByFd(const evutil_socket_t &fd) { return connections_[fd]; }
+std::shared_ptr<TcpConnection> TcpServer::GetConnectionByFd(const evutil_socket_t &fd) { return connections_[fd]; }
 
 void TcpServer::ListenerCallback(struct evconnlistener *, evutil_socket_t fd, struct sockaddr *sockaddr, int,
                                  void *const data) {
   try {
-    ListenerCallbackInner(fd, sockaddr, data);
+    auto server = reinterpret_cast<class TcpServer *>(data);
+    MS_EXCEPTION_IF_NULL(server);
+    server->ListenerCallbackInner(fd, sockaddr);
   } catch (const std::exception &e) {
     MS_LOG(ERROR) << "Catch exception: " << e.what();
   }
 }
 
-void TcpServer::ListenerCallbackInner(evutil_socket_t fd, struct sockaddr *sockaddr, void *const data) {
-  auto server = reinterpret_cast<class TcpServer *>(data);
-  MS_EXCEPTION_IF_NULL(server);
-  auto base = reinterpret_cast<struct event_base *>(server->base_);
+void TcpServer::ListenerCallbackInner(evutil_socket_t fd, struct sockaddr *sockaddr) {
+  auto base = reinterpret_cast<struct event_base *>(event_base_);
   MS_EXCEPTION_IF_NULL(base);
   MS_EXCEPTION_IF_NULL(sockaddr);
 
-  if (server->ConnectionNum() >= server->max_connection_) {
-    MS_LOG(WARNING) << "The current connection num:" << server->ConnectionNum() << " is greater or equal to "
-                    << server->max_connection_;
+  if (ConnectionNum() >= max_connection_) {
+    MS_LOG(WARNING) << "The current connection num:" << ConnectionNum() << " is greater or equal to "
+                    << max_connection_;
     return;
   }
 
@@ -295,29 +279,22 @@ void TcpServer::ListenerCallbackInner(evutil_socket_t fd, struct sockaddr *socka
     return;
   }
 
-  std::shared_ptr<TcpConnection> conn = server->onCreateConnection(bev, fd);
+  std::shared_ptr<TcpConnection> conn = onCreateConnection(bev, fd);
   MS_EXCEPTION_IF_NULL(conn);
   SetTcpNoDelay(fd);
-  server->AddConnection(fd, conn);
-  if (FLContext::instance()->server_mode() == kServerModeHybrid ||
-      FLContext::instance()->server_mode() == kServerModeFL) {
-    conn->InitConnection(
-      [fd, server](const std::shared_ptr<MessageMeta> &meta, const Protos &protos, const void *data, size_t size) {
-        OnServerReceiveMessage on_server_receive = server->GetServerReceive();
-        if (on_server_receive) {
-          on_server_receive(server->GetConnectionByFd(fd), meta, protos, data, size);
-        }
-      });
-  } else {
-    conn->InitConnection(
-      [=](const std::shared_ptr<MessageMeta> &meta, const Protos &protos, const void *data, size_t size) {
-        OnServerReceiveMessage on_server_receive = server->GetServerReceive();
-        if (on_server_receive) {
-          on_server_receive(conn, meta, protos, data, size);
-        }
-      });
-  }
-
+  AddConnection(fd, conn);
+  // TcpConnection shared_ptr cannot hold itself
+  std::weak_ptr<TcpConnection> conn_weak = conn;
+  conn->InitConnection([this, conn_weak](const MessageMeta &meta, const Protos &protos, const VectorPtr &data) {
+    auto conn = conn_weak.lock();
+    if (!conn) {
+      return;
+    }
+    OnServerReceiveMessage on_server_receive = GetServerReceive();
+    if (on_server_receive) {
+      on_server_receive(conn, meta, protos, data);
+    }
+  });
   bufferevent_setcb(bev, TcpServer::ReadCallback, nullptr, TcpServer::EventCallback,
                     reinterpret_cast<void *>(conn.get()));
   MS_LOG(INFO) << "A client is connected, fd is " << fd;
@@ -351,7 +328,7 @@ void TcpServer::SignalCallback(evutil_socket_t, std::int16_t, void *const data) 
 void TcpServer::SignalCallbackInner(void *const data) {
   MS_EXCEPTION_IF_NULL(data);
   auto server = reinterpret_cast<class TcpServer *>(data);
-  struct event_base *base = server->base_;
+  struct event_base *base = server->event_base_;
   MS_EXCEPTION_IF_NULL(base);
   struct timeval delay = {0, 0};
   MS_LOG(ERROR) << "Caught an interrupt signal; exiting cleanly in 0 seconds.";
@@ -375,14 +352,14 @@ void TcpServer::ReadCallbackInner(struct bufferevent *bev, void *const connectio
   auto conn = static_cast<class TcpConnection *>(connection);
   struct evbuffer *buf = bufferevent_get_input(bev);
   MS_EXCEPTION_IF_NULL(buf);
-  char read_buffer[kMessageChunkLength];
-  while (EVBUFFER_LENGTH(buf) > 0) {
-    int read = evbuffer_remove(buf, &read_buffer, sizeof(read_buffer));
-    if (read == -1) {
-      MS_LOG(EXCEPTION) << "Can not drain data from the event buffer!";
+  auto read_fun = [buf](void *data, size_t max_size) -> size_t {
+    auto ret = evbuffer_remove(buf, data, max_size);
+    if (ret < 0) {
+      return 0;
     }
-    conn->OnReadHandler(read_buffer, IntToSize(read));
-  }
+    return static_cast<size_t>(ret);
+  };
+  conn->OnReadHandler(read_fun);
 }
 
 void TcpServer::EventCallback(struct bufferevent *bev, std::int16_t events, void *const data) {
@@ -420,12 +397,13 @@ void TcpServer::EventCallbackInner(struct bufferevent *bev, std::int16_t events,
                       << ", the error lib:" << ERR_lib_error_string(err)
                       << ", the error func:" << ERR_func_error_string(err);
     }
+    // Free connection structures
+    srv->RemoveConnection(conn->GetFd());
+
     // Notify about disconnection
     if (srv->client_disconnection_) {
       srv->client_disconnection_(*srv, *conn);
     }
-    // Free connection structures
-    srv->RemoveConnection(conn->GetFd());
   } else {
     MS_LOG(WARNING) << "Unhandled event:" << events;
   }
@@ -439,38 +417,21 @@ void TcpServer::SetTcpNoDelay(const evutil_socket_t &fd) {
   }
 }
 
-bool TcpServer::SendMessage(const std::shared_ptr<TcpConnection> &conn, const std::shared_ptr<CommMessage> &message) {
+bool TcpServer::SendMessage(const std::shared_ptr<TcpConnection> &conn, const MessageMeta &meta, const Protos &protos,
+                            const void *data, size_t size) {
   MS_EXCEPTION_IF_NULL(conn);
-  MS_EXCEPTION_IF_NULL(message);
-  return conn->SendMessage(message);
-}
-
-bool TcpServer::SendMessage(const std::shared_ptr<TcpConnection> &conn, const std::shared_ptr<MessageMeta> &meta,
-                            const Protos &protos, const void *data, size_t size) {
-  MS_EXCEPTION_IF_NULL(conn);
-  MS_EXCEPTION_IF_NULL(meta);
   MS_EXCEPTION_IF_NULL(data);
   return conn->SendMessage(meta, protos, data, size);
-}
-
-void TcpServer::SendMessage(const std::shared_ptr<CommMessage> &message) {
-  MS_EXCEPTION_IF_NULL(message);
-  std::lock_guard<std::mutex> lock(connection_mutex_);
-
-  for (auto it = connections_.begin(); it != connections_.end(); ++it) {
-    SendMessage(it->second, message);
-  }
 }
 
 uint16_t TcpServer::BoundPort() const { return server_port_; }
 
 std::string TcpServer::BoundIp() const { return server_address_; }
 
-int TcpServer::ConnectionNum() const { return SizeToInt(connections_.size()); }
+uint64_t TcpServer::ConnectionNum() const { return connections_.size(); }
 
 const std::map<evutil_socket_t, std::shared_ptr<TcpConnection>> &TcpServer::Connections() const { return connections_; }
 
 void TcpServer::SetMessageCallback(const OnServerReceiveMessage &cb) { message_callback_ = cb; }
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore

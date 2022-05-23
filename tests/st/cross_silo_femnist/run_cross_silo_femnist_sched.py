@@ -13,49 +13,28 @@
 # limitations under the License.
 # ============================================================================
 
+import os
 import argparse
 import subprocess
 
 parser = argparse.ArgumentParser(description="Run test_cross_silo_femnist.py case")
-parser.add_argument("--device_target", type=str, default="CPU")
-parser.add_argument("--server_mode", type=str, default="FEDERATED_LEARNING")
-parser.add_argument("--worker_num", type=int, default=1)
-parser.add_argument("--server_num", type=int, default=2)
-parser.add_argument("--scheduler_ip", type=str, default="127.0.0.1")
-parser.add_argument("--scheduler_port", type=int, default=8113)
-parser.add_argument("--scheduler_manage_port", type=int, default=11202)
-parser.add_argument("--config_file_path", type=str, default="")
-parser.add_argument("--dataset_path", type=str, default="")
-parser.add_argument("--sync_type", type=str, default="fixed", choices=["fixed", "adaptive"])
+parser.add_argument("--yaml_config", type=str, default="default_yaml_config.yaml")
+parser.add_argument("--scheduler_manage_address", type=str, default="127.0.0.1:11202")
 
 args, _ = parser.parse_known_args()
-device_target = args.device_target
-server_mode = args.server_mode
-worker_num = args.worker_num
-server_num = args.server_num
-scheduler_ip = args.scheduler_ip
-scheduler_port = args.scheduler_port
-scheduler_manage_port = args.scheduler_manage_port
-config_file_path = args.config_file_path
-dataset_path = args.dataset_path
-sync_type = args.sync_type
+scheduler_manage_address = args.scheduler_manage_address
+yaml_config = args.yaml_config
 
-cmd_sched = "execute_path=$(pwd) && self_path=$(dirname \"${script_self}\") && rm -rf ${execute_path}/scheduler/ &&"
-cmd_sched += "mkdir ${execute_path}/scheduler/ &&"
-cmd_sched += "cd ${execute_path}/scheduler/ || exit && export GLOG_v=1 &&"
-cmd_sched += "python ${self_path}/../test_cross_silo_femnist.py"
-cmd_sched += " --device_target=" + device_target
-cmd_sched += " --server_mode=" + server_mode
+cur_dir = os.path.dirname(os.path.abspath(__file__))
+yaml_config = os.path.join(cur_dir, yaml_config)
+
+cmd_sched = "execute_path=$(pwd) && self_path=$(dirname \"${script_self}\") && rm -rf ${execute_path}/logs/scheduler/ "
+cmd_sched += "&& mkdir -p ${execute_path}/logs/scheduler/ &&"
+cmd_sched += "cd ${execute_path}/logs/scheduler/ || exit && export GLOG_v=1 &&"
+cmd_sched += "python ${self_path}/../../test_cross_silo_femnist.py"
 cmd_sched += " --ms_role=MS_SCHED"
-cmd_sched += " --worker_num=" + str(worker_num)
-cmd_sched += " --server_num=" + str(server_num)
-cmd_sched += " --config_file_path=" + str(config_file_path)
-cmd_sched += " --scheduler_ip=" + scheduler_ip
-cmd_sched += " --scheduler_port=" + str(scheduler_port)
-cmd_sched += " --scheduler_manage_port=" + str(scheduler_manage_port)
-cmd_sched += " --dataset_path=" + str(dataset_path)
-cmd_sched += " --user_id=" + str(0)
-cmd_sched += " --sync_type=" + sync_type
+cmd_sched += " --yaml_config=" + str(yaml_config)
+cmd_sched += " --scheduler_manage_address=" + str(scheduler_manage_address)
 cmd_sched += " > scheduler.log 2>&1 &"
 
 subprocess.call(['bash', '-c', cmd_sched])

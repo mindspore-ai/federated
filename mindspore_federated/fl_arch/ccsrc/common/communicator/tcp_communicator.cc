@@ -17,101 +17,90 @@
 #include "common/communicator/tcp_communicator.h"
 #include <memory>
 #include <utility>
+#include "communicator/tcp_msg_handler.h"
 
 namespace mindspore {
 namespace fl {
-namespace core {
+namespace {
+constexpr int kDefaultTcpThreadCount = 3;
+const std::unordered_map<TcpUserCommand, std::string> kUserCommandToMsgType = {
+  {TcpUserCommand::kPullWeight, "pullWeight"}, {TcpUserCommand::kPushWeight, "pushWeight"},
+  {TcpUserCommand::kStartFLJob, "startFLJob"}, {TcpUserCommand::kExchangeKeys, "exchangeKeys"},
+  {TcpUserCommand::kGetKeys, "getKeys"},       {TcpUserCommand::kUpdateModel, "updateModel"},
+  {TcpUserCommand::kGetModel, "getModel"},     {TcpUserCommand::kPushMetrics, "pushMetrics"}};
+}  // namespace
+
 bool TcpCommunicator::Start() {
-  if (running_) {
+  if (task_executor_) {
     MS_LOG(INFO) << "The TCP communicator has already started.";
     return true;
   }
-  MS_EXCEPTION_IF_NULL(abstrace_node_);
-
-  // Set message callback. For example, message of push/pull, etc.
-  tcp_msg_callback_ = std::bind(
-    [&](std::shared_ptr<fl::core::TcpConnection> conn, std::shared_ptr<fl::core::MessageMeta> meta, const void *data,
-        size_t size) -> void {
-      MS_ERROR_IF_NULL_WO_RET_VAL(conn);
-      MS_ERROR_IF_NULL_WO_RET_VAL(meta);
-      MS_ERROR_IF_NULL_WO_RET_VAL(data);
-      TcpUserCommand user_command = static_cast<TcpUserCommand>(meta->user_cmd());
-      const std::string &msg_type = kUserCommandToMsgType.at(user_command);
-      if (msg_type == "" || !msg_callbacks_[msg_type]) {
-        MS_LOG(ERROR) << "Tcp server doesn't support command " << user_command << " " << msg_type;
-        return;
-      }
-
-      MS_LOG(DEBUG) << "TcpCommunicator receives message for " << msg_type;
-      // avoid data release when tcp message callback invoked in other thread
-      auto unique_data = std::make_unique<uint8_t[]>(size);
-      if (size > 0) {
-        auto src_size = size;
-        auto dst_size = size;
-        auto ret = memcpy_s(unique_data.get(), dst_size, data, src_size);
-        if (ret != 0) {
-          MS_LOG(ERROR) << "Failed to copy tcp data, data size: " << size << ", user command: " << user_command
-                        << ", msg type: " << msg_type;
-          return;
-        }
-      }
-      std::shared_ptr<MessageHandler> tcp_msg_handler =
-        std::make_shared<TcpMsgHandler>(abstrace_node_, conn, meta, std::move(unique_data), size);
-      MS_ERROR_IF_NULL_WO_RET_VAL(tcp_msg_handler);
-      // The Submit function timed out for 30s, if it returns false, it will retry 60 times.
-      bool res = CommUtil::Retry(
-        [&] {
-          MS_EXCEPTION_IF_NULL(task_executor_);
-          return task_executor_->Submit(msg_callbacks_[msg_type], tcp_msg_handler);
-        },
-        kRetryCount, kRetryIntervalInMs);
-      if (res == false) {
-        MS_LOG(EXCEPTION) << "Submit tcp msg handler failed.";
-      }
-
-      return;
-    },
-    std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4);
-  abstrace_node_->set_handler(tcp_msg_callback_);
-
-  if (!abstrace_node_->Start()) {
-    MS_LOG(EXCEPTION) << "Starting server node failed.";
-    return false;
-  }
-  running_ = true;
-  running_thread_ = std::thread([&]() {
-    while (running_) {
-      std::this_thread::yield();
-    }
-  });
+  task_executor_ = std::make_shared<TaskExecutor>(kDefaultTcpThreadCount);
+  MS_EXCEPTION_IF_NULL(task_executor_);
   return true;
 }
 
 bool TcpCommunicator::Stop() {
-  MS_EXCEPTION_IF_NULL(abstrace_node_);
-
-  // In some cases, server calls the Finish function while other nodes don't. So timeout is acceptable.
-  if (!abstrace_node_->Finish()) {
-    MS_LOG(WARNING) << "Finishing server node timeout.";
+  // stop handle tcp message
+  if (task_executor_) {
+    task_executor_->Stop();
   }
-  if (!abstrace_node_->Stop()) {
-    MS_LOG(ERROR) << "Stopping server node failed.";
-    return false;
-  }
-  running_ = false;
   return true;
 }
 
-void TcpCommunicator::RegisterMsgCallBack(const std::string &msg_type, const MessageCallback &cb) {
+void TcpCommunicator::RegisterRoundMsgCallback(const std::string &msg_type, const MessageCallback &cb) {
   MS_LOG(INFO) << "msg_type is: " << msg_type;
   msg_callbacks_.try_emplace(msg_type, cb);
-  return;
 }
 
-void TcpCommunicator::RegisterEventCallback(const fl::core::ClusterEvent &event, const EventCallback &event_cb) {
-  MS_EXCEPTION_IF_NULL(abstrace_node_);
-  abstrace_node_->RegisterEventCallback(event, event_cb);
+void TcpCommunicator::HandleRoundRequest(const std::shared_ptr<TcpConnection> &conn, const MessageMeta &meta,
+                                         const Protos &type, const VectorPtr &data) {
+  MS_EXCEPTION_IF_NULL(conn);
+  auto ret = HandleRoundRequestInner(conn, meta, type, data);
+  if (!ret.IsSuccess()) {
+    MS_LOG_ERROR << ret.StatusMessage();
+    conn->ErrorResponse(meta, ret.StatusMessage());
+  }
 }
-}  // namespace core
+
+FlStatus TcpCommunicator::HandleRoundRequestInner(const std::shared_ptr<TcpConnection> &conn, const MessageMeta &meta,
+                                                  const Protos &, const VectorPtr &data) {
+  MS_EXCEPTION_IF_NULL(conn);
+  MS_EXCEPTION_IF_NULL(data);
+  TcpUserCommand user_command = static_cast<TcpUserCommand>(meta.user_cmd());
+  auto msg_it = kUserCommandToMsgType.find(user_command);
+  if (msg_it == kUserCommandToMsgType.end()) {
+    std::stringstream stringstream;
+    stringstream << "Tcp server doesn't support command " << user_command;
+    return FlStatus(kFlFailed, stringstream.str());
+  }
+  const std::string &msg_type = msg_it->second;
+  auto msg_handler = GetRoundMsgCallBack(msg_type);
+  if (msg_handler == nullptr) {
+    std::stringstream stringstream;
+    stringstream << "Tcp server doesn't support command " << user_command << " " << msg_type;
+    return FlStatus(kFlFailed, stringstream.str());
+  }
+  MS_LOG(DEBUG) << "TcpCommunicator receives message for " << msg_type;
+  std::shared_ptr<MessageHandler> tcp_msg_handler = std::make_shared<TcpMsgHandler>(conn, meta, data);
+  if (tcp_msg_handler == nullptr) {
+    return FlStatus(kFlFailed, "Create TcpMsgHandler failed");
+  }
+  if (task_executor_ == nullptr) {
+    return FlStatus(kFlFailed, "Task executor is not inited");
+  }
+  if (!task_executor_->Submit(msg_handler, tcp_msg_handler)) {
+    return FlStatus(kFlFailed, "Submit tcp msg handler failed.");
+  }
+  return kFlSuccess;
+}
+
+CommunicatorBase::MessageCallback TcpCommunicator::GetRoundMsgCallBack(const std::string &msg_type) const {
+  auto it = msg_callbacks_.find(msg_type);
+  if (it == msg_callbacks_.end()) {
+    return nullptr;
+  }
+  return it->second;
+}
 }  // namespace fl
 }  // namespace mindspore

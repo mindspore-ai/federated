@@ -18,7 +18,6 @@
 
 namespace mindspore {
 namespace fl {
-namespace core {
 HttpRequestHandler::~HttpRequestHandler() {
   if (evbase_) {
     event_base_free(evbase_);
@@ -53,7 +52,7 @@ bool HttpRequestHandler::Initialize(int fd, const std::unordered_map<std::string
     MS_LOG(ERROR) << "Evhttp accept socket failed!";
     return false;
   }
-
+  std::vector<std::string> addresses;
   for (const auto &handler : handlers) {
     auto TransFunc = [](struct evhttp_request *req, void *arg) {
       try {
@@ -73,16 +72,16 @@ bool HttpRequestHandler::Initialize(int fd, const std::unordered_map<std::string
     // O SUCCESS,-1 ALREADY_EXIST,-2 FAILURE
     MS_EXCEPTION_IF_NULL(handler.second);
     int ret = evhttp_set_cb(http, handler.first.c_str(), TransFunc, reinterpret_cast<void *>(handler.second));
-    std::string log_prefix = "Ev http register handle of:";
     if (ret == 0) {
-      MS_LOG(INFO) << log_prefix << handler.first.c_str() << " success.";
+      addresses.push_back(handler.first);
     } else if (ret == -1) {
-      MS_LOG(WARNING) << log_prefix << handler.first.c_str() << " exist.";
+      MS_LOG(WARNING) << "Ev http register handle of: " << handler.first << " exist.";
     } else {
-      MS_LOG(ERROR) << log_prefix << handler.first.c_str() << " failed.";
+      MS_LOG(ERROR) << "Ev http register handle of: " << handler.first << " failed.";
       return false;
     }
   }
+  MS_LOG(INFO) << "Ev http register handle of: " << addresses << " success.";
   return true;
 }
 
@@ -90,20 +89,16 @@ void HttpRequestHandler::Run() {
   MS_LOG(INFO) << "Start http server!";
   MS_EXCEPTION_IF_NULL(evbase_);
   int ret = event_base_dispatch(evbase_);
-  if (ret == 0) {
-    MS_LOG(INFO) << "Event base dispatch success!";
-  } else if (ret == 1) {
+  if (ret == 1) {
     MS_LOG(ERROR) << "Event base dispatch failed with no events pending or active!";
   } else if (ret == -1) {
     MS_LOG(ERROR) << "Event base dispatch failed with error occurred!";
-  } else {
-    MS_LOG(ERROR) << "Event base dispatch with unexpected error code!";
+  } else if (ret != 0) {
+    MS_LOG(ERROR) << "Event base dispatch with unexpected error code " << ret;
   }
 }
 
 bool HttpRequestHandler::Stop() {
-  MS_LOG(INFO) << "Stop http server!";
-
   MS_EXCEPTION_IF_NULL(evbase_);
   if (event_base_got_break(evbase_)) {
     MS_LOG(INFO) << "The event base has already been stopped!";
@@ -127,6 +122,5 @@ bufferevent *HttpRequestHandler::BuffereventCallback(event_base *base, void *arg
   MS_EXCEPTION_IF_NULL(bev);
   return bev;
 }
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore

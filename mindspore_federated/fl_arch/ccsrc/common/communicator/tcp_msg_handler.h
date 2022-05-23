@@ -14,38 +14,31 @@
  * limitations under the License.
  */
 
-#ifndef MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_MSG_HANDLER_H_
-#define MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_MSG_HANDLER_H_
+#ifndef MINDSPORE_CCSRC_FL_TCP_MSG_HANDLER_H_
+#define MINDSPORE_CCSRC_FL_TCP_MSG_HANDLER_H_
 
 #include <memory>
-#include "common/core/abstract_node.h"
-#include "common/communicator/message_handler.h"
-#include "common/constants.h"
+#include "communicator/tcp_communicator.h"
+#include "communicator/message_handler.h"
 
 namespace mindspore {
 namespace fl {
-namespace core {
 class TcpMsgHandler : public MessageHandler {
  public:
-  TcpMsgHandler(AbstractNode *abstract_node, const std::shared_ptr<fl::core::TcpConnection> &conn,
-                const std::shared_ptr<MessageMeta> &meta, DataPtr data, size_t size);
+  TcpMsgHandler(const std::shared_ptr<TcpConnection> &conn, const MessageMeta &meta, const VectorPtr &data);
   ~TcpMsgHandler() override = default;
 
-  void *data() const override;
+  const void *data() const override;
   size_t len() const override;
   bool SendResponse(const void *data, const size_t &len) override;
 
  private:
-  AbstractNode *abstract_node_;
   std::shared_ptr<TcpConnection> tcp_conn_;
-  // fl::core::MessageMeta is used for server to get the user command and to find communication peer when responding.
-  std::shared_ptr<MessageMeta> meta_;
+  // MessageMeta is used for server to get the user command and to find communication peer when responding.
+  MessageMeta meta_;
   // We use data of shared_ptr array so that the raw pointer won't be released until the reference is 0.
-  DataPtr data_ptr_;
-  void *data_;
-  size_t len_;
+  VectorPtr data_;
 };
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore
-#endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_MSG_HANDLER_H_
+#endif  // MINDSPORE_CCSRC_FL_TCP_MSG_HANDLER_H_

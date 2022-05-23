@@ -15,50 +15,41 @@
  */
 
 #include "server/kernel/round/round_kernel.h"
-
-#include <chrono>
 #include <mutex>
 #include <queue>
-#include <string>
+#include <chrono>
 #include <thread>
 #include <utility>
+#include <string>
 #include <vector>
-
 #include "server/iteration.h"
+#include "server/cert_verify.h"
 
 namespace mindspore {
 namespace fl {
 namespace server {
 namespace kernel {
-RoundKernel::RoundKernel() : name_(""), current_count_(0), running_(true) {}
+RoundKernel::RoundKernel() = default;
 
-RoundKernel::~RoundKernel() { running_ = false; }
+RoundKernel::~RoundKernel() = default;
 
-void RoundKernel::OnFirstCountEvent(const std::shared_ptr<fl::core::MessageHandler> &) { return; }
-
-void RoundKernel::OnLastCountEvent(const std::shared_ptr<fl::core::MessageHandler> &) { return; }
-
-void RoundKernel::StopTimer() const {
-  if (stop_timer_cb_) {
-    stop_timer_cb_();
+void RoundKernel::InitKernelCommon(size_t iteration_time_window) {
+  iteration_time_window_ = iteration_time_window;
+  executor_ = &Executor::GetInstance();
+  MS_EXCEPTION_IF_NULL(executor_);
+  if (!executor_->initialized()) {
+    MS_LOG(EXCEPTION) << "Executor must be initialized in server pipeline.";
+    return;
   }
-  return;
 }
 
-void RoundKernel::FinishIteration(bool is_last_iter_valid, const std::string &in_reason) const {
-  std::string reason = in_reason;
-  if (is_last_iter_valid) {
-    reason = "Round " + name_ + " finished! This iteration is valid. Proceed to next iteration.";
-  }
-  Iteration::GetInstance().NotifyNext(is_last_iter_valid, reason);
-}
+void RoundKernel::OnFirstCountEvent() {}
+
+void RoundKernel::OnLastCountEvent() {}
 
 void RoundKernel::set_name(const std::string &name) { name_ = name; }
 
-void RoundKernel::set_stop_timer_cb(const StopTimerCb &timer_stopper) { stop_timer_cb_ = timer_stopper; }
-
-void RoundKernel::SendResponseMsg(const std::shared_ptr<fl::core::MessageHandler> &message, const void *data,
-                                  size_t len) {
+void RoundKernel::SendResponseMsg(const std::shared_ptr<MessageHandler> &message, const void *data, size_t len) {
   if (!verifyResponse(message, data, len)) {
     return;
   }
@@ -67,12 +58,12 @@ void RoundKernel::SendResponseMsg(const std::shared_ptr<fl::core::MessageHandler
     MS_LOG(WARNING) << "Sending response failed.";
     return;
   }
-  uint64_t time = fl::core::CommUtil::GetNowTime().time_stamp;
+  uint64_t time = fl::CommUtil::GetNowTime().time_stamp;
   RecordSendData(std::make_pair(time, len));
 }
 
-void RoundKernel::SendResponseMsgInference(const std::shared_ptr<fl::core::MessageHandler> &message, const void *data,
-                                           size_t len, fl::core::RefBufferRelCallback cb) {
+void RoundKernel::SendResponseMsgInference(const std::shared_ptr<MessageHandler> &message, const void *data, size_t len,
+                                           RefBufferRelCallback cb) {
   if (!verifyResponse(message, data, len)) {
     return;
   }
@@ -81,12 +72,11 @@ void RoundKernel::SendResponseMsgInference(const std::shared_ptr<fl::core::Messa
     MS_LOG(WARNING) << "Sending response failed.";
     return;
   }
-  uint64_t time = fl::core::CommUtil::GetNowTime().time_stamp;
+  uint64_t time = fl::CommUtil::GetNowTime().time_stamp;
   RecordSendData(std::make_pair(time, len));
 }
 
-bool RoundKernel::verifyResponse(const std::shared_ptr<fl::core::MessageHandler> &message, const void *data,
-                                 size_t len) {
+bool RoundKernel::verifyResponse(const std::shared_ptr<MessageHandler> &message, const void *data, size_t len) {
   if (message == nullptr) {
     MS_LOG(WARNING) << "The message handler is nullptr.";
     return false;
@@ -102,6 +92,43 @@ bool RoundKernel::verifyResponse(const std::shared_ptr<fl::core::MessageHandler>
   return true;
 }
 
+sigVerifyResult RoundKernel::VerifySignatureBase(const std::string &fl_id,
+                                                 const std::vector<std::string> &src_data_list,
+                                                 const flatbuffers::Vector<uint8_t> *signature,
+                                                 const std::string &timestamp) {
+  std::vector<unsigned char> src_data;
+  for (auto &item : src_data_list) {
+    src_data.insert(src_data.end(), item.begin(), item.end());
+  }
+  return VerifySignatureBase(fl_id, src_data, signature, timestamp);
+}
+
+sigVerifyResult RoundKernel::VerifySignatureBase(const std::string &fl_id, const std::vector<uint8_t> &src_data,
+                                                 const flatbuffers::Vector<uint8_t> *signature,
+                                                 const std::string &timestamp) {
+  if (signature == nullptr) {
+    MS_LOG(DEBUG) << "signature in request " << name_ << " is nullptr";
+    return sigVerifyResult::FAILED;
+  }
+  std::string key_attestation;
+  auto found = cache::ClientInfos::GetInstance().GetClientKeyAttestation(fl_id, &key_attestation);
+  if (!found.IsSuccess()) {
+    MS_LOG(WARNING) << "can not find key attestation for fl_id: " << fl_id;
+    return sigVerifyResult::TIMEOUT;
+  }
+  auto &certVerify = CertVerify::GetInstance();
+  unsigned char srcDataHash[SHA256_DIGEST_LENGTH];
+  certVerify.sha256Hash(src_data.data(), SizeToInt(src_data.size()), srcDataHash, SHA256_DIGEST_LENGTH);
+  if (!certVerify.verifyRSAKey(key_attestation, srcDataHash, signature->data(), SHA256_DIGEST_LENGTH)) {
+    return sigVerifyResult::FAILED;
+  }
+  if (!certVerify.verifyTimeStamp(fl_id, timestamp)) {
+    return sigVerifyResult::TIMEOUT;
+  }
+  MS_LOG(INFO) << "verify signature for fl_id: " << fl_id << " success.";
+  return sigVerifyResult::PASSED;
+}
+
 void RoundKernel::IncreaseTotalClientNum() { total_client_num_ += 1; }
 
 void RoundKernel::IncreaseAcceptClientNum() { accept_client_num_ += 1; }
@@ -113,7 +140,7 @@ void RoundKernel::Summarize() {
                  << ", reject client num is: " << (total_client_num_ - accept_client_num_);
   }
 
-  if (name_ == "updateModel" && accept_client_num() > 0) {
+  if (name_ == kUpdateModelKernel && accept_client_num() > 0) {
     MS_LOG(INFO) << "Client Upload avg Loss: " << (upload_loss_ / accept_client_num());
   }
 }

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_HTTP_REQUEST_HANDLER_H_
-#define MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_HTTP_REQUEST_HANDLER_H_
+#ifndef MINDSPORE_CCSRC_FL_COMMUNICATOR_HTTP_REQUEST_HANDLER_H_
+#define MINDSPORE_CCSRC_FL_COMMUNICATOR_HTTP_REQUEST_HANDLER_H_
 
 #include <event2/event.h>
 #include <event2/http.h>
@@ -31,12 +31,11 @@
 #include "common/communicator/http_message_handler.h"
 #include "common/communicator/ssl_http.h"
 #include "common/constants.h"
-#include "python/fl_context.h"
+#include "common/fl_context.h"
 
 namespace mindspore {
 namespace fl {
-namespace core {
-using OnRequestReceive = std::function<void(std::shared_ptr<HttpMessageHandler>)>;
+using OnRequestReceive = std::function<void(const std::shared_ptr<HttpMessageHandler> &)>;
 
 /* Each thread corresponds to one HttpRequestHandler, which is used to create one eventbase. All eventbase are listened
  * on the same fd. Every evhttp_request is executed in one thread.
@@ -54,7 +53,6 @@ class HttpRequestHandler {
  private:
   struct event_base *evbase_;
 };
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore
-#endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_HTTP_REQUEST_HANDLER_H_
+#endif  // MINDSPORE_CCSRC_FL_COMMUNICATOR_HTTP_REQUEST_HANDLER_H_

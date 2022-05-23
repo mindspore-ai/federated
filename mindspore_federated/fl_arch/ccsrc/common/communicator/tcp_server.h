@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_SERVER_H_
-#define MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_SERVER_H_
+#ifndef MINDSPORE_CCSRC_FL_COMMUNICATOR_TCP_SERVER_H_
+#define MINDSPORE_CCSRC_FL_COMMUNICATOR_TCP_SERVER_H_
 
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
@@ -41,82 +41,71 @@
 #include "common/utils/convert_utils_base.h"
 #include "common/core/comm_util.h"
 #include "common/constants.h"
-#include "python/fl_context.h"
-#include "common/core/configuration.h"
-#include "common/core/file_configuration.h"
+#include "common/fl_context.h"
 
 namespace mindspore {
 namespace fl {
-namespace core {
 class TcpServer;
 class TcpConnection {
  public:
-  explicit TcpConnection(struct bufferevent *bev, const evutil_socket_t &fd, TcpServer *server)
-      : buffer_event_(bev), fd_(fd), server_(server) {
-    MS_LOG(WARNING) << "TcpConnection is constructed! fd is " << fd;
-  }
-  TcpConnection(const TcpConnection &);
+  TcpConnection(struct bufferevent *bev, const evutil_socket_t &fd, TcpServer *server)
+      : buffer_event_(bev), fd_(fd), server_(server) {}
+  TcpConnection(const TcpConnection &) = delete;
   virtual ~TcpConnection();
 
-  using Callback = std::function<void(const std::shared_ptr<CommMessage>)>;
-
-  void InitConnection(const messageReceive &callback);
+  void OnReadHandler(const TcpMessageHandler::ReadBufferFun &read_fun);
+  void InitConnection(const TcpMessageHandler::MessageHandleFun &callback);
   void SendMessage(const void *buffer, size_t num) const;
-  bool SendMessage(const std::shared_ptr<CommMessage> &message) const;
-  bool SendMessage(const std::shared_ptr<MessageMeta> &meta, const Protos &protos, const void *data, size_t size) const;
-  void OnReadHandler(const void *buffer, size_t numBytes);
+  bool SendMessage(const MessageMeta &meta, const Protos &protos, const void *data, size_t size) const;
+  void SimpleResponse(const MessageMeta &meta);
+  void ErrorResponse(const MessageMeta &meta, const std::string &error_msg);
+
   const TcpServer *GetServer() const;
   const evutil_socket_t &GetFd() const;
-  void set_callback(const Callback &callback);
 
  protected:
   struct bufferevent *buffer_event_;
   evutil_socket_t fd_;
   TcpServer *server_;
   TcpMessageHandler tcp_message_handler_;
-  Callback callback_;
 };
 
-using OnServerReceiveMessage =
-  std::function<void(const std::shared_ptr<TcpConnection> &conn, const std::shared_ptr<MessageMeta> &meta,
-                     const Protos &protos, const void *data, size_t size)>;
+using OnServerReceiveMessage = std::function<void(const std::shared_ptr<TcpConnection> &conn, const MessageMeta &meta,
+                                                  const Protos &protos, const VectorPtr &data)>;
 
 class TcpServer {
  public:
   using OnConnected = std::function<void(const TcpServer &, const TcpConnection &)>;
   using OnDisconnected = std::function<void(const TcpServer &, const TcpConnection &)>;
   using OnAccepted = std::function<std::shared_ptr<TcpConnection>(const TcpServer &)>;
-  using OnTimerOnce = std::function<void(const TcpServer &)>;
-  using OnTimer = std::function<void()>;
 
-  TcpServer(const std::string &address, std::uint16_t port, Configuration *const config);
+  TcpServer(const std::string &address, std::uint16_t port);
   TcpServer(const TcpServer &server);
   virtual ~TcpServer();
 
   void SetServerCallback(const OnConnected &client_conn, const OnDisconnected &client_disconn,
                          const OnAccepted &client_accept);
-  void Init();
   void Start();
   void Stop();
-  void SendToAllClients(const char *data, size_t len);
   void AddConnection(const evutil_socket_t &fd, std::shared_ptr<TcpConnection> connection);
   void RemoveConnection(const evutil_socket_t &fd);
-  std::shared_ptr<TcpConnection> &GetConnectionByFd(const evutil_socket_t &fd);
+  std::shared_ptr<TcpConnection> GetConnectionByFd(const evutil_socket_t &fd);
   OnServerReceiveMessage GetServerReceive() const;
   void SetMessageCallback(const OnServerReceiveMessage &cb);
-  bool SendMessage(const std::shared_ptr<TcpConnection> &conn, const std::shared_ptr<CommMessage> &message);
-  bool SendMessage(const std::shared_ptr<TcpConnection> &conn, const std::shared_ptr<MessageMeta> &meta,
-                   const Protos &protos, const void *data, size_t sizee);
-  void SendMessage(const std::shared_ptr<CommMessage> &message);
+  bool SendMessage(const std::shared_ptr<TcpConnection> &conn, const MessageMeta &meta, const Protos &protos,
+                   const void *data, size_t sizee);
   uint16_t BoundPort() const;
   std::string BoundIp() const;
-  int ConnectionNum() const;
+  uint64_t ConnectionNum() const;
   const std::map<evutil_socket_t, std::shared_ptr<TcpConnection>> &Connections() const;
 
  protected:
+  void Init();
+  void StartDispatch();
+
   static void ListenerCallback(struct evconnlistener *listener, evutil_socket_t socket, struct sockaddr *saddr,
                                int socklen, void *server);
-  static void ListenerCallbackInner(evutil_socket_t socket, struct sockaddr *saddr, void *server);
+  void ListenerCallbackInner(evutil_socket_t socket, struct sockaddr *saddr);
   static void SignalCallback(evutil_socket_t sig, std::int16_t events, void *server);
   static void SignalCallbackInner(void *server);
   static void ReadCallback(struct bufferevent *, void *connection);
@@ -126,8 +115,7 @@ class TcpServer {
   static void SetTcpNoDelay(const evutil_socket_t &fd);
   std::shared_ptr<TcpConnection> onCreateConnection(struct bufferevent *bev, const evutil_socket_t &fd);
 
-  struct event_base *base_;
-  struct event *signal_event_;
+  struct event_base *event_base_;
   struct evconnlistener *listener_;
   std::string server_address_;
   std::uint16_t server_port_;
@@ -139,11 +127,11 @@ class TcpServer {
   OnAccepted client_accept_;
   std::mutex connection_mutex_;
   OnServerReceiveMessage message_callback_;
-  // The Configuration file
-  Configuration *config_;
-  int64_t max_connection_;
+  uint64_t max_connection_;
+
+  bool is_started_ = false;
+  std::thread dispatch_thread_;
 };
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore
-#endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_SERVER_H_
+#endif  // MINDSPORE_CCSRC_FL_COMMUNICATOR_TCP_SERVER_H_

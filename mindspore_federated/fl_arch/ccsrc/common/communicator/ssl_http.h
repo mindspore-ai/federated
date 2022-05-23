@@ -32,11 +32,9 @@
 #include "common/utils/log_adapter.h"
 #include "common/core/comm_util.h"
 #include "common/constants.h"
-#include "common/core/file_configuration.h"
 
 namespace mindspore {
 namespace fl {
-namespace core {
 class SSLHTTP {
  public:
   static SSLHTTP &GetInstance() {
@@ -56,7 +54,6 @@ class SSLHTTP {
   void InitSSLCtx(const X509 *cert, const EVP_PKEY *pkey, const std::string &default_cipher_list);
   SSL_CTX *ssl_ctx_;
 };
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_SSL_HTTP_H_

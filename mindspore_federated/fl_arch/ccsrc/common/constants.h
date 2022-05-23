@@ -85,7 +85,7 @@ constexpr int64_t kSubmitTimeOutInMs = 30000;
 constexpr int64_t kRetryCount = 60;
 constexpr int64_t kRetryIntervalInMs = 10;
 
-constexpr int64_t kThreadNum = 32;
+constexpr int64_t kThreadNum = 16;
 constexpr int64_t kGradIndex = 0;
 constexpr int64_t kIndiceIndex = 1;
 constexpr int64_t kFirstDimSize = 2;
@@ -158,8 +158,18 @@ constexpr int64_t kLength = 100;
 constexpr int64_t kMaxPort = 65535;
 constexpr int64_t kSecurityLevel = 3;
 
-constexpr char kTcpCommunicator[] = "TCP";
-constexpr char kHttpCommunicator[] = "HTTP";
+constexpr char kServerModeFL[] = "FEDERATED_LEARNING";
+constexpr char kServerModeHybrid[] = "HYBRID_TRAINING";
+constexpr char kDPEncryptType[] = "DP_ENCRYPT";
+constexpr char kPWEncryptType[] = "PW_ENCRYPT";
+constexpr char kStablePWEncryptType[] = "STABLE_PW_ENCRYPT";
+constexpr char kNotEncryptType[] = "NOT_ENCRYPT";
+constexpr char kDSEncryptType[] = "SIGNDS";
+constexpr char kNoCompressType[] = "NO_COMPRESS";
+constexpr auto kDiffSparseQuant = "DIFF_SPARSE_QUANT";
+constexpr auto kQuant = "QUANT";
+
+constexpr auto kUpdateModelKernel = "updateModel";
 
 constexpr char kServerCert[] = "server.p12";
 constexpr char kClientCert[] = "client.p12";
@@ -174,23 +184,13 @@ using DataPtr = std::unique_ptr<uint8_t[]>;
 using VectorPtr = std::shared_ptr<std::vector<unsigned char>>;
 using EventCallback = std::function<void(void)>;
 
-// The barrier function which should be called before doing scaling out/in operations.
-// It's easy for us to scale out/in nodes after one iteration is completed and keep consistent.
-using BarrierBeforeScaleOut = std::function<void(void)>;
-using BarrierBeforeScaleIn = std::function<void(void)>;
-
-// These handlers helps worker/server node to reinitialize or recover data after scaling out/in operation of scheduler
-// is done.
-using HandlerAfterScaleOut = std::function<void(void)>;
-using HandlerAfterScaleIn = std::function<void(void)>;
-using HandlerAfterScaleOutRollback = std::function<void(void)>;
-
 constexpr char kClusterNotReady[] =
   "The Scheduler's connections are not equal with total node num, Maybe this is because some server nodes are drop "
   "out or scale in nodes has not been recycled.";
 constexpr char kJobNotReady[] = "The server's training job is not ready.";
 constexpr char kClusterSafeMode[] = "The cluster is in safemode.";
 constexpr char kJobNotAvailable[] = "The server's training job is disabled or finished.";
+constexpr char kServerInnerError[] = "An inner error occurred";
 
 enum class UserDefineEvent { kIterationRunning = 0, kIterationCompleted, kNodeTimeout };
 
@@ -205,7 +205,7 @@ enum class UserDefineEvent { kIterationRunning = 0, kIterationCompleted, kNodeTi
 
 #define ERROR_STATUS(result, code, message) \
   MS_LOG(ERROR) << message;                 \
-  result = RequestProcessResult(code, message)
+  result = {code, message}
 
 #define CHECK_RETURN_TYPE(_condition)                    \
   do {                                                   \

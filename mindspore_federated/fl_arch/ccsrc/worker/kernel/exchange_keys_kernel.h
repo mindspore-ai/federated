@@ -20,7 +20,7 @@
 #include <vector>
 #include <string>
 #include <memory>
-#include "worker/fl_worker.h"
+#include "worker/worker.h"
 #include "armour/secure_protocol/key_agreement.h"
 #include "worker/kernel/abstract_kernel.h"
 
@@ -33,19 +33,15 @@ class ExchangeKeysKernelMod : public AbstractKernel {
   ExchangeKeysKernelMod() = default;
   ~ExchangeKeysKernelMod() override = default;
 
-  void Init();
+  void Init() override;
   bool Launch();
 
  private:
-  bool BuildExchangeKeysReq(const std::shared_ptr<FBBuilder> &fbb);
+  bool BuildExchangeKeysReq(FBBuilder *fbb);
   std::vector<uint8_t> GetPubicKeyBytes();
 
-  uint32_t rank_id_;
-  uint32_t server_num_;
-  uint32_t target_server_rank_;
   std::string fl_id_;
-  std::shared_ptr<FBBuilder> fbb_;
-  armour::PrivateKey *secret_prikey_;
+  armour::PrivateKey *secret_prikey_ = nullptr;
 };
 }  // namespace kernel
 }  // namespace worker

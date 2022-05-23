@@ -22,10 +22,9 @@ namespace mindspore {
 namespace fl {
 namespace server {
 namespace kernel {
-void PushMetricsKernel::InitKernel(size_t) { local_rank_ = DistributedCountService::GetInstance().local_rank(); }
+void PushMetricsKernel::InitKernel(size_t) {}
 
-bool PushMetricsKernel::Launch(const uint8_t *req_data, size_t len,
-                               const std::shared_ptr<fl::core::MessageHandler> &message) {
+bool PushMetricsKernel::Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<MessageHandler> &message) {
   MS_LOG(INFO) << "Launching PushMetricsKernel kernel.";
   std::shared_ptr<FBBuilder> fbb = std::make_shared<FBBuilder>();
   if (fbb == nullptr || req_data == nullptr) {
@@ -63,17 +62,10 @@ bool PushMetricsKernel::Launch(const uint8_t *req_data, size_t len,
 
 bool PushMetricsKernel::Reset() {
   MS_LOG(INFO) << "PushMetricsKernel reset!";
-  StopTimer();
-  DistributedCountService::GetInstance().ResetCounter(name_);
   return true;
 }
 
-void PushMetricsKernel::OnLastCountEvent(const std::shared_ptr<fl::core::MessageHandler> &) {
-  if (FLContext::instance()->resetter_round() == ResetterRound::kPushMetrics) {
-    FinishIteration(true);
-  }
-  return;
-}
+void PushMetricsKernel::OnLastCountEvent() { Executor::GetInstance().OnPushMetrics(); }
 
 ResultCode PushMetricsKernel::PushMetrics(const std::shared_ptr<FBBuilder> &fbb,
                                           const schema::RequestPushMetrics *push_metrics_req) {
@@ -85,7 +77,8 @@ ResultCode PushMetricsKernel::PushMetrics(const std::shared_ptr<FBBuilder> &fbb,
   Iteration::GetInstance().set_loss(loss);
   Iteration::GetInstance().set_accuracy(accuracy);
 
-  if (!DistributedCountService::GetInstance().Count(name_, std::to_string(local_rank_))) {
+  std::string count_reason = "";
+  if (!DistributedCountService::GetInstance().Count(name_)) {
     std::string reason = "Count for push metrics request failed.";
     BuildPushMetricsRsp(fbb, schema::ResponseCode_SystemError);
     MS_LOG(ERROR) << reason;

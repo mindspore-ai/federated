@@ -14,36 +14,55 @@
  * limitations under the License.
  */
 
-#include "scheduler.h"
+#include "scheduler/scheduler.h"
 
 namespace mindspore {
 namespace fl {
+namespace {
+int g_signal = 0;
+}
+void SignalHandler(int signal) {
+  if (g_signal == 0) {
+    g_signal = signal;
+    Scheduler::GetInstance().SetStopFlag();
+  }
+}
+
+void Scheduler::SetStopFlag() { stop_flag_ = true; }
+
 Scheduler &Scheduler::GetInstance() {
   static Scheduler instance{};
   return instance;
 }
 
-bool Scheduler::Run() {
+void Scheduler::Run() {
   MS_LOG(INFO) << "Start scheduler.";
-  FLContext::instance()->cluster_config().scheduler_ip = FLContext::instance()->scheduler_ip();
-  FLContext::instance()->cluster_config().scheduler_port = FLContext::instance()->scheduler_port();
-  FLContext::instance()->cluster_config().initial_worker_num = FLContext::instance()->initial_worker_num();
-  FLContext::instance()->cluster_config().initial_server_num = FLContext::instance()->initial_server_num();
+  (void)signal(SIGTERM, SignalHandler);
+  (void)signal(SIGINT, SignalHandler);
+  InitAndLoadDistributedCache();
+  scheduler_node_ = std::make_unique<SchedulerNode>();
   if (!scheduler_node_->Start()) {
-    MS_LOG(WARNING) << "Scheduler start failed.";
-    return false;
+    MS_LOG(EXCEPTION) << "Scheduler start failed.";
   }
-
-  if (!scheduler_node_->Finish()) {
-    MS_LOG(WARNING) << "Scheduler finish failed.";
-    return false;
+  MS_LOG(INFO) << "Scheduler started successfully.";
+  constexpr auto time_sleep = std::chrono::seconds(1);
+  while (!stop_flag_) {
+    std::this_thread::sleep_for(time_sleep);
   }
-
   if (!scheduler_node_->Stop()) {
     MS_LOG(WARNING) << "Scheduler stop failed.";
-    return false;
   }
-  return true;
+}
+
+void Scheduler::InitAndLoadDistributedCache() {
+  auto config = FLContext::instance()->distributed_cache_config();
+  if (config.address.empty()) {
+    MS_LOG(EXCEPTION) << "Distributed cache address cannot be empty.";
+  }
+  if (!cache::DistributedCacheLoader::Instance().InitCacheImpl(config)) {
+    MS_LOG(EXCEPTION) << "Link to distributed cache failed, distributed cache address: " << config.address
+                      << ", enable ssl: " << config.enable_ssl;
+  }
 }
 }  // namespace fl
 }  // namespace mindspore

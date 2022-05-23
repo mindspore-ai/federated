@@ -24,10 +24,9 @@
 #include "schema/fl_job_generated.h"
 #include "schema/cipher_generated.h"
 #include "armour/secure_protocol/key_agreement.h"
-#include "python/fl_context.h"
-#include "common/core/worker_node.h"
-#include "common/core/cluster_metadata.h"
-#include "common/communicator/tcp_communicator.h"
+#include "common/fl_context.h"
+#include "worker/worker_node.h"
+#include "communicator/tcp_communicator.h"
 #include "common/common.h"
 
 namespace mindspore {

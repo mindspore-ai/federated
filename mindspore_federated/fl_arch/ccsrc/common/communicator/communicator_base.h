@@ -14,87 +14,48 @@
  * limitations under the License.
  */
 
-#ifndef MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_COMMUNICATOR_BASE_H_
-#define MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_COMMUNICATOR_BASE_H_
+#ifndef MINDSPORE_CCSRC_FL_COMMUNICATOR_COMMUNICATOR_BASE_H_
+#define MINDSPORE_CCSRC_FL_COMMUNICATOR_COMMUNICATOR_BASE_H_
 
 #include <string>
+#include <vector>
 #include <memory>
 #include <unordered_map>
 #include <functional>
 #include <thread>
 
-#include "common/communicator/message_handler.h"
+#include "common/protos/comm.pb.h"
+#include "communicator/message_handler.h"
 #include "common/utils/log_adapter.h"
-#include "common/communicator/http_message_handler.h"
-#include "common/communicator/tcp_server.h"
-#include "common/core/node_info.h"
-#include "common/constants.h"
 
 namespace mindspore {
 namespace fl {
-namespace core {
 enum class TcpUserCommand {
-  kPush,
-  kPull,
-  kCount,
-  kReachThreshold,
-  kResetCount,
-  kGetMetadata,
-  kUpdateMetadata,
-  kCounterEvent,
   kPullWeight,
   kPushWeight,
-  kSyncIteration,
-  kNotifyLeaderToNextIter,
-  kPrepareForNextIter,
-  kProceedToNextIter,
-  kEndLastIter,
   kStartFLJob,
   kUpdateModel,
   kGetModel,
   kPushMetrics,
-  kNewInstance,
-  kQueryInstance,
-  kEnableFLS,
-  kDisableFLS,
-  kSyncAfterRecover,
   kExchangeKeys,
   kGetKeys,
-  kGetOneDeviceMeta,
-  kQueryNodeScaleState
 };
+
+using VectorPtr = std::shared_ptr<std::vector<uint8_t>>;
 
 // CommunicatorBase is used to receive request and send response for server.
 // It is the base class of HttpCommunicator and TcpCommunicator.
 class CommunicatorBase {
  public:
-  using MessageCallback = std::function<void(std::shared_ptr<MessageHandler>)>;
-  using HttpMsgCallback = std::function<void(std::shared_ptr<HttpMessageHandler>)>;
-  using OnNodeEventCallback = std::function<void(const ClusterEvent &)>;
-  using TcpMsgCallback = std::function<void(std::shared_ptr<fl::core::TcpConnection> conn,
-                                            std::shared_ptr<fl::core::MessageMeta> meta, const void *data, size_t size)>;
-  CommunicatorBase() : running_(false) {}
-
-  virtual ~CommunicatorBase();
+  CommunicatorBase() = default;
+  virtual ~CommunicatorBase() = default;
 
   virtual bool Start() = 0;
   virtual bool Stop() = 0;
-  // You need to call the Start() function before calling the Join() function, it will block server's main thread.
-  // if you want to exit the Join() function, then you should call the Stop() function in another thread.
-  void Join();
 
-  virtual void RegisterMsgCallBack(const std::string &msg_type, const MessageCallback &cb) = 0;
-
-  bool SendResponse(const void *rsp_data, size_t rsp_len, const std::shared_ptr<MessageHandler> &msg_handler);
-
-  bool running() const;
-
- protected:
-  std::unordered_map<std::string, MessageCallback> msg_callbacks_;
-  std::thread running_thread_;
-  bool running_;
+  using MessageCallback = std::function<void(const std::shared_ptr<MessageHandler> &)>;
+  virtual void RegisterRoundMsgCallback(const std::string &msg_type, const MessageCallback &cb) = 0;
 };
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore
-#endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_COMMUNICATOR_BASE_H_
+#endif  // MINDSPORE_CCSRC_FL_COMMUNICATOR_COMMUNICATOR_BASE_H_

@@ -21,61 +21,17 @@
 #include <memory>
 #include <map>
 #include "schema/cipher_generated.h"
+#include "distributed_cache/client_infos.h"
+#include "distributed_cache/counter.h"
 
 namespace mindspore {
 namespace fl {
 namespace server {
 namespace kernel {
-void ClientListKernel::InitKernel(size_t) {
-  if (LocalMetaStore::GetInstance().has_value(kCtxTotalTimeoutDuration)) {
-    iteration_time_window_ = LocalMetaStore::GetInstance().value<size_t>(kCtxTotalTimeoutDuration);
-  }
-  cipher_init_ = &armour::CipherInit::GetInstance();
-}
+void ClientListKernel::InitKernel(size_t) { cipher_init_ = &armour::CipherInit::GetInstance(); }
 
 sigVerifyResult ClientListKernel::VerifySignature(const schema::GetClientList *get_clients_req) {
-  auto fbs_fl_id = get_clients_req->fl_id();
-  MS_EXCEPTION_IF_NULL(fbs_fl_id);
-  std::string fl_id = fbs_fl_id->str();
-  auto fbs_timestamp = get_clients_req->fl_id();
-  MS_EXCEPTION_IF_NULL(fbs_timestamp);
-  std::string timestamp = fbs_timestamp->str();
-  int iteration = get_clients_req->iteration();
-  std::string iter_str = std::to_string(iteration);
-  auto fbs_signature = get_clients_req->signature();
-  std::vector<unsigned char> signature;
-  if (fbs_signature == nullptr) {
-    MS_LOG(ERROR) << "signature in get_clients_req is nullptr";
-    return sigVerifyResult::FAILED;
-  }
-  signature.assign(fbs_signature->begin(), fbs_signature->end());
-  std::map<std::string, std::string> key_attestations;
-  const fl::PBMetadata &key_attestations_pb_out =
-    fl::server::DistributedMetadataStore::GetInstance().GetMetadata(kCtxClientKeyAttestation);
-  const fl::KeyAttestation &key_attestation_pb = key_attestations_pb_out.key_attestation();
-  auto iter = key_attestation_pb.key_attestations().begin();
-  for (; iter != key_attestation_pb.key_attestations().end(); ++iter) {
-    (void)key_attestations.emplace(std::pair<std::string, std::string>(iter->first, iter->second));
-  }
-  if (key_attestations.find(fl_id) == key_attestations.end()) {
-    MS_LOG(ERROR) << "can not find key attestation for fl_id: " << fl_id;
-    return sigVerifyResult::FAILED;
-  }
-
-  std::vector<unsigned char> src_data;
-  (void)src_data.insert(src_data.end(), timestamp.begin(), timestamp.end());
-  (void)src_data.insert(src_data.end(), iter_str.begin(), iter_str.end());
-  auto certVerify = CertVerify::GetInstance();
-  unsigned char srcDataHash[SHA256_DIGEST_LENGTH];
-  certVerify.sha256Hash(src_data.data(), SizeToInt(src_data.size()), srcDataHash, SHA256_DIGEST_LENGTH);
-  if (!certVerify.verifyRSAKey(key_attestations[fl_id], srcDataHash, signature.data(), SHA256_DIGEST_LENGTH)) {
-    return sigVerifyResult::FAILED;
-  }
-  if (!certVerify.verifyTimeStamp(fl_id, timestamp)) {
-    return sigVerifyResult::TIMEOUT;
-  }
-  MS_LOG(INFO) << "verify signature for fl_id: " << fl_id << " success.";
-  return sigVerifyResult::PASSED;
+  return VerifySignatureBase(get_clients_req);
 }
 
 bool ClientListKernel::DealClient(const size_t iter_num, const schema::GetClientList *get_clients_req,
@@ -91,14 +47,16 @@ bool ClientListKernel::DealClient(const size_t iter_num, const schema::GetClient
     return false;
   }
   uint64_t update_model_client_needed = LocalMetaStore::GetInstance().value<uint64_t>(kCtxUpdateModelThld);
-  PBMetadata client_list_pb_out = DistributedMetadataStore::GetInstance().GetMetadata(kCtxUpdateModelClientList);
-  const UpdateModelClientList &client_list_pb = client_list_pb_out.client_list();
-  for (size_t i = 0; i < IntToSize(client_list_pb.fl_id_size()); ++i) {
-    client_list.push_back(client_list_pb.fl_id(SizeToInt(i)));
+  auto ret = cache::ClientInfos::GetInstance().GetAllUpdateModelClients(&client_list);
+  if (!ret.IsSuccess()) {
+    MS_LOG(INFO) << "The server is not ready. get update model client list failed";
+    BuildClientListRsp(fbb, schema::ResponseCode_SucNotReady, "The server is not ready.", empty_client_list,
+                       std::to_string(CURRENT_TIME_MILLI.count()), iter_num);
+    return false;
   }
   if (client_list.size() < update_model_client_needed) {
     MS_LOG(INFO) << "The server is not ready. update_model_client_needed: " << update_model_client_needed;
-    MS_LOG(INFO) << "now update_model_client_num: " << client_list_pb.fl_id_size();
+    MS_LOG(INFO) << "now update_model_client_num: " << client_list.size();
     BuildClientListRsp(fbb, schema::ResponseCode_SucNotReady, "The server is not ready.", empty_client_list,
                        std::to_string(CURRENT_TIME_MILLI.count()), iter_num);
     return false;
@@ -112,17 +70,15 @@ bool ClientListKernel::DealClient(const size_t iter_num, const schema::GetClient
     return false;
   }
 
-  bool retcode_client =
-    cipher_init_->cipher_meta_storage_.UpdateClientToServer(kCtxGetUpdateModelClientList, fl_id);
-  if (!retcode_client) {
+  auto status = cache::ClientInfos::GetInstance().AddGetUpdateModelClient(fl_id);
+  if (!status.IsSuccess()) {
     std::string reason = "update get update model clients failed";
     MS_LOG(ERROR) << reason;
     BuildClientListRsp(fbb, schema::ResponseCode_SucNotReady, reason, empty_client_list,
                        std::to_string(CURRENT_TIME_MILLI.count()), iter_num);
     return false;
   }
-
-  if (!DistributedCountService::GetInstance().Count(name_, get_clients_req->fl_id()->str())) {
+  if (!DistributedCountService::GetInstance().Count(name_)) {
     std::string reason = "Counting for get user list request failed. Please retry later.";
     BuildClientListRsp(fbb, schema::ResponseCode_OutOfTime, reason, empty_client_list,
                        std::to_string(CURRENT_TIME_MILLI.count()), iter_num);
@@ -135,9 +91,8 @@ bool ClientListKernel::DealClient(const size_t iter_num, const schema::GetClient
   return true;
 }
 
-bool ClientListKernel::Launch(const uint8_t *req_data, size_t len,
-                              const std::shared_ptr<fl::core::MessageHandler> &message) {
-  size_t iter_num = LocalMetaStore::GetInstance().curr_iter_num();
+bool ClientListKernel::Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<MessageHandler> &message) {
+  size_t iter_num = cache::InstanceContext::Instance().iteration_num();
   MS_LOG(INFO) << "Launching ClientListKernel, Iteration number is " << iter_num;
 
   std::shared_ptr<FBBuilder> fbb = std::make_shared<FBBuilder>();
@@ -208,19 +163,9 @@ bool ClientListKernel::Launch(const uint8_t *req_data, size_t len,
   return true;
 }  // namespace fl
 
-bool ClientListKernel::Reset() {
-  MS_LOG(INFO) << "ITERATION NUMBER IS : " << LocalMetaStore::GetInstance().curr_iter_num();
-  MS_LOG(INFO) << "Get Client list kernel reset!";
-  DistributedCountService::GetInstance().ResetCounter(name_);
-  DistributedMetadataStore::GetInstance().ResetMetadata(kCtxGetUpdateModelClientList);
-  StopTimer();
-  return true;
-}
-
-void ClientListKernel::BuildClientListRsp(const std::shared_ptr<FBBuilder> &fbb,
-                                          const schema::ResponseCode retcode, const std::string &reason,
-                                          std::vector<std::string> clients, const std::string &next_req_time,
-                                          const size_t iteration) {
+void ClientListKernel::BuildClientListRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
+                                          const std::string &reason, std::vector<std::string> clients,
+                                          const std::string &next_req_time, const size_t iteration) {
   auto rsp_reason = fbb->CreateString(reason);
   auto rsp_next_req_time = fbb->CreateString(next_req_time);
   std::vector<flatbuffers::Offset<flatbuffers::String>> clients_vector;

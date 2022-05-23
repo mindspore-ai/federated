@@ -17,26 +17,31 @@
 #ifndef MINDSPORE_CCSRC_FL_SERVER_KERNEL_ROUND_ROUND_KERNEL_H_
 #define MINDSPORE_CCSRC_FL_SERVER_KERNEL_ROUND_ROUND_KERNEL_H_
 
-#include <chrono>
 #include <map>
 #include <memory>
+#include <string>
+#include <vector>
 #include <mutex>
 #include <queue>
-#include <string>
+#include <utility>
+#include <chrono>
 #include <thread>
 #include <unordered_map>
-#include <utility>
-#include <vector>
-
 #include "common/common.h"
-#include "server/distributed_count_service.h"
-#include "server/distributed_metadata_store.h"
 #include "server/local_meta_store.h"
+#include "server/distributed_count_service.h"
+#include "distributed_cache/client_infos.h"
+#include "distributed_cache/counter.h"
+#include "distributed_cache/instance_context.h"
+#include "server/executor.h"
 
 namespace mindspore {
 namespace fl {
 namespace server {
 namespace kernel {
+// results of signature verification
+enum sigVerifyResult { FAILED, TIMEOUT, PASSED };
+
 constexpr uint64_t kReleaseDuration = 100;
 // RoundKernel contains the main logic of server handling messages from workers. One iteration has multiple round
 // kernels to represent the process. They receive and parse messages from the server communication module. After
@@ -49,35 +54,26 @@ class RoundKernel {
   RoundKernel();
   virtual ~RoundKernel();
 
+  size_t iteration_time_window() const { return iteration_time_window_; }
+  void InitKernelCommon(size_t iteration_time_window);
   // Initialize RoundKernel with threshold_count which means that for every iteration, this round needs threshold_count
   // messages.
   virtual void InitKernel(size_t threshold_count) = 0;
 
   // Launch the round kernel logic to handle the message passed by the communication module.
-  virtual bool Launch(const uint8_t *req_data, size_t len,
-                      const std::shared_ptr<fl::core::MessageHandler> &message) = 0;
+  virtual bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<MessageHandler> &message) = 0;
 
   // Some rounds could be stateful in a iteration. Reset method resets the status of this round.
-  virtual bool Reset() = 0;
+  virtual bool Reset() { return true; }
 
   // The counter event handlers for DistributedCountService.
   // The callbacks when first message and last message for this round kernel is received.
   // These methods is called by class DistributedCountService and triggered by counting server.
-  virtual void OnFirstCountEvent(const std::shared_ptr<fl::core::MessageHandler> &message);
-  virtual void OnLastCountEvent(const std::shared_ptr<fl::core::MessageHandler> &message);
-
-  // Called when this round is finished. This round timer's Stop method will be called.
-  void StopTimer() const;
-
-  // Called after this iteration(including all rounds) is finished. All rounds' Reset method will
-  // be called.
-  void FinishIteration(bool is_last_iter_valid, const std::string &reason = "") const;
+  virtual void OnFirstCountEvent();
+  virtual void OnLastCountEvent();
 
   // Set round kernel name, which could be used in round kernel's methods.
   void set_name(const std::string &name);
-
-  // Set callbacks to be called under certain triggered conditions.
-  void set_stop_timer_cb(const StopTimerCb &timer_stopper);
 
   void Summarize();
 
@@ -99,7 +95,7 @@ class RoundKernel {
 
   float upload_loss() const;
 
-  bool verifyResponse(const std::shared_ptr<fl::core::MessageHandler> &message, const void *data, size_t len);
+  bool verifyResponse(const std::shared_ptr<MessageHandler> &message, const void *data, size_t len);
 
   // Record the size of send data and the time stamp
   void RecordSendData(const std::pair<uint64_t, size_t> &send_data);
@@ -118,29 +114,36 @@ class RoundKernel {
 
  protected:
   // Send response to client, and the data can be released after the call.
-  void SendResponseMsg(const std::shared_ptr<fl::core::MessageHandler> &message, const void *data, size_t len);
+  void SendResponseMsg(const std::shared_ptr<MessageHandler> &message, const void *data, size_t len);
   // Send response to client, and the data will be released by cb after finished send msg.
-  void SendResponseMsgInference(const std::shared_ptr<fl::core::MessageHandler> &message, const void *data, size_t len,
-                                fl::core::RefBufferRelCallback cb);
+  void SendResponseMsgInference(const std::shared_ptr<MessageHandler> &message, const void *data, size_t len,
+                                RefBufferRelCallback cb);
+  sigVerifyResult VerifySignatureBase(const std::string &fl_id, const std::vector<std::string> &src_data,
+                                      const flatbuffers::Vector<uint8_t> *signature, const std::string &timestamp);
+  sigVerifyResult VerifySignatureBase(const std::string &fl_id, const std::vector<uint8_t> &src_data,
+                                      const flatbuffers::Vector<uint8_t> *signature, const std::string &timestamp);
 
+  template <class T>
+  sigVerifyResult VerifySignatureBase(const T *request) {
+    MS_ERROR_IF_NULL_W_RET_VAL(request, sigVerifyResult::FAILED);
+    MS_ERROR_IF_NULL_W_RET_VAL(request->fl_id(), sigVerifyResult::FAILED);
+    MS_ERROR_IF_NULL_W_RET_VAL(request->timestamp(), sigVerifyResult::FAILED);
+
+    std::string fl_id = request->fl_id()->str();
+    std::string timestamp = request->timestamp()->str();
+    int iteration = request->iteration();
+    std::string iter_str = std::to_string(iteration);
+    return VerifySignatureBase(fl_id, {timestamp, iter_str}, request->signature(), timestamp);
+  }
   // Round kernel's name.
   std::string name_;
 
-  // The current received message count for this round in this iteration.
-  size_t current_count_;
+  std::atomic<size_t> total_client_num_ = 0;
+  std::atomic<size_t> accept_client_num_ = 0;
 
-  StopTimerCb stop_timer_cb_;
-
-  // Members below are used for allocating and releasing response data on the heap.
-
-  // To ensure the performance, we use another thread to release data on the heap. So the operation on the data should
-  // be threadsafe.
-  std::atomic_bool running_;
-
-  std::atomic<size_t> total_client_num_;
-  std::atomic<size_t> accept_client_num_;
-
-  std::atomic<float> upload_loss_;
+  std::atomic<float> upload_loss_ = 0.0;
+  size_t iteration_time_window_ = 0;
+  Executor *executor_ = nullptr;
 
   // The mutex for send_data_and_time_
   std::mutex send_data_rate_mutex_;

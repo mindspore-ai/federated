@@ -14,43 +14,33 @@
  * limitations under the License.
  */
 
-#ifndef MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_HTTP_COMMUNICATOR_H_
-#define MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_HTTP_COMMUNICATOR_H_
+#ifndef MINDSPORE_CCSRC_FL_COMMUNICATOR_HTTP_COMMUNICATOR_H_
+#define MINDSPORE_CCSRC_FL_COMMUNICATOR_HTTP_COMMUNICATOR_H_
 
 #include <string>
 #include <memory>
 #include <unordered_map>
 #include "common/communicator/http_server.h"
 #include "common/communicator/http_message_handler.h"
-#include "common/communicator/task_executor.h"
 #include "common/communicator/communicator_base.h"
 #include "common/communicator/http_msg_handler.h"
 
 namespace mindspore {
 namespace fl {
-namespace core {
 class HttpCommunicator : public CommunicatorBase {
  public:
-  explicit HttpCommunicator(const std::string &ip, uint16_t port, const std::shared_ptr<TaskExecutor> &task_executor)
-      : task_executor_(task_executor), http_server_(nullptr), ip_(ip), port_(port) {
-    http_server_ = std::make_shared<HttpServer>(ip_, port_, kThreadNum);
-  }
-
+  explicit HttpCommunicator(const std::shared_ptr<HttpServer> &http_server) : http_server_(http_server) {}
   ~HttpCommunicator() = default;
 
-  bool Start() override;
-  bool Stop() override;
-  void RegisterMsgCallBack(const std::string &msg_type, const MessageCallback &cb) override;
+  bool Start() override { return true; }
+  bool Stop() override { return true; }
+  void RegisterRoundMsgCallback(const std::string &msg_type, const MessageCallback &cb) override;
 
  private:
-  std::shared_ptr<TaskExecutor> task_executor_;
   std::shared_ptr<HttpServer> http_server_;
+  using HttpMsgCallback = std::function<void(const std::shared_ptr<HttpMessageHandler> &)>;
   std::unordered_map<std::string, HttpMsgCallback> http_msg_callbacks_;
-
-  std::string ip_;
-  uint16_t port_;
 };
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore
-#endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_HTTP_COMMUNICATOR_H_
+#endif  // MINDSPORE_CCSRC_FL_COMMUNICATOR_HTTP_COMMUNICATOR_H_

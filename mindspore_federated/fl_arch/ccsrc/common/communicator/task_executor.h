@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TASK_EXECUTOR_H_
-#define MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TASK_EXECUTOR_H_
+#ifndef MINDSPORE_CCSRC_FL_COMMUNICATOR_TASK_EXECUTOR_H_
+#define MINDSPORE_CCSRC_FL_COMMUNICATOR_TASK_EXECUTOR_H_
 
 #include <functional>
 #include <queue>
@@ -23,13 +23,13 @@
 #include <vector>
 #include <thread>
 #include <condition_variable>
+#include <atomic>
 
 #include "common/utils/log_adapter.h"
 #include "common/constants.h"
 
 namespace mindspore {
 namespace fl {
-namespace core {
 /* This class can submit tasks in multiple threads
  * example:
  * void TestTaskExecutor() {
@@ -48,37 +48,31 @@ class TaskExecutor {
   // If the number of submitted tasks is greater than the size of the queue, it will block the submission of subsequent
   // tasks unitl timeout.
   template <typename Fun, typename... Args>
-  bool Submit(Fun &&function, Args &&... args) {
+  bool Submit(Fun &&function, Args &&...args) {
     auto callee = std::bind(function, args...);
     std::function<void()> task = [callee]() -> void { callee(); };
-    size_t index = 0;
     for (size_t i = 0; i < submit_timeout_; i++) {
       std::unique_lock<std::mutex> lock(mtx_);
-      if (task_num_ >= max_task_num_) {
-        lock.unlock();
-        std::this_thread::sleep_for(std::chrono::milliseconds(kSubmitTaskIntervalInMs));
-        index++;
-      } else {
-        break;
+      if (has_stopped_) {
+        MS_LOG(INFO) << "Submit task failed, task executor has stopped";
+        return false;
       }
+      if (task_queue_.size() < max_task_num_) {
+        task_queue_.push(task);
+        lock.unlock();
+        cv_.notify_all();
+        return true;
+      }
+      lock.unlock();
+      std::this_thread::sleep_for(std::chrono::milliseconds(kSubmitTaskIntervalInMs));
     }
-    if (index >= submit_timeout_) {
-      MS_LOG(WARNING) << "Submit task failed after " << submit_timeout_ << " ms.";
-      return false;
-    }
-    std::unique_lock<std::mutex> lock(mtx_);
-    task_num_++;
-    task_queue_.push(task);
-    return true;
+    MS_LOG(WARNING) << "Submit task failed after " << submit_timeout_ << " ms.";
+    return false;
   }
+  void Stop();
 
  private:
-  bool running_;
-
-  // The number of tasks actually running
-  size_t thread_num_;
-  // The number of idle threads that can execute tasks
-  size_t idle_thread_num_;
+  std::atomic_bool has_stopped_ = false;
 
   // The timeout period of the task submission, in milliseconds. default timeout is 3000 milliseconds.
   size_t submit_timeout_;
@@ -87,17 +81,13 @@ class TaskExecutor {
   // max_task_num_, the Submit function will block.Until the current number of tasks is less than max task num,or
   // timeout.
   size_t max_task_num_;
-  // The number of currently submitted to the task queue
-  size_t task_num_;
 
-  std::thread notify_thread_;
   std::mutex mtx_;
   std::condition_variable cv_;
 
   std::vector<std::thread> working_threads_;
   std::queue<std::function<void()>> task_queue_;
 };
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore
-#endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TASK_EXECUTOR_H_
+#endif  // MINDSPORE_CCSRC_FL_COMMUNICATOR_TASK_EXECUTOR_H_

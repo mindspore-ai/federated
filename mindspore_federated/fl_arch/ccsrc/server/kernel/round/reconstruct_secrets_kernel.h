@@ -30,23 +30,17 @@ namespace mindspore {
 namespace fl {
 namespace server {
 namespace kernel {
-// results of signature verification
-enum sigVerifyResult { FAILED, TIMEOUT, PASSED };
-
 class ReconstructSecretsKernel : public RoundKernel {
  public:
   ReconstructSecretsKernel() = default;
   ~ReconstructSecretsKernel() override = default;
 
   void InitKernel(size_t required_cnt) override;
-  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<fl::core::MessageHandler> &message) override;
-  bool Reset() override;
-  void OnLastCountEvent(const std::shared_ptr<fl::core::MessageHandler> &message) override;
+  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<MessageHandler> &message) override;
+  void OnLastCountEvent() override;
 
  private:
   std::string name_unmask_;
-  Executor *executor_;
-  size_t iteration_time_window_{0};
   armour::CipherReconStruct cipher_reconstruct_;
   sigVerifyResult VerifySignature(const schema::SendReconstructSecret *reconstruct_secret_req);
 };

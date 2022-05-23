@@ -49,8 +49,7 @@ class CipherKeys {
 
   // handle the client's request of exchange keys.
   bool ExchangeKeys(const size_t cur_iterator, const std::string &next_req_time,
-                    const schema::RequestExchangeKeys *exchange_keys_req,
-                    const std::shared_ptr<FBBuilder> &fbb);
+                    const schema::RequestExchangeKeys *exchange_keys_req, const std::shared_ptr<FBBuilder> &fbb);
 
   // build response code of get keys.
   void BuildGetKeysRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
@@ -63,8 +62,6 @@ class CipherKeys {
   // build response code of exchange keys.
   void BuildExchangeKeysRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
                             const std::string &reason, const std::string &next_req_time, const size_t iteration);
-  // clear the shared memory.
-  void ClearKeys();
 
  private:
   CipherInit *cipher_init_;  // the parameter of the secure aggregation

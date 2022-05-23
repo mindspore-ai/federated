@@ -25,75 +25,20 @@ namespace mindspore {
 namespace fl {
 namespace server {
 namespace kernel {
-void ReconstructSecretsKernel::InitKernel(size_t required_cnt) {
-  if (LocalMetaStore::GetInstance().has_value(kCtxTotalTimeoutDuration)) {
-    iteration_time_window_ = LocalMetaStore::GetInstance().value<size_t>(kCtxTotalTimeoutDuration);
-  }
-  auto last_cnt_handler = [&](std::shared_ptr<fl::core::MessageHandler>) {
-    if (FLContext::instance()->resetter_round() == ResetterRound::kReconstructSeccrets) {
-      MS_LOG(INFO) << "start FinishIteration";
-      FinishIteration(true);
-      MS_LOG(INFO) << "end FinishIteration";
-    }
-    return;
-  };
-  auto first_cnt_handler = [&](std::shared_ptr<fl::core::MessageHandler>) { return; };
+void ReconstructSecretsKernel::InitKernel(size_t) {
   name_unmask_ = "UnMaskKernel";
-  MS_LOG(INFO) << "ReconstructSecretsKernel Init, ITERATION NUMBER IS : "
-               << LocalMetaStore::GetInstance().curr_iter_num();
-  DistributedCountService::GetInstance().RegisterCounter(name_unmask_, required_cnt,
-                                                         {first_cnt_handler, last_cnt_handler});
+  MS_LOG(INFO) << "ReconstructSecretsKernel Load, ITERATION NUMBER IS : "
+               << cache::InstanceContext::Instance().iteration_num();
 }
 
 sigVerifyResult ReconstructSecretsKernel::VerifySignature(const schema::SendReconstructSecret *reconstruct_secret_req) {
-  MS_ERROR_IF_NULL_W_RET_VAL(reconstruct_secret_req, sigVerifyResult::FAILED);
-  MS_ERROR_IF_NULL_W_RET_VAL(reconstruct_secret_req->fl_id(), sigVerifyResult::FAILED);
-  MS_ERROR_IF_NULL_W_RET_VAL(reconstruct_secret_req->timestamp(), sigVerifyResult::FAILED);
-
-  std::string fl_id = reconstruct_secret_req->fl_id()->str();
-  std::string timestamp = reconstruct_secret_req->timestamp()->str();
-  int iteration = reconstruct_secret_req->iteration();
-  std::string iter_str = std::to_string(iteration);
-  auto fbs_signature = reconstruct_secret_req->signature();
-  std::vector<unsigned char> signature;
-  if (fbs_signature == nullptr) {
-    MS_LOG(ERROR) << "signature in reconstruct_secret_req is nullptr";
-    return sigVerifyResult::FAILED;
-  }
-  signature.assign(fbs_signature->begin(), fbs_signature->end());
-  std::map<std::string, std::string> key_attestations;
-  const fl::PBMetadata &key_attestations_pb_out =
-    fl::server::DistributedMetadataStore::GetInstance().GetMetadata(kCtxClientKeyAttestation);
-  const fl::KeyAttestation &key_attestation_pb = key_attestations_pb_out.key_attestation();
-  auto iter = key_attestation_pb.key_attestations().begin();
-  for (; iter != key_attestation_pb.key_attestations().end(); ++iter) {
-    (void)key_attestations.emplace(std::pair<std::string, std::string>(iter->first, iter->second));
-  }
-  if (key_attestations.find(fl_id) == key_attestations.end()) {
-    MS_LOG(ERROR) << "can not find key attestation for fl_id: " << fl_id;
-    return sigVerifyResult::FAILED;
-  }
-
-  std::vector<unsigned char> src_data;
-  (void)src_data.insert(src_data.end(), timestamp.begin(), timestamp.end());
-  (void)src_data.insert(src_data.end(), iter_str.begin(), iter_str.end());
-  auto certVerify = CertVerify::GetInstance();
-  unsigned char srcDataHash[SHA256_DIGEST_LENGTH];
-  certVerify.sha256Hash(src_data.data(), SizeToInt(src_data.size()), srcDataHash, SHA256_DIGEST_LENGTH);
-  if (!certVerify.verifyRSAKey(key_attestations[fl_id], srcDataHash, signature.data(), SHA256_DIGEST_LENGTH)) {
-    return sigVerifyResult::FAILED;
-  }
-  if (!certVerify.verifyTimeStamp(fl_id, timestamp)) {
-    return sigVerifyResult::TIMEOUT;
-  }
-  MS_LOG(INFO) << "verify signature for fl_id: " << fl_id << " success.";
-  return sigVerifyResult::PASSED;
+  return VerifySignatureBase(reconstruct_secret_req);
 }
 
 bool ReconstructSecretsKernel::Launch(const uint8_t *req_data, size_t len,
-                                      const std::shared_ptr<fl::core::MessageHandler> &message) {
+                                      const std::shared_ptr<MessageHandler> &message) {
   bool response = false;
-  size_t iter_num = LocalMetaStore::GetInstance().curr_iter_num();
+  size_t iter_num = cache::InstanceContext::Instance().iteration_num();
   MS_LOG(INFO) << "Launching ReconstructSecrets Kernel, Iteration number is " << iter_num;
 
   std::shared_ptr<FBBuilder> fbb = std::make_shared<FBBuilder>();
@@ -105,12 +50,14 @@ bool ReconstructSecretsKernel::Launch(const uint8_t *req_data, size_t len,
 
   // get client list from memory server.
   std::vector<std::string> update_model_clients;
-  const PBMetadata update_model_clients_pb_out =
-    DistributedMetadataStore::GetInstance().GetMetadata(kCtxUpdateModelClientList);
-  const UpdateModelClientList &update_model_clients_pb = update_model_clients_pb_out.client_list();
-
-  for (size_t i = 0; i < IntToSize(update_model_clients_pb.fl_id_size()); ++i) {
-    update_model_clients.push_back(update_model_clients_pb.fl_id(SizeToInt(i)));
+  auto status = fl::cache::ClientInfos::GetInstance().GetAllUpdateModelClients(&update_model_clients);
+  if (!status.IsSuccess()) {
+    std::string reason = "Get update model client list failed.";
+    cipher_reconstruct_.BuildReconstructSecretsRsp(fbb, schema::ResponseCode_RequestError, reason, SizeToInt(iter_num),
+                                                   std::to_string(CURRENT_TIME_MILLI.count()));
+    MS_LOG(ERROR) << reason;
+    SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
+    return false;
   }
   flatbuffers::Verifier verifier(req_data, len);
   if (!verifier.VerifyBuffer<schema::SendReconstructSecret>()) {
@@ -174,7 +121,7 @@ bool ReconstructSecretsKernel::Launch(const uint8_t *req_data, size_t len,
   response = cipher_reconstruct_.ReconstructSecrets(SizeToInt(iter_num), std::to_string(CURRENT_TIME_MILLI.count()),
                                                     reconstruct_secret_req, fbb, update_model_clients);
   if (response) {
-    (void)DistributedCountService::GetInstance().Count(name_, reconstruct_secret_req->fl_id()->str());
+    (void)DistributedCountService::GetInstance().Count(name_);
   }
   if (DistributedCountService::GetInstance().CountReachThreshold(name_)) {
     MS_LOG(INFO) << "Current amount for ReconstructSecretsKernel is enough.";
@@ -188,33 +135,11 @@ bool ReconstructSecretsKernel::Launch(const uint8_t *req_data, size_t len,
   return true;
 }
 
-void ReconstructSecretsKernel::OnLastCountEvent(const std::shared_ptr<fl::core::MessageHandler> &) {
-  MS_LOG(INFO) << "ITERATION NUMBER IS : " << LocalMetaStore::GetInstance().curr_iter_num();
+void ReconstructSecretsKernel::OnLastCountEvent() {
+  MS_LOG(INFO) << "ITERATION NUMBER IS : " << cache::InstanceContext::Instance().iteration_num();
   if (FLContext::instance()->encrypt_type() == kPWEncryptType) {
-    int sleep_time = 5;
-    while (!Executor::GetInstance().IsAllWeightAggregationDone()) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time));
-    }
-    MS_LOG(INFO) << "start unmask";
-    while (!Executor::GetInstance().Unmask()) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time));
-    }
-    MS_LOG(INFO) << "end unmask";
-    Executor::GetInstance().set_unmasked(true);
-    std::string worker_id = std::to_string(DistributedCountService::GetInstance().local_rank());
-    (void)DistributedCountService::GetInstance().Count(name_unmask_, worker_id);
+    Executor::GetInstance().TodoUnmask();
   }
-}
-
-bool ReconstructSecretsKernel::Reset() {
-  MS_LOG(INFO) << "ITERATION NUMBER IS : " << LocalMetaStore::GetInstance().curr_iter_num();
-  MS_LOG(INFO) << "reconstruct secrets kernel reset!";
-  DistributedCountService::GetInstance().ResetCounter(name_);
-  DistributedCountService::GetInstance().ResetCounter(name_unmask_);
-  StopTimer();
-  Executor::GetInstance().set_unmasked(false);
-  cipher_reconstruct_.ClearReconstructSecrets();
-  return true;
 }
 
 REG_ROUND_KERNEL(reconstructSecrets, ReconstructSecretsKernel)

@@ -16,96 +16,123 @@
 
 #include "common/communicator/tcp_message_handler.h"
 
-#include <arpa/inet.h>
-#include <iostream>
-#include <utility>
-#include <memory>
-
 namespace mindspore {
 namespace fl {
-namespace core {
-void TcpMessageHandler::SetCallback(const messageReceive &message_receive) { message_callback_ = message_receive; }
-
-void TcpMessageHandler::ReceiveMessage(const void *buffer, size_t num) {
-  MS_EXCEPTION_IF_NULL(buffer);
-  auto buffer_data = reinterpret_cast<const uint8_t *>(buffer);
-
-  while (num > 0) {
-    if (remaining_length_ == 0) {
-      for (size_t i = 0; cur_header_len_ < kHeaderLen && num > 0; ++i) {
-        header_[cur_header_len_] = buffer_data[i];
-        cur_header_len_ += 1;
-        --num;
-        if (cur_header_len_ == kHeaderLen) {
-          message_header_.message_proto_ = *reinterpret_cast<const Protos *>(header_);
-          if (message_header_.message_proto_ != Protos::RAW && message_header_.message_proto_ != Protos::FLATBUFFERS &&
-              message_header_.message_proto_ != Protos::PROTOBUF) {
-            MS_LOG(WARNING) << "The proto:" << message_header_.message_proto_ << " is illegal!";
-            Reset();
-            return;
-          }
-          message_header_.message_meta_length_ =
-            *reinterpret_cast<const uint32_t *>(header_ + sizeof(message_header_.message_proto_));
-          message_header_.message_length_ = *reinterpret_cast<const size_t *>(
-            header_ + sizeof(message_header_.message_proto_) + sizeof(message_header_.message_meta_length_));
-          if (message_header_.message_length_ >= UINT32_MAX) {
-            MS_LOG(WARNING) << "The message len:" << message_header_.message_length_ << " is too long.";
-            Reset();
-            return;
-          }
-          if (message_header_.message_meta_length_ > message_header_.message_length_) {
-            MS_LOG(WARNING) << "The message meta len " << message_header_.message_meta_length_ << " > the message len "
-                            << message_header_.message_length_;
-            Reset();
-            return;
-          }
-          remaining_length_ = message_header_.message_length_;
-          message_buffer_.resize(remaining_length_);
-          buffer_data += (i + 1);
-          break;
-        }
-      }
-    }
-
-    if (remaining_length_ > 0 && num > 0) {
-      size_t copy_len = remaining_length_ <= num ? remaining_length_ : num;
-      remaining_length_ -= copy_len;
-      num -= copy_len;
-
-      size_t dest_size = message_buffer_.size() - last_copy_len_;
-      size_t src_size = copy_len;
-      auto ret = memcpy_s(message_buffer_.data() + last_copy_len_, dest_size, buffer_data, src_size);
-      last_copy_len_ += copy_len;
-      buffer_data += copy_len;
-      if (ret != EOK) {
-        MS_LOG(EXCEPTION) << "The memcpy_s error, errorno(" << ret << ")";
-      }
-
-      if (remaining_length_ == 0) {
-        if (message_callback_) {
-          std::shared_ptr<MessageMeta> pb_message = std::make_shared<MessageMeta>();
-          MS_EXCEPTION_IF_NULL(pb_message);
-          if (!pb_message->ParseFromArray(message_buffer_.data(), UintToInt(message_header_.message_meta_length_))) {
-            MS_LOG(ERROR) << "Parse protobuf MessageMeta failed";
-            Reset();
-            return;
-          }
-          message_callback_(pb_message, message_header_.message_proto_,
-                            message_buffer_.data() + message_header_.message_meta_length_,
-                            message_header_.message_length_ - message_header_.message_meta_length_);
-        }
+void TcpMessageHandler::ReceiveMessage(const ReadBufferFun &read_fun) {
+  while (true) {
+    bool end_read = false;
+    try {
+      auto ret = ReceiveMessageInner(read_fun, &end_read);
+      if (!ret) {
         Reset();
       }
+    } catch (const std::bad_alloc &) {
+      MS_LOG_WARNING << "Catch exception std::bad_alloc";
+      Reset();
+    }
+    if (end_read) {
+      return;
     }
   }
 }
 
-void TcpMessageHandler::Reset() {
-  message_buffer_.clear();
-  cur_header_len_ = 0;
-  last_copy_len_ = 0;
-  remaining_length_ = 0;
+bool TcpMessageHandler::ReceiveMessageInner(const ReadBufferFun &read_fun, bool *end_read) {
+  if (read_fun == nullptr) {
+    return false;
+  }
+  if (cur_header_len_ < kHeaderLen) {
+    size_t expect_size = kHeaderLen - cur_header_len_;
+    auto read_size = read_fun(header_ + cur_header_len_, expect_size);
+    if (read_size >= 0) {
+      cur_header_len_ += read_size;
+    }
+    if (read_size < expect_size) {
+      *end_read = true;
+      return true;
+    }
+    if (cur_header_len_ == kHeaderLen) {
+      message_header_ = *(reinterpret_cast<MessageHeader *>(header_));
+      if (message_header_.message_proto_ != Protos::RAW && message_header_.message_proto_ != Protos::FLATBUFFERS &&
+          message_header_.message_proto_ != Protos::PROTOBUF) {
+        MS_LOG(WARNING) << "The proto:" << message_header_.message_proto_ << " is illegal!";
+        return false;
+      }
+      if (message_header_.message_length_ == 0 || message_header_.message_meta_length_ == 0) {
+        MS_LOG_WARNING << "The message len " << message_header_.message_length_ << " or meta length "
+                       << message_header_.message_meta_length_ << " is invalid!";
+      }
+      if (message_header_.message_length_ >= INT32_MAX) {
+        MS_LOG(WARNING) << "The message len:" << message_header_.message_length_ << " is too long.";
+        return false;
+      }
+      if (message_header_.message_meta_length_ >= message_header_.message_length_) {
+        MS_LOG(WARNING) << "The message meta len " << message_header_.message_meta_length_ << " >= the message len "
+                        << message_header_.message_length_;
+        return false;
+      }
+      meta_buffer_.resize(message_header_.message_meta_length_);
+      auto message_data_len = message_header_.message_length_ - message_header_.message_meta_length_;
+      data_ = std::make_shared<std::vector<uint8_t>>();
+      if (data_ == nullptr) {
+        MS_LOG(WARNING) << "New message data shared_ptr failed";
+        return false;
+      }
+      data_->resize(message_data_len);
+    }
+  }
+  if (cur_meta_len_ < meta_buffer_.size()) {
+    size_t expect_size = meta_buffer_.size() - cur_meta_len_;
+    auto read_size = read_fun(meta_buffer_.data() + cur_meta_len_, expect_size);
+    if (read_size >= 0) {
+      cur_meta_len_ += read_size;
+    }
+    if (read_size < expect_size) {
+      *end_read = true;
+      return true;
+    }
+    if (cur_meta_len_ == meta_buffer_.size()) {
+      if (!message_meta_.ParseFromArray(meta_buffer_.data(), static_cast<int>(meta_buffer_.size()))) {
+        MS_LOG(WARNING) << "Parse protobuf MessageMeta failed";
+        return false;
+      }
+    }
+  }
+  if (data_ == nullptr) {
+    MS_LOG_WARNING << "Data cannot be nullptr";
+    return false;
+  }
+  // data_->size() != 0
+  if (cur_data_len_ < data_->size()) {
+    size_t expect_size = data_->size() - cur_data_len_;
+    auto read_size = read_fun(data_->data() + cur_data_len_, expect_size);
+    if (read_size >= 0) {
+      cur_data_len_ += read_size;
+    }
+    if (read_size < expect_size) {
+      *end_read = true;
+      return true;
+    }
+    if (cur_data_len_ == data_->size()) {
+      if (msg_callback_) {
+        try {
+          msg_callback_(message_meta_, message_header_.message_proto_, data_);
+        } catch (const std::exception &e) {
+          MS_LOG_WARNING << "Catch exception when handle tcp message: " << e.what()
+                         << ", msg meta cmd: " << message_meta_.cmd();
+        }
+      }
+      Reset();
+    }
+  }
+  return true;
 }
-}  // namespace core
+
+void TcpMessageHandler::Reset() {
+  cur_header_len_ = 0;
+  cur_meta_len_ = 0;
+  cur_data_len_ = 0;
+  meta_buffer_.clear();
+  data_ = nullptr;
+}
 }  // namespace fl
 }  // namespace mindspore

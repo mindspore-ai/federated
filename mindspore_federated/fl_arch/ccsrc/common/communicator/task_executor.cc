@@ -18,71 +18,46 @@
 
 namespace mindspore {
 namespace fl {
-namespace core {
 TaskExecutor::TaskExecutor(size_t thread_num, size_t max_task_num, size_t submit_timeout)
-    : running_(true),
-      thread_num_(thread_num),
-      idle_thread_num_(0),
-      submit_timeout_(submit_timeout),
-      max_task_num_(max_task_num),
-      task_num_(0) {
-  for (size_t i = 0; i < thread_num; i++) {
-    working_threads_.emplace_back([this]() {
-      std::function<void()> task;
-      while (true) {
-        std::unique_lock<std::mutex> lock(mtx_);
-        // Idle thread number increases when the mtx_ is locked.
-        idle_thread_num_++;
-
-        if (!running_) {
-          // To avoid thread from blocking after destructor.
+    : submit_timeout_(submit_timeout), max_task_num_(max_task_num) {
+  auto task_fun = [this]() {
+    std::function<void()> task;
+    while (true) {
+      std::unique_lock<std::mutex> lock(mtx_);
+      if (has_stopped_) {
+        return;
+      }
+      while (task_queue_.empty()) {
+        cv_.wait(lock, [this]() { return has_stopped_.load() || !task_queue_.empty(); });
+        if (has_stopped_) {
           return;
         }
-
-        cv_.wait(lock);
-
-        if (!running_ || task_queue_.empty()) {
-          return;
-        }
-
-        task = task_queue_.front();
-        task_queue_.pop();
-        if (lock.owns_lock()) {
-          lock.unlock();
-        }
-
-        task();
       }
-    });
-  }
-  notify_thread_ = std::thread([this]() {
-    // If there is no idle thread, wait until the working thread is available.
-    while (running_) {
-      {
-        std::unique_lock<std::mutex> lock(mtx_);
-        if (idle_thread_num_ > 0 && task_num_ > 0) {
-          idle_thread_num_--;
-          task_num_--;
-          lock.unlock();
-          cv_.notify_one();
-        }
-      }
-      std::this_thread::sleep_for(std::chrono::milliseconds(kSubmitTaskIntervalInMs));
+      task = task_queue_.front();
+      task_queue_.pop();
+      lock.unlock();
+      task();
     }
-  });
+  };
+  for (size_t i = 0; i < thread_num; i++) {
+    working_threads_.emplace_back(task_fun);
+  }
 }
 
-TaskExecutor::~TaskExecutor() {
-  {
-    std::unique_lock<std::mutex> lock(mtx_);
-    running_ = false;
+void TaskExecutor::Stop() {
+  if (has_stopped_) {
+    return;
   }
+  has_stopped_ = true;
   cv_.notify_all();
   for (auto &t : working_threads_) {
-    t.join();
+    if (t.joinable()) {
+      t.join();
+    }
   }
-  notify_thread_.join();
+  working_threads_.clear();
 }
-}  // namespace core
+
+TaskExecutor::~TaskExecutor() { Stop(); }
 }  // namespace fl
 }  // namespace mindspore

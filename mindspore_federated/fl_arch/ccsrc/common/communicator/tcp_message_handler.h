@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_MESSAGE_HANDLER_H_
-#define MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_MESSAGE_HANDLER_H_
+#ifndef MINDSPORE_CCSRC_FL_COMMUNICATOR_TCP_MESSAGE_HANDLER_H_
+#define MINDSPORE_CCSRC_FL_COMMUNICATOR_TCP_MESSAGE_HANDLER_H_
 
 #include <functional>
 #include <iostream>
@@ -31,33 +31,32 @@
 
 namespace mindspore {
 namespace fl {
-namespace core {
-using messageReceive =
-  std::function<void(const std::shared_ptr<MessageMeta> &, const Protos &, const void *, size_t size)>;
-
 constexpr size_t kHeaderLen = sizeof(MessageHeader);
 
 class TcpMessageHandler {
  public:
-  TcpMessageHandler() : remaining_length_(0), cur_header_len_(0), last_copy_len_(0) {}
-  virtual ~TcpMessageHandler() = default;
+  using MessageHandleFun = std::function<void(const MessageMeta &, const Protos &, const VectorPtr &)>;
+  void SetCallback(const MessageHandleFun &cb) { msg_callback_ = cb; }
 
-  void SetCallback(const messageReceive &cb);
-  void ReceiveMessage(const void *buffer, size_t num);
-
-  void Reset();
+  using ReadBufferFun = std::function<size_t(void *, size_t max_size)>;
+  void ReceiveMessage(const ReadBufferFun &read_fun);
 
  private:
-  messageReceive message_callback_;
-  std::vector<uint8_t> message_buffer_;
-  uint8_t header_[kHeaderLen]{0};
-  size_t remaining_length_;
   size_t cur_header_len_ = 0;
-  size_t last_copy_len_;
+  size_t cur_meta_len_ = 0;
+  size_t cur_data_len_ = 0;
+
+  uint8_t header_[kHeaderLen]{0};
+  std::vector<uint8_t> meta_buffer_;
+  VectorPtr data_;
   MessageHeader message_header_;
+  MessageMeta message_meta_;
+  MessageHandleFun msg_callback_ = nullptr;
+
+  bool ReceiveMessageInner(const ReadBufferFun &read_fun, bool *end_read);
+  void Reset();
 };
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore
 
-#endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_MESSAGE_HANDLER_H_
+#endif  // MINDSPORE_CCSRC_FL_COMMUNICATOR_TCP_MESSAGE_HANDLER_H_

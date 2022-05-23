@@ -24,7 +24,7 @@
 #include <functional>
 #include <utility>
 #include "worker/kernel/abstract_kernel.h"
-#include "worker/fl_worker.h"
+#include "worker/worker.h"
 
 namespace mindspore {
 namespace fl {
@@ -36,13 +36,10 @@ constexpr int kRetryDurationOfPushMetrics = 500;
 constexpr int kMaxRetryTime = 3600;
 class PushMetricsKernelMod : public AbstractKernel {
  public:
-  PushMetricsKernelMod() : fbb_(nullptr), total_iteration_(0) {}
+  PushMetricsKernelMod() : total_iteration_(0) {}
   ~PushMetricsKernelMod() override = default;
 
-  void Init() {
-    fbb_ = std::make_shared<FBBuilder>();
-    MS_EXCEPTION_IF_NULL(fbb_);
-  }
+  void Init() override {}
 
   static std::shared_ptr<PushMetricsKernelMod> GetInstance() {
     static std::shared_ptr<PushMetricsKernelMod> instance = nullptr;
@@ -54,22 +51,18 @@ class PushMetricsKernelMod : public AbstractKernel {
   }
 
   bool Launch(float loss, float accuracy) {
-    if (!BuildPushMetricsReq(fbb_, loss, accuracy)) {
-      MS_LOG(EXCEPTION) << "Building request for FusedPushWeight failed.";
-      return false;
-    }
-
+    FBBuilder fbb;
+    BuildPushMetricsReq(&fbb, loss, accuracy);
     uint32_t retry_time = 0;
     std::shared_ptr<std::vector<unsigned char>> push_metrics_rsp_msg = nullptr;
     do {
-      if (!fl::worker::FLWorker::GetInstance().running()) {
+      if (fl::worker::Worker::GetInstance().HasStopped()) {
         MS_LOG(WARNING) << "Worker has finished.";
         return true;
       }
       retry_time++;
-      if (!fl::worker::FLWorker::GetInstance().SendToServer(fl::kLeaderServerRank, fbb_->GetBufferPointer(),
-                                                            fbb_->GetSize(), fl::core::TcpUserCommand::kPushMetrics,
-                                                            &push_metrics_rsp_msg)) {
+      if (!fl::worker::Worker::GetInstance().SendToServer(fbb.GetBufferPointer(), fbb.GetSize(),
+                                                          fl::TcpUserCommand::kPushMetrics, &push_metrics_rsp_msg)) {
         MS_LOG(WARNING) << "Sending request for PushMetrics to server 0 failed.";
         std::this_thread::sleep_for(std::chrono::milliseconds(kRetryDurationOfPushMetrics));
         continue;
@@ -97,23 +90,21 @@ class PushMetricsKernelMod : public AbstractKernel {
     }
 
     MS_LOG(INFO) << "Push metrics for loss and accuracy success.";
-    fl::worker::FLWorker::GetInstance().SetIterationCompleted();
+    fl::worker::Worker::GetInstance().SetIterationCompleted();
     return true;
   }
 
  private:
   template <typename T>
-  bool BuildPushMetricsReq(const std::shared_ptr<FBBuilder> &fbb, T loss, T accuracy) {
+  void BuildPushMetricsReq(FBBuilder *fbb, T loss, T accuracy) {
     MS_EXCEPTION_IF_NULL(fbb);
-    schema::RequestPushMetricsBuilder req_push_metrics_builder(*(fbb.get()));
+    schema::RequestPushMetricsBuilder req_push_metrics_builder(*fbb);
     req_push_metrics_builder.add_loss(loss);
     req_push_metrics_builder.add_accuracy(accuracy);
     auto req_push_metrics = req_push_metrics_builder.Finish();
     fbb->Finish(req_push_metrics);
-    return true;
   }
 
-  std::shared_ptr<FBBuilder> fbb_;
   size_t total_iteration_;
 };
 }  // namespace kernel

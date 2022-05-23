@@ -81,3 +81,6 @@ test_temp_summary_event_file/
 *.shp
 *.pkl
 .clangd
+python/tests/temp/
+python/tests/metrics.json
+python/tests/server_recovery.json

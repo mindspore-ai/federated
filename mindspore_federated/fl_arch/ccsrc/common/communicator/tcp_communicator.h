@@ -14,89 +14,44 @@
  * limitations under the License.
  */
 
-#ifndef MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_COMMUNICATOR_H_
-#define MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_COMMUNICATOR_H_
+#ifndef MINDSPORE_CCSRC_FL_TCP_COMMUNICATOR_H_
+#define MINDSPORE_CCSRC_FL_TCP_COMMUNICATOR_H_
 
-#include <map>
 #include <vector>
 #include <string>
 #include <memory>
 #include <unordered_map>
-#include "common/core/server_node.h"
-#include "common/core/cluster_metadata.h"
-#include "common/core/cluster_config.h"
-#include "python/fl_context.h"
 #include "common/communicator/task_executor.h"
 #include "common/communicator/communicator_base.h"
-#include "common/communicator/tcp_msg_handler.h"
-#include "common/core/comm_util.h"
 #include "common/constants.h"
+#include "common/status.h"
+#include "common/communicator/tcp_server.h"
 
 namespace mindspore {
 namespace fl {
-namespace core {
-const std::unordered_map<TcpUserCommand, std::string> kUserCommandToMsgType = {
-  {TcpUserCommand::kPush, "push"},
-  {TcpUserCommand::kPull, "pull"},
-  {TcpUserCommand::kCount, "count"},
-  {TcpUserCommand::kReachThreshold, "countReachThreshold"},
-  {TcpUserCommand::kResetCount, "resetCnt"},
-  {TcpUserCommand::kGetMetadata, "getMetadata"},
-  {TcpUserCommand::kUpdateMetadata, "updateMetadata"},
-  {TcpUserCommand::kGetOneDeviceMeta, "getOneDeviceMeta"},
-  {TcpUserCommand::kCounterEvent, "counterEvent"},
-  {TcpUserCommand::kPullWeight, "pullWeight"},
-  {TcpUserCommand::kPushWeight, "pushWeight"},
-  {TcpUserCommand::kSyncIteration, "syncIteration"},
-  {TcpUserCommand::kNotifyLeaderToNextIter, "notifyLeaderToNextIter"},
-  {TcpUserCommand::kPrepareForNextIter, "prepareForNextIter"},
-  {TcpUserCommand::kProceedToNextIter, "proceedToNextIter"},
-  {TcpUserCommand::kEndLastIter, "endLastIter"},
-  {TcpUserCommand::kStartFLJob, "startFLJob"},
-  {TcpUserCommand::kExchangeKeys, "exchangeKeys"},
-  {TcpUserCommand::kGetKeys, "getKeys"},
-  {TcpUserCommand::kUpdateModel, "updateModel"},
-  {TcpUserCommand::kGetModel, "getModel"},
-  {TcpUserCommand::kPushMetrics, "pushMetrics"},
-  {TcpUserCommand::kNewInstance, "newInstance"},
-  {TcpUserCommand::kQueryInstance, "queryInstance"},
-  {TcpUserCommand::kEnableFLS, "enableFLS"},
-  {TcpUserCommand::kDisableFLS, "disableFLS"},
-  {TcpUserCommand::kSyncAfterRecover, "syncAfterRecover"},
-  {TcpUserCommand::kQueryNodeScaleState, "queryNodeScaleState"}};
-
 class TcpCommunicator : public CommunicatorBase {
  public:
-  explicit TcpCommunicator(const std::shared_ptr<TaskExecutor> &task_executor, AbstractNode *node)
-      : task_executor_(task_executor), abstrace_node_(node) {}
+  TcpCommunicator() = default;
   ~TcpCommunicator() = default;
 
   bool Start() override;
   bool Stop() override;
 
-  void RegisterMsgCallBack(const std::string &msg_type, const MessageCallback &cb) override;
-  void RegisterEventCallback(const fl::core::ClusterEvent &event, const EventCallback &event_cb);
-
-  template <class T>
-  bool SendPbRequest(const T &pb_msg, const uint32_t &rank_id, TcpUserCommand command,
-                     std::shared_ptr<std::vector<unsigned char>> *output = nullptr) {
-    const std::string &msg_str = pb_msg.SerializeAsString();
-    if (!abstrace_node_->Send(NodeRole::SERVER, rank_id, msg_str, static_cast<int>(command), output)) {
-      MS_LOG(ERROR) << "Sending protobuffer message to server " << rank_id << " failed.";
-      return false;
-    }
-    return true;
-  }
+  void RegisterRoundMsgCallback(const std::string &msg_type, const MessageCallback &cb) override;
+  void HandleRoundRequest(const std::shared_ptr<TcpConnection> &conn, const MessageMeta &meta, const Protos &type,
+                          const VectorPtr &data);
 
  private:
-  std::shared_ptr<TaskExecutor> task_executor_;
+  std::unordered_map<std::string, MessageCallback> msg_callbacks_;
 
-  TcpMsgCallback tcp_msg_callback_;
-  OnNodeEventCallback event_callback_;
+  // The task executor of the communicators. This helps server to handle network message concurrently. The tasks
+  // submitted to this task executor is asynchronous.
+  std::shared_ptr<TaskExecutor> task_executor_ = nullptr;
+  MessageCallback GetRoundMsgCallBack(const std::string &msg_type) const;
 
-  AbstractNode *abstrace_node_;
+  FlStatus HandleRoundRequestInner(const std::shared_ptr<TcpConnection> &conn, const MessageMeta &meta, const Protos &,
+                                   const VectorPtr &data);
 };
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore
-#endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_COMMUNICATOR_H_
+#endif  // MINDSPORE_CCSRC_FL_TCP_COMMUNICATOR_H_

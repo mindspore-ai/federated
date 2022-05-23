@@ -25,16 +25,16 @@ constexpr int salt_len = 32;
 
 bool ExchangeKeysKernelMod::Launch() {
   MS_LOG(INFO) << "Launching client ExchangeKeysKernelMod";
-  if (!BuildExchangeKeysReq(fbb_)) {
+  FBBuilder fbb;
+  if (!BuildExchangeKeysReq(&fbb)) {
     MS_LOG(EXCEPTION) << "Building request for ExchangeKeys failed.";
     return false;
   }
 
   std::shared_ptr<std::vector<unsigned char>> exchange_keys_rsp_msg = nullptr;
-  if (!fl::worker::FLWorker::GetInstance().SendToServer(target_server_rank_, fbb_->GetBufferPointer(), fbb_->GetSize(),
-                                                        fl::core::TcpUserCommand::kExchangeKeys,
-                                                        &exchange_keys_rsp_msg)) {
-    MS_LOG(EXCEPTION) << "Sending request for ExchangeKeys to server " << target_server_rank_ << " failed.";
+  if (!fl::worker::Worker::GetInstance().SendToServer(fbb.GetBufferPointer(), fbb.GetSize(),
+                                                      fl::TcpUserCommand::kExchangeKeys, &exchange_keys_rsp_msg)) {
+    MS_LOG(EXCEPTION) << "Sending request for ExchangeKeys to server failed.";
     return false;
   }
   if (exchange_keys_rsp_msg == nullptr) {
@@ -60,29 +60,15 @@ bool ExchangeKeysKernelMod::Launch() {
 }
 
 void ExchangeKeysKernelMod::Init() {
-  fl_id_ = fl::worker::FLWorker::GetInstance().fl_id();
-  server_num_ = fl::worker::FLWorker::GetInstance().server_num();
-  rank_id_ = fl::worker::FLWorker::GetInstance().rank_id();
-  if (rank_id_ == UINT32_MAX) {
-    MS_LOG(EXCEPTION) << "Federated worker is not initialized yet.";
-    return;
-  }
-
-  if (server_num_ <= 0) {
-    MS_LOG(EXCEPTION) << "Server number should be larger than 0, but got: " << server_num_;
-    return;
-  }
-  target_server_rank_ = rank_id_ % server_num_;
+  fl_id_ = fl::worker::Worker::GetInstance().fl_id();
 
   MS_LOG(INFO) << "Initializing ExchangeKeys kernel"
-               << ", fl_id: " << fl_id_ << ". Request will be sent to server " << target_server_rank_;
+               << ", fl_id: " << fl_id_;
 
-  fbb_ = std::make_shared<FBBuilder>();
-  MS_EXCEPTION_IF_NULL(fbb_);
   MS_LOG(INFO) << "Initialize ExchangeKeys kernel successfully.";
 }
 
-bool ExchangeKeysKernelMod::BuildExchangeKeysReq(const std::shared_ptr<FBBuilder> &fbb) {
+bool ExchangeKeysKernelMod::BuildExchangeKeysReq(FBBuilder *fbb) {
   MS_EXCEPTION_IF_NULL(fbb);
   // generate initialization vector value used for generate pairwise noise
   std::vector<uint8_t> pw_iv_(iv_vec_len);
@@ -100,8 +86,8 @@ bool ExchangeKeysKernelMod::BuildExchangeKeysReq(const std::shared_ptr<FBBuilder
   }
 
   // save pw_salt and pw_iv at local
-  fl::worker::FLWorker::GetInstance().set_pw_salt(pw_salt_);
-  fl::worker::FLWorker::GetInstance().set_pw_iv(pw_iv_);
+  fl::worker::Worker::GetInstance().set_pw_salt(pw_salt_);
+  fl::worker::Worker::GetInstance().set_pw_iv(pw_iv_);
 
   // get public key bytes
   std::vector<uint8_t> pubkey_bytes = GetPubicKeyBytes();
@@ -111,12 +97,12 @@ bool ExchangeKeysKernelMod::BuildExchangeKeysReq(const std::shared_ptr<FBBuilder
   }
 
   // build data which will be send to server
-  int iter = fl::worker::FLWorker::GetInstance().fl_iteration_num();
+  int iter = fl::worker::Worker::GetInstance().fl_iteration_num();
   auto fbs_fl_id = fbb->CreateString(fl_id_);
   auto fbs_public_key = fbb->CreateVector(pubkey_bytes.data(), pubkey_bytes.size());
   auto fbs_pw_iv = fbb->CreateVector(pw_iv_.data(), iv_vec_len);
   auto fbs_pw_salt = fbb->CreateVector(pw_salt_.data(), salt_len);
-  schema::RequestExchangeKeysBuilder req_exchange_key_builder(*(fbb.get()));
+  schema::RequestExchangeKeysBuilder req_exchange_key_builder(*fbb);
   req_exchange_key_builder.add_fl_id(fbs_fl_id);
   req_exchange_key_builder.add_s_pk(fbs_public_key);
   req_exchange_key_builder.add_iteration(iter);
@@ -131,7 +117,7 @@ bool ExchangeKeysKernelMod::BuildExchangeKeysReq(const std::shared_ptr<FBBuilder
 std::vector<uint8_t> ExchangeKeysKernelMod::GetPubicKeyBytes() {
   // generate private key of secret
   armour::PrivateKey *sPriKeyPtr = armour::KeyAgreement::GeneratePrivKey();
-  fl::worker::FLWorker::GetInstance().set_secret_pk(sPriKeyPtr);
+  fl::worker::Worker::GetInstance().set_secret_pk(sPriKeyPtr);
 
   // get public bytes length
   size_t pubLen;

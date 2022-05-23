@@ -28,51 +28,14 @@
 
 namespace mindspore {
 namespace fl {
-namespace core {
 /*
  * Configuration information read through environment variables and configuration files, generally immutable
  */
 struct ClusterConfig {
-  explicit ClusterConfig(const uint32_t &worker_num, const uint32_t &server_num, std::string scheduler_ip,
-                         const uint16_t &scheduler_port)
-      : initial_worker_num(worker_num),
-        initial_server_num(server_num),
-        heartbeat_interval(3),
-        scheduler_ip(scheduler_ip),
-        scheduler_port(scheduler_port),
-        heartbeat_timeout(30),
-        cluster_available_timeout(900),
-        connect_interval(3000),
-        scheduler_timeout(30),
-        initial_total_node_num(0),
-        initial_next_worker_rank_id(0),
-        initial_next_server_rank_id(0),
-        initial_cluster_state(ClusterState::CLUSTER_STARTING) {}
-  // Configure through environment variables:MS_WORKER_NUM
-  uint32_t initial_worker_num;
-  // Configure through environment variables:MS_SERVER_NUM
-  uint32_t initial_server_num;
-
-  // The interval for sending heartbeat packets between worker node,server node and scheduler node is 3 seconds.
-  uint32_t heartbeat_interval;
-  std::string scheduler_ip;
-  uint16_t scheduler_port;
-  // The timeout for worker node and server node sending heartbeat packets to scheduler node is 30 seconds.
-  uint32_t heartbeat_timeout;
+  explicit ClusterConfig() : cluster_available_timeout(900) {}
   // Timeout period for cluster preparation is 900 seconds.
   uint32_t cluster_available_timeout;
-  // The timeout period for the client to connect to the server is 3000ms.
-  uint32_t connect_interval;
-  // When the scheduler exits, the worker and server can continue to work for 5 hours
-  int64_t scheduler_timeout;
-  // the node that has bean registered to scheduler
-  std::unordered_map<std::string, NodeInfo> initial_registered_nodes_infos;
-  uint32_t initial_total_node_num;
-  uint32_t initial_next_worker_rank_id;
-  uint32_t initial_next_server_rank_id;
-  ClusterState initial_cluster_state;
 };
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_CLUSTER_CONFIG_H_

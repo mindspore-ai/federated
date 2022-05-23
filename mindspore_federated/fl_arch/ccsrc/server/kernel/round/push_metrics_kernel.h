@@ -32,19 +32,17 @@ namespace server {
 namespace kernel {
 class PushMetricsKernel : public RoundKernel {
  public:
-  PushMetricsKernel() : local_rank_(0) {}
+  PushMetricsKernel() = default;
   ~PushMetricsKernel() override = default;
 
-  void InitKernel(size_t threshold_count);
-  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<fl::core::MessageHandler> &message) override;
+  void InitKernel(size_t threshold_count) override;
+  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<MessageHandler> &message) override;
   bool Reset() override;
-  void OnLastCountEvent(const std::shared_ptr<fl::core::MessageHandler> &message) override;
+  void OnLastCountEvent() override;
 
  private:
   ResultCode PushMetrics(const std::shared_ptr<FBBuilder> &fbb, const schema::RequestPushMetrics *push_metrics_req);
   void BuildPushMetricsRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode);
-
-  uint32_t local_rank_;
 };
 }  // namespace kernel
 }  // namespace server

@@ -16,13 +16,14 @@
 
 #include "armour/cipher/cipher_keys.h"
 #include "armour/cipher/cipher_meta_storage.h"
+#include "distributed_cache/client_infos.h"
+#include "distributed_cache/instance_context.h"
 
 namespace mindspore {
 namespace fl {
 namespace armour {
 bool CipherKeys::GetKeys(const size_t cur_iterator, const std::string &next_req_time,
-                         const schema::GetExchangeKeys *get_exchange_keys_req,
-                         const std::shared_ptr<FBBuilder> &fbb) {
+                         const schema::GetExchangeKeys *get_exchange_keys_req, const std::shared_ptr<FBBuilder> &fbb) {
   MS_LOG(INFO) << "CipherMgr::GetKeys START";
   if (get_exchange_keys_req == nullptr) {
     MS_LOG(ERROR) << "Request is nullptr";
@@ -37,9 +38,9 @@ bool CipherKeys::GetKeys(const size_t cur_iterator, const std::string &next_req_
   std::map<std::string, std::vector<std::vector<uint8_t>>> client_public_keys;
   std::string encrypt_type = FLContext::instance()->encrypt_type();
   if (encrypt_type == kPWEncryptType) {
-    cipher_init_->cipher_meta_storage_.GetClientKeysFromServer(kCtxClientsKeys, &client_public_keys);
+    cipher_init_->cipher_meta_storage_.GetClientKeysFromServer(&client_public_keys);
   } else {
-    cipher_init_->cipher_meta_storage_.GetStableClientKeysFromServer(kCtxClientsKeys, &client_public_keys);
+    cipher_init_->cipher_meta_storage_.GetStableClientKeysFromServer(&client_public_keys);
   }
 
   size_t cur_exchange_clients_num = client_public_keys.size();
@@ -59,8 +60,8 @@ bool CipherKeys::GetKeys(const size_t cur_iterator, const std::string &next_req_
     return false;
   }
 
-  bool ret = cipher_init_->cipher_meta_storage_.UpdateClientToServer(kCtxGetKeysClientList, fl_id);
-  if (!ret) {
+  auto ret = fl::cache::ClientInfos::GetInstance().AddGetKeysClient(fl_id);
+  if (!ret.IsSuccess()) {
     MS_LOG(ERROR) << "Update get keys clients failed";
     BuildGetKeysRsp(fbb, schema::ResponseCode_OutOfTime, cur_iterator, next_req_time, false);
     return false;
@@ -93,11 +94,10 @@ bool CipherKeys::ExchangeKeys(const size_t cur_iterator, const std::string &next
     return false;
   }
   std::string fl_id = exchange_keys_req->fl_id()->str();
-  mindspore::fl::PBMetadata device_metas =
-    fl::server::DistributedMetadataStore::GetInstance().GetMetadata(kCtxDeviceMetas);
-  mindspore::fl::FLIdToDeviceMeta fl_id_to_meta = device_metas.device_metas();
+  fl::DeviceMeta device_meta;
+  auto status = fl::cache::ClientInfos::GetInstance().GetDeviceMeta(fl_id, &device_meta);
   MS_LOG(INFO) << "exchange key for fl id " << fl_id;
-  if (fl_id_to_meta.fl_id_to_meta().count(fl_id) == 0) {
+  if (!status.IsSuccess()) {
     std::string reason = "devices_meta for " + fl_id + " is not set. Please retry later.";
     BuildExchangeKeysRsp(fbb, schema::ResponseCode_OutOfTime, reason, next_req_time, cur_iterator);
     MS_LOG(ERROR) << reason;
@@ -107,13 +107,13 @@ bool CipherKeys::ExchangeKeys(const size_t cur_iterator, const std::string &next
   // step 1: get clientlist and client keys from memory server.
   std::map<std::string, std::vector<std::vector<uint8_t>>> client_public_keys;
   std::vector<std::string> client_list;
-  cipher_init_->cipher_meta_storage_.GetClientListFromServer(kCtxExChangeKeysClientList, &client_list);
+  fl::cache::ClientInfos::GetInstance().GetAllExchangeKeyClients(&client_list);
 
   std::string encrypt_type = FLContext::instance()->encrypt_type();
   if (encrypt_type == kPWEncryptType) {
-    cipher_init_->cipher_meta_storage_.GetClientKeysFromServer(kCtxClientsKeys, &client_public_keys);
+    cipher_init_->cipher_meta_storage_.GetClientKeysFromServer(&client_public_keys);
   } else {
-    cipher_init_->cipher_meta_storage_.GetStableClientKeysFromServer(kCtxClientsKeys, &client_public_keys);
+    cipher_init_->cipher_meta_storage_.GetStableClientKeysFromServer(&client_public_keys);
   }
 
   // step2: process new item data. and update new item data to memory server.
@@ -138,16 +138,13 @@ bool CipherKeys::ExchangeKeys(const size_t cur_iterator, const std::string &next
 
   bool retcode_key;
   if (encrypt_type == kPWEncryptType) {
-    retcode_key =
-      cipher_init_->cipher_meta_storage_.UpdateClientKeyToServer(kCtxClientsKeys, exchange_keys_req);
+    retcode_key = cipher_init_->cipher_meta_storage_.UpdateClientKeyToServer(exchange_keys_req);
   } else {
-    retcode_key =
-      cipher_init_->cipher_meta_storage_.UpdateStableClientKeyToServer(kCtxClientsKeys, exchange_keys_req);
+    retcode_key = cipher_init_->cipher_meta_storage_.UpdateStableClientKeyToServer(exchange_keys_req);
   }
 
-  bool retcode_client =
-    cipher_init_->cipher_meta_storage_.UpdateClientToServer(kCtxExChangeKeysClientList, fl_id);
-  if (retcode_key && retcode_client) {
+  status = fl::cache::ClientInfos::GetInstance().AddExchangeKeyClient(fl_id);
+  if (retcode_key && status.IsSuccess()) {
     MS_LOG(INFO) << "The client " << fl_id << " CipherMgr::ExchangeKeys Success";
     BuildExchangeKeysRsp(fbb, schema::ResponseCode_SUCCEED, "Success, but the server is not ready yet.", next_req_time,
                          cur_iterator);
@@ -160,9 +157,9 @@ bool CipherKeys::ExchangeKeys(const size_t cur_iterator, const std::string &next
   }
 }
 
-void CipherKeys::BuildExchangeKeysRsp(const std::shared_ptr<FBBuilder> &fbb,
-                                      const schema::ResponseCode retcode, const std::string &reason,
-                                      const std::string &next_req_time, const size_t iteration) {
+void CipherKeys::BuildExchangeKeysRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
+                                      const std::string &reason, const std::string &next_req_time,
+                                      const size_t iteration) {
   auto rsp_reason = fbb->CreateString(reason);
   auto rsp_next_req_time = fbb->CreateString(next_req_time);
 
@@ -189,13 +186,17 @@ void CipherKeys::BuildGetKeysRsp(const std::shared_ptr<FBBuilder> &fbb, const sc
     return;
   }
 
-  const fl::PBMetadata &clients_keys_pb_out =
-    fl::server::DistributedMetadataStore::GetInstance().GetMetadata(kCtxClientsKeys);
-  const fl::ClientKeys &clients_keys_pb = clients_keys_pb_out.client_keys();
+  std::unordered_map<std::string, fl::KeysPb> value_map;
+  auto status = fl::cache::ClientInfos::GetInstance().GetAllClientKeys(&value_map);
+  if (!status.IsSuccess()) {
+    MS_LOG(ERROR) << "Get keys from cache failed. Please retry later.";
+    BuildGetKeysRsp(fbb, schema::ResponseCode_OutOfTime, iteration, next_req_time, false);
+    return;
+  }
   std::vector<flatbuffers::Offset<schema::ClientPublicKeys>> public_keys_list;
-  for (auto iter = clients_keys_pb.client_keys().begin(); iter != clients_keys_pb.client_keys().end(); ++iter) {
-    std::string fl_id = iter->first;
-    fl::KeysPb keys_pb = iter->second;
+  for (auto &item : value_map) {
+    auto &fl_id = item.first;
+    auto &keys_pb = item.second;
     auto fbs_fl_id = fbb->CreateString(fl_id);
     std::vector<uint8_t> pw_iv(keys_pb.pw_iv().begin(), keys_pb.pw_iv().end());
     auto fbs_pw_iv = fbb->CreateVector(pw_iv.data(), pw_iv.size());
@@ -231,9 +232,8 @@ void CipherKeys::BuildGetKeysRsp(const std::shared_ptr<FBBuilder> &fbb, const sc
   return;
 }
 
-void CipherKeys::BuildPkiVerifyGetKeysRsp(const std::shared_ptr<FBBuilder> &fbb,
-                                          const schema::ResponseCode retcode, const size_t iteration,
-                                          const std::string &next_req_time, bool is_good) {
+void CipherKeys::BuildPkiVerifyGetKeysRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
+                                          const size_t iteration, const std::string &next_req_time, bool is_good) {
   if (!is_good) {
     auto fbs_next_req_time = fbb->CreateString(next_req_time);
     schema::ReturnExchangeKeysBuilder rsp_buider(*(fbb.get()));
@@ -244,13 +244,17 @@ void CipherKeys::BuildPkiVerifyGetKeysRsp(const std::shared_ptr<FBBuilder> &fbb,
     fbb->Finish(rsp_get_keys);
     return;
   }
-  const fl::PBMetadata &clients_keys_pb_out =
-    fl::server::DistributedMetadataStore::GetInstance().GetMetadata(kCtxClientsKeys);
-  const fl::ClientKeys &clients_keys_pb = clients_keys_pb_out.client_keys();
+  std::unordered_map<std::string, fl::KeysPb> value_map;
+  auto status = fl::cache::ClientInfos::GetInstance().GetAllClientKeys(&value_map);
+  if (!status.IsSuccess()) {
+    MS_LOG(ERROR) << "Get keys from cache failed. Please retry later.";
+    BuildGetKeysRsp(fbb, schema::ResponseCode_OutOfTime, iteration, next_req_time, false);
+    return;
+  }
   std::vector<flatbuffers::Offset<schema::ClientPublicKeys>> public_keys_list;
-  for (auto iter = clients_keys_pb.client_keys().begin(); iter != clients_keys_pb.client_keys().end(); ++iter) {
-    std::string fl_id = iter->first;
-    fl::KeysPb keys_pb = iter->second;
+  for (auto &item : value_map) {
+    auto &fl_id = item.first;
+    auto &keys_pb = item.second;
     auto fbs_fl_id = fbb->CreateString(fl_id);
 
     // package public keys for pairwise encryption
@@ -293,12 +297,6 @@ void CipherKeys::BuildPkiVerifyGetKeysRsp(const std::shared_ptr<FBBuilder> &fbb,
   fbb->Finish(rsp_get_keys);
   MS_LOG(INFO) << "CipherMgr::GetKeys Success";
   return;
-}
-
-void CipherKeys::ClearKeys() {
-  fl::server::DistributedMetadataStore::GetInstance().ResetMetadata(kCtxExChangeKeysClientList);
-  fl::server::DistributedMetadataStore::GetInstance().ResetMetadata(kCtxClientsKeys);
-  fl::server::DistributedMetadataStore::GetInstance().ResetMetadata(kCtxGetKeysClientList);
 }
 }  // namespace armour
 }  // namespace fl

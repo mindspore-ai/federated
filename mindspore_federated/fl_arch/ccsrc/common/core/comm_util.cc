@@ -30,7 +30,6 @@
 
 namespace mindspore {
 namespace fl {
-namespace core {
 std::random_device CommUtil::rd;
 std::mt19937_64 CommUtil::gen(rd());
 std::uniform_int_distribution<> CommUtil::dis = std::uniform_int_distribution<>{0, 15};
@@ -75,6 +74,34 @@ bool CommUtil::CheckPort(const uint16_t &port) {
     MS_LOG(ERROR) << "The range of port should be 1 to 65535.";
     return false;
   }
+  return true;
+}
+
+bool CommUtil::SplitIpAddress(const std::string &server_address, std::string *ip, uint32_t *port) {
+  auto port_b = server_address.rfind(":");
+  if (port_b == std::string::npos || port_b == 0 || port_b == server_address.size() - 1) {
+    return false;
+  }
+  auto ip_str = server_address.substr(0, port_b);
+  if (!CheckIpWithRegex(ip_str)) {
+    return false;
+  }
+  auto port_str = server_address.substr(port_b + 1);
+  uint32_t port_sum = 0;
+  for (char c : port_str) {
+    if (c < '0' || c > '9') {
+      return false;
+    }
+    port_sum = port_sum * 10 + (c - '0');
+    if (port_sum > 65535) {
+      return false;
+    }
+  }
+  if (port_sum == 0) {
+    return false;
+  }
+  *ip = ip_str;
+  *port = port_sum;
   return true;
 }
 
@@ -133,6 +160,12 @@ std::string CommUtil::GetLoopBackInterfaceName() {
 }
 
 std::string CommUtil::GenerateUUID() {
+  constexpr int kGroup1RandomLength = 8;
+  constexpr int kGroup2RandomLength = 4;
+  constexpr int kGroup3RandomLength = 4;
+  constexpr int kGroup4RandomLength = 4;
+  constexpr int kGroup5RandomLength = 12;
+
   std::stringstream ss;
   int i;
   ss << std::hex;
@@ -183,42 +216,6 @@ NodeRole CommUtil::StringToNodeRole(const std::string &roleStr) {
     MS_LOG(EXCEPTION) << "The node role string:" << roleStr << " is illegal!";
   }
 }
-bool CommUtil::ValidateRankId(const enum NodeRole &node_role, const uint32_t &rank_id, const int32_t &total_worker_num,
-                              const int32_t &total_server_num) {
-  if (node_role == NodeRole::SERVER && (rank_id > IntToUint(total_server_num) - 1)) {
-    return false;
-  } else if (node_role == NodeRole::WORKER && (rank_id > IntToUint(total_worker_num) - 1)) {
-    return false;
-  }
-  return true;
-}
-
-bool CommUtil::Retry(const std::function<bool()> &func, size_t max_attempts, size_t interval_milliseconds) {
-  for (size_t attempt = 0; attempt < max_attempts; ++attempt) {
-    if (func()) {
-      return true;
-    }
-    std::this_thread::sleep_for(std::chrono::milliseconds(interval_milliseconds));
-  }
-  return false;
-}
-
-void CommUtil::LogCallback(int severity, const char *msg) {
-  MS_EXCEPTION_IF_NULL(msg);
-  switch (severity) {
-    case EVENT_LOG_MSG:
-      MS_LOG(INFO) << kLibeventLogPrefix << msg;
-      break;
-    case EVENT_LOG_WARN:
-      MS_LOG(WARNING) << kLibeventLogPrefix << msg;
-      break;
-    case EVENT_LOG_ERR:
-      MS_LOG(ERROR) << kLibeventLogPrefix << msg;
-      break;
-    default:
-      break;
-  }
-}
 
 bool CommUtil::IsFileExists(const std::string &file) { return access(file.c_str(), F_OK) != -1; }
 
@@ -256,14 +253,6 @@ bool CommUtil::CreateDirectory(const std::string &directoryPath) {
     }
   }
   return true;
-}
-
-std::string CommUtil::ClusterStateToString(const ClusterState &state) {
-  if (state < SizeToInt(kClusterState.size())) {
-    return kClusterState.at(state);
-  } else {
-    return std::to_string(state);
-  }
 }
 
 std::string CommUtil::ParseConfig(const Configuration &config, const std::string &key) {
@@ -595,7 +584,7 @@ bool CommUtil::StringToBool(const std::string &alive) {
 }
 
 Time CommUtil::GetNowTime() {
-  fl::core::Time time;
+  fl::Time time;
   auto time_now = std::chrono::system_clock::now();
   std::time_t tt = std::chrono::system_clock::to_time_t(time_now);
   struct tm ptm;
@@ -613,6 +602,8 @@ Time CommUtil::GetNowTime() {
   auto second_time_stamp = std::chrono::duration_cast<std::chrono::seconds>(time_now.time_since_epoch());
   auto mill_time_stamp = std::chrono::duration_cast<std::chrono::milliseconds>(time_now.time_since_epoch());
   auto ms_stamp = mill_time_stamp - second_time_stamp;
+
+  constexpr int kMillSecondLength = 3;
   time_mill_oss << "." << std::setfill('0') << std::setw(kMillSecondLength) << ms_stamp.count();
 
   time.time_stamp = mill_time_stamp.count();
@@ -639,18 +630,17 @@ bool CommUtil::ParseAndCheckConfigJson(Configuration *file_configuration, const 
       return false;
     }
     // Parse the storage type.
-    uint32_t storage_type = fl::core::CommUtil::JsonGetKeyWithException<uint32_t>(value_json, kStoreType);
+    uint32_t storage_type = CommUtil::JsonGetKeyWithException<uint32_t>(value_json, kStoreType);
     if (std::to_string(storage_type) != kFileStorage) {
       MS_LOG(EXCEPTION) << "Storage type " << storage_type << " is not supported.";
       return false;
     }
     // Parse storage file path.
-    std::string file_path = fl::core::CommUtil::JsonGetKeyWithException<std::string>(value_json, kStoreFilePath);
+    std::string file_path = CommUtil::JsonGetKeyWithException<std::string>(value_json, kStoreFilePath);
     file_config->storage_type = storage_type;
     file_config->storage_file_path = file_path;
   }
   return true;
 }
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore

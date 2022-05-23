@@ -28,25 +28,9 @@ namespace fl {
 namespace server {
 namespace kernel {
 void StartFLJobKernel::InitKernel(size_t) {
-  // The time window of one iteration should be started at the first message of startFLJob round.
-  if (LocalMetaStore::GetInstance().has_value(kCtxTotalTimeoutDuration)) {
-    iteration_time_window_ = LocalMetaStore::GetInstance().value<size_t>(kCtxTotalTimeoutDuration);
-  }
-  iter_next_req_timestamp_ = LongToUlong(CURRENT_TIME_MILLI.count()) + iteration_time_window_;
+  iter_next_req_timestamp_ = LongToUlong(CURRENT_TIME_MILLI.count()) + iteration_time_window();
   LocalMetaStore::GetInstance().put_value(kCtxIterationNextRequestTimestamp, iter_next_req_timestamp_);
   InitClientVisitedNum();
-  executor_ = &Executor::GetInstance();
-  MS_EXCEPTION_IF_NULL(executor_);
-  if (!executor_->initialized()) {
-    MS_LOG(EXCEPTION) << "Executor must be initialized in server pipeline.";
-    return;
-  }
-  PBMetadata devices_metas;
-  DistributedMetadataStore::GetInstance().RegisterMetadata(kCtxDeviceMetas, devices_metas);
-
-  PBMetadata client_key_attestation;
-  DistributedMetadataStore::GetInstance().RegisterMetadata(kCtxClientKeyAttestation, client_key_attestation);
-  return;
 }
 
 bool StartFLJobKernel::VerifyFLJobRequest(const schema::RequestFLJob *start_fl_job_req) {
@@ -64,10 +48,9 @@ bool StartFLJobKernel::VerifyFLJobRequest(const schema::RequestFLJob *start_fl_j
   return true;
 }
 
-bool StartFLJobKernel::Launch(const uint8_t *req_data, size_t len,
-                              const std::shared_ptr<fl::core::MessageHandler> &message) {
+bool StartFLJobKernel::Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<MessageHandler> &message) {
   MS_LOG(DEBUG) << "Launching StartFLJobKernel kernel.";
-  fl::core::Time start_fl_job_time = fl::core::CommUtil::GetNowTime();
+  fl::Time start_fl_job_time = fl::CommUtil::GetNowTime();
   std::shared_ptr<FBBuilder> fbb = std::make_shared<FBBuilder>();
   if (fbb == nullptr || req_data == nullptr) {
     std::string reason = "FBBuilder builder or req_data is nullptr.";
@@ -96,7 +79,7 @@ bool StartFLJobKernel::Launch(const uint8_t *req_data, size_t len,
     return false;
   }
 
-  ResultCode result_code = ReachThresholdForStartFLJob(fbb, start_fl_job_req);
+  ResultCode result_code = ReachThresholdForStartFLJob(fbb);
   if (result_code != ResultCode::kSuccess) {
     SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
     return false;
@@ -120,16 +103,18 @@ bool StartFLJobKernel::Launch(const uint8_t *req_data, size_t len,
     SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
     return false;
   }
-  PBMetadata metadata;
-  *metadata.mutable_device_meta() = device_meta;
-  if (!DistributedMetadataStore::GetInstance().UpdateMetadata(kCtxDeviceMetas, metadata)) {
+  auto fl_id = start_fl_job_req->fl_id()->c_str();
+  auto ret = cache::ClientInfos::GetInstance().AddDeviceMeta(fl_id, device_meta);
+  if (!ret.IsSuccess()) {
     std::string reason = "Updating device metadata failed for fl id " + device_meta.fl_id();
+    MS_LOG(WARNING) << reason;
     BuildStartFLJobRsp(
       fbb, schema::ResponseCode_OutOfTime, reason, false,
       std::to_string(LocalMetaStore::GetInstance().value<uint64_t>(kCtxIterationNextRequestTimestamp)));
     SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
     return false;
   }
+
   // If calling ReportCount before ReadyForStartFLJob, the result will be inconsistent if the device is not selected.
   result_code = CountForStartFLJob(fbb, start_fl_job_req);
   if (result_code != ResultCode::kSuccess) {
@@ -137,7 +122,7 @@ bool StartFLJobKernel::Launch(const uint8_t *req_data, size_t len,
     return false;
   }
   IncreaseAcceptClientNum();
-  auto curr_iter_num = LocalMetaStore::GetInstance().curr_iter_num();
+  auto curr_iter_num = cache::InstanceContext::Instance().iteration_num();
   auto last_iteration = curr_iter_num - 1;
   auto download_compress_types = start_fl_job_req->download_compress_types();
   schema::CompressType compressType =
@@ -146,7 +131,7 @@ bool StartFLJobKernel::Launch(const uint8_t *req_data, size_t len,
   if (compressType == schema::CompressType_QUANT) {
     compress_type = kQuant;
   } else {
-    compress_type = kNoCompress;
+    compress_type = kNoCompressType;
   }
   auto cache = ModelStore::GetInstance().GetModelResponseCache(name_, curr_iter_num, last_iteration, compress_type);
   if (cache == nullptr) {
@@ -184,11 +169,13 @@ bool StartFLJobKernel::JudgeFLJobCert(const std::shared_ptr<FBBuilder> &fbb,
   std::string key_attestation = start_fl_job_req->key_attestation()->str();
   std::string equip_cert = start_fl_job_req->equip_cert()->str();
   std::string equip_ca_cert = start_fl_job_req->equip_ca_cert()->str();
-  std::string root_first_ca_path = FLContext::instance()->root_first_ca_path();
-  std::string root_second_ca_path = FLContext::instance()->root_second_ca_path();
-  std::string equip_crl_path = FLContext::instance()->equip_crl_path();
 
-  auto certVerify = CertVerify::GetInstance();
+  auto &client_verify_config = FLContext::instance()->client_verify_config();
+  std::string root_first_ca_path = client_verify_config.root_first_ca_path;
+  std::string root_second_ca_path = client_verify_config.root_second_ca_path;
+  std::string equip_crl_path = client_verify_config.equip_crl_path;
+
+  auto &certVerify = CertVerify::GetInstance();
   bool ret =
     certVerify.verifyCertAndSign(fl_id, timestamp, (const unsigned char *)sign_data, key_attestation, equip_cert,
                                  equip_ca_cert, root_first_ca_path, root_second_ca_path, equip_crl_path);
@@ -210,14 +197,8 @@ bool StartFLJobKernel::StoreKeyAttestation(const std::shared_ptr<FBBuilder> &fbb
   std::string fl_id = start_fl_job_req->fl_id()->str();
   std::string key_attestation = start_fl_job_req->key_attestation()->str();
 
-  fl::PairKeyAttestation pair_key_attestation_pb;
-  pair_key_attestation_pb.set_fl_id(fl_id);
-  pair_key_attestation_pb.set_certificate(key_attestation);
-
-  fl::PBMetadata pb_data;
-  pb_data.mutable_pair_key_attestation()->MergeFrom(pair_key_attestation_pb);
-  bool ret = fl::server::DistributedMetadataStore::GetInstance().UpdateMetadata(kCtxClientKeyAttestation, pb_data);
-  if (!ret) {
+  auto ret = cache::ClientInfos::GetInstance().AddClientKeyAttestation(fl_id, key_attestation);
+  if (!ret.IsSuccess()) {
     std::string reason = "startFLJob: store key attestation failed";
     MS_LOG(WARNING) << reason;
     BuildStartFLJobRsp(
@@ -230,23 +211,18 @@ bool StartFLJobKernel::StoreKeyAttestation(const std::shared_ptr<FBBuilder> &fbb
 
 bool StartFLJobKernel::Reset() {
   MS_LOG(INFO) << "Starting fl job kernel reset!";
-  StopTimer();
-  DistributedCountService::GetInstance().ResetCounter(name_);
-  DistributedMetadataStore::GetInstance().ResetMetadata(kCtxDeviceMetas);
-  DistributedMetadataStore::GetInstance().ResetMetadata(kCtxClientKeyAttestation);
   return true;
 }
 
-void StartFLJobKernel::OnFirstCountEvent(const std::shared_ptr<fl::core::MessageHandler> &) {
-  iter_next_req_timestamp_ = LongToUlong(CURRENT_TIME_MILLI.count()) + iteration_time_window_;
+void StartFLJobKernel::OnFirstCountEvent() {
+  iter_next_req_timestamp_ = LongToUlong(CURRENT_TIME_MILLI.count()) + iteration_time_window();
   LocalMetaStore::GetInstance().put_value(kCtxIterationNextRequestTimestamp, iter_next_req_timestamp_);
   // The first startFLJob request means a new iteration starts running.
   Iteration::GetInstance().SetIterationRunning();
 }
 
-ResultCode StartFLJobKernel::ReachThresholdForStartFLJob(const std::shared_ptr<FBBuilder> &fbb,
-                                                         const schema::RequestFLJob *start_fl_job_req) {
-  if (DistributedCountService::GetInstance().CountReachThreshold(name_, start_fl_job_req->fl_id()->str())) {
+ResultCode StartFLJobKernel::ReachThresholdForStartFLJob(const std::shared_ptr<FBBuilder> &fbb) {
+  if (DistributedCountService::GetInstance().CountReachThreshold(name_)) {
     std::string reason = "Current amount for startFLJob has reached the threshold. Please startFLJob later.";
     BuildStartFLJobRsp(
       fbb, schema::ResponseCode_OutOfTime, reason, false,
@@ -260,13 +236,13 @@ ResultCode StartFLJobKernel::ReachThresholdForStartFLJob(const std::shared_ptr<F
 DeviceMeta StartFLJobKernel::CreateDeviceMetadata(const schema::RequestFLJob *start_fl_job_req) {
   std::string fl_name = start_fl_job_req->fl_name()->str();
   std::string fl_id = start_fl_job_req->fl_id()->str();
-  int data_size = start_fl_job_req->data_size();
+  auto data_size = start_fl_job_req->data_size();
   MS_LOG(DEBUG) << "DeviceMeta fl_name:" << fl_name << ", fl_id:" << fl_id << ", data_size:" << data_size;
 
   DeviceMeta device_meta;
   device_meta.set_fl_name(fl_name);
   device_meta.set_fl_id(fl_id);
-  device_meta.set_data_size(IntToSize(data_size));
+  device_meta.set_data_size(data_size);
   return device_meta;
 }
 
@@ -275,6 +251,10 @@ ResultCode StartFLJobKernel::ReadyForStartFLJob(const std::shared_ptr<FBBuilder>
   std::string reason = "";
   if (device_meta.data_size() < 1) {
     reason = "FL job data size is not enough.";
+    ret = ResultCode::kFail;
+  }
+  if (device_meta.data_size() > UINT16_MAX) {
+    reason = "FL job data size is too large.";
     ret = ResultCode::kFail;
   }
   if (ret != ResultCode::kSuccess) {
@@ -288,7 +268,7 @@ ResultCode StartFLJobKernel::ReadyForStartFLJob(const std::shared_ptr<FBBuilder>
 
 ResultCode StartFLJobKernel::CountForStartFLJob(const std::shared_ptr<FBBuilder> &fbb,
                                                 const schema::RequestFLJob *start_fl_job_req) {
-  if (!DistributedCountService::GetInstance().Count(name_, start_fl_job_req->fl_id()->str())) {
+  if (!DistributedCountService::GetInstance().Count(name_)) {
     std::string reason =
       "Counting start fl job request failed for fl id " + start_fl_job_req->fl_id()->str() + ", Please retry later.";
     BuildStartFLJobRsp(
@@ -302,9 +282,9 @@ ResultCode StartFLJobKernel::CountForStartFLJob(const std::shared_ptr<FBBuilder>
 
 void StartFLJobKernel::StartFLJob(const std::shared_ptr<FBBuilder> &fbb, const DeviceMeta &,
                                   const schema::RequestFLJob *start_fl_job_req) {
-  size_t last_iteration = LocalMetaStore::GetInstance().curr_iter_num() - 1;
+  size_t last_iteration = cache::InstanceContext::Instance().iteration_num() - 1;
 
-  std::map<std::string, AddressPtr> feature_maps = {};
+  ModelItemPtr model_item = nullptr;
   std::map<std::string, AddressPtr> compress_feature_maps = {};
 
   // Only download compress weights if client support.
@@ -312,9 +292,9 @@ void StartFLJobKernel::StartFLJob(const std::shared_ptr<FBBuilder> &fbb, const D
   schema::CompressType compressType =
     mindspore::fl::compression::CompressExecutor::GetInstance().GetCompressType(download_compress_types);
   if (compressType == schema::CompressType_NO_COMPRESS) {
-    feature_maps = ModelStore::GetInstance().GetModelByIterNum(last_iteration);
-    if (feature_maps.empty()) {
-      MS_LOG(WARNING) << "The feature map for startFLJob is empty.";
+    model_item = ModelStore::GetInstance().GetModelByIterNum(last_iteration);
+    if (model_item == nullptr) {
+      MS_LOG(WARNING) << "The feature map for startFLJob is empty, latest iteration num: " << last_iteration;
     }
   } else {
     if (mindspore::fl::compression::CompressExecutor::GetInstance().EnableCompressWeight(compressType)) {
@@ -324,14 +304,13 @@ void StartFLJobKernel::StartFLJob(const std::shared_ptr<FBBuilder> &fbb, const D
 
   BuildStartFLJobRsp(fbb, schema::ResponseCode_SUCCEED, "success", true,
                      std::to_string(LocalMetaStore::GetInstance().value<uint64_t>(kCtxIterationNextRequestTimestamp)),
-                     feature_maps, compressType, compress_feature_maps);
+                     model_item, compressType, compress_feature_maps);
   return;
 }
 
 void StartFLJobKernel::BuildStartFLJobRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
                                           const std::string &reason, const bool is_selected,
-                                          const std::string &next_req_time,
-                                          const std::map<std::string, AddressPtr> &feature_maps,
+                                          const std::string &next_req_time, const ModelItemPtr &model_item,
                                           const schema::CompressType &compressType,
                                           const std::map<std::string, AddressPtr> &compress_feature_maps) {
   if (fbb == nullptr) {
@@ -363,8 +342,9 @@ void StartFLJobKernel::BuildStartFLJobRsp(const std::shared_ptr<FBBuilder> &fbb,
   auto ds_params = schema::CreateDSParams(*fbb.get(), sign_k, sign_eps, sign_thr_ratio, sign_global_lr, sign_dim_out);
   auto cipher_public_params =
     schema::CreateCipherPublicParams(*fbb.get(), encrypt_type, pw_params, dp_params, ds_params);
+
   schema::CompressType upload_compress_type;
-  if (FLContext::instance()->upload_compress_type() == kDiffSparseQuant) {
+  if (FLContext::instance()->compression_config().upload_compress_type == kDiffSparseQuant) {
     upload_compress_type = schema::CompressType_DIFF_SPARSE_QUANT;
   } else {
     upload_compress_type = schema::CompressType_NO_COMPRESS;
@@ -382,13 +362,15 @@ void StartFLJobKernel::BuildStartFLJobRsp(const std::shared_ptr<FBBuilder> &fbb,
   auto fbs_fl_plan = fl_plan_builder.Finish();
 
   std::vector<flatbuffers::Offset<schema::FeatureMap>> fbs_feature_maps;
-  for (auto feature_map : feature_maps) {
-    MS_LOG(DEBUG) << "Weight_ fullname is " << feature_map.first;
-    auto fbs_weight_fullname = fbb->CreateString(feature_map.first);
-    auto fbs_weight_data =
-      fbb->CreateVector(reinterpret_cast<float *>(feature_map.second->addr), feature_map.second->size / sizeof(float));
-    auto fbs_feature_map = schema::CreateFeatureMap(*(fbb.get()), fbs_weight_fullname, fbs_weight_data);
-    fbs_feature_maps.push_back(fbs_feature_map);
+  if (model_item) {
+    auto weight_data_base = model_item->weight_data.data();
+    for (auto &feature : model_item->weight_items) {
+      auto fbs_weight_fullname = fbb->CreateString(feature.first);
+      auto fbs_weight_data = fbb->CreateVector(reinterpret_cast<float *>(weight_data_base + feature.second.offset),
+                                               feature.second.size / sizeof(float));
+      auto fbs_feature_map = schema::CreateFeatureMap(*(fbb.get()), fbs_weight_fullname, fbs_weight_data);
+      fbs_feature_maps.push_back(fbs_feature_map);
+    }
   }
   auto fbs_feature_maps_vector = fbb->CreateVector(fbs_feature_maps);
 
@@ -401,8 +383,9 @@ void StartFLJobKernel::BuildStartFLJobRsp(const std::shared_ptr<FBBuilder> &fbb,
         continue;
       }
       auto fbs_compress_weight_fullname = fbb->CreateString(compress_feature_map.first);
-      auto fbs_compress_weight_data = fbb->CreateVector(reinterpret_cast<int8_t *>(compress_feature_map.second->addr),
-                                                        compress_feature_map.second->size / sizeof(int8_t));
+      auto fbs_compress_weight_data =
+        fbb->CreateVector(reinterpret_cast<const int8_t *>(compress_feature_map.second->addr),
+                          compress_feature_map.second->size / sizeof(int8_t));
 
       const std::string min_val_name = compress_feature_map.first + "." + kMinVal;
       const std::string max_val_name = compress_feature_map.first + "." + kMaxVal;
@@ -410,8 +393,8 @@ void StartFLJobKernel::BuildStartFLJobRsp(const std::shared_ptr<FBBuilder> &fbb,
       const AddressPtr min_val_ptr = compress_feature_maps.at(min_val_name);
       const AddressPtr max_val_ptr = compress_feature_maps.at(max_val_name);
 
-      float *fbs_min_val_ptr = reinterpret_cast<float *>(min_val_ptr->addr);
-      float *fbs_max_val_ptr = reinterpret_cast<float *>(max_val_ptr->addr);
+      auto fbs_min_val_ptr = reinterpret_cast<const float *>(min_val_ptr->addr);
+      auto fbs_max_val_ptr = reinterpret_cast<const float *>(max_val_ptr->addr);
       auto fbs_compress_feature_map = schema::CreateCompressFeatureMap(
         *(fbb.get()), fbs_compress_weight_fullname, fbs_compress_weight_data, *fbs_min_val_ptr, *fbs_max_val_ptr);
       fbs_compress_feature_maps.push_back(fbs_compress_feature_map);
@@ -422,7 +405,7 @@ void StartFLJobKernel::BuildStartFLJobRsp(const std::shared_ptr<FBBuilder> &fbb,
   schema::ResponseFLJobBuilder rsp_fl_job_builder(*(fbb.get()));
   rsp_fl_job_builder.add_retcode(static_cast<int>(retcode));
   rsp_fl_job_builder.add_reason(fbs_reason);
-  rsp_fl_job_builder.add_iteration(SizeToInt(LocalMetaStore::GetInstance().curr_iter_num()));
+  rsp_fl_job_builder.add_iteration(SizeToInt(cache::InstanceContext::Instance().iteration_num()));
   rsp_fl_job_builder.add_is_selected(is_selected);
   rsp_fl_job_builder.add_next_req_time(fbs_next_req_time);
   rsp_fl_job_builder.add_fl_plan_config(fbs_fl_plan);
@@ -430,7 +413,7 @@ void StartFLJobKernel::BuildStartFLJobRsp(const std::shared_ptr<FBBuilder> &fbb,
   rsp_fl_job_builder.add_download_compress_type(compressType);
   rsp_fl_job_builder.add_compress_feature_map(fbs_compress_feature_maps_vector);
   rsp_fl_job_builder.add_upload_compress_type(upload_compress_type);
-  rsp_fl_job_builder.add_upload_sparse_rate(FLContext::instance()->upload_sparse_rate());
+  rsp_fl_job_builder.add_upload_sparse_rate(FLContext::instance()->compression_config().upload_sparse_rate);
   auto rsp_fl_job = rsp_fl_job_builder.Finish();
   fbb->Finish(rsp_fl_job);
   return;

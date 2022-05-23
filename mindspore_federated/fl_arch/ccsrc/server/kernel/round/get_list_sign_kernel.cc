@@ -26,61 +26,14 @@ namespace mindspore {
 namespace fl {
 namespace server {
 namespace kernel {
-void GetListSignKernel::InitKernel(size_t) {
-  if (LocalMetaStore::GetInstance().has_value(kCtxTotalTimeoutDuration)) {
-    iteration_time_window_ = LocalMetaStore::GetInstance().value<size_t>(kCtxTotalTimeoutDuration);
-  }
-  cipher_init_ = &armour::CipherInit::GetInstance();
-}
+void GetListSignKernel::InitKernel(size_t) { cipher_init_ = &armour::CipherInit::GetInstance(); }
 
 sigVerifyResult GetListSignKernel::VerifySignature(const schema::RequestAllClientListSign *client_list_sign_req) {
-  MS_ERROR_IF_NULL_W_RET_VAL(client_list_sign_req, sigVerifyResult::FAILED);
-  MS_ERROR_IF_NULL_W_RET_VAL(client_list_sign_req->fl_id(), sigVerifyResult::FAILED);
-  MS_ERROR_IF_NULL_W_RET_VAL(client_list_sign_req->timestamp(), sigVerifyResult::FAILED);
-
-  std::string fl_id = client_list_sign_req->fl_id()->str();
-  std::string timestamp = client_list_sign_req->timestamp()->str();
-  int iteration = client_list_sign_req->iteration();
-  std::string iter_str = std::to_string(iteration);
-  auto fbs_signature = client_list_sign_req->signature();
-  std::vector<unsigned char> signature;
-  if (fbs_signature == nullptr) {
-    MS_LOG(ERROR) << "signature in client_list_sign_req is nullptr";
-    return sigVerifyResult::FAILED;
-  }
-  signature.assign(fbs_signature->begin(), fbs_signature->end());
-  std::map<std::string, std::string> key_attestations;
-  const fl::PBMetadata &key_attestations_pb_out =
-    fl::server::DistributedMetadataStore::GetInstance().GetMetadata(kCtxClientKeyAttestation);
-  const fl::KeyAttestation &key_attestation_pb = key_attestations_pb_out.key_attestation();
-  auto iter = key_attestation_pb.key_attestations().begin();
-  for (; iter != key_attestation_pb.key_attestations().end(); ++iter) {
-    (void)key_attestations.emplace(std::pair<std::string, std::string>(iter->first, iter->second));
-  }
-  if (key_attestations.find(fl_id) == key_attestations.end()) {
-    MS_LOG(ERROR) << "can not find key attestation for fl_id: " << fl_id;
-    return sigVerifyResult::FAILED;
-  }
-
-  std::vector<unsigned char> src_data;
-  (void)src_data.insert(src_data.end(), timestamp.begin(), timestamp.end());
-  (void)src_data.insert(src_data.end(), iter_str.begin(), iter_str.end());
-  auto certVerify = CertVerify::GetInstance();
-  unsigned char srcDataHash[SHA256_DIGEST_LENGTH];
-  certVerify.sha256Hash(src_data.data(), SizeToInt(src_data.size()), srcDataHash, SHA256_DIGEST_LENGTH);
-  if (!certVerify.verifyRSAKey(key_attestations[fl_id], srcDataHash, signature.data(), SHA256_DIGEST_LENGTH)) {
-    return sigVerifyResult::FAILED;
-  }
-  if (!certVerify.verifyTimeStamp(fl_id, timestamp)) {
-    return sigVerifyResult::TIMEOUT;
-  }
-  MS_LOG(INFO) << "verify signature for fl_id: " << fl_id << " success.";
-  return sigVerifyResult::PASSED;
+  return VerifySignatureBase(client_list_sign_req);
 }
 
-bool GetListSignKernel::Launch(const uint8_t *req_data, size_t len,
-                               const std::shared_ptr<fl::core::MessageHandler> &message) {
-  size_t iter_num = LocalMetaStore::GetInstance().curr_iter_num();
+bool GetListSignKernel::Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<MessageHandler> &message) {
+  size_t iter_num = cache::InstanceContext::Instance().iteration_num();
   MS_LOG(INFO) << "Launching GetListSign kernel,  Iteration number is " << iter_num;
   std::shared_ptr<FBBuilder> fbb = std::make_shared<FBBuilder>();
   if (fbb == nullptr || req_data == nullptr) {
@@ -153,8 +106,9 @@ bool GetListSignKernel::Launch(const uint8_t *req_data, size_t len,
     SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
     return true;
   }
-  if (!DistributedCountService::GetInstance().Count(name_, fl_id)) {
-    std::string reason = "Counting for get list sign request failed for fl id " + fl_id + ". Please retry later. ";
+  std::string count_reason = "";
+  if (!DistributedCountService::GetInstance().Count(name_)) {
+    std::string reason = "Counting for get list sign request failed. Please retry later. " + count_reason;
     BuildGetListSignKernelRsp(fbb, schema::ResponseCode_OutOfTime, reason, std::to_string(CURRENT_TIME_MILLI.count()),
                               iter_num, list_signs);
     MS_LOG(ERROR) << reason;
@@ -166,34 +120,30 @@ bool GetListSignKernel::Launch(const uint8_t *req_data, size_t len,
 
 bool GetListSignKernel::GetListSign(const size_t cur_iterator, const std::string &next_req_time,
                                     const schema::RequestAllClientListSign *get_list_sign_req,
-                                    const std::shared_ptr<FBBuilder> &fbb) {
+                                    const std::shared_ptr<fl::FBBuilder> &fbb) {
   MS_LOG(INFO) << "CipherMgr::SendClientListSign START";
   std::map<std::string, std::vector<unsigned char>> client_list_signs_empty;
   std::map<std::string, std::vector<unsigned char>> client_list_signs_all;
-  const fl::PBMetadata &clients_sign_pb_out =
-    fl::server::DistributedMetadataStore::GetInstance().GetMetadata(kCtxClientListSigns);
-  const fl::ClientListSign &clients_sign_pb = clients_sign_pb_out.client_list_sign();
-  size_t cur_clients_sign_num = IntToSize(clients_sign_pb.client_list_sign_size());
+  std::unordered_map<std::string, std::string> client_list_sings_strs;
+  auto status = cache::ClientInfos::GetInstance().GetAllClientListSign(&client_list_sings_strs);
+  if (!status.IsSuccess()) {
+    MS_LOG(WARNING) << "Failed to get all client list signatures";
+    BuildGetListSignKernelRsp(fbb, schema::ResponseCode_SucNotReady, "The server is not ready.", next_req_time,
+                              cur_iterator, client_list_signs_empty);
+    return false;
+  }
+  size_t cur_clients_sign_num = client_list_sings_strs.size();
   if (cur_clients_sign_num < cipher_init_->push_list_sign_threshold) {
     MS_LOG(INFO) << "The server is not ready. push_list_sign_needed: " << cipher_init_->push_list_sign_threshold;
-    MS_LOG(INFO) << "now push_sign_client_num: " << clients_sign_pb.client_list_sign_size();
+    MS_LOG(INFO) << "now push_sign_client_num: " << cur_clients_sign_num;
     BuildGetListSignKernelRsp(fbb, schema::ResponseCode_SucNotReady, "The server is not ready.", next_req_time,
                               cur_iterator, client_list_signs_empty);
     return false;
   }
 
-  std::vector<std::string> update_model_clients;
-  const PBMetadata update_model_clients_pb_out =
-    DistributedMetadataStore::GetInstance().GetMetadata(kCtxUpdateModelClientList);
-  const UpdateModelClientList &update_model_clients_pb = update_model_clients_pb_out.client_list();
-  for (size_t i = 0; i < IntToSize(update_model_clients_pb.fl_id_size()); ++i) {
-    update_model_clients.push_back(update_model_clients_pb.fl_id(SizeToInt(i)));
-  }
-
-  auto iter = clients_sign_pb.client_list_sign().begin();
-  for (; iter != clients_sign_pb.client_list_sign().end(); ++iter) {
-    std::vector<unsigned char> signature(iter->second.begin(), iter->second.end());
-    (void)client_list_signs_all.emplace(std::pair<std::string, std::vector<unsigned char>>(iter->first, signature));
+  for (auto &item : client_list_sings_strs) {
+    std::vector<uint8_t> signature(item.second.begin(), item.second.end());
+    (void)client_list_signs_all.emplace(std::pair<std::string, std::vector<uint8_t>>(item.first, signature));
   }
 
   MS_ERROR_IF_NULL_W_RET_VAL(get_list_sign_req, false);
@@ -201,7 +151,8 @@ bool GetListSignKernel::GetListSign(const size_t cur_iterator, const std::string
   std::string fl_id = get_list_sign_req->fl_id()->str();
   if (client_list_signs_all.find(fl_id) == client_list_signs_all.end()) {
     std::string reason;
-    if (find(update_model_clients.begin(), update_model_clients.end(), fl_id) != update_model_clients.end()) {
+    auto has_client = fl::cache::ClientInfos::GetInstance().HasUpdateModelClient(fl_id);
+    if (has_client) {
       reason = "client not send list signature, but in update model client list.";
       BuildGetListSignKernelRsp(fbb, schema::ResponseCode_SUCCEED, reason, next_req_time, cur_iterator,
                                 client_list_signs_all);
@@ -213,28 +164,10 @@ bool GetListSignKernel::GetListSign(const size_t cur_iterator, const std::string
     MS_LOG(WARNING) << reason;
     return false;
   }
-
-  if (client_list_signs_all.find(fl_id) != client_list_signs_all.end()) {
-    // the client has sended signature, return false.
-    std::string reason = "The server has received the request, please do not request again.";
-    MS_LOG(WARNING) << reason;
-    BuildGetListSignKernelRsp(fbb, schema::ResponseCode_SUCCEED, reason, next_req_time, cur_iterator,
-                              client_list_signs_all);
-    return false;
-  }
-
   std::string reason = "send update model client list signature success. ";
   BuildGetListSignKernelRsp(fbb, schema::ResponseCode_SUCCEED, reason, next_req_time, cur_iterator,
                             client_list_signs_all);
   MS_LOG(INFO) << "CipherMgr::Send Client ListSign Success";
-  return true;
-}
-
-bool GetListSignKernel::Reset() {
-  MS_LOG(INFO) << "ITERATION NUMBER IS : " << LocalMetaStore::GetInstance().curr_iter_num();
-  MS_LOG(INFO) << "Get List Signature kernel reset!";
-  DistributedCountService::GetInstance().ResetCounter(name_);
-  StopTimer();
   return true;
 }
 

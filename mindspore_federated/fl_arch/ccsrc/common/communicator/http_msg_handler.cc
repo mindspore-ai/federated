@@ -19,11 +19,10 @@
 
 namespace mindspore {
 namespace fl {
-namespace core {
 HttpMsgHandler::HttpMsgHandler(const std::shared_ptr<HttpMessageHandler> &http_msg, uint8_t *const data, size_t len)
     : http_msg_(http_msg), data_(data), len_(len) {}
 
-void *HttpMsgHandler::data() const {
+const void *HttpMsgHandler::data() const {
   MS_ERROR_IF_NULL_W_RET_VAL(data_, nullptr);
   return data_;
 }
@@ -33,14 +32,15 @@ size_t HttpMsgHandler::len() const { return len_; }
 bool HttpMsgHandler::SendResponse(const void *data, const size_t &len) {
   MS_ERROR_IF_NULL_W_RET_VAL(data, false);
   http_msg_->QuickResponse(kHttpSuccess, data, len);
+  has_sent_response_ = true;
   return true;
 }
 
 bool HttpMsgHandler::SendResponseInference(const void *data, const size_t &len, RefBufferRelCallback cb) {
   MS_ERROR_IF_NULL_W_RET_VAL(data, false);
   http_msg_->QuickResponseInference(kHttpSuccess, data, len, cb);
+  has_sent_response_ = true;
   return true;
 }
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore

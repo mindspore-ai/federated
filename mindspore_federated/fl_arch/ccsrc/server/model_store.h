@@ -24,7 +24,6 @@
 #include <unordered_map>
 #include "common/common.h"
 #include "server/memory_register.h"
-#include "server/executor.h"
 #include "compression/encode_executor.h"
 #include "server/local_meta_store.h"
 
@@ -42,7 +41,7 @@ using CompressTypeMap = std::map<schema::CompressType, std::shared_ptr<MemoryReg
 
 // Server framework use ModelStore to store and query models.
 // ModelStore stores multiple models because worker could get models of the previous iterations.
-class ModelStore {
+class MS_EXPORT ModelStore {
  public:
   static ModelStore &GetInstance() {
     static ModelStore instance;
@@ -50,20 +49,24 @@ class ModelStore {
   }
 
   // Initialize ModelStore with max count of models need to be stored.
-  void Initialize(uint32_t rank_id, uint32_t max_count = 3);
+  void Initialize(const std::vector<InputWeight> &feature_map, uint32_t max_count = 3);
+
+  bool StoreModelByIterNum(size_t iteration, const void *data, size_t len);
 
   // Store the model of the given iteration. The model is acquired from Executor. If the current model count is already
   // max_model_count_, the earliest model will be replaced.
-  void StoreModelByIterNum(size_t iteration, const std::map<std::string, AddressPtr> &model);
+  bool StoreModelByIterNum(size_t iteration, const std::map<std::string, Address> &model);
+  bool StoreModelByIterNum(size_t iteration, const ModelItemPtr &model);
 
   // Get model of the given iteration.
-  std::map<std::string, AddressPtr> GetModelByIterNum(size_t iteration);
+  ModelItemPtr GetModelByIterNum(size_t iteration);
+  std::pair<size_t, ModelItemPtr> GetLatestModel();
 
   // Reset the stored models. Called when federated learning job finishes.
   void Reset();
 
   // Returns all models stored in ModelStore.
-  const std::map<size_t, std::shared_ptr<MemoryRegister>> &iteration_to_model();
+  const std::map<size_t, ModelItemPtr> &iteration_to_model();
 
   // Returns the model size, which could be calculated at the initializing phase.
   size_t model_size() const;
@@ -74,16 +77,16 @@ class ModelStore {
   const std::map<size_t, std::map<schema::CompressType, std::shared_ptr<MemoryRegister>>>
     &iteration_to_compress_model();
 
-  void StoreCompressModelByIterNum(size_t iteration, const std::map<std::string, AddressPtr> &new_model);
+  void StoreCompressModelByIterNum(size_t iteration, const ModelItemPtr &new_model);
 
   static void RelModelResponseCache(const void *data, size_t datalen, void *extra);
-  std::shared_ptr<std::vector<uint8_t>> GetModelResponseCache(const std::string &round_name, size_t cur_iteration_num,
-                                                              size_t model_iteration_num,
-                                                              const std::string &compress_type);
-  std::shared_ptr<std::vector<uint8_t>> StoreModelResponseCache(const std::string &round_name, size_t cur_iteration_num,
-                                                                size_t model_iteration_num,
-                                                                const std::string &compress_type, const void *data,
-                                                                size_t datalen);
+  VectorPtr GetModelResponseCache(const std::string &round_name, size_t cur_iteration_num, size_t model_iteration_num,
+                                  const std::string &compress_type);
+  VectorPtr StoreModelResponseCache(const std::string &round_name, size_t cur_iteration_num, size_t model_iteration_num,
+                                    const std::string &compress_type, const void *data, size_t datalen);
+
+  ModelItemPtr AssignNewModelMemory();
+  ModelItemPtr AllocNewModelItem(size_t model_size);
 
  private:
   ModelStore() : max_model_count_(0), model_size_(0), iteration_to_model_({}), iteration_to_compress_model_({}) {}
@@ -91,46 +94,41 @@ class ModelStore {
   ModelStore(const ModelStore &) = delete;
   ModelStore &operator=(const ModelStore &) = delete;
 
-  void SaveCheckpoint(size_t iteration, const std::map<std::string, AddressPtr> &model);
-
-  // To store multiple models, new memory must assigned. The max memory size assigned for models is max_model_count_ *
-  // model_size_.
-  std::shared_ptr<MemoryRegister> AssignNewModelMemory();
+  void InitModel(const std::vector<InputWeight> &feature_map);
 
   std::shared_ptr<MemoryRegister> AssignNewCompressModelMemory(schema::CompressType compressType,
-                                                               const std::map<std::string, AddressPtr> &model);
-
-  // Calculate the model size. This method should be called after iteration_to_model_ is initialized.
-  size_t ComputeModelSize();
+                                                               const ModelItemPtr &model);
 
   size_t max_model_count_;
   size_t model_size_;
 
   // Initial model which is the model of iteration 0.
-  std::shared_ptr<MemoryRegister> initial_model_;
+  ModelItemPtr initial_model_ = nullptr;
 
   // The number of all models stored is max_model_count_.
   std::mutex model_mtx_;
-  std::map<size_t, std::shared_ptr<MemoryRegister>> iteration_to_model_;
+  std::map<size_t, ModelItemPtr> iteration_to_model_;
 
   // iteration -> (compress type -> compress model)
   std::map<size_t, std::map<schema::CompressType, std::shared_ptr<MemoryRegister>>> iteration_to_compress_model_;
-
-  uint32_t rank_id_;
 
   struct HttpResponseModelCache {
     std::string round_name;  // startFlJob, getModel
     size_t cur_iteration_num = 0;
     size_t model_iteration_num = 0;
-    std::string compress_type = kNoCompress;
+    std::string compress_type = kNoCompressType;
     size_t reference_count = 0;
-    std::shared_ptr<std::vector<uint8_t>> cache = nullptr;
+    VectorPtr cache = nullptr;
   };
   size_t total_add_reference_count = 0;
   size_t total_sub_reference_count = 0;
   std::mutex model_response_cache_lock_;
   std::vector<HttpResponseModelCache> model_response_cache_;
   void OnIterationUpdate();
+
+  std::mutex model_cache_mtx_;
+  // total weight size, ModelItemPtr
+  std::map<size_t, std::vector<ModelItemPtr>> empty_model_cache_;
 };
 }  // namespace server
 }  // namespace fl

@@ -21,21 +21,22 @@
 #include <memory>
 #include <map>
 #include "common/common.h"
+#include "python/feature_py.h"
 #include "common/utils/python_adapter.h"
 
 namespace mindspore {
 namespace fl {
-
 class MS_EXPORT FederatedJob {
  public:
-  static void StartFederatedJob();
-  static bool StartServerAction();
-  static bool StartSchedulerAction();
-  static bool StartFLWorkerAction();
+  static void StartFederatedServer(const std::vector<std::shared_ptr<FeatureItemPy>> &feature_list,
+                                   const py::object &after_stated_callback, const py::object &before_stopped_callback,
+                                   const py::object &on_iteration_end_callback);
+  static void StartFederatedScheduler();
+  static void InitFederatedWorker();
 
   static bool StartFLJob(size_t data_size);
   static py::dict UpdateAndGetModel(std::map<std::string, std::vector<float>> weight_datas);
-  static py::dict PullWeight();
+  static py::dict PullWeight(const std::vector<std::string> &pull_weight_names);
   static bool PushWeight(std::map<std::string, std::vector<float>> &weight_datas);
   static bool PushMetrics(float loss, float accuracy);
 };

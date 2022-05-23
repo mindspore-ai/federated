@@ -14,32 +14,32 @@
  * limitations under the License.
  */
 
- syntax = "proto3";
- package mindspore.fl.datajoin;
+syntax = "proto3";
+package mindspore.fl.datajoin;
 
- enum NodeStatusCode {
-   OK = 0;
-   REGISTER = 1;
-   TERMINATE = 2;
-   NOT_FOUND = 3;
-   ALREADY_EXISTS = 6;
-   PERMISSION_DENIED = 7;
-   RESOURCE_EXHAUSTED = 8;
-   FAILED_PRECONDITION = 9;
-   ABORTED = 10;
-   OUT_OF_RANGE = 11;
-   UNIMPLEMENTED = 12;
-   INTERNAL = 13;
-   UNAVAILABLE = 14;
-   DATA_LOSS = 15;
-   UNAUTHENTICATED = 16;
-   NOT_READY = 17;
-   DO_NOT_USE_RESERVED_FOR_FUTURE_EXPANSION_USE_DEFAULT_IN_SWITCH_INSTEAD_ = 20;
- }
+enum NodeStatusCode {
+  OK = 0;
+  REGISTER = 1;
+  TERMINATE = 2;
+  NOT_FOUND = 3;
+  ALREADY_EXISTS = 6;
+  PERMISSION_DENIED = 7;
+  RESOURCE_EXHAUSTED = 8;
+  FAILED_PRECONDITION = 9;
+  ABORTED = 10;
+  OUT_OF_RANGE = 11;
+  UNIMPLEMENTED = 12;
+  INTERNAL = 13;
+  UNAVAILABLE = 14;
+  DATA_LOSS = 15;
+  UNAUTHENTICATED = 16;
+  NOT_READY = 17;
+  DO_NOT_USE_RESERVED_FOR_FUTURE_EXPANSION_USE_DEFAULT_IN_SWITCH_INSTEAD_ = 20;
+}
 
 
 
- message CountRequest {
-   string name = 1;
-   string id = 2;
- }
+message CountRequest {
+  string name = 1;
+  string id = 2;
+}

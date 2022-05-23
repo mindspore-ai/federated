@@ -109,13 +109,13 @@ void LogWriter::OutputLog(const std::ostringstream &msg) const {
 
 void LogWriter::operator<(const LogStream &stream) const noexcept {
   std::ostringstream msg;
-  msg << stream.sstream_->rdbuf();
+  msg << stream.sstream_.rdbuf();
   OutputLog(msg);
 }
 
 void LogWriter::operator^(const LogStream &stream) const {
   std::ostringstream msg;
-  msg << stream.sstream_->rdbuf();
+  msg << stream.sstream_.rdbuf();
   std::ostringstream oss;
   oss << location_.file_ << ":" << location_.line_ << " " << location_.func_ << "] ";
   oss << msg.str();
@@ -337,9 +337,7 @@ bool ParseLogLevel(const std::string &str_level, MsLogLevel *ptr_level) {
   return false;
 }
 
-static MsLogLevel GetGlobalLogLevel() {
-  return static_cast<MsLogLevel>(FLAGS_v);
-}
+static MsLogLevel GetGlobalLogLevel() { return static_cast<MsLogLevel>(FLAGS_v); }
 
 void InitSubModulesLogLevel() {
   // initialize submodule's log level using global

@@ -26,16 +26,10 @@ namespace mindspore {
 namespace fl {
 namespace server {
 namespace kernel {
-void PushListSignKernel::InitKernel(size_t) {
-  if (LocalMetaStore::GetInstance().has_value(kCtxTotalTimeoutDuration)) {
-    iteration_time_window_ = LocalMetaStore::GetInstance().value<size_t>(kCtxTotalTimeoutDuration);
-  }
-  cipher_init_ = &armour::CipherInit::GetInstance();
-}
+void PushListSignKernel::InitKernel(size_t) { cipher_init_ = &armour::CipherInit::GetInstance(); }
 
-bool PushListSignKernel::Launch(const uint8_t *req_data, size_t len,
-                                const std::shared_ptr<fl::core::MessageHandler> &message) {
-  size_t iter_num = LocalMetaStore::GetInstance().curr_iter_num();
+bool PushListSignKernel::Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<MessageHandler> &message) {
+  size_t iter_num = cache::InstanceContext::Instance().iteration_num();
   MS_LOG(INFO) << "Launching PushListSignKernel, Iteration number is " << iter_num;
   std::shared_ptr<FBBuilder> fbb = std::make_shared<FBBuilder>();
   if (fbb == nullptr || req_data == nullptr) {
@@ -87,7 +81,7 @@ bool PushListSignKernel::Launch(const uint8_t *req_data, size_t len,
 
 bool PushListSignKernel::LaunchForPushListSign(const schema::SendClientListSign *client_list_sign_req,
                                                const size_t &iter_num, const std::shared_ptr<FBBuilder> &fbb,
-                                               const std::shared_ptr<fl::core::MessageHandler> &message) {
+                                               const std::shared_ptr<MessageHandler> &message) {
   MS_ERROR_IF_NULL_W_RET_VAL(client_list_sign_req, false);
   size_t iter_client = IntToSize(client_list_sign_req->iteration());
   if (iter_num != iter_client) {
@@ -99,18 +93,12 @@ bool PushListSignKernel::LaunchForPushListSign(const schema::SendClientListSign 
     SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
     return true;
   }
-  std::vector<std::string> update_model_clients;
-  const PBMetadata update_model_clients_pb_out =
-    DistributedMetadataStore::GetInstance().GetMetadata(kCtxUpdateModelClientList);
-  const UpdateModelClientList &update_model_clients_pb = update_model_clients_pb_out.client_list();
-  for (size_t i = 0; i < IntToSize(update_model_clients_pb.fl_id_size()); ++i) {
-    update_model_clients.push_back(update_model_clients_pb.fl_id(SizeToInt(i)));
-  }
   MS_ERROR_IF_NULL_W_RET_VAL(client_list_sign_req->fl_id(), false);
   std::string fl_id = client_list_sign_req->fl_id()->str();
+  auto found_in_update_model_list = fl::cache::ClientInfos::GetInstance().HasUpdateModelClient(fl_id);
   if (DistributedCountService::GetInstance().CountReachThreshold(name_)) {
     MS_LOG(ERROR) << "Current amount for PushListSignKernel is enough.";
-    if (find(update_model_clients.begin(), update_model_clients.end(), fl_id) != update_model_clients.end()) {
+    if (found_in_update_model_list) {
       // client in get update model client list.
       BuildPushListSignKernelRsp(fbb, schema::ResponseCode_SUCCEED, "Current amount for PushListSignKernel is enough.",
                                  std::to_string(CURRENT_TIME_MILLI.count()), iter_num);
@@ -123,13 +111,14 @@ bool PushListSignKernel::LaunchForPushListSign(const schema::SendClientListSign 
     return true;
   }
   if (!PushListSign(iter_num, std::to_string(CURRENT_TIME_MILLI.count()), client_list_sign_req, fbb,
-                    update_model_clients)) {
+                    found_in_update_model_list)) {
     MS_LOG(ERROR) << "push client list sign failed.";
     SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
     return true;
   }
-  if (!DistributedCountService::GetInstance().Count(name_, fl_id)) {
-    std::string reason = "Counting for push list sign request failed for fl id " + fl_id + ". Please retry later.";
+  std::string count_reason = "";
+  if (!DistributedCountService::GetInstance().Count(name_)) {
+    std::string reason = "Counting for push list sign request failed. Please retry later. " + count_reason;
     BuildPushListSignKernelRsp(fbb, schema::ResponseCode_OutOfTime, reason, std::to_string(CURRENT_TIME_MILLI.count()),
                                iter_num);
     MS_LOG(ERROR) << reason;
@@ -150,58 +139,23 @@ sigVerifyResult PushListSignKernel::VerifySignature(const schema::SendClientList
   int iteration = client_list_sign_req->iteration();
   std::string iter_str = std::to_string(iteration);
   auto fbs_signature = client_list_sign_req->req_signature();
-  std::vector<unsigned char> signature;
-  if (fbs_signature == nullptr) {
-    MS_LOG(ERROR) << "signature in client_list_sign_req is nullptr";
-    return sigVerifyResult::FAILED;
-  }
-  signature.assign(fbs_signature->begin(), fbs_signature->end());
-  std::map<std::string, std::string> key_attestations;
-  const fl::PBMetadata &key_attestations_pb_out =
-    fl::server::DistributedMetadataStore::GetInstance().GetMetadata(kCtxClientKeyAttestation);
-  const fl::KeyAttestation &key_attestation_pb = key_attestations_pb_out.key_attestation();
-  auto iter = key_attestation_pb.key_attestations().begin();
-  for (; iter != key_attestation_pb.key_attestations().end(); ++iter) {
-    (void)key_attestations.emplace(std::pair<std::string, std::string>(iter->first, iter->second));
-  }
-  if (key_attestations.find(fl_id) == key_attestations.end()) {
-    MS_LOG(ERROR) << "can not find key attestation for fl_id: " << fl_id;
-    return sigVerifyResult::FAILED;
-  }
-
-  std::vector<unsigned char> src_data;
-  (void)src_data.insert(src_data.end(), timestamp.begin(), timestamp.end());
-  (void)src_data.insert(src_data.end(), iter_str.begin(), iter_str.end());
-  auto certVerify = CertVerify::GetInstance();
-  unsigned char srcDataHash[SHA256_DIGEST_LENGTH];
-  certVerify.sha256Hash(src_data.data(), SizeToInt(src_data.size()), srcDataHash, SHA256_DIGEST_LENGTH);
-  if (!certVerify.verifyRSAKey(key_attestations[fl_id], srcDataHash, signature.data(), SHA256_DIGEST_LENGTH)) {
-    return sigVerifyResult::FAILED;
-  }
-  if (!certVerify.verifyTimeStamp(fl_id, timestamp)) {
-    return sigVerifyResult::TIMEOUT;
-  }
-  MS_LOG(INFO) << "verify signature for fl_id: " << fl_id << " success.";
-  return sigVerifyResult::PASSED;
+  return VerifySignatureBase(fl_id, {timestamp, iter_str}, fbs_signature, timestamp);
 }
 
 bool PushListSignKernel::PushListSign(const size_t cur_iterator, const std::string &next_req_time,
                                       const schema::SendClientListSign *client_list_sign_req,
-                                      const std::shared_ptr<FBBuilder> &fbb,
-                                      const std::vector<std::string> &update_model_clients) {
+                                      const std::shared_ptr<fl::FBBuilder> &fbb, bool found_in_update_model_clients) {
   MS_LOG(INFO) << "CipherMgr::PushClientListSign START";
-  std::vector<std::string> get_client_list;  // the clients which get update model client list
-  cipher_init_->cipher_meta_storage_.GetClientListFromServer(kCtxGetUpdateModelClientList,
-                                                             &get_client_list);
   MS_ERROR_IF_NULL_W_RET_VAL(client_list_sign_req, false);
   MS_ERROR_IF_NULL_W_RET_VAL(client_list_sign_req->fl_id(), false);
 
   std::string fl_id = client_list_sign_req->fl_id()->str();
-  if (find(get_client_list.begin(), get_client_list.end(), fl_id) == get_client_list.end()) {
+  auto found = cache::ClientInfos::GetInstance().HasGetUpdateModelClient(fl_id);
+  if (!found) {
     // client not in get update model client list.
     std::string reason = "client send signature is not in get update model client list. && client is illegal";
     MS_LOG(WARNING) << reason;
-    if (find(update_model_clients.begin(), update_model_clients.end(), fl_id) != update_model_clients.end()) {
+    if (found_in_update_model_clients) {
       // client in update model client list, client can move to next round
       BuildPushListSignKernelRsp(fbb, schema::ResponseCode_SUCCEED, reason, next_req_time, cur_iterator);
     } else {
@@ -209,15 +163,10 @@ bool PushListSignKernel::PushListSign(const size_t cur_iterator, const std::stri
     }
     return false;
   }
-  std::vector<std::string> send_signs_clients;
-  const fl::PBMetadata &clients_sign_pb_out =
-    fl::server::DistributedMetadataStore::GetInstance().GetMetadata(kCtxClientListSigns);
-  const fl::ClientListSign &clients_sign_pb = clients_sign_pb_out.client_list_sign();
-  auto iter = clients_sign_pb.client_list_sign().begin();
-  for (; iter != clients_sign_pb.client_list_sign().end(); ++iter) {
-    send_signs_clients.push_back(iter->first);
-  }
-  if (find(send_signs_clients.begin(), send_signs_clients.end(), fl_id) != send_signs_clients.end()) {
+
+  std::string client_sign_str;
+  auto status = cache::ClientInfos::GetInstance().GetClientListSign(fl_id, &client_sign_str);
+  if (status.IsSuccess()) {
     // the client has sended signature, return false.
     std::string reason = "The server has received the request, please do not request again.";
     MS_LOG(ERROR) << reason;
@@ -225,17 +174,12 @@ bool PushListSignKernel::PushListSign(const size_t cur_iterator, const std::stri
     return false;
   }
   auto fbs_signature = client_list_sign_req->signature();
-  std::vector<char> signature;
+  std::string signature;
   if (fbs_signature != nullptr) {
     signature.assign(fbs_signature->begin(), fbs_signature->end());
   }
-  fl::PairClientListSign pair_client_list_sign_pb;
-  pair_client_list_sign_pb.set_fl_id(fl_id);
-  pair_client_list_sign_pb.set_signature(signature.data(), signature.size());
-  fl::PBMetadata pb_data;
-  pb_data.mutable_pair_client_list_sign()->MergeFrom(pair_client_list_sign_pb);
-  bool retcode = fl::server::DistributedMetadataStore::GetInstance().UpdateMetadata(kCtxClientListSigns, pb_data);
-  if (!retcode) {
+  status = cache::ClientInfos::GetInstance().AddClientListSign(fl_id, signature);
+  if (!status.IsSuccess()) {
     std::string reason = "store client list signature failed";
     MS_LOG(ERROR) << reason;
     BuildPushListSignKernelRsp(fbb, schema::ResponseCode_OutOfTime, reason, next_req_time, cur_iterator);
@@ -248,11 +192,8 @@ bool PushListSignKernel::PushListSign(const size_t cur_iterator, const std::stri
 }
 
 bool PushListSignKernel::Reset() {
-  MS_LOG(INFO) << "ITERATION NUMBER IS : " << LocalMetaStore::GetInstance().curr_iter_num();
+  MS_LOG(INFO) << "ITERATION NUMBER IS : " << cache::InstanceContext::Instance().iteration_num();
   MS_LOG(INFO) << "Push list sign kernel reset!";
-  DistributedCountService::GetInstance().ResetCounter(name_);
-  DistributedMetadataStore::GetInstance().ResetMetadata(kCtxClientListSigns);
-  StopTimer();
   return true;
 }
 

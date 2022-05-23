@@ -21,6 +21,7 @@ include_directories("${CMAKE_BINARY_DIR}/mindspore_federated" ${CMAKE_BINARY_DIR
 include_directories("fl_arch")
 include_directories("fl_arch/ccsrc")
 include_directories("fl_arch/ccsrc/common")
+include_directories()
 
 set(SERVER_FLATBUFFER_OUTPUT "${CMAKE_BINARY_DIR}/schema")
 set(FBS_FILES
@@ -32,13 +33,11 @@ ms_build_flatbuffers(FBS_FILES ${CMAKE_CURRENT_SOURCE_DIR}../schema generated_fb
 # federated for c++ server and python interface
 file(GLOB_RECURSE FEDERATED_SRC RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
         "fl_arch/ccsrc/armour/*.cc"
-        "fl_arch/ccsrc/common/*.h"
         "fl_arch/ccsrc/common/*.cc"
         "fl_arch/ccsrc/compression/*.cc"
         "fl_arch/ccsrc/scheduler/*.cc"
         "fl_arch/ccsrc/server/*.cc"
-        "fl_arch/ccsrc/worker/*.cc"
-        "fl_arch/ccsrc/python/*.cc")
+        "fl_arch/ccsrc/worker/*.cc")
 
 add_library(federated SHARED ${FEDERATED_SRC})
 
@@ -54,6 +53,9 @@ target_link_libraries(federated PRIVATE mindspore_federated::event_openssl)
 target_link_libraries(federated PRIVATE mindspore_federated::glog)
 target_link_libraries(federated PRIVATE ${SECUREC_LIBRARY})
 target_link_libraries(federated PRIVATE mindspore_federated::flatbuffers)
+target_link_libraries(federated PRIVATE mindspore_federated::hiredis)
+target_link_libraries(federated PRIVATE mindspore_federated::hiredis_ssl)
+
 set_target_properties(federated PROPERTIES SKIP_BUILD_RPATH TRUE)
 
 # python

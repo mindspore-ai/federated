@@ -17,6 +17,7 @@
 #include "armour/cipher/cipher_shares.h"
 #include "common/common.h"
 #include "armour/cipher/cipher_meta_storage.h"
+#include "distributed_cache/client_infos.h"
 
 namespace mindspore {
 namespace fl {
@@ -43,45 +44,37 @@ bool CipherShares::ShareSecrets(const int cur_iterator, const schema::RequestSha
   clock_t start_time = clock();
 
   int iteration = share_secrets_req->iteration();
-  std::vector<std::string> get_keys_clients;
-  cipher_init_->cipher_meta_storage_.GetClientListFromServer(kCtxGetKeysClientList, &get_keys_clients);
-  std::vector<std::string> clients_share_list;
-  cipher_init_->cipher_meta_storage_.GetClientListFromServer(kCtxShareSecretsClientList,
-                                                             &clients_share_list);
-
-  std::map<std::string, std::vector<clientshare_str>> encrypted_shares_all;
-  cipher_init_->cipher_meta_storage_.GetClientSharesFromServer(kCtxClientsEncryptedShares,
-                                                               &encrypted_shares_all);
-
-  MS_LOG(INFO) << "Client of get keys size : " << get_keys_clients.size()
-               << "client of update shares size : " << clients_share_list.size()
-               << "updated shares size: " << encrypted_shares_all.size();
-
   // step 2: update new item to memory server. serialise: update pb struct to memory server.
 
   std::string fl_id_src = share_secrets_req->fl_id()->str();
-  if (find(get_keys_clients.begin(), get_keys_clients.end(), fl_id_src) == get_keys_clients.end()) {
+  auto found = fl::cache::ClientInfos::GetInstance().HasGetKeysClient(fl_id_src);
+  if (!found) {
     // the client not in get keys clients
     BuildShareSecretsRsp(share_secrets_resp_builder, schema::ResponseCode_RequestError,
                          ("client share secret is not in getkeys list. && client is illegal"), next_req_time,
                          iteration);
     return false;
   }
-
-  if (encrypted_shares_all.find(fl_id_src) != encrypted_shares_all.end()) {  // the client is already exists
+  fl::SharesPb shares_pb;
+  auto status = fl::cache::ClientInfos::GetInstance().GetClientEncryptedShare(fl_id_src, &shares_pb);
+  if (status.IsSuccess()) {  // the client is already exists
     BuildShareSecretsRsp(share_secrets_resp_builder, schema::ResponseCode_SUCCEED,
                          ("client sharesecret already exists."), next_req_time, iteration);
     return false;
   }
-
+  if (status != fl::cache::kCacheNil) {
+    BuildShareSecretsRsp(share_secrets_resp_builder, schema::ResponseCode_OutOfTime,
+                         "Get encrypted info from cache failed", next_req_time, iteration);
+    MS_LOG(ERROR) << "CipherShares::Get encrypted info from cache failed";
+    return false;
+  }
   // update new item to memory server.
   const flatbuffers::Vector<flatbuffers::Offset<schema::ClientShare>> *encrypted_shares =
     (share_secrets_req->encrypted_shares());
-  bool retcode_client =
-    cipher_init_->cipher_meta_storage_.UpdateClientToServer(kCtxShareSecretsClientList, fl_id_src);
-  bool retcode_share = cipher_init_->cipher_meta_storage_.UpdateClientShareToServer(
-    kCtxClientsEncryptedShares, fl_id_src, encrypted_shares);
-  if (!(retcode_share && retcode_client)) {
+  auto retcode_client = fl::cache::ClientInfos::GetInstance().AddShareSecretsClient(fl_id_src);
+  bool retcode_share =
+    cipher_init_->cipher_meta_storage_.UpdateClientEncryptedShareToServer(fl_id_src, encrypted_shares);
+  if (!(retcode_share && retcode_client.IsSuccess())) {
     BuildShareSecretsRsp(share_secrets_resp_builder, schema::ResponseCode_OutOfTime,
                          "update client of shares and shares failed", next_req_time, iteration);
     MS_LOG(ERROR) << "CipherShares::ShareSecrets update client of shares and shares failed ";
@@ -95,8 +88,8 @@ bool CipherShares::ShareSecrets(const int cur_iterator, const schema::RequestSha
   return true;
 }
 
-bool CipherShares::GetSecrets(const schema::GetShareSecrets *get_secrets_req,
-                              const std::shared_ptr<FBBuilder> &fbb, const std::string &next_req_time) {
+bool CipherShares::GetSecrets(const schema::GetShareSecrets *get_secrets_req, const std::shared_ptr<FBBuilder> &fbb,
+                              const std::string &next_req_time) {
   MS_LOG(INFO) << "CipherShares::GetSecrets START";
   clock_t start_time = clock();
   // step 0: check whether the parameters are legal.
@@ -113,8 +106,7 @@ bool CipherShares::GetSecrets(const schema::GetShareSecrets *get_secrets_req,
   }
   // step 1: get client list and client shares list from memory server.
   std::map<std::string, std::vector<clientshare_str>> encrypted_shares_all;
-  cipher_init_->cipher_meta_storage_.GetClientSharesFromServer(kCtxClientsEncryptedShares,
-                                                               &encrypted_shares_all);
+  cipher_init_->cipher_meta_storage_.GetClientEncryptedSharesFromServer(&encrypted_shares_all);
   size_t encrypted_shares_num = encrypted_shares_all.size();
   if (cipher_init_->share_secrets_threshold > encrypted_shares_num) {  // the client num is not enough, return false.
     BuildGetSecretsRsp(fbb, schema::ResponseCode_SucNotReady, IntToSize(iteration), next_req_time, nullptr);
@@ -131,9 +123,8 @@ bool CipherShares::GetSecrets(const schema::GetShareSecrets *get_secrets_req,
     return false;
   }
 
-  bool retcode_client =
-    cipher_init_->cipher_meta_storage_.UpdateClientToServer(kCtxGetSecretsClientList, fl_id);
-  if (!retcode_client) {
+  auto retcode_client = fl::cache::ClientInfos::GetInstance().AddGetSecretsClient(fl_id);
+  if (!retcode_client.IsSuccess()) {
     MS_LOG(ERROR) << "update get secrets clients failed";
     BuildGetSecretsRsp(fbb, schema::ResponseCode_SucNotReady, IntToSize(iteration), next_req_time, nullptr);
     return false;
@@ -183,10 +174,9 @@ bool CipherShares::GetSecrets(const schema::GetShareSecrets *get_secrets_req,
   return true;
 }
 
-void CipherShares::BuildGetSecretsRsp(
-  const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode, size_t iteration,
-  const std::string &next_req_time,
-  const std::vector<flatbuffers::Offset<schema::ClientShare>> *encrypted_shares) {
+void CipherShares::BuildGetSecretsRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
+                                      size_t iteration, const std::string &next_req_time,
+                                      const std::vector<flatbuffers::Offset<schema::ClientShare>> *encrypted_shares) {
   int rsp_retcode = retcode;
   int rsp_iteration = SizeToInt(iteration);
   auto rsp_next_req_time = fbb->CreateString(next_req_time);
@@ -211,12 +201,6 @@ void CipherShares::BuildShareSecretsRsp(const std::shared_ptr<FBBuilder> &share_
     schema::CreateResponseShareSecrets(*share_secrets_resp_builder, retcode, rsp_reason, rsp_next_req_time, iteration);
   share_secrets_resp_builder->Finish(share_secrets_rsp);
   return;
-}
-
-void CipherShares::ClearShareSecrets() {
-  fl::server::DistributedMetadataStore::GetInstance().ResetMetadata(kCtxShareSecretsClientList);
-  fl::server::DistributedMetadataStore::GetInstance().ResetMetadata(kCtxClientsEncryptedShares);
-  fl::server::DistributedMetadataStore::GetInstance().ResetMetadata(kCtxGetSecretsClientList);
 }
 }  // namespace armour
 }  // namespace fl

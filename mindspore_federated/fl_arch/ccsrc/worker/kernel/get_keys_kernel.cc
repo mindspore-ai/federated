@@ -22,12 +22,13 @@ namespace worker {
 namespace kernel {
 bool GetKeysKernelMod::Launch() {
   MS_LOG(INFO) << "Launching client GetKeysKernelMod";
-  BuildGetKeysReq(fbb_);
+  FBBuilder fbb;
+  BuildGetKeysReq(&fbb);
 
   std::shared_ptr<std::vector<unsigned char>> get_keys_rsp_msg = nullptr;
-  if (!fl::worker::FLWorker::GetInstance().SendToServer(target_server_rank_, fbb_->GetBufferPointer(), fbb_->GetSize(),
-                                                        fl::core::TcpUserCommand::kGetKeys, &get_keys_rsp_msg)) {
-    MS_LOG(EXCEPTION) << "Sending request for GetKeys to server " << target_server_rank_ << " failed.";
+  if (!fl::worker::Worker::GetInstance().SendToServer(fbb.GetBufferPointer(), fbb.GetSize(),
+                                                      fl::TcpUserCommand::kGetKeys, &get_keys_rsp_msg)) {
+    MS_LOG(EXCEPTION) << "Sending request for GetKeys to server failed.";
     return false;
   }
   if (get_keys_rsp_msg == nullptr) {
@@ -59,32 +60,17 @@ bool GetKeysKernelMod::Launch() {
 }
 
 void GetKeysKernelMod::Init() {
-  fl_id_ = fl::worker::FLWorker::GetInstance().fl_id();
-  server_num_ = fl::worker::FLWorker::GetInstance().server_num();
-  rank_id_ = fl::worker::FLWorker::GetInstance().rank_id();
-  if (rank_id_ == UINT32_MAX) {
-    MS_LOG(EXCEPTION) << "Federated worker is not initialized yet.";
-    return;
-  }
-  if (server_num_ <= 0) {
-    MS_LOG(EXCEPTION) << "Server number should be larger than 0, but got: " << server_num_;
-    return;
-  }
-  target_server_rank_ = rank_id_ % server_num_;
+  fl_id_ = fl::worker::Worker::GetInstance().fl_id();
 
-  MS_LOG(INFO) << "Initializing GetKeys kernel"
-               << ", fl_id: " << fl_id_ << ". Request will be sent to server " << target_server_rank_;
-
-  fbb_ = std::make_shared<FBBuilder>();
-  MS_EXCEPTION_IF_NULL(fbb_);
+  MS_LOG(INFO) << "Initializing GetKeys kernel, fl_id: " << fl_id_;
   MS_LOG(INFO) << "Initialize GetKeys kernel successfully.";
 }
 
-void GetKeysKernelMod::BuildGetKeysReq(const std::shared_ptr<FBBuilder> &fbb) {
+void GetKeysKernelMod::BuildGetKeysReq(FBBuilder *fbb) {
   MS_EXCEPTION_IF_NULL(fbb);
-  int iter = fl::worker::FLWorker::GetInstance().fl_iteration_num();
+  int iter = fl::worker::Worker::GetInstance().fl_iteration_num();
   auto fbs_fl_id = fbb->CreateString(fl_id_);
-  schema::GetExchangeKeysBuilder get_keys_builder(*(fbb.get()));
+  schema::GetExchangeKeysBuilder get_keys_builder(*fbb);
   get_keys_builder.add_fl_id(fbs_fl_id);
   get_keys_builder.add_iteration(iter);
   auto req_fl_job = get_keys_builder.Finish();
@@ -129,7 +115,7 @@ bool GetKeysKernelMod::SavePublicKeyList(
       MS_LOG(INFO) << "Add public keys of client:" << fl_id << " successfully.";
     }
   }
-  fl::worker::FLWorker::GetInstance().set_public_keys_list(saved_remote_public_keys);
+  fl::worker::Worker::GetInstance().set_public_keys_list(saved_remote_public_keys);
   return true;
 }
 }  // namespace kernel

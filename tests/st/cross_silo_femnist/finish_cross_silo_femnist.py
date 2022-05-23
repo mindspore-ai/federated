@@ -13,17 +13,14 @@
 # limitations under the License.
 # ============================================================================
 
-import argparse
+import os
 import subprocess
 
-parser = argparse.ArgumentParser(description="Finish test_cross_silo_femnist.py case")
-parser.add_argument("--scheduler_port", type=int, default=8113)
+cur_dir = os.path.dirname(os.path.abspath(__file__))
 
-args, _ = parser.parse_known_args()
-scheduler_port = args.scheduler_port
-
-cmd = "pid=`ps -ef|grep \"scheduler_port=" + str(scheduler_port) + "\" "
+cmd = "pid=`ps -ef|grep \"yaml_config=" + str(cur_dir) + "\" "
 cmd += " | grep -v \"grep\" | grep -v \"finish\" |awk '{print $2}'` && "
 cmd += "for id in $pid; do kill -9 $id && echo \"killed $id\"; done"
 
+print("cmd: ", cmd)
 subprocess.call(['bash', '-c', cmd])

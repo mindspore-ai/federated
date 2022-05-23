@@ -36,12 +36,10 @@
 #include "common/utils/log_adapter.h"
 #include "common/core/comm_util.h"
 #include "common/constants.h"
-#include "common/core/file_configuration.h"
-#include "python/fl_context.h"
+#include "common/fl_context.h"
 
 namespace mindspore {
 namespace fl {
-namespace core {
 class SSLClient {
  public:
   static SSLClient &GetInstance() {
@@ -59,9 +57,9 @@ class SSLClient {
   void InitSSL();
   void CleanSSL();
 
-  void StartCheckCertTime(const Configuration &config, const X509 *cert);
+  void StartCheckCertTime(uint64_t cert_expire_warning_time_in_day, const X509 *cert);
   void StopCheckCertTime();
-  void InitSSLCtx(const Configuration &config, const X509 *cert, const EVP_PKEY *pkey, std::string ca_path);
+  void InitSSLCtx(const X509 *cert, const EVP_PKEY *pkey, std::string ca_path);
 
   SSL_CTX *ssl_ctx_;
   std::unique_ptr<std::thread> check_time_thread_;
@@ -70,7 +68,6 @@ class SSLClient {
   std::mutex mutex_;
   std::condition_variable cond_;
 };
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_SSL_CLIENT_H_

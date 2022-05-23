@@ -29,7 +29,6 @@
 
 namespace mindspore {
 namespace fl {
-namespace core {
 SSLHTTP::SSLHTTP() : ssl_ctx_(nullptr) { InitSSL(); }
 
 SSLHTTP::~SSLHTTP() { CleanSSL(); }
@@ -57,18 +56,12 @@ void SSLHTTP::InitSSL() {
     MS_LOG(EXCEPTION) << "X509_STORE_set_default_paths failed";
   }
 
-  std::unique_ptr<Configuration> config_ =
-    std::make_unique<FileConfiguration>(FLContext::instance()->config_file_path());
-  MS_EXCEPTION_IF_NULL(config_);
-  if (!config_->Initialize()) {
-    MS_LOG(EXCEPTION) << "The config file is empty.";
-  }
-
+  auto &ssl_config = FLContext::instance()->ssl_config();
   // 1.Parse the server's certificate and the ciphertext of key.
   std::string server_cert = kCertificateChain;
-  std::string path = CommUtil::ParseConfig(*(config_), kServerCertPath);
+  std::string path = ssl_config.server_cert_path;
   if (!CommUtil::IsFileExists(path)) {
-    MS_LOG(EXCEPTION) << "The key:" << kServerCertPath << "'s value is not exist.";
+    MS_LOG(EXCEPTION) << "The file path of server_cert_path " << path << " is not exist.";
   }
   server_cert = path;
 
@@ -103,7 +96,7 @@ void SSLHTTP::InitSSL() {
   if (!CommUtil::verifyCertTimeStamp(cert)) {
     MS_LOG(EXCEPTION) << "Verify Cert Time failed.";
   }
-  std::string default_cipher_list = CommUtil::ParseConfig(*config_, kCipherList);
+  std::string default_cipher_list = ssl_config.cipher_list;
   InitSSLCtx(cert, pkey, default_cipher_list);
   EVP_PKEY_free(pkey);
   X509_free(cert);
@@ -139,6 +132,5 @@ void SSLHTTP::CleanSSL() {
 }
 
 SSL_CTX *SSLHTTP::GetSSLCtx() const { return ssl_ctx_; }
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore

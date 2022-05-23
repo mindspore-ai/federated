@@ -14,37 +14,39 @@
  * limitations under the License.
  */
 
-#include "common/communicator/tcp_msg_handler.h"
+#include "communicator/tcp_msg_handler.h"
 #include <memory>
-#include <utility>
 
 namespace mindspore {
 namespace fl {
-namespace core {
-TcpMsgHandler::TcpMsgHandler(AbstractNode *abstract_node, const std::shared_ptr<fl::core::TcpConnection> &conn,
-                             const std::shared_ptr<MessageMeta> &meta, DataPtr data, size_t size)
-    : abstract_node_(abstract_node), tcp_conn_(conn), meta_(meta), data_(nullptr), len_(size) {
-  data_ptr_ = std::move(data);
-  if (data_ptr_ != nullptr) {
-    data_ = data_ptr_.get();
+TcpMsgHandler::TcpMsgHandler(const std::shared_ptr<TcpConnection> &conn, const MessageMeta &meta, const VectorPtr &data)
+    : tcp_conn_(conn), meta_(meta), data_(data) {}
+
+const void *TcpMsgHandler::data() const {
+  if (data_ == nullptr) {
+    return nullptr;
   }
+  return data_->data();
 }
 
-void *TcpMsgHandler::data() const {
-  MS_ERROR_IF_NULL_W_RET_VAL(data_, nullptr);
-  return data_;
+size_t TcpMsgHandler::len() const {
+  if (data_ == nullptr) {
+    return 0;
+  }
+  return data_->size();
 }
-
-size_t TcpMsgHandler::len() const { return len_; }
 
 bool TcpMsgHandler::SendResponse(const void *data, const size_t &len) {
   MS_ERROR_IF_NULL_W_RET_VAL(tcp_conn_, false);
-  MS_ERROR_IF_NULL_W_RET_VAL(meta_, false);
   MS_ERROR_IF_NULL_W_RET_VAL(data, false);
-  MS_ERROR_IF_NULL_W_RET_VAL(abstract_node_, false);
-  abstract_node_->Response(tcp_conn_, meta_, const_cast<void *>(data), len);
+
+  MS_LOG(DEBUG) << "Response tcp message, this node id:" << meta_.recv_node()
+                << ", request node id: " << meta_.send_node() << ", request id:" << meta_.request_id();
+  if (!tcp_conn_->SendMessage(meta_, Protos::RAW, data, len)) {
+    MS_LOG(WARNING) << "Server response message failed.";
+  }
+  has_sent_response_ = true;
   return true;
 }
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore
