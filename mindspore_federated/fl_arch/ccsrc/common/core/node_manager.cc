@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "node_manager.h"
+#include "common/core/node_manager.h"
 
 namespace mindspore {
 namespace fl {

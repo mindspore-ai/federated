@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "instance_manager.h"
+#include "common/core/instance_manager.h"
 
 namespace mindspore {
 namespace fl {

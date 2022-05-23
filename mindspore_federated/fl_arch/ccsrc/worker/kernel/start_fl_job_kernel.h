@@ -22,6 +22,10 @@
 #include <memory>
 #include "worker/kernel/abstract_kernel.h"
 #include "worker/fl_worker.h"
+#include "python/fl_context.h"
+#include "common/core/comm_util.h"
+#include "common/utils/python_adapter.h"
+#include "server/local_meta_store.h"
 
 namespace mindspore {
 namespace fl {
@@ -32,9 +36,18 @@ class StartFLJobKernelMod : public AbstractKernel {
   StartFLJobKernelMod() = default;
   ~StartFLJobKernelMod() override = default;
 
-  bool Launch(const std::vector<AddressPtr> &inputs) {
-    MS_LOG(INFO) << "Launching client StartFLJobKernelMod";
-    if (!BuildStartFLJobReq(fbb_)) {
+  static std::shared_ptr<StartFLJobKernelMod> GetInstance() {
+    static std::shared_ptr<StartFLJobKernelMod> instance = nullptr;
+    if (instance == nullptr) {
+      instance.reset(new StartFLJobKernelMod());
+      instance->Init();
+    }
+    return instance;
+  }
+
+  bool Launch(size_t data_size) {
+    MS_LOG(INFO)  << "Launching client StartFLJobKernelMod";
+    if (!BuildStartFLJobReq(fbb_, data_size)) {
       MS_LOG(EXCEPTION) << "Building request for StartFLJob failed.";
       return false;
     }
@@ -63,14 +76,14 @@ class StartFLJobKernelMod : public AbstractKernel {
       default:
         MS_LOG(EXCEPTION) << "Launching start fl job for worker failed. Reason: " << start_fl_job_rsp->reason();
     }
-
+    fl::worker::FLWorker::GetInstance().set_data_size(data_size);
     uint64_t iteration = IntToSize(start_fl_job_rsp->iteration());
     fl::worker::FLWorker::GetInstance().set_fl_iteration_num(iteration);
     MS_LOG(INFO) << "Start fl job for iteration " << iteration;
     return true;
   }
 
-  void Init() {
+  void Init() override {
     server_num_ = fl::worker::FLWorker::GetInstance().server_num();
     rank_id_ = fl::worker::FLWorker::GetInstance().rank_id();
     if (rank_id_ == UINT32_MAX) {
@@ -80,40 +93,35 @@ class StartFLJobKernelMod : public AbstractKernel {
     target_server_rank_ = rank_id_ % server_num_;
     fl_name_ = fl::worker::FLWorker::GetInstance().fl_name();
     fl_id_ = fl::worker::FLWorker::GetInstance().fl_id();
-//    data_size_ = LongToInt(common::AnfAlgo::GetNodeAttr<int64_t>(kernel_node, "data_size"));
-//    fl::worker::FLWorker::GetInstance().set_data_size(data_size_);
     MS_LOG(INFO) << "Initializing StartFLJob kernel. fl_name: " << fl_name_ << ", fl_id: " << fl_id_
-                 << ", data_size: " << data_size_ << ". Request will be sent to server " << target_server_rank_;
+                 << ". Request will be sent to server " << target_server_rank_;
 
     fbb_ = std::make_shared<FBBuilder>();
     MS_EXCEPTION_IF_NULL(fbb_);
   }
 
-  void InitKernel() { return; }
-
- protected:
-  void InitSizeLists() { return; }
-
  private:
-  bool BuildStartFLJobReq(const std::shared_ptr<FBBuilder> &fbb) {
+  bool BuildStartFLJobReq(const std::shared_ptr<FBBuilder> &fbb, size_t data_size) {
     MS_EXCEPTION_IF_NULL(fbb);
     auto fbs_fl_name = fbb->CreateString(fl_name_);
     auto fbs_fl_id = fbb->CreateString(fl_id_);
+    auto time = fl::core::CommUtil::GetNowTime();
+    MS_LOG(INFO) << "now time: " << time.time_str_mill;
+    auto fbs_timestamp = fbb->CreateString(std::to_string(time.time_stamp));
     schema::RequestFLJobBuilder req_fl_job_builder(*(fbb.get()));
     req_fl_job_builder.add_fl_name(fbs_fl_name);
     req_fl_job_builder.add_fl_id(fbs_fl_id);
-    req_fl_job_builder.add_data_size(data_size_);
+    req_fl_job_builder.add_data_size(data_size);
+    req_fl_job_builder.add_timestamp(fbs_timestamp);
     auto req_fl_job = req_fl_job_builder.Finish();
     fbb->Finish(req_fl_job);
     return true;
   }
-
   uint32_t rank_id_;
   uint32_t server_num_;
   uint32_t target_server_rank_;
   std::string fl_name_;
   std::string fl_id_;
-  int data_size_;
   std::shared_ptr<FBBuilder> fbb_;
 };
 }  // namespace kernel

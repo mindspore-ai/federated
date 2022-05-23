@@ -17,11 +17,14 @@
 #ifndef MINDSPORE_KEY_AGREEMENT_H
 #define MINDSPORE_KEY_AGREEMENT_H
 
-#ifndef _WIN32
-#include <openssl/dh.h>
-#include <openssl/pem.h>
+#include <event2/util.h>
+#include <openssl/bio.h>
+#include <openssl/err.h>
 #include <openssl/evp.h>
-#endif
+#include <openssl/rand.h>
+#include <openssl/ssl.h>
+#include <openssl/x509.h>
+#include <openssl/hmac.h>
 #include "common/utils/log_adapter.h"
 
 #define KEY_LEN 32
@@ -32,18 +35,14 @@ namespace mindspore {
 namespace fl {
 namespace armour {
 
-#ifdef _WIN32
-class PublicKey {};
-class PrivateKey {};
-#else
-class PublicKey {
+class MS_EXPORT PublicKey {
  public:
   explicit PublicKey(EVP_PKEY *evpKey);
   ~PublicKey();
   EVP_PKEY *evpPubKey;
 };
 
-class PrivateKey {
+class MS_EXPORT PrivateKey {
  public:
   explicit PrivateKey(EVP_PKEY *evpKey);
   ~PrivateKey();
@@ -53,9 +52,8 @@ class PrivateKey {
   int GetPublicBytes(size_t *len, unsigned char *pubKeyBytes) const;
   EVP_PKEY *evpPrivKey;
 };
-#endif
 
-class KeyAgreement {
+class MS_EXPORT KeyAgreement {
  public:
   static PrivateKey *GeneratePrivKey();
   static PublicKey *GeneratePubKey(PrivateKey *privKey);
@@ -64,7 +62,6 @@ class KeyAgreement {
   static int ComputeSharedKey(PrivateKey *privKey, PublicKey *peerPublicKey, int key_len, const unsigned char *salt,
                               int salt_len, unsigned char *exchangeKey);
 };
-
 }  // namespace armour
 }  // namespace fl
 }  // namespace mindspore

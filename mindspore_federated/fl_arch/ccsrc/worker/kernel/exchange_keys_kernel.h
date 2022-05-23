@@ -33,11 +33,8 @@ class ExchangeKeysKernelMod : public AbstractKernel {
   ExchangeKeysKernelMod() = default;
   ~ExchangeKeysKernelMod() override = default;
 
-  bool Launch(const std::vector<AddressPtr> &inputs) override;
-
-  void Init() override;
-
-  void InitKernel() override;
+  void Init();
+  bool Launch();
 
  private:
   bool BuildExchangeKeysReq(const std::shared_ptr<FBBuilder> &fbb);

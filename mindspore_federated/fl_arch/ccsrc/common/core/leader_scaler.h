@@ -24,8 +24,8 @@
 #include <vector>
 
 #include "common/communicator/tcp_client.h"
-#include "node_manager.h"
-#include "node.h"
+#include "common/core/node_manager.h"
+#include "common/core/node.h"
 #include "common/communicator/request_process_result_code.h"
 #include "common/constants.h"
 #include "common/utils/log_adapter.h"

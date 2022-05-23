@@ -19,14 +19,6 @@
 namespace mindspore {
 namespace fl {
 namespace armour {
-#ifdef _WIN32
-int Masking::GetMasking(std::vector<float> *noise, int noise_len, const uint8_t *seed, int seed_len,
-                        const uint8_t *ivec, int ivec_size) {
-  MS_LOG(ERROR) << "Unsupported feature in Windows platform.";
-  return -1;
-}
-
-#else
 int Masking::GetMasking(std::vector<float> *noise, int noise_len, const uint8_t *secret, int secret_len,
                         const uint8_t *ivec, int ivec_size) {
   if ((secret_len != KEY_LENGTH_16 && secret_len != KEY_LENGTH_32) || secret == NULL) {
@@ -57,7 +49,6 @@ int Masking::GetMasking(std::vector<float> *noise, int noise_len, const uint8_t 
   }
   return 0;
 }
-#endif
 }  // namespace armour
 }  // namespace fl
 }  // namespace mindspore

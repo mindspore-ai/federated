@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "node.h"
+#include "common/core/node.h"
 
 namespace mindspore {
 namespace fl {
@@ -78,11 +78,6 @@ bool Node::SendMessageSync(const std::shared_ptr<TcpClient> &client, const std::
   MS_LOG(DEBUG) << "The node role is:" << CommUtil::NodeRoleToString(node_info_.node_role_)
                 << ", the node id is:" << node_info_.node_id_ << " send the request id is:" << request_id;
   return Wait(request_id, timeout);
-}
-
-bool Node::EnableRecovery() const {
-  MS_EXCEPTION_IF_NULL(config_);
-  return config_->Exists(kKeyRecovery);
 }
 
 bool Node::Wait(uint64_t request_id, const uint32_t &timeout) {

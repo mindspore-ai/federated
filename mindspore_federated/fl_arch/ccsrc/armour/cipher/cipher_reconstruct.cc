@@ -31,10 +31,6 @@ bool CipherReconStruct::CombineMask(std::vector<Share *> *shares_tmp,
                                     const std::vector<std::string> &client_list,
                                     const std::map<std::string, std::vector<std::vector<uint8_t>>> &client_ivs) {
   bool retcode = true;
-#ifdef _WIN32
-  MS_LOG(ERROR) << "Unsupported feature in Windows platform.";
-  retcode = false;
-#else
   if (shares_tmp == nullptr || client_noise == nullptr) {
     MS_LOG(ERROR) << "shares_tmp or client_noise is nullptr.";
     return false;
@@ -120,7 +116,6 @@ bool CipherReconStruct::CombineMask(std::vector<Share *> *shares_tmp,
       return false;
     }
   }
-#endif
   return retcode;
 }
 

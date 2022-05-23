@@ -40,7 +40,7 @@ class FusedPullWeightKernelMod : public AbstractKernel {
       : server_num_(0), indices_({}), weight_full_names_({}), fl_iteration_(0), total_iteration_(0) {}
   ~FusedPullWeightKernelMod() override = default;
 
-  bool Launch(const std::vector<AddressPtr> &inputs) {
+  bool Launch() {
     MS_LOG(DEBUG) << "Launch FusedPullWeightKernelMod.";
     if (inputs.size() != weight_full_names_.size()) {
       MS_LOG(EXCEPTION) << "Input number is " << inputs.size() << ", but FusedPullWeightKernelMod needs "
@@ -134,13 +134,6 @@ class FusedPullWeightKernelMod : public AbstractKernel {
     fl::worker::FLWorker::GetInstance().SetIterationRunning();
     return true;
   }
-
-  void Init() override {}
-
-  void InitKernel() override { return; }
-
- protected:
-  void InitSizeLists() { return; }
 
  private:
   template <typename T>

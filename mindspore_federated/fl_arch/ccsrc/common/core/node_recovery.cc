@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "node_recovery.h"
+#include "common/core/node_recovery.h"
 
 namespace mindspore {
 namespace fl {

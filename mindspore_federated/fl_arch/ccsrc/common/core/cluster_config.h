@@ -33,11 +33,11 @@ namespace core {
  * Configuration information read through environment variables and configuration files, generally immutable
  */
 struct ClusterConfig {
-  explicit ClusterConfig(const uint32_t &worker_num, const uint32_t &server_num, std::string scheduler_ip, const uint16_t &scheduler_port)
+  explicit ClusterConfig(const uint32_t &worker_num, const uint32_t &server_num, std::string scheduler_ip,
+                         const uint16_t &scheduler_port)
       : initial_worker_num(worker_num),
         initial_server_num(server_num),
         heartbeat_interval(3),
-        persistent_interval(300),
         scheduler_ip(scheduler_ip),
         scheduler_port(scheduler_port),
         heartbeat_timeout(30),
@@ -55,9 +55,6 @@ struct ClusterConfig {
 
   // The interval for sending heartbeat packets between worker node,server node and scheduler node is 3 seconds.
   uint32_t heartbeat_interval;
-  // Persistent storage time interval, sent by the scheduler to each node that needs persistence at equal intervals of
-  // 300 seconds.
-  uint32_t persistent_interval;
   std::string scheduler_ip;
   uint16_t scheduler_port;
   // The timeout for worker node and server node sending heartbeat packets to scheduler node is 30 seconds.

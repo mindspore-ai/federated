@@ -114,11 +114,6 @@ class FusedPushWeightKernelMod : public AbstractKernel {
 
   void Init() override {}
 
-  void InitKernel() override { return; }
-
- protected:
-  void InitSizeLists() { return; }
-
  private:
   bool BuildPushWeightReq(std::shared_ptr<FBBuilder> fbb, const std::vector<AddressPtr> &weights) {
     std::vector<flatbuffers::Offset<schema::FeatureMap>> fbs_feature_maps;

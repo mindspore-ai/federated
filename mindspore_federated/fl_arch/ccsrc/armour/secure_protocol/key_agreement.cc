@@ -20,34 +20,6 @@
 namespace mindspore {
 namespace fl {
 namespace armour {
-#ifdef _WIN32
-PrivateKey *KeyAgreement::GeneratePrivKey() {
-  MS_LOG(ERROR) << "Unsupported feature in Windows platform.";
-  return NULL;
-}
-
-PublicKey *KeyAgreement::GeneratePubKey(PrivateKey *privKey) {
-  MS_LOG(ERROR) << "Unsupported feature in Windows platform.";
-  return NULL;
-}
-
-PrivateKey *KeyAgreement::FromPrivateBytes(uint8_t *data, int len) {
-  MS_LOG(ERROR) << "Unsupported feature in Windows platform.";
-  return NULL;
-}
-
-PublicKey *KeyAgreement::FromPublicBytes(uint8_t *data, int len) {
-  MS_LOG(ERROR) << "Unsupported feature in Windows platform.";
-  return NULL;
-}
-
-int KeyAgreement::ComputeSharedKey(PrivateKey *privKey, PublicKey *peerPublicKey, int key_len, const uint8_t *salt,
-                                   int salt_len, uint8_t *exchangeKey) {
-  MS_LOG(ERROR) << "Unsupported feature in Windows platform.";
-  return -1;
-}
-
-#else
 PublicKey::PublicKey(EVP_PKEY *evpKey) { evpPubKey = evpKey; }
 
 PublicKey::~PublicKey() { EVP_PKEY_free(evpPubKey); }
@@ -229,7 +201,6 @@ int KeyAgreement::ComputeSharedKey(PrivateKey *privKey, PublicKey *peerPublicKey
   }
   return privKey->Exchange(peerPublicKey, key_len, salt, salt_len, exchangeKey);
 }
-#endif
 }  // namespace armour
 }  // namespace fl
 }  // namespace mindspore

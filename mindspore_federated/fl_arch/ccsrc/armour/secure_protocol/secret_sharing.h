@@ -16,20 +16,15 @@
 
 #ifndef MINDSPORE_SECRET_SHARING_H
 #define MINDSPORE_SECRET_SHARING_H
-#ifndef _WIN32
-#include "openssl/bn.h"
-#endif
 #include <string>
 #include <vector>
+#include "openssl/bn.h"
 #include "common/utils/log_adapter.h"
 #include "common/common.h"
 
 namespace mindspore {
 namespace fl {
 namespace armour {
-#define SECRET_MAX_LEN 32
-#define PRIME_MAX_LEN 33
-
 struct Share {
   unsigned int index;
   unsigned char *data;
@@ -37,7 +32,6 @@ struct Share {
   ~Share();
 };
 
-#ifndef _WIN32
 void secure_zero(uint8_t *s, size_t);
 int GetPrime(BIGNUM *prim);
 
@@ -67,8 +61,6 @@ class SecretSharing {
   bool GetShare(BIGNUM *x, BIGNUM *share, Share *s_share);
   void FreeBNVector(std::vector<BIGNUM *> bns);
 };
-#endif
-
 }  // namespace armour
 }  // namespace fl
 }  // namespace mindspore

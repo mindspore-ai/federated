@@ -17,9 +17,7 @@
 #ifndef MINDSPORE_ARMOUR_ENCRYPT_H
 #define MINDSPORE_ARMOUR_ENCRYPT_H
 
-#ifndef _WIN32
 #include <openssl/evp.h>
-#endif
 #include "common/utils/log_adapter.h"
 
 #define AES_IV_SIZE 16
@@ -54,7 +52,6 @@ class AESEncrypt : public SymmetricEncrypt {
   int evp_aes_decrypt(const uint8_t *encrypt_data, const int len, const uint8_t *key, const uint8_t *ivec,
                       uint8_t *decrypt_data, int *decrypt_len) const;
 };
-
 }  // namespace armour
 }  // namespace fl
 }  // namespace mindspore

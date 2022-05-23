@@ -18,14 +18,12 @@
 #define MINDSPORE_CCSRC_FL_SERVER_CERT_VERIFY_H
 
 #include <assert.h>
-#ifndef _WIN32
 #include <openssl/evp.h>
 #include <openssl/rsa.h>
 #include <openssl/x509v3.h>
 #include <openssl/err.h>
 #include <openssl/pem.h>
 #include <openssl/sha.h>
-#endif
 #include <iostream>
 #include <fstream>
 #include <string>

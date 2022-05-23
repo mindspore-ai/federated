@@ -23,7 +23,7 @@ namespace kernel {
 constexpr int iv_vec_len = 16;
 constexpr int salt_len = 32;
 
-bool ExchangeKeysKernelMod::Launch(const std::vector<AddressPtr> &inputs) {
+bool ExchangeKeysKernelMod::Launch() {
   MS_LOG(INFO) << "Launching client ExchangeKeysKernelMod";
   if (!BuildExchangeKeysReq(fbb_)) {
     MS_LOG(EXCEPTION) << "Building request for ExchangeKeys failed.";
@@ -81,8 +81,6 @@ void ExchangeKeysKernelMod::Init() {
   MS_EXCEPTION_IF_NULL(fbb_);
   MS_LOG(INFO) << "Initialize ExchangeKeys kernel successfully.";
 }
-
-void ExchangeKeysKernelMod::InitKernel() { return; }
 
 bool ExchangeKeysKernelMod::BuildExchangeKeysReq(const std::shared_ptr<FBBuilder> &fbb) {
   MS_EXCEPTION_IF_NULL(fbb);

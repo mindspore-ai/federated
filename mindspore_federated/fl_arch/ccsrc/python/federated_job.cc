@@ -21,10 +21,15 @@
 #include "worker/fl_worker.h"
 #include "scheduler/scheduler.h"
 #include "python/fl_context.h"
+#include "worker/kernel/start_fl_job_kernel.h"
+#include "worker/kernel/update_model_kernel.h"
+#include "worker/kernel/get_model_kernel.h"
 
 namespace mindspore {
 namespace fl {
-
+using StartFLJobKernelMod = worker::kernel::StartFLJobKernelMod;
+using UpdateModelKernelMod = worker::kernel::UpdateModelKernelMod;
+using GetModelKernelMod = worker::kernel::GetModelKernelMod;
 void FederatedJob::StartFederatedJob() {
   bool result = false;
   if (FLContext::instance()->is_server()) {
@@ -92,26 +97,30 @@ bool FederatedJob::StartServerAction() {
     rounds_config.push_back({"getKeys", true, cipher_time_window, true, get_keys_threshold});
   }
   CipherConfig cipher_config = {share_secrets_ratio,     cipher_time_window,
-                                            exchange_keys_threshold, get_keys_threshold,
-                                            share_secrets_threshold, get_secrets_threshold,
-                                            client_list_threshold,   push_list_sign_threshold,
-                                            get_list_sign_threshold, minimum_clients_for_reconstruct};
+                                exchange_keys_threshold, get_keys_threshold,
+                                share_secrets_threshold, get_secrets_threshold,
+                                client_list_threshold,   push_list_sign_threshold,
+                                get_list_sign_threshold, minimum_clients_for_reconstruct};
 
   size_t executor_threshold = update_model_threshold;
-  server::Server::GetInstance().Initialize(true, true, FLContext::instance()->fl_server_port(), rounds_config, cipher_config,
-                                                 executor_threshold);
+  server::Server::GetInstance().Initialize(true, true, FLContext::instance()->fl_server_port(), rounds_config,
+                                           cipher_config, executor_threshold);
   server::Server::GetInstance().Run();
   return true;
 }
 
+bool FederatedJob::StartSchedulerAction() { return Scheduler::GetInstance().Run(); }
 
-bool FederatedJob::StartSchedulerAction() {
-  return Scheduler::GetInstance().Run();
-}
+bool FederatedJob::StartFLWorkerAction() { return worker::FLWorker::GetInstance().Run(); }
 
-bool FederatedJob::StartFLWorkerAction() {
-  return worker::FLWorker::GetInstance().Run();
+bool FederatedJob::StartFLJob(size_t data_size) { return StartFLJobKernelMod::GetInstance()->Launch(data_size); }
+
+py::dict FederatedJob::UpdateAndGetModel(std::map<std::string, std::vector<float>> weight_datas) {
+  py::dict dict_data;
+  if (!UpdateModelKernelMod::GetInstance()->Launch(weight_datas)) {
+    return dict_data;
+  }
+  return GetModelKernelMod::GetInstance()->Launch();
 }
 }  // namespace fl
 }  // namespace mindspore
-

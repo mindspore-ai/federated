@@ -196,7 +196,7 @@ def _set_fl_context(kwargs):
         if key not in _set_fl_context_func_map:
             raise ValueError("Set PS context keyword %s is not recognized!" % key)
         logger.info("FL context key is {}, value is {}".format(key, value))
-        if key == "checkpoint_dir" and kwargs["ms_role"] == "MS_SERVER":
+        if key == "checkpoint_dir" and (kwargs["ms_role"] == "MS_SERVER" or kwargs["ms_role"] == "MS_WORKER"):
             checkpoint_dir = kwargs["checkpoint_dir"]
             if (os.path.exists(checkpoint_dir)):
                 for checkpoint_file in os.listdir(checkpoint_dir):
@@ -211,18 +211,17 @@ def _set_fl_context(kwargs):
             weight_datas = list()
             weight_shapes = list()
             weight_types = list()
-            for key, value in param_dict.items():
-                weight_fullnames.append(key)
-                weight_np = value.asnumpy()
+            for param_name, param_value in param_dict.items():
+                weight_fullnames.append(param_name)
+                weight_np = param_value.asnumpy()
                 weight_shapes.append(list(weight_np.shape))
                 weight_datas.append(weight_np.reshape(-1).tolist())
-                weight_types.append(str(weight_np.dtype))
-                logger.info("Weight fullname is {}".format(key))
+                weight_types.append(str(weight_np.dtype).title())
+                logger.info("Weight fullname is {}".format(param_name))
             set_func = _set_fl_context_func_map["feature_maps"]
             set_func(weight_fullnames, weight_datas, weight_shapes, weight_types)
-        else:
-            set_func = _set_fl_context_func_map[key]
-            set_func(value)
+        set_func = _set_fl_context_func_map[key]
+        set_func(value)
 
 
 def _get_fl_context(attr_key):

@@ -29,8 +29,8 @@
 #include "common/communicator/communicator_base.h"
 #include "common/communicator/message.h"
 #include "common/communicator/task_executor.h"
-#include "follower_scaler.h"
-#include "node.h"
+#include "common/core/follower_scaler.h"
+#include "common/core/node.h"
 #include "common/core/node_info.h"
 #include "common/core/recovery_base.h"
 
@@ -53,7 +53,6 @@ class AbstractNode : public Node {
         is_current_node_scale_in_(false),
         follower_scaler_(nullptr),
         node_recovery_(nullptr),
-        persistent_state_(PersistentState::NOT_ENABLE_PERSIST),
         scheduler_ip_(""),
         scheduler_port_(0),
         is_recover(false) {}
@@ -127,9 +126,6 @@ class AbstractNode : public Node {
   void RegisterFollowerScalerHandlerAfterScaleIn(const std::string &module, const HandlerAfterScaleIn &handler);
 
   std::string node_scale_state_str();
-
-  PersistentState persistent_state() const;
-  void set_persistent_state(PersistentState persistent_state);
 
   uint32_t worker_num() const;
   uint32_t server_num() const;
@@ -322,10 +318,6 @@ class AbstractNode : public Node {
 
   // Recovery for worker/server node.
   std::unique_ptr<RecoveryBase> node_recovery_;
-
-  // The state of the persistent storage, such as ready to be persisted, in the process of being persisted, has
-  // completed the persistence, etc.
-  std::atomic<PersistentState> persistent_state_;
 
   // The ip of scheduler.
   std::string scheduler_ip_;

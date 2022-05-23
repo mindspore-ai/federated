@@ -25,7 +25,6 @@ void secure_zero(uint8_t *s, size_t n) {
     while (n--) *p++ = '\0';
 }
 
-#ifndef _WIN32
 int GetPrime(BIGNUM *prim) {
   constexpr int byteBits = 8;
   const int max_prime_len = SECRET_MAX_LEN + 1;
@@ -248,7 +247,6 @@ int SecretSharing::Combine(size_t k, const std::vector<Share *> &shares, uint8_t
   FreeBNVector(nums);
   return ret;
 }
-#endif
 }  // namespace armour
 }  // namespace fl
 }  // namespace mindspore

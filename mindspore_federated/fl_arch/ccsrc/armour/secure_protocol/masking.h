@@ -24,8 +24,7 @@
 namespace mindspore {
 namespace fl {
 namespace armour {
-
-class Masking {
+class MS_EXPORT Masking {
  public:
   static int GetMasking(std::vector<float> *noise, int noise_len, const uint8_t *secret, int secret_len,
                         const uint8_t *ivec, int ivec_size);
