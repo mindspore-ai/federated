@@ -21,38 +21,43 @@
 #include <string>
 #include <memory>
 #include <functional>
+#include <map>
 
 #include "worker/fl_worker.h"
 #include "armour/secure_protocol/masking.h"
+#include "common/core/comm_util.h"
 
 namespace mindspore {
 namespace fl {
 namespace worker {
 namespace kernel {
-constexpr int SECRET_MAX_LEN = 32;
 class UpdateModelKernelMod : public AbstractKernel {
  public:
   UpdateModelKernelMod() = default;
   ~UpdateModelKernelMod() override = default;
 
-  bool Launch(const std::vector<AddressPtr> &inputs) {
-    MS_LOG(INFO) << "Launching client UpdateModelKernelMod";
-    if (inputs.size() != weight_full_names_.size()) {
-      MS_LOG(EXCEPTION) << "Input number of UpdateModelKernelMod should be " << weight_full_names_.size()
-                        << ", but got " << inputs.size();
-      return false;
+  static std::shared_ptr<UpdateModelKernelMod> GetInstance() {
+    static std::shared_ptr<UpdateModelKernelMod> instance = nullptr;
+    if (instance == nullptr) {
+      instance.reset(new UpdateModelKernelMod());
+      instance->Init();
     }
+    return instance;
+  }
 
-    if (!WeightingData(inputs)) {
+  bool Launch(std::map<std::string, std::vector<float>> &weight_datas) {
+    MS_LOG(INFO) << "Launching client UpdateModelKernelMod";
+
+    if (!WeightingData(weight_datas)) {
       MS_LOG(EXCEPTION) << "Weighting data with data_size failed.";
       return false;
     }
 
-    if (encrypt_mode.compare("STABLE_PW_ENCRYPT") == 0) {
-      EncryptData(inputs);
+    if (encrypt_type_.compare("STABLE_PW_ENCRYPT") == 0) {
+      EncryptData(weight_datas);
     }
 
-    if (!BuildUpdateModelReq(fbb_, inputs)) {
+    if (!BuildUpdateModelReq(fbb_, weight_datas)) {
       MS_LOG(EXCEPTION) << "Building request for FusedPushWeight failed.";
       return false;
     }
@@ -98,15 +103,20 @@ class UpdateModelKernelMod : public AbstractKernel {
     target_server_rank_ = rank_id_ % server_num_;
     fl_name_ = fl::worker::FLWorker::GetInstance().fl_name();
     fl_id_ = fl::worker::FLWorker::GetInstance().fl_id();
-    encrypt_mode = AnfAlgo::GetNodeAttr<string>(kernel_node, "encrypt_mode");
-    if (encrypt_mode.compare("") != 0 && encrypt_mode.compare("STABLE_PW_ENCRYPT") != 0) {
-      MS_LOG(EXCEPTION) << "Value Error: the parameter 'encrypt_mode' of updateModel kernel can only be '' or "
-                           "'STABLE_PW_ENCRYPT' until now, but got: "
-                        << encrypt_mode;
+    data_size_ = fl::worker::FLWorker::GetInstance().data_size();
+    encrypt_type_ = fl::worker::FLWorker::GetInstance().encrypt_type();
+    auto &feature_maps = FLContext::instance()->feature_maps();
+    for (const auto &item : feature_maps) {
+      weight_full_names_.push_back(item.first);
     }
-    MS_LOG(INFO) << "Initializing StartFLJob kernel. fl_name: " << fl_name_ << ", fl_id: " << fl_id_
-                 << ". Request will be sent to server " << target_server_rank_;
-    if (encrypt_mode.compare("STABLE_PW_ENCRYPT") == 0) {
+    if (encrypt_type_.compare("NOT_ENCRYPT") != 0 && encrypt_type_.compare("STABLE_PW_ENCRYPT") != 0) {
+      MS_LOG(EXCEPTION)
+        << "Value Error: the parameter 'encrypt_type' of updateModel kernel can only be 'NOT_ENCRYPT' or "
+           "'STABLE_PW_ENCRYPT' until now, but got: "
+        << encrypt_type_;
+    }
+
+    if (encrypt_type_.compare("STABLE_PW_ENCRYPT") == 0) {
       MS_LOG(INFO) << "STABLE_PW_ENCRYPT mode is open, model weights will be encrypted before send to server.";
       client_keys = fl::worker::FLWorker::GetInstance().public_keys_list();
       if (client_keys.size() == 0) {
@@ -114,25 +124,28 @@ class UpdateModelKernelMod : public AbstractKernel {
                              "and P.GetKeys() have been executed before updateModel.";
       }
     }
-    output_size_list_.push_back(sizeof(float));
+    MS_LOG(INFO) << "Initializing StartFLJob kernel. fl_name: " << fl_name_ << ", fl_id: " << fl_id_
+                 << ". Request will be sent to server " << target_server_rank_ << ", Encrypt type: " << encrypt_type_
+                 << ", Weight full names: " << weight_full_names_;
   }
 
-  void InitKernel() { return; }
-
- protected:
-  void InitSizeLists() { return; }
-
  private:
-  bool BuildUpdateModelReq(const std::shared_ptr<FBBuilder> &fbb, const std::vector<AddressPtr> &weights) {
+  bool BuildUpdateModelReq(const std::shared_ptr<FBBuilder> &fbb,
+                           std::map<std::string, std::vector<float>> &weight_datas) {
     MS_EXCEPTION_IF_NULL(fbb_);
     auto fbs_fl_name = fbb->CreateString(fl_name_);
     auto fbs_fl_id = fbb->CreateString(fl_id_);
+    auto time = fl::core::CommUtil::GetNowTime();
+    MS_LOG(INFO) << "now time: " << time.time_str_mill;
+    auto fbs_timestamp = fbb->CreateString(std::to_string(time.time_stamp));
     std::vector<flatbuffers::Offset<schema::FeatureMap>> fbs_feature_maps;
     for (size_t i = 0; i < weight_full_names_.size(); i++) {
       const std::string &weight_name = weight_full_names_[i];
       auto fbs_weight_fullname = fbb->CreateString(weight_name);
-      auto fbs_weight_data =
-        fbb->CreateVector(reinterpret_cast<const float *>(weights[i]->addr), weights[i]->size / sizeof(float));
+      auto &weight_data = weight_datas[weight_name];
+      float weights[weight_data.size()];
+      std::copy(weight_data.begin(), weight_data.end(), weights);
+      auto fbs_weight_data = fbb->CreateVector(reinterpret_cast<const float *>(weights), weight_data.size());
       auto fbs_feature_map = schema::CreateFeatureMap(*(fbb.get()), fbs_weight_fullname, fbs_weight_data);
       fbs_feature_maps.push_back(fbs_feature_map);
     }
@@ -141,6 +154,7 @@ class UpdateModelKernelMod : public AbstractKernel {
     schema::RequestUpdateModelBuilder req_update_model_builder(*(fbb.get()));
     req_update_model_builder.add_fl_name(fbs_fl_name);
     req_update_model_builder.add_fl_id(fbs_fl_id);
+    req_update_model_builder.add_timestamp(fbs_timestamp);
     iteration_ = fl::worker::FLWorker::GetInstance().fl_iteration_num();
     req_update_model_builder.add_iteration(SizeToInt(iteration_));
     req_update_model_builder.add_feature_map(fbs_feature_maps_vector);
@@ -149,22 +163,21 @@ class UpdateModelKernelMod : public AbstractKernel {
     return true;
   }
 
-  bool WeightingData(const std::vector<AddressPtr> &inputs) {
-    data_size_ = fl::worker::FLWorker::GetInstance().data_size();
-    for (auto &input : inputs) {
-      float *data = reinterpret_cast<float *>(input->addr);
-      for (size_t i = 0; i < input->size / sizeof(float); i++) {
+  bool WeightingData(std::map<std::string, std::vector<float>> &weight_datas) {
+    for (auto &item : weight_datas) {
+      auto &data = item.second;
+      for (size_t i = 0; i < data.size(); i++) {
         data[i] *= data_size_;
       }
     }
     return true;
   }
 
-  void EncryptData(const std::vector<AddressPtr> &inputs) {
+  void EncryptData(std::map<std::string, std::vector<float>> &weight_datas) {
     // calculate the sum of all layer's weight size
     size_t total_size = 0;
     for (size_t i = 0; i < weight_full_names_.size(); i++) {
-      total_size += (inputs[i]->size / sizeof(float));
+      total_size += weight_datas[weight_full_names_[i]].size();
     }
     // get pairwise encryption noise vector
     std::vector<float> noise_vector = GetEncryptNoise(total_size);
@@ -174,8 +187,8 @@ class UpdateModelKernelMod : public AbstractKernel {
     for (size_t i = 0; i < weight_full_names_.size(); i++) {
       const std::string &weight_name = weight_full_names_[i];
       MS_LOG(INFO) << "Encrypt weights of layer: " << weight_name;
-      size_t weights_size = inputs[i]->size / sizeof(float);
-      float *original_data = reinterpret_cast<float *>(inputs[i]->addr);
+      auto &original_data = weight_datas[weight_name];
+      size_t weights_size = original_data.size();
       for (size_t j = 0; j < weights_size; j++) {
         original_data[j] += noise_vector[j + encrypt_num];
       }
@@ -248,8 +261,8 @@ class UpdateModelKernelMod : public AbstractKernel {
   int data_size_;
   uint64_t iteration_;
   std::vector<std::string> weight_full_names_;
-  std::string encrypt_mode;
   std::vector<EncryptPublicKeys> client_keys;
+  std::string encrypt_type_;
 };
 }  // namespace kernel
 }  // namespace worker

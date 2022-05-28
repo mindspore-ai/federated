@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "follower_scaler.h"
+#include "common/core/follower_scaler.h"
 #include "common/communicator/tcp_communicator.h"
 
 namespace mindspore {

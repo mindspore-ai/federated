@@ -14,7 +14,6 @@
 # ============================================================================
 """Interface for start up single core servable"""
 
-from mindspore_federated.python import log as logger
 from mindspore_federated.python.common import _fl_context
 from mindspore_federated._mindspore_federated import Federated_
 

@@ -74,20 +74,6 @@ enum NodeRole {
   SCHEDULER = 2;
 }
 
-enum PersistentCommand {
-  DEFAULT = 0;
-  PREPARE_PERSIST = 1;
-  BEGIN_PERSIST = 2;
-}
-
-enum PersistentState {
-  NOT_ENABLE_PERSIST = 0;
-  PREPARING_PERSIST = 1;
-  READY_PERSIST = 2;
-  PERSISTING = 3;
-  FINISH_PERSIST = 4;
-}
-
 message CollectiveMessageMeta {
   bool enable_flag = 1;
   uint32 send_rank_id = 2;
@@ -137,7 +123,6 @@ message RegisterRespMessage {
 message HeartbeatMessage {
   // the current Node unique id:0,1,2...
   string node_id = 1;
-  PersistentState persistent_state = 2;
   bool has_address = 3;
   string ip = 4;
   uint32 port = 5;
@@ -175,7 +160,6 @@ message HeartbeatRespMessage {
   ClusterState cluster_state = 1;
   repeated ServersMeta servers_meta = 2;
   bool is_worker = 3;
-  PersistentCommand persistent_cmd = 5;
 }
 
 message FetchServersMessage {
@@ -193,7 +177,6 @@ message ServersMeta {
   bool is_alive = 4;
   NodeRole role = 5;
   string node_id = 6;
-  PersistentState persistent_state = 7;
 }
 
 message SendMetadataMessage {

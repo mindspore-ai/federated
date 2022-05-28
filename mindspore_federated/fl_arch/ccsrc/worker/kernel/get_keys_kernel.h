@@ -23,6 +23,7 @@
 #include "worker/kernel/abstract_kernel.h"
 #include "worker/fl_worker.h"
 #include "armour/secure_protocol/key_agreement.h"
+#include "common/core/comm_util.h"
 
 namespace mindspore {
 namespace fl {
@@ -33,11 +34,8 @@ class GetKeysKernelMod : public AbstractKernel {
   GetKeysKernelMod() = default;
   ~GetKeysKernelMod() override = default;
 
-  bool Launch(const std::vector<AddressPtr> &inputs) override;
-
   void Init() override;
-
-  void InitKernel() override;
+  bool Launch();
 
  private:
   void BuildGetKeysReq(const std::shared_ptr<FBBuilder> &fbb);

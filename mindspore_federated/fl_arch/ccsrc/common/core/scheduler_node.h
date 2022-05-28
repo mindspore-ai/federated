@@ -32,16 +32,16 @@
 #include "python/fl_context.h"
 #include "common/communicator/tcp_client.h"
 #include "common/communicator/tcp_server.h"
-#include "node_manager.h"
-#include "node.h"
+#include "common/core/node_manager.h"
+#include "common/core/node.h"
 #include "common/communicator/request_process_result_code.h"
 #include "common/communicator/http_message_handler.h"
 #include "common/constants.h"
 #include "common/core/cluster_metadata.h"
 #include "common/communicator/http_server.h"
-#include "leader_scaler.h"
+#include "common/core/leader_scaler.h"
 #include "common/core/recovery_base.h"
-#include "instance_manager.h"
+#include "common/core/instance_manager.h"
 
 namespace mindspore {
 namespace fl {
@@ -52,15 +52,13 @@ class SchedulerNode : public Node {
       : server_(nullptr),
         scheduler_thread_(nullptr),
         update_state_thread_(nullptr),
-        update_persistent_cmd_thread_(nullptr),
         restful_thread_(nullptr),
         http_server_(nullptr),
         client_thread_(nullptr),
         is_client_started_(false),
         leader_scaler_(nullptr),
-        scheduler_recovery_(nullptr),
-        persistent_cmd_(PersistentCommand::DEFAULT) {}
-  ~SchedulerNode() override;
+        scheduler_recovery_(nullptr) {}
+  ~SchedulerNode();
 
   typedef void (SchedulerNode::*ResponseHandler)(const std::shared_ptr<TcpServer> &server,
                                                  const std::shared_ptr<TcpConnection> &conn,
@@ -77,8 +75,6 @@ class SchedulerNode : public Node {
   void InitCommandHandler();
   void CreateTcpServer();
   void StartUpdateClusterStateTimer();
-  // Persistent timer, periodically trigger persistent behavior.
-  void StartUpdatePersistentCommandTimer();
 
   virtual void InitEventTxtFile();
 
@@ -107,10 +103,6 @@ class SchedulerNode : public Node {
   // Process failure event message from other nodes.
   void ProcessFailureEvent(const std::shared_ptr<TcpServer> &server, const std::shared_ptr<TcpConnection> &conn,
                            const std::shared_ptr<MessageMeta> &meta, const void *data, size_t size);
-
-  // Determine whether the registration request of the node should be rejected, the registration of the
-  // alive node should be rejected.
-  virtual bool NeedRejectRegister(const NodeInfo &node_info) { return false; }
 
   // After scheduler collects all registered message, it actively sends finish to the node connected by the client.
   void SendMetadata(const std::shared_ptr<TcpClient> &client, uint32_t rank_id);
@@ -195,9 +187,6 @@ class SchedulerNode : public Node {
   std::shared_ptr<TcpServer> server_;
   std::unique_ptr<std::thread> scheduler_thread_;
   std::unique_ptr<std::thread> update_state_thread_;
-  std::unique_ptr<std::thread> update_persistent_cmd_thread_;
-  std::condition_variable persistent_cmd_cv_;
-  std::mutex persistent_cmd_mutex_;
 
   mindspore::HashMap<NodeCommand, ResponseHandler> handlers_;
 
@@ -219,8 +208,6 @@ class SchedulerNode : public Node {
 
   // Used to persist and obtain metadata information for scheduler.
   std::shared_ptr<RecoveryBase> scheduler_recovery_;
-  // persistent command need to be sent.
-  std::atomic<PersistentCommand> persistent_cmd_;
 
   // The node id of scale in nodes.
   std::vector<std::string> scale_in_node_ids_;

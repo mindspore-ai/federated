@@ -29,7 +29,7 @@
 #include "common/core/file_configuration.h"
 #include "python/fl_context.h"
 #include "common/core/recovery_base.h"
-#include "scheduler_node.h"
+#include "common/core/scheduler_node.h"
 #include "common/core/node_info.h"
 
 namespace mindspore {

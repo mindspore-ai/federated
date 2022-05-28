@@ -172,21 +172,6 @@ const std::map<std::string, size_t> kCiphers = {
 
 using DataPtr = std::unique_ptr<uint8_t[]>;
 using VectorPtr = std::shared_ptr<std::vector<unsigned char>>;
-using Key = size_t;
-using Keys = std::vector<Key>;
-using Values = std::vector<float>;
-using ValuesPtr = std::shared_ptr<Values>;
-using Grad = std::vector<float>;
-using LookupIds = std::vector<Key>;
-using Lengths = std::vector<int>;
-using GradPtr = std::shared_ptr<Grad>;
-using InputsShape = std::vector<std::shared_ptr<std::vector<size_t>>>;
-using InputsShapePtr = std::shared_ptr<std::vector<std::shared_ptr<std::vector<size_t>>>>;
-
-constexpr size_t INDEX_NOT_SEND = UINT_MAX;
-using OptimOriginIdx = std::map<std::string, size_t>;
-using OptimPSSendIdx = std::map<std::string, size_t>;
-
 using EventCallback = std::function<void(void)>;
 
 // The barrier function which should be called before doing scaling out/in operations.

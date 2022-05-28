@@ -29,18 +29,6 @@ AESEncrypt::AESEncrypt(const uint8_t *key, int key_len, const uint8_t *ivec, int
 
 AESEncrypt::~AESEncrypt() {}
 
-#if defined(_WIN32)
-int AESEncrypt::EncryptData(const uint8_t *data, const int len, uint8_t *encrypt_data, int *encrypt_len) {
-  MS_LOG(ERROR) << "Unsupported feature in Windows platform.";
-  return -1;
-}
-
-int AESEncrypt::DecryptData(const uint8_t *encrypt_data, const int encrypt_len, uint8_t *data, int *len) {
-  MS_LOG(ERROR) << "Unsupported feature in Windows platform.";
-  return -1;
-}
-
-#else
 int AESEncrypt::EncryptData(const uint8_t *data, const int len, uint8_t *encrypt_data, int *encrypt_len) const {
   int ret;
   if (priv_key_ == nullptr || ivec_ == nullptr) {
@@ -218,7 +206,6 @@ int AESEncrypt::evp_aes_decrypt(const uint8_t *encrypt_data, const int len, cons
   EVP_CIPHER_CTX_free(ctx);
   return 0;
 }
-#endif
 }  // namespace armour
 }  // namespace fl
 }  // namespace mindspore

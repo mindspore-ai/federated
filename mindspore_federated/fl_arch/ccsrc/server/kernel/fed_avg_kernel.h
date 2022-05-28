@@ -61,7 +61,10 @@ class FedAvgKernel : public AggregationKernelMod {
     input_size_list_.push_back(new_weight_size);
     input_size_list_.push_back(sizeof(size_t));
 
-    LocalMetaStore::GetInstance().put_aggregation_feature_map(param_name, feature_maps[param_name]);
+    MS_LOG(DEBUG) <<"weight size is " << feature_map.weight_size << ", weight shape is " << feature_map.weight_shape
+                  << ", weight type is " << feature_map.weight_type;
+
+    LocalMetaStore::GetInstance().put_aggregation_feature_map(param_name, feature_map);
     MS_LOG(INFO) << "Aggregate Weight full name is " << param_name;
     return;
   }

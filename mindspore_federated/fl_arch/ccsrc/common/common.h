@@ -188,8 +188,11 @@ constexpr auto kCtxFedAvgTotalDataSize = "fed_avg_total_data_size";
 constexpr auto kCtxCipherPrimer = "cipher_primer";
 constexpr auto kCurrentIteration = "current_iteration";
 constexpr auto kInstanceState = "instance_state";
+constexpr auto SECRET_MAX_LEN = 32;
+constexpr auto PRIME_MAX_LEN = 33;
 const char PYTHON_MOD_SERIALIZE_MODULE[] = "mindspore.train.serialization";
 const char PYTHON_MOD_SAFE_WEIGHT[] = "_save_weight";
+
 
 // This macro the current timestamp in milliseconds.
 #define CURRENT_TIME_MILLI \

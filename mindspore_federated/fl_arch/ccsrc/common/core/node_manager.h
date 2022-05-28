@@ -33,7 +33,7 @@
 #include <deque>
 #include <algorithm>
 
-#include "node.h"
+#include "common/core/node.h"
 #include "common/utils/log_adapter.h"
 #include "common/utils/convert_utils_base.h"
 #include "common/core/cluster_metadata.h"

@@ -25,6 +25,7 @@
 #include <functional>
 #include "worker/kernel/abstract_kernel.h"
 #include "worker/fl_worker.h"
+#include "python/fl_context.h"
 
 namespace mindspore {
 namespace fl {
@@ -35,11 +36,21 @@ class GetModelKernelMod : public AbstractKernel {
   GetModelKernelMod() = default;
   ~GetModelKernelMod() override = default;
 
-  bool Launch(const std::vector<AddressPtr> &inputs) {
+  static std::shared_ptr<GetModelKernelMod> GetInstance() {
+    static std::shared_ptr<GetModelKernelMod> instance = nullptr;
+    if (instance == nullptr) {
+      instance.reset(new GetModelKernelMod());
+      instance->Init();
+    }
+    return instance;
+  }
+
+  py::dict Launch() {
     MS_LOG(INFO) << "Launching client GetModelKernelMod";
-    if (!BuildGetModelReq(fbb_, inputs)) {
+    py::dict dict_data;
+    if (!BuildGetModelReq(fbb_)) {
       MS_LOG(EXCEPTION) << "Building request for FusedPushWeight failed.";
-      return false;
+      return dict_data;
     }
 
     const schema::ResponseGetModel *get_model_rsp = nullptr;
@@ -50,12 +61,12 @@ class GetModelKernelMod : public AbstractKernel {
                                                             fbb_->GetSize(), fl::core::TcpUserCommand::kGetModel,
                                                             &get_model_rsp_msg)) {
         MS_LOG(EXCEPTION) << "Sending request for GetModel to server " << target_server_rank_ << " failed.";
-        return false;
+        return dict_data;
       }
       flatbuffers::Verifier verifier(get_model_rsp_msg->data(), get_model_rsp_msg->size());
       if (!verifier.VerifyBuffer<schema::ResponseGetModel>()) {
         MS_LOG(EXCEPTION) << "The schema of ResponseGetModel is invalid.";
-        return false;
+        return dict_data;
       }
 
       get_model_rsp = flatbuffers::GetRoot<schema::ResponseGetModel>(get_model_rsp_msg->data());
@@ -75,25 +86,27 @@ class GetModelKernelMod : public AbstractKernel {
     MS_EXCEPTION_IF_NULL(feature_map);
     if (feature_map->size() == 0) {
       MS_LOG(EXCEPTION) << "Feature map after GetModel is empty.";
-      return false;
+      return dict_data;
     }
+    auto &feature_maps = FLContext::instance()->feature_maps();
     for (size_t i = 0; i < feature_map->size(); i++) {
-      std::string weight_full_name = feature_map->Get(i)->weight_fullname()->str();
-      float *weight_data = const_cast<float *>(feature_map->Get(i)->data()->data());
-      size_t weight_size = feature_map->Get(i)->data()->size() * sizeof(float);
-      if (weight_name_to_input_idx_.count(weight_full_name) == 0) {
-        MS_LOG(EXCEPTION) << "Weight " << weight_full_name << " doesn't exist in FL worker.";
-        return false;
-      }
-      MS_LOG(INFO) << "Cover weight " << weight_full_name << " by the model in server.";
-      size_t index = weight_name_to_input_idx_[weight_full_name];
-      int ret = memcpy_s(inputs[index]->addr, inputs[index]->size, weight_data, weight_size);
-      if (ret != 0) {
-        MS_LOG(EXCEPTION) << "memcpy_s error, errorno(" << ret << ")";
-        return false;
-      }
+      const auto &feature_fbs = feature_map->Get(i);
+      const auto &feature_data_fbs = feature_fbs->data();
+
+      std::string weight_fullname = feature_fbs->weight_fullname()->str();
+      float *weight_data = const_cast<float *>(feature_data_fbs->data());
+      std::vector<float> weight_data_vec(weight_data, weight_data + feature_data_fbs->size());
+
+      Feature feature = feature_maps[weight_fullname];
+      py::list data_list;
+      data_list.append(feature.weight_type);
+      data_list.append(feature.weight_shape);
+      data_list.append(weight_data_vec);
+      data_list.append(weight_data_vec.size());
+      dict_data[py::str(weight_fullname)] = data_list;
     }
-    return true;
+
+    return dict_data;
   }
 
   void Init() {
@@ -111,21 +124,20 @@ class GetModelKernelMod : public AbstractKernel {
     fl_name_ = fl::worker::FLWorker::GetInstance().fl_name();
     MS_LOG(INFO) << "Initializing GetModel kernel. fl_name: " << fl_name_ << ". Request will be sent to server "
                  << target_server_rank_;
-    output_size_list_.push_back(sizeof(float));
   }
 
-  void InitKernel() { return; }
-
- protected:
-  void InitSizeLists() { return; }
-
  private:
-  bool BuildGetModelReq(const std::shared_ptr<FBBuilder> &fbb, const std::vector<AddressPtr> &weights) {
+  bool BuildGetModelReq(const std::shared_ptr<FBBuilder> &fbb) {
     MS_EXCEPTION_IF_NULL(fbb_);
     auto fbs_fl_name = fbb->CreateString(fl_name_);
+    auto time = fl::core::CommUtil::GetNowTime();
+    MS_LOG(INFO) << "now time: " << time.time_str_mill;
+    auto fbs_timestamp = fbb->CreateString(std::to_string(time.time_stamp));
     schema::RequestGetModelBuilder req_get_model_builder(*(fbb.get()));
     req_get_model_builder.add_fl_name(fbs_fl_name);
+    req_get_model_builder.add_timestamp(fbs_timestamp);
     iteration_ = fl::worker::FLWorker::GetInstance().fl_iteration_num();
+    MS_LOG(INFO) << "Get model iteration: " << iteration_;
     req_get_model_builder.add_iteration(SizeToInt(iteration_));
     auto req_get_model = req_get_model_builder.Finish();
     fbb->Finish(req_get_model);

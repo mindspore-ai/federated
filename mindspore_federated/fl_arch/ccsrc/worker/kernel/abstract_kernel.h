@@ -37,11 +37,7 @@ class AbstractKernel {
   AbstractKernel() = default;
   virtual ~AbstractKernel() = default;
 
-  virtual bool Launch(const std::vector<AddressPtr> &inputs) = 0;
-
   virtual void Init() = 0;
-
-  virtual void InitKernel() = 0;
 };
 }  // namespace kernel
 }  // namespace worker

@@ -105,6 +105,7 @@ class MS_EXPORT FLWorker {
 
   std::string fl_name() const;
   std::string fl_id() const;
+  std::string encrypt_type() const;
 
  private:
   FLWorker()
@@ -124,7 +125,9 @@ class MS_EXPORT FLWorker {
         secret_pk_(nullptr),
         pw_salt_({}),
         pw_iv_({}),
-        public_keys_list_({}) {}
+        public_keys_list_({}),
+        encrypt_type_("") {}
+
   ~FLWorker() = default;
   FLWorker(const FLWorker &) = delete;
   FLWorker &operator=(const FLWorker &) = delete;
@@ -183,6 +186,8 @@ class MS_EXPORT FLWorker {
 
   // The public keys used for computing the pairwise encryption's secret.
   std::vector<EncryptPublicKeys> public_keys_list_;
+
+  std::string encrypt_type_;
 };
 }  // namespace worker
 }  // namespace fl

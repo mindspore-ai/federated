@@ -18,7 +18,7 @@
 
 #include "common/communicator/http_communicator.h"
 #include "common/communicator/tcp_communicator.h"
-#include "node_recovery.h"
+#include "common/core/node_recovery.h"
 
 namespace mindspore {
 namespace fl {
@@ -597,9 +597,6 @@ void AbstractNode::RegisterFollowerScalerHandlerAfterScaleIn(const std::string &
   follower_scaler_->RegisterHandlerAfterScaleIn(module, handler);
 }
 
-PersistentState AbstractNode::persistent_state() const { return persistent_state_; }
-void AbstractNode::set_persistent_state(PersistentState persistent_state) { persistent_state_ = persistent_state; }
-
 uint32_t AbstractNode::worker_num() const { return worker_num_; }
 
 uint32_t AbstractNode::server_num() const { return server_num_; }
@@ -721,12 +718,6 @@ bool AbstractNode::Heartbeat(const std::shared_ptr<TcpClient> &client) {
 
   HeartbeatMessage heartbeat_message;
   heartbeat_message.set_node_id(node_info_.node_id_);
-  heartbeat_message.set_persistent_state(PersistentState::NOT_ENABLE_PERSIST);
-
-  // The worker role does not support disaster recovery currently.
-  if (EnableRecovery() && role() == NodeRole::SERVER) {
-    heartbeat_message.set_persistent_state(persistent_state_);
-  }
 
   if (!SendMessageSync(client, meta, Protos::PROTOBUF, heartbeat_message.SerializeAsString().data(),
                        heartbeat_message.ByteSizeLong(), kCommTimeoutInSeconds)) {
@@ -803,17 +794,6 @@ void AbstractNode::ProcessHeartbeatResp(const std::shared_ptr<MessageMeta> &meta
       MS_LOG(INFO) << "The nodes:" << timeoutNodeId
                    << "is support recovery, users can pull up this node to restore the cluster.";
     }
-  }
-
-  if (!EnableRecovery()) {
-    return;
-  }
-
-  PersistentCommand persistent_cmd = heartbeat_resp_message.persistent_cmd();
-  // The worker role does not support disaster recovery for the time being.
-  if (role() == NodeRole::SERVER && persistent_cmd == PersistentCommand::BEGIN_PERSIST &&
-      persistent_state_ != PersistentState::PERSISTING) {
-    OnEventCallback(ClusterEvent::ON_BEGIN_PERSIST);
   }
 }
 

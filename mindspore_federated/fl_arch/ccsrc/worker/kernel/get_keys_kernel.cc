@@ -20,7 +20,7 @@ namespace mindspore {
 namespace fl {
 namespace worker {
 namespace kernel {
-bool GetKeysKernelMod::Launch(const std::vector<AddressPtr> &inputs) {
+bool GetKeysKernelMod::Launch() {
   MS_LOG(INFO) << "Launching client GetKeysKernelMod";
   BuildGetKeysReq(fbb_);
 
@@ -79,8 +79,6 @@ void GetKeysKernelMod::Init() {
   MS_EXCEPTION_IF_NULL(fbb_);
   MS_LOG(INFO) << "Initialize GetKeys kernel successfully.";
 }
-
-void GetKeysKernelMod::InitKernel() { return; }
 
 void GetKeysKernelMod::BuildGetKeysReq(const std::shared_ptr<FBBuilder> &fbb) {
   MS_EXCEPTION_IF_NULL(fbb);

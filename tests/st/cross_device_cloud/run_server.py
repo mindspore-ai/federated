@@ -18,7 +18,7 @@ import subprocess
 import os
 import ast
 
-parser = argparse.ArgumentParser(description="Run test_lenet.py case")
+parser = argparse.ArgumentParser(description="Run run_cloud.py case")
 parser.add_argument("--device_target", type=str, default="CPU")
 parser.add_argument("--server_mode", type=str, default="FEDERATED_LEARNING")
 parser.add_argument("--worker_num", type=int, default=0)
@@ -116,7 +116,7 @@ if __name__ == "__main__":
         cmd_server += "rm -rf ${execute_path}/server_" + str(i) + "/ &&"
         cmd_server += "mkdir ${execute_path}/server_" + str(i) + "/ &&"
         cmd_server += "cd ${execute_path}/server_" + str(i) + "/ || exit && export GLOG_v=1 &&"
-        cmd_server += "python ${self_path}/../test_lenet.py"
+        cmd_server += "python ${self_path}/../run_cloud.py"
         cmd_server += " --device_target=" + device_target
         cmd_server += " --server_mode=" + server_mode
         cmd_server += " --ms_role=MS_SERVER"

@@ -100,7 +100,6 @@ void Server::Run() {
                       });
   MS_EXCEPTION_IF_NULL(communicator_with_server_);
   communicator_with_server_->Join();
-  //  MsException::Instance().CheckException();
 }
 
 void Server::InitPkiCertificate() {

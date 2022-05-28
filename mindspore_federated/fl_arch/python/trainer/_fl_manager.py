@@ -16,68 +16,64 @@
 
 from copy import deepcopy
 import numpy as np
+from mindspore_federated._mindspore_federated import Federated_
 from mindspore import context, nn
-from mindspore.common import Parameter, ParameterTuple
+from mindspore import load_checkpoint, load_param_into_net
+from mindspore.train.serialization import tensor_to_ms_type
+from mindspore.common.tensor import Tensor
+from mindspore.common.parameter import Parameter
 from mindspore.train.callback import Callback
-from mindspore.ops import operations as P
 from mindspore._checkparam import Validator, Rel
+from mindspore_federated.python import log as logger
 
-
-class _StartFLJob(nn.Cell):
+class _StartFLJob():
     """
     StartFLJob for Federated Learning Worker.
     """
 
     def __init__(self, data_size):
         super(_StartFLJob, self).__init__()
-        self.start_fl_job = P.StartFLJob(data_size)
+        self._data_size = data_size
 
     def construct(self):
-        succ = self.start_fl_job()
-        return succ
+        return Federated_.start_fl_job(self._data_size)
 
 
-class _UpdateAndGetModel(nn.Cell):
+class _UpdateAndGetModel():
     """
     Update and Get Model for Federated Learning Worker.
     """
 
-    def __init__(self, weights, encrypt_type=""):
+    def __init__(self, weights):
         super(_UpdateAndGetModel, self).__init__()
-        self.update_model = P.UpdateModel(encrypt_type)
-        self.get_model = P.GetModel()
-        self.weights = weights
+        self._weights = weights
 
     def construct(self):
-        self.update_model(self.weights)
-        succ = self.get_model(self.weights)
-        return succ
+        return Federated_.update_and_get_model(self._weights)
 
 
-class _ExchangeKeys(nn.Cell):
+class _ExchangeKeys():
     """
     Exchange Keys for Stable PW Encrypt.
     """
 
     def __init__(self):
         super(_ExchangeKeys, self).__init__()
-        self.exchange_keys = P.ExchangeKeys()
 
     def construct(self):
-        return self.exchange_keys()
+        return Federated_.exchange_keys()
 
 
-class _GetKeys(nn.Cell):
+class _GetKeys():
     """
     Get Keys for Stable PW Encrypt.
     """
 
     def __init__(self):
         super(_GetKeys, self).__init__()
-        self.get_keys = P.GetKeys()
 
     def construct(self):
-        return self.get_keys()
+        return Federated_.get_keys()
 
 
 class FederatedLearningManager(Callback):
@@ -99,29 +95,27 @@ class FederatedLearningManager(Callback):
         This is an experimental prototype that is subject to change.
     """
 
-    def __init__(self, model, sync_frequency, sync_type='fixed', **kwargs):
+    def __init__(self, server_mode, model, sync_frequency, data_size, sync_type='fixed', **kwargs):
         super(FederatedLearningManager, self).__init__()
-        server_mode = context.get_fl_context("server_mode")
         if server_mode not in ("FEDERATED_LEARNING", "HYBRID_TRAINING"):
             raise ValueError("server_mode must in (\"FEDERATED_LEARNING\", \"HYBRID_TRAINING\")")
         Validator.check_isinstance('model', model, nn.Cell)
         Validator.check_positive_int(sync_frequency)
         Validator.check_string(sync_type, ["fixed", "adaptive"])
+        self._server_mode = server_mode
         self._model = model
         self._sync_frequency = sync_frequency
         self._next_sync_iter_id = self._sync_frequency
+        self._data_size = data_size
         self._sync_type = sync_type
         self._global_step = 0
-        self._data_size = 0
         self._encrypt_type = kwargs.get("encrypt_type", "NOT_ENCRYPT")
         if self._encrypt_type != "NOT_ENCRYPT" and self._encrypt_type != "STABLE_PW_ENCRYPT":
             raise ValueError(
                 "encrypt_mode must be 'NOT_ENCRYPT' or 'STABLE_PW_ENCRYPT', but got {}.".format(self._encrypt_type))
-
         if self._is_adaptive_sync():
             self._as_set_init_state(kwargs)
             self._as_wrap_cell()
-
     def _is_adaptive_sync(self):
         """
         Determine whether adaptive frequency synchronization is required.
@@ -239,26 +233,38 @@ class FederatedLearningManager(Callback):
         Args:
             run_context (RunContext): Include some information of the model.
         """
-        self._global_step += 1
-        cb_params = run_context.original_args()
-        self._data_size += cb_params.batch_num
-        if context.get_fl_context("ms_role") == "MS_WORKER":
+        if self._server_mode == "FEDERATED_LEARNING":
+            self._global_step += 1
+            cb_params = run_context.original_args()
+            self._data_size += cb_params.batch_num
             if self._global_step == self._next_sync_iter_id:
                 start_fl_job = _StartFLJob(self._data_size)
-                start_fl_job()
+                start_fl_job.construct()
                 self._data_size = 0
                 if self._is_adaptive_sync():
                     self._as_set_grads()
                 if self._encrypt_type == "STABLE_PW_ENCRYPT":
                     exchange_keys = _ExchangeKeys()
-                    exchange_keys()
+                    exchange_keys.construct()
                     get_keys = _GetKeys()
-                    get_keys()
-                    update_and_get_model = _UpdateAndGetModel(ParameterTuple(self._model.trainable_params()),
-                                                              self._encrypt_type)
-                else:
-                    update_and_get_model = _UpdateAndGetModel(ParameterTuple(self._model.trainable_params()))
-                update_and_get_model()
+                    get_keys.construct()
+
+                weights = dict()
+                for param in self._model.trainable_params():
+                    weight = param.asnumpy().reshape(-1).tolist()
+                    weights[param.name] = weight
+                update_and_get_model = _UpdateAndGetModel(weights)
+                feature_map = update_and_get_model.construct()
+                if not feature_map:
+                    raise ValueError("Feature map from getting model is empty!")
+                parameter_dict = {}
+                for key, value in feature_map.items():
+                    ms_type = tensor_to_ms_type[value[0].title()]
+                    shape = value[1]
+                    param_data = np.reshape(value[2], shape)
+                    parameter_dict[key] = Parameter(Tensor(param_data, ms_type), name=key)
+                load_param_into_net(self._model, parameter_dict)
+                logger.info("Load param from get model into net.")
                 self._next_sync_iter_id = self._global_step + self._sync_frequency
                 if self._is_adaptive_sync():
                     self._as_analyze_gradient()
@@ -266,3 +272,5 @@ class FederatedLearningManager(Callback):
                     self._as_set_last_param()
 
                 print("sync step is: {}".format(self._global_step))
+        elif self._server_mode == "HYBRID_TRAINING":
+            pass

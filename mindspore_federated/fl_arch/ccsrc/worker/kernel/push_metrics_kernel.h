@@ -48,11 +48,6 @@ class PushMetricsKernelMod : public AbstractKernel {
     MS_EXCEPTION_IF_NULL(fbb_);
   }
 
-  void InitKernel() { return; }
-
- protected:
-  void InitSizeLists() { return; }
-
  private:
   template <typename T>
   bool BuildPushMetricsReq(const std::shared_ptr<FBBuilder> &fbb, T loss, T accuracy) {

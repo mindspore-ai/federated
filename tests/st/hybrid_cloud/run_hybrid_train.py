@@ -15,10 +15,19 @@
 
 import argparse
 import ast
+import numpy as np
 
 from mindspore_federated.python._federated_local import FederatedLearningJob
+from mindspore_federated.python.trainer._fl_manager import FederatedLearningManager
+import mindspore.context as context
+import mindspore.nn as nn
+from mindspore import Tensor
+from mindspore.common import dtype as mstype
+from mindspore.nn import WithLossCell
+from src.cell_wrapper import TrainOneStepCellWithServerCommunicator
+from src.model import LeNet5, PushMetrics
 
-parser = argparse.ArgumentParser(description="test_fl_lenet")
+parser = argparse.ArgumentParser(description="test_hybrid_train_lenet")
 parser.add_argument("--device_target", type=str, default="CPU")
 parser.add_argument("--server_mode", type=str, default="FEDERATED_LEARNING")
 parser.add_argument("--ms_role", type=str, default="MS_WORKER")
@@ -36,8 +45,15 @@ parser.add_argument("--fl_iteration_num", type=int, default=25)
 parser.add_argument("--client_epoch_num", type=int, default=20)
 parser.add_argument("--client_batch_size", type=int, default=32)
 parser.add_argument("--client_learning_rate", type=float, default=0.1)
+parser.add_argument("--worker_step_num_per_iteration", type=int, default=65)
 parser.add_argument("--scheduler_manage_port", type=int, default=11202)
 parser.add_argument("--config_file_path", type=str, default="")
+parser.add_argument("--pki_verify", type=ast.literal_eval, default=False)
+# parameters used for pki_verify=True
+parser.add_argument("--root_first_ca_path", type=str, default="")
+parser.add_argument("--root_second_ca_path", type=str, default="")
+parser.add_argument("--equip_crl_path", type=str, default="")
+parser.add_argument("--replay_attack_time_diff", type=int, default=600000)
 parser.add_argument("--encrypt_type", type=str, default="NOT_ENCRYPT")
 # parameters for encrypt_type='DP_ENCRYPT'
 parser.add_argument("--dp_eps", type=float, default=50.0)
@@ -64,6 +80,7 @@ parser.add_argument("--upload_sparse_rate", type=float, default=0.5)
 parser.add_argument("--download_compress_type", type=str, default="NO_COMPRESS",
                     choices=["NO_COMPRESS", "QUANT"])
 parser.add_argument("--checkpoint_dir", type=str, default="")
+parser.add_argument("--model_path", type=str, default="")
 
 args, _ = parser.parse_known_args()
 device_target = args.device_target
@@ -78,23 +95,29 @@ start_fl_job_threshold = args.start_fl_job_threshold
 start_fl_job_time_window = args.start_fl_job_time_window
 update_model_ratio = args.update_model_ratio
 update_model_time_window = args.update_model_time_window
-share_secrets_ratio = args.share_secrets_ratio
-cipher_time_window = args.cipher_time_window
-reconstruct_secrets_threshold = args.reconstruct_secrets_threshold
 fl_name = args.fl_name
 fl_iteration_num = args.fl_iteration_num
 client_epoch_num = args.client_epoch_num
 client_batch_size = args.client_batch_size
 client_learning_rate = args.client_learning_rate
+worker_step_num_per_iteration = args.worker_step_num_per_iteration
 scheduler_manage_port = args.scheduler_manage_port
 config_file_path = args.config_file_path
+encrypt_type = args.encrypt_type
+share_secrets_ratio = args.share_secrets_ratio
+cipher_time_window = args.cipher_time_window
+reconstruct_secrets_threshold = args.reconstruct_secrets_threshold
 dp_eps = args.dp_eps
 dp_delta = args.dp_delta
 dp_norm_clip = args.dp_norm_clip
-encrypt_type = args.encrypt_type
 client_password = args.client_password
 server_password = args.server_password
 enable_ssl = args.enable_ssl
+pki_verify = args.pki_verify
+root_first_ca_path = args.root_first_ca_path
+root_second_ca_path = args.root_second_ca_path
+equip_crl_path = args.equip_crl_path
+replay_attack_time_diff = args.replay_attack_time_diff
 sign_k = args.sign_k
 sign_eps = args.sign_eps
 sign_thr_ratio = args.sign_thr_ratio
@@ -105,6 +128,7 @@ upload_compress_type = args.upload_compress_type
 upload_sparse_rate = args.upload_sparse_rate
 download_compress_type = args.download_compress_type
 checkpoint_dir = args.checkpoint_dir
+model_path = args.model_path
 
 ctx = {
     "server_mode": server_mode,
@@ -118,16 +142,22 @@ ctx = {
     "start_fl_job_time_window": start_fl_job_time_window,
     "update_model_ratio": update_model_ratio,
     "update_model_time_window": update_model_time_window,
-    "share_secrets_ratio": share_secrets_ratio,
-    "cipher_time_window": cipher_time_window,
-    "reconstruct_secrets_threshold": reconstruct_secrets_threshold,
     "fl_name": fl_name,
     "fl_iteration_num": fl_iteration_num,
     "client_epoch_num": client_epoch_num,
     "client_batch_size": client_batch_size,
     "client_learning_rate": client_learning_rate,
+    "worker_step_num_per_iteration": worker_step_num_per_iteration,
     "scheduler_manage_port": scheduler_manage_port,
     "config_file_path": config_file_path,
+    "pki_verify": pki_verify,
+    "root_first_ca_path": root_first_ca_path,
+    "root_second_ca_path": root_second_ca_path,
+    "equip_crl_path": equip_crl_path,
+    "replay_attack_time_diff": replay_attack_time_diff,
+    "share_secrets_ratio": share_secrets_ratio,
+    "cipher_time_window": cipher_time_window,
+    "reconstruct_secrets_threshold": reconstruct_secrets_threshold,
     "dp_eps": dp_eps,
     "dp_delta": dp_delta,
     "dp_norm_clip": dp_norm_clip,
@@ -144,9 +174,52 @@ ctx = {
     "upload_compress_type": upload_compress_type,
     "upload_sparse_rate": upload_sparse_rate,
     "download_compress_type": download_compress_type,
-    "checkpoint_dir": checkpoint_dir,
+    "checkpoint_dir": checkpoint_dir
 }
+
+context.set_context(mode=context.GRAPH_MODE, device_target=device_target)
 
 if __name__ == "__main__":
     fl_job = FederatedLearningJob(ctx)
     fl_job.run()
+
+    epoch = 50000
+    np.random.seed(0)
+    network = LeNet5(62)
+    push_metrics = PushMetrics()
+    if ms_role == "MS_WORKER":
+        # Please do not freeze layers if you want to both get and overwrite these layers to servers, which is meaningless.
+        network.conv1.weight.requires_grad = False
+        network.conv2.weight.requires_grad = False
+        # Get weights before running backbone.
+        network.conv1.set_param_fl(pull_from_server=True)
+        network.conv2.set_param_fl(pull_from_server=True)
+
+        # Overwrite weights after running optimizers.
+        network.fc1.set_param_fl(push_to_server=True)
+        network.fc2.set_param_fl(push_to_server=True)
+        network.fc3.set_param_fl(push_to_server=True)
+
+    criterion = nn.SoftmaxCrossEntropyWithLogits(sparse=True, reduction="mean")
+    net_opt = nn.Momentum(network.trainable_params(), 0.01, 0.9)
+    net_with_criterion = WithLossCell(network, criterion)
+    train_network = TrainOneStepCellWithServerCommunicator(net_with_criterion, net_opt)
+    train_network.set_train()
+    losses = []
+
+    federated_learning_manager = FederatedLearningManager(
+        network,
+        sync_frequency=epoch * num_batches,
+        sync_type=sync_type,
+        encrypt_type=encrypt_type,
+    )
+
+    for i in range(epoch):
+        data = Tensor(np.random.rand(32, 3, 32, 32).astype(np.float32))
+        label = Tensor(np.random.randint(0, 61, (32)).astype(np.int32))
+        loss = train_network(data, label).asnumpy()
+        if ms_role == "MS_WORKER":
+            if (i + 1) % worker_step_num_per_iteration == 0:
+                push_metrics(Tensor(loss, mstype.float32), Tensor(loss, mstype.float32))
+        losses.append(loss)
+    print(losses)

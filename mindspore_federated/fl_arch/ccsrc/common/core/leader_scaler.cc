@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "leader_scaler.h"
+#include "common/core/leader_scaler.h"
 
 namespace mindspore {
 namespace fl {

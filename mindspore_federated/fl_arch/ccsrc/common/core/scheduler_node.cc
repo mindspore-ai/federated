@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-#include "scheduler_node.h"
+#include "common/core/scheduler_node.h"
 
 #include <string>
 
 #include "common/common.h"
-#include "scheduler_recovery.h"
+#include "common/core/scheduler_recovery.h"
 
 namespace mindspore {
 namespace fl {
@@ -64,14 +64,13 @@ bool SchedulerNode::Start(const uint32_t &timeout) {
     return false;
   }
 
-  StartUpdatePersistentCommandTimer();
   MS_LOG(INFO) << "[Scheduler start]: 4. Successfully start scheduler, there are " << node_manager_.worker_num()
                << " workers and " << node_manager_.server_num() << " servers registered.";
   return true;
 }
 
 void SchedulerNode::RunRecovery() {
-  fl::core::ClusterConfig &clusterConfig = FLContext::instance()->cluster_config();
+  ClusterConfig &clusterConfig = FLContext::instance()->cluster_config();
   // create tcp client to myself in case of event dispatch failed when Send reconnect msg to server failed
   client_to_scheduler_ =
     std::make_shared<TcpClient>(clusterConfig.scheduler_ip, clusterConfig.scheduler_port, NodeRole::SCHEDULER);
@@ -165,21 +164,9 @@ void SchedulerNode::ProcessHeartbeat(const std::shared_ptr<TcpServer> &server,
   std::string node_id = heartbeat_message.node_id();
 
   HeartbeatRespMessage heartbeat_resp_message;
-  heartbeat_resp_message.set_persistent_cmd(PersistentCommand::DEFAULT);
 
   NodeInfo nodeInfo = node_manager_.QueryNodeInfo(node_id);
   if (!nodeInfo.node_id_.empty()) {
-    // The worker role does not support disaster recovery for the time being.
-    NodeRole node_role = nodeInfo.node_role_;
-    if (node_role == NodeRole::SERVER && persistent_cmd_ == PersistentCommand::BEGIN_PERSIST) {
-      if (!node_manager_.IsNodePersisting(node_id)) {
-        heartbeat_resp_message.set_persistent_cmd(PersistentCommand::BEGIN_PERSIST);
-        node_manager_.AddPersistingNode(node_id);
-      }
-      if (node_manager_.IsAllNodeInPersisting()) {
-        persistent_cmd_ = PersistentCommand::DEFAULT;
-      }
-    }
     node_manager_.UpdateHeartbeat(node_id);
   }
 
@@ -194,36 +181,6 @@ void SchedulerNode::ProcessHeartbeat(const std::shared_ptr<TcpServer> &server,
   if (!server->SendMessage(conn, meta, Protos::PROTOBUF, heartbeat_resp_message.SerializeAsString().data(),
                            heartbeat_resp_message.ByteSizeLong())) {
     MS_LOG(WARNING) << "Send heart beat failed.";
-  }
-
-  if (node_manager_.IsAllNodesRegistered()) {
-    return;
-  }
-
-  uint32_t rank_id = UINT32_MAX;
-  // Re-Add the missing node into node manager.
-  if (heartbeat_message.has_address() &&
-      node_manager_.ReAddNodeIfNotExists(node_id, heartbeat_message.ip(), heartbeat_message.port(), &rank_id)) {
-    SetRegisterConnectionFd(conn, node_id);
-
-    if (node_manager_.IsAllNodesRegistered()) {
-      is_ready_ = true;
-      MS_LOG(INFO) << "There are " << node_manager_.worker_num() << " workers and " << node_manager_.server_num()
-                   << " servers registered to scheduer, so the scheduler send meta data to worker/server.";
-      node_manager_.UpdateNodesInfo();
-
-      auto node_infos = node_manager_.nodes_info();
-      for (const auto &kvs : node_infos) {
-        auto client = GetOrCreateClient(kvs.second);
-        MS_EXCEPTION_IF_NULL(client);
-        SendMetadata(client, kvs.second.rank_id_);
-        node_manager_.UpdateHeartbeat(kvs.first);
-      }
-
-      node_manager_.UpdateClusterState(ClusterState::CLUSTER_READY);
-      PersistMetaData();
-      wait_start_cond_.notify_all();
-    }
   }
 }
 
@@ -262,8 +219,8 @@ void SchedulerNode::InitCommandHandler() {
 
 void SchedulerNode::InitEventTxtFile() {
   MS_LOG(DEBUG) << "Start init event txt";
-  fl::core::FileConfig event_file_config;
-  if (!fl::core::CommUtil::ParseAndCheckConfigJson(config_.get(), kFailureEvent, &event_file_config)) {
+  FileConfig event_file_config;
+  if (!CommUtil::ParseAndCheckConfigJson(config_.get(), kFailureEvent, &event_file_config)) {
     MS_LOG(EXCEPTION) << "Parse and checkout config json failed";
     return;
   }
@@ -329,20 +286,6 @@ void SchedulerNode::ProcessRegister(const std::shared_ptr<TcpServer> &server,
   MS_LOG(INFO) << "The node id:" << node_id << " is registering to scheduler.";
   client_mutex_.lock();
   if (node_manager_.IsNodeRegistered(node_id)) {
-    NodeInfo node_info = node_manager_.QueryNodeInfo(node_id);
-    if (NeedRejectRegister(node_info)) {
-      MS_LOG(WARNING) << "The node(id: " << node_id << ") is alive, register is rejected!";
-      RegisterRespMessage register_rejected_message;
-      register_rejected_message.set_node_id(node_id);
-      register_rejected_message.set_rank_id(UINT32_MAX);
-      if (!server->SendMessage(conn, meta, Protos::PROTOBUF, register_rejected_message.SerializeAsString().data(),
-                               register_rejected_message.ByteSizeLong())) {
-        MS_LOG(WARNING) << "Server response rejected message failed.";
-      }
-      client_mutex_.unlock();
-      return;
-    }
-
     if (connected_nodes_.count(node_id)) {
       (void)connected_nodes_.erase(node_id);
     }
@@ -759,23 +702,6 @@ void SchedulerNode::StartUpdateClusterStateTimer() {
   MS_EXCEPTION_IF_NULL(update_state_thread_);
 }
 
-void SchedulerNode::StartUpdatePersistentCommandTimer() {
-  if (!EnableRecovery()) {
-    return;
-  }
-
-  update_persistent_cmd_thread_ = std::make_unique<std::thread>([&]() {
-    while (!is_finish_.load()) {
-      std::unique_lock<std::mutex> locker(persistent_cmd_mutex_);
-      (void)persistent_cmd_cv_.wait_for(
-        locker, std::chrono::seconds(FLContext::instance()->cluster_config().persistent_interval));
-      persistent_cmd_ = PersistentCommand::BEGIN_PERSIST;
-    }
-  });
-
-  MS_EXCEPTION_IF_NULL(update_persistent_cmd_thread_);
-}
-
 const std::shared_ptr<TcpClient> &SchedulerNode::GetOrCreateClient(const NodeInfo &node_info) {
   std::lock_guard<std::mutex> lock(client_mutex_);
   if (connected_nodes_.count(node_info.node_id_)) {
@@ -831,11 +757,6 @@ bool SchedulerNode::Stop() {
       client_thread_->join();
     }
     is_ready_ = true;
-
-    if (update_persistent_cmd_thread_ && update_persistent_cmd_thread_->joinable()) {
-      persistent_cmd_cv_.notify_one();
-      update_persistent_cmd_thread_->join();
-    }
   }
   if (FLContext::instance()->scheduler_manage_port() != 0) {
     MS_LOG(WARNING) << "Stop the restful scheduler http service, the ip is 127.0.0.1 "
@@ -1605,7 +1526,7 @@ void SchedulerNode::RecordSchedulerRestartInfo() {
   MS_EXCEPTION_IF_NULL(scheduler_recovery_ptr);
   auto ip = scheduler_recovery_ptr->GetMetadata(kRecoverySchedulerIp);
   auto port = scheduler_recovery_ptr->GetMetadata(kRecoverySchedulerPort);
-  std::string time = fl::core::CommUtil::GetNowTime().time_str_mill;
+  std::string time = CommUtil::GetNowTime().time_str_mill;
   std::string event = "Node restart";
   std::string event_info =
     "nodeRole:" + node_role + "," + ip + ":" + port + "," + "currentTime:" + time + "," + "event:" + event + ";";
@@ -1645,7 +1566,7 @@ bool SchedulerNode::CheckIfNodeDisconnected() const {
 }
 
 void SchedulerNode::BroadcastTimeoutEvent() {
-  fl::core::ClusterConfig &clusterConfig = FLContext::instance()->cluster_config();
+  ClusterConfig &clusterConfig = FLContext::instance()->cluster_config();
   auto initial_node_infos = clusterConfig.initial_registered_nodes_infos;
   const uint32_t event = static_cast<uint32_t>(UserDefineEvent::kNodeTimeout);
   MS_LOG(INFO) << "Broad timeout event:" << event;

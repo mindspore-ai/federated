@@ -18,9 +18,9 @@ import subprocess
 import os
 import ast
 
-parser = argparse.ArgumentParser(description="Run test_lenet.py case")
+parser = argparse.ArgumentParser(description="Run run_cloud.py case")
 parser.add_argument("--device_target", type=str, default="CPU")
-parser.add_argument("--server_mode", type=str, default="FEDERATED_LEARNING")
+parser.add_argument("--server_mode", type=str, default="HYBRID_TRAINING")
 parser.add_argument("--worker_num", type=int, default=0)
 parser.add_argument("--server_num", type=int, default=2)
 parser.add_argument("--scheduler_ip", type=str, default="127.0.0.1")
@@ -47,11 +47,11 @@ if __name__ == "__main__":
     server_password = args.server_password
     enable_ssl = args.enable_ssl
 
-    os.environ['MS_NODE_ID'] = "20"
+    os.environ['MS_NODE_ID'] = "fl-scheduler"
     cmd_sched = "execute_path=$(pwd) && self_path=$(dirname \"${script_self}\") && rm -rf ${execute_path}/scheduler/ &&"
     cmd_sched += "mkdir ${execute_path}/scheduler/ &&"
     cmd_sched += "cd ${execute_path}/scheduler/ || exit && export GLOG_v=1 &&"
-    cmd_sched += "python ${self_path}/../test_lenet.py"
+    cmd_sched += "python ${self_path}/../run_hybrid_train.py"
     cmd_sched += " --device_target=" + device_target
     cmd_sched += " --server_mode=" + server_mode
     cmd_sched += " --ms_role=MS_SCHED"

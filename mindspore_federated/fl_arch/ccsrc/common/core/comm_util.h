@@ -125,7 +125,7 @@ struct FileConfig {
   std::string storage_file_path;
 };
 
-class CommUtil {
+class MS_EXPORT CommUtil {
  public:
   static bool CheckIpWithRegex(const std::string &ip);
   static bool CheckIp(const std::string &ip);

@@ -21,17 +21,21 @@
 #include "common/utils/python_adapter.h"
 #include "python/fl_context.h"
 #include "python/federated_job.h"
+#include "worker/kernel/start_fl_job_kernel.h"
 
 namespace py = pybind11;
 using FLContext = mindspore::fl::FLContext;
 using FederatedJob = mindspore::fl::FederatedJob;
+using StartFLJobKernelMod = mindspore::fl::worker::kernel::StartFLJobKernelMod;
 
 namespace mindspore {
 namespace fl {
 // Interface with python
 PYBIND11_MODULE(_mindspore_federated, m) {
   (void)py::class_<FederatedJob, std::shared_ptr<FederatedJob>>(m, "Federated_")
-    .def_static("start_federated_job", &FederatedJob::StartFederatedJob);
+    .def_static("start_federated_job", &FederatedJob::StartFederatedJob)
+    .def_static("start_fl_job", &FederatedJob::StartFLJob)
+    .def_static("update_and_get_model", &FederatedJob::UpdateAndGetModel);
 
   (void)py::class_<FLContext, std::shared_ptr<FLContext>>(m, "FLContext")
     .def_static("get_instance", &FLContext::instance, "Get fl context instance.")

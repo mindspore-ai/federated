@@ -19,17 +19,22 @@
 
 #include <string>
 #include <memory>
+#include <map>
 #include "common/common.h"
+#include "common/utils/python_adapter.h"
 
 namespace mindspore {
 namespace fl {
 
-class FederatedJob {
+class MS_EXPORT FederatedJob {
  public:
   static void StartFederatedJob();
   static bool StartServerAction();
   static bool StartSchedulerAction();
   static bool StartFLWorkerAction();
+
+  static bool StartFLJob(size_t data_size);
+  static py::dict UpdateAndGetModel(std::map<std::string, std::vector<float>> weight_datas);
 };
 }  // namespace fl
 }  // namespace mindspore

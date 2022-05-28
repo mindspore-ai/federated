@@ -33,7 +33,6 @@ bool ServerNode::Start(const uint32_t &timeout) {
     return false;
   }
   is_recover = false;
-//  MsException::Instance().CheckException();
   MS_LOG(INFO) << "[Server start]: 5. Successfully start server node!";
   return true;
 }

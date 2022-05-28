@@ -20,7 +20,7 @@ import ast
 import argparse
 import subprocess
 
-parser = argparse.ArgumentParser(description="Run test_lenet.py case")
+parser = argparse.ArgumentParser(description="Run run_cloud.py case")
 parser.add_argument("--device_target", type=str, default="CPU")
 parser.add_argument("--server_mode", type=str, default="HYBRID_TRAINING")
 parser.add_argument("--worker_num", type=int, default=1)
@@ -105,7 +105,7 @@ cmd_server += "rm -rf ${execute_path}/disaster_recovery_server_" + str(disaster_
 cmd_server += "mkdir ${execute_path}/disaster_recovery_server_" + str(disaster_recovery_server_port) + "/ &&"
 cmd_server += "cd ${execute_path}/disaster_recovery_server_" + str(disaster_recovery_server_port) \
               + "/ || exit && export GLOG_v=1 &&"
-cmd_server += "python ${self_path}/../test_lenet.py"
+cmd_server += "python ${self_path}/../run_cloud.py"
 cmd_server += " --device_target=" + device_target
 cmd_server += " --server_mode=" + server_mode
 cmd_server += " --ms_role=MS_SERVER"

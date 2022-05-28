@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "scheduler_recovery.h"
+#include "common/core/scheduler_recovery.h"
 #include "common/core/comm_util.h"
 
 namespace mindspore {

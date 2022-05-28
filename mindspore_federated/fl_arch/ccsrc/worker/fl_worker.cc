@@ -39,6 +39,7 @@ bool FLWorker::Run() {
   scheduler_ip_ = FLContext::instance()->scheduler_ip();
   scheduler_port_ = FLContext::instance()->scheduler_port();
   worker_step_num_per_iteration_ = FLContext::instance()->worker_step_num_per_iteration();
+  encrypt_type_ = FLContext::instance()->encrypt_type();
   FLContext::instance()->cluster_config().scheduler_ip = scheduler_ip_;
   FLContext::instance()->cluster_config().scheduler_port = scheduler_port_;
   FLContext::instance()->cluster_config().initial_worker_num = worker_num_;
@@ -46,7 +47,7 @@ bool FLWorker::Run() {
   MS_LOG(INFO) << "Initialize cluster config for worker. Worker number:" << worker_num_
                << ", Server number:" << server_num_ << ", Scheduler ip:" << scheduler_ip_
                << ", Scheduler port:" << scheduler_port_
-               << ", Worker training step per iteration:" << worker_step_num_per_iteration_;
+               << ", Worker training step per iteration:" << worker_step_num_per_iteration_ << ", Encrypt type: " << encrypt_type_;
 
   worker_node_ = std::make_shared<fl::core::WorkerNode>();
   MS_EXCEPTION_IF_NULL(worker_node_);
@@ -187,6 +188,8 @@ std::vector<EncryptPublicKeys> FLWorker::public_keys_list() const { return publi
 std::string FLWorker::fl_name() const { return kServerModeFL; }
 
 std::string FLWorker::fl_id() const { return std::to_string(rank_id_); }
+
+std::string FLWorker::encrypt_type() const { return encrypt_type_; }
 
 void FLWorker::InitializeFollowerScaler() {
   MS_EXCEPTION_IF_NULL(worker_node_);
