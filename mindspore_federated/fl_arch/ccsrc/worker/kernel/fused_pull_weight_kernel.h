@@ -27,6 +27,7 @@
 #include "python/fl_context.h"
 #include "schema/fl_job_generated.h"
 #include "worker/fl_worker.h"
+#include "worker/fl_worker.h"
 
 namespace mindspore {
 namespace fl {
@@ -36,30 +37,21 @@ namespace kernel {
 constexpr int kRetryDurationOfPullWeights = 200;
 class FusedPullWeightKernelMod : public AbstractKernel {
  public:
-  FusedPullWeightKernelMod()
-      : server_num_(0), indices_({}), weight_full_names_({}), fl_iteration_(0), total_iteration_(0) {}
+  FusedPullWeightKernelMod() : fl_iteration_(0) {}
   ~FusedPullWeightKernelMod() override = default;
 
-  bool Launch() {
-    MS_LOG(DEBUG) << "Launch FusedPullWeightKernelMod.";
-    if (inputs.size() != weight_full_names_.size()) {
-      MS_LOG(EXCEPTION) << "Input number is " << inputs.size() << ", but FusedPullWeightKernelMod needs "
-                        << weight_full_names_.size() << " weights as inputs.";
+  static std::shared_ptr<FusedPullWeightKernelMod> GetInstance() {
+    static std::shared_ptr<FusedPullWeightKernelMod> instance = nullptr;
+    if (instance == nullptr) {
+      instance.reset(new FusedPullWeightKernelMod());
+      instance->Init();
     }
+    return instance;
+  }
 
-    total_iteration_++;
-    uint64_t step_num_per_iteration = fl::worker::FLWorker::GetInstance().worker_step_num_per_iteration();
-    if (step_num_per_iteration == 0) {
-      MS_LOG(EXCEPTION) << "step number per iteration should not be 0";
-    }
-    MS_LOG(INFO) << "Try to pull weights. Local step number: " << total_iteration_
-                 << ", step number needs to run per iteration: " << step_num_per_iteration;
-    // The worker has to train kWorkerTrainStepNum standalone iterations before it communicates with server.
-    if (step_num_per_iteration != fl::kOneStepPerIteration &&
-        total_iteration_ % step_num_per_iteration != fl::kTrainBeginStepNum) {
-      return true;
-    }
-
+  py::dict Launch() {
+    MS_LOG(INFO) << "Launch FusedPullWeightKernelMod.";
+    py::dict dict_data;
     fl_iteration_++;
     MS_LOG(INFO) << "Launching pulling weight for federated learning iteration " << fl_iteration_;
 
@@ -70,7 +62,7 @@ class FusedPullWeightKernelMod : public AbstractKernel {
     while (retcode == schema::ResponseCode_SucNotReady) {
       if (!fl::worker::FLWorker::GetInstance().running()) {
         MS_LOG(WARNING) << "Worker has finished.";
-        return true;
+        return dict_data;
       }
       // Recreate fbb to avoid memory leak of FlatBuffers.
       fbb = std::make_shared<FBBuilder>();
@@ -109,7 +101,6 @@ class FusedPullWeightKernelMod : public AbstractKernel {
         fl_iteration_ = pull_weight_rsp->iteration();
         MS_LOG(DEBUG) << "Server is not ready for downloading yet. Reason: " << pull_weight_rsp->reason()->str()
                       << ". Retry later.";
-        continue;
       } else if (retcode != schema::ResponseCode_SUCCEED) {
         MS_LOG(WARNING) << "FusedPullWeight failed. Server return code: " << pull_weight_rsp->retcode()
                         << ", reason: " << pull_weight_rsp->reason()->str();
@@ -118,36 +109,59 @@ class FusedPullWeightKernelMod : public AbstractKernel {
       }
     }
 
-    auto feature_map = ParseFeatureMap(pull_weight_rsp);
-    for (size_t i = 0; i < weight_full_names_.size(); i++) {
-      const std::string &weight_name = weight_full_names_[i];
-      if (feature_map.count(weight_name) == 0) {
-        MS_LOG(EXCEPTION) << "The weights for " << weight_name << " is not pulled from server.";
-      }
-      int ret =
-        memcpy_s(inputs[i]->addr, inputs[i]->size, feature_map[weight_name].addr, feature_map[weight_name].size);
-      if (ret != 0) {
-        MS_LOG(EXCEPTION) << "memcpy_s error, errorno(" << ret << ")";
-      }
+    auto feature_map_fbs = pull_weight_rsp->feature_map();
+    if (feature_map_fbs->size() == 0) {
+      MS_LOG(EXCEPTION) << "Feature map fbs size is empty.";
     }
-    MS_LOG(INFO) << "Pull weights for " << weight_full_names_ << " success. Iteration: " << fl_iteration_;
+    auto &feature_maps = FLContext::instance()->feature_maps();
+    for (size_t i = 0; i < feature_map_fbs->size(); i++) {
+      const auto &feature_fbs = feature_map_fbs->Get(i);
+      const auto &feature_data_fbs = feature_fbs->data();
+
+      std::string weight_fullname = feature_fbs->weight_fullname()->str();
+      float *weight_data = const_cast<float *>(feature_data_fbs->data());
+      std::vector<float> weight_data_vec(weight_data, weight_data + feature_data_fbs->size());
+
+      Feature feature = feature_maps[weight_fullname];
+      py::list data_list;
+      data_list.append(feature.weight_type);
+      data_list.append(feature.weight_shape);
+      data_list.append(weight_data_vec);
+      data_list.append(weight_data_vec.size());
+      dict_data[py::str(weight_fullname)] = data_list;
+    }
+    MS_LOG(INFO) << "Pull weights for iteration: " << fl_iteration_ << " success.";
     fl::worker::FLWorker::GetInstance().SetIterationRunning();
-    return true;
+    return dict_data;
+  }
+
+  void Init() {
+    auto &feature_maps = FLContext::instance()->feature_maps();
+    for (const auto &item : feature_maps) {
+      weight_full_names_.push_back(item.first);
+    }
+    MS_LOG(INFO) << "Pull weight full names: " << weight_full_names_;
   }
 
  private:
-  template <typename T>
-  void InitFunc() {}
+ bool BuildPullWeightReq(std::shared_ptr<fl::FBBuilder> fbb) {
+    MS_EXCEPTION_IF_NULL(fbb);
+    std::vector<flatbuffers::Offset<flatbuffers::String>> fbs_weight_names;
+    for (const std::string &weight_name : weight_full_names_) {
+      auto fbs_weight_name = fbb->CreateString(weight_name);
+      fbs_weight_names.push_back(fbs_weight_name);
+    }
+    auto fbs_weight_names_vector = fbb->CreateVector(fbs_weight_names);
+    schema::RequestPullWeightBuilder req_pull_weight_builder(*(fbb.get()));
+    req_pull_weight_builder.add_weight_names(fbs_weight_names_vector);
+    req_pull_weight_builder.add_iteration(fl_iteration_);
+    auto req_pull_weight = req_pull_weight_builder.Finish();
+    fbb->Finish(req_pull_weight);
+    return true;
+  }
 
-  using FusedPullWeightInitFunc = std::function<void(FusedPullWeightKernelMod *)>;
-  static std::vector<std::pair<KernelAttr, FusedPullWeightInitFunc>> func_list_;
-  FusedPullWeightInitFunc init_func_;
-
-  uint32_t server_num_;
-  std::vector<int64_t> indices_;
-  std::vector<std::string> weight_full_names_;
   uint64_t fl_iteration_;
-  uint64_t total_iteration_;
+  std::vector<std::string> weight_full_names_;
 };
 }  // namespace kernel
 }  // namespace worker

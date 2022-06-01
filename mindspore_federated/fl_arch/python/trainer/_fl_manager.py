@@ -26,6 +26,10 @@ from mindspore.train.callback import Callback
 from mindspore._checkparam import Validator, Rel
 from mindspore_federated.python import log as logger
 
+ONE_STEP_PER_ITERATION = 1
+TRAIN_BEGIN_STEP_NUM = 1
+TRAIN_END_STEP_NUM = 0
+
 class _StartFLJob():
     """
     StartFLJob for Federated Learning Worker.
@@ -76,6 +80,43 @@ class _GetKeys():
         return Federated_.get_keys()
 
 
+class _PullWeight():
+    """
+    Pull Weight for Federated Learning Worker.
+    """
+
+    def __init__(self):
+        super(_PullWeight, self).__init__()
+
+    def construct(self):
+        return Federated_.pull_weight()
+
+
+class _PushWeight():
+    """
+    Push Weight for Federated Learning Worker.
+    """
+
+    def __init__(self, weights):
+        super(_PushWeight, self).__init__()
+        self._weights = weights
+
+    def construct(self):
+        return Federated_.push_weight(self._weights)
+
+
+class PushMetrics():
+    """
+    Push Metrics for Federated Learning Worker.
+    """
+
+    def __init__(self):
+        super(PushMetrics, self).__init__()
+
+    def construct(self, loss, accuracy):
+        return Federated_.push_metrics(loss, accuracy)
+
+
 class FederatedLearningManager(Callback):
     """
     Manage Federated Learning during training.
@@ -95,7 +136,7 @@ class FederatedLearningManager(Callback):
         This is an experimental prototype that is subject to change.
     """
 
-    def __init__(self, server_mode, model, sync_frequency, data_size, sync_type='fixed', **kwargs):
+    def __init__(self, server_mode, model, sync_frequency, data_size=1, sync_type='fixed', **kwargs):
         super(FederatedLearningManager, self).__init__()
         if server_mode not in ("FEDERATED_LEARNING", "HYBRID_TRAINING"):
             raise ValueError("server_mode must in (\"FEDERATED_LEARNING\", \"HYBRID_TRAINING\")")
@@ -116,6 +157,7 @@ class FederatedLearningManager(Callback):
         if self._is_adaptive_sync():
             self._as_set_init_state(kwargs)
             self._as_wrap_cell()
+        logger.info("Step number needs to run per iteration: {}".format(self._next_sync_iter_id))
     def _is_adaptive_sync(self):
         """
         Determine whether adaptive frequency synchronization is required.
@@ -225,6 +267,40 @@ class FederatedLearningManager(Callback):
         self._last_param = {_.name: deepcopy(_.asnumpy()) for _ in self._model.trainable_params()
                             if self._as_prefix not in _.name}
 
+    def start_pull_weight(self):
+        """
+        pull weight from server in hybrid training mode
+        """
+        logger.info("Try to pull weights. Local step number: {}".format(self._global_step))
+        # The worker has to train kWorkerTrainStepNum standalone iterations before it communicates with server.
+        if self._next_sync_iter_id != ONE_STEP_PER_ITERATION and self._global_step % self._next_sync_iter_id != TRAIN_BEGIN_STEP_NUM:
+            return
+        pull_weight = _PullWeight()
+        weights = pull_weight.construct()
+        if not weights:
+            raise ValueError("Weights from pulling weight is empty!")
+        parameter_dict = {}
+        for key, value in weights.items():
+            ms_type = tensor_to_ms_type[value[0].title()]
+            shape = value[1]
+            param_data = np.reshape(value[2], shape)
+            parameter_dict[key] = Parameter(Tensor(param_data, ms_type), name=key)
+        load_param_into_net(self._model, parameter_dict)
+
+    def start_push_weight(self):
+        """
+        push weight to server in hybrid training mode
+        """
+        logger.info("Try to push weights. Local step number: {}".format(self._global_step))
+        if self._next_sync_iter_id != ONE_STEP_PER_ITERATION and self._global_step % self._next_sync_iter_id != TRAIN_END_STEP_NUM:
+            return
+        weights = dict()
+        for param in self._model.trainable_params():
+            weight = param.asnumpy().reshape(-1).tolist()
+            weights[param.name] = weight
+        push_weight = _PushWeight(weights)
+        push_weight.construct()
+
     def step_end(self, run_context):
         """
         Synchronization parameters at the end of step. If sync_type is "adaptive", the synchronous frequency is
@@ -233,8 +309,8 @@ class FederatedLearningManager(Callback):
         Args:
             run_context (RunContext): Include some information of the model.
         """
+        self._global_step += 1
         if self._server_mode == "FEDERATED_LEARNING":
-            self._global_step += 1
             cb_params = run_context.original_args()
             self._data_size += cb_params.batch_num
             if self._global_step == self._next_sync_iter_id:
@@ -264,13 +340,12 @@ class FederatedLearningManager(Callback):
                     param_data = np.reshape(value[2], shape)
                     parameter_dict[key] = Parameter(Tensor(param_data, ms_type), name=key)
                 load_param_into_net(self._model, parameter_dict)
-                logger.info("Load param from get model into net.")
+                logger.info("Load param from get model into net, global step is {}.".format(self._global_step))
                 self._next_sync_iter_id = self._global_step + self._sync_frequency
                 if self._is_adaptive_sync():
                     self._as_analyze_gradient()
                     self._round_id += 1
                     self._as_set_last_param()
-
-                print("sync step is: {}".format(self._global_step))
         elif self._server_mode == "HYBRID_TRAINING":
-            pass
+            self.start_pull_weight()
+            self.start_push_weight()

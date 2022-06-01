@@ -41,11 +41,6 @@ namespace mindspore {
 namespace fl {
 using FBBuilder = flatbuffers::FlatBufferBuilder;
 
-// The step number for worker to judge whether to communicate with server.
-constexpr uint32_t kTrainBeginStepNum = 1;
-constexpr uint32_t kTrainEndStepNum = 0;
-constexpr uint32_t kOneStepPerIteration = 1;
-
 // The sleeping time of the worker thread before the networking is completed.
 constexpr uint32_t kWorkerSleepTimeForNetworking = 1000;
 
@@ -76,7 +71,6 @@ class MS_EXPORT FLWorker {
   uint32_t server_num() const;
   uint32_t worker_num() const;
   uint32_t rank_id() const;
-  uint64_t worker_step_num_per_iteration() const;
 
   // Check whether worker has exited.
   bool running() const;
@@ -118,7 +112,6 @@ class MS_EXPORT FLWorker {
         rank_id_(UINT32_MAX),
         iteration_num_(0),
         data_size_(0),
-        worker_step_num_per_iteration_(1),
         server_iteration_state_(IterationState::kCompleted),
         worker_iteration_state_(IterationState::kCompleted),
         safemode_(false),
@@ -160,9 +153,6 @@ class MS_EXPORT FLWorker {
 
   // Data size for this federated learning job.
   int data_size_;
-
-  // The worker standalone training step number before communicating with server. This used in hybrid training mode.
-  uint64_t worker_step_num_per_iteration_;
 
   // The iteration state is either running or completed.
   // This variable represents the server iteration state and should be changed by events

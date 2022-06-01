@@ -150,7 +150,6 @@ class GetModelKernelMod : public AbstractKernel {
   uint32_t target_server_rank_;
   std::string fl_name_;
   uint64_t iteration_;
-  std::map<std::string, size_t> weight_name_to_input_idx_;
 };
 }  // namespace kernel
 }  // namespace worker

@@ -35,7 +35,11 @@ PYBIND11_MODULE(_mindspore_federated, m) {
   (void)py::class_<FederatedJob, std::shared_ptr<FederatedJob>>(m, "Federated_")
     .def_static("start_federated_job", &FederatedJob::StartFederatedJob)
     .def_static("start_fl_job", &FederatedJob::StartFLJob)
-    .def_static("update_and_get_model", &FederatedJob::UpdateAndGetModel);
+    .def_static("update_and_get_model", &FederatedJob::UpdateAndGetModel)
+    .def_static("pull_weight", &FederatedJob::PullWeight)
+    .def_static("push_weight", &FederatedJob::PushWeight)
+    .def_static("push_metrics", &FederatedJob::PushMetrics);
+
 
   (void)py::class_<FLContext, std::shared_ptr<FLContext>>(m, "FLContext")
     .def_static("get_instance", &FLContext::instance, "Get fl context instance.")
@@ -92,10 +96,6 @@ PYBIND11_MODULE(_mindspore_federated, m) {
          "Set federated learning client learning rate.")
     .def("client_learning_rate", &FLContext::client_learning_rate,
          "Get worker's standalone training step number before communicating with server.")
-    .def("set_worker_step_num_per_iteration", &FLContext::set_worker_step_num_per_iteration,
-         "Set worker's standalone training step number before communicating with server..")
-    .def("worker_step_num_per_iteration", &FLContext::worker_step_num_per_iteration,
-         "Get federated learning client learning rate.")
     .def("set_secure_aggregation", &FLContext::set_secure_aggregation,
          "Set federated learning client using secure aggregation.")
     .def("set_dp_eps", &FLContext::set_dp_eps, "Set dp epsilon for federated learning secure aggregation.")

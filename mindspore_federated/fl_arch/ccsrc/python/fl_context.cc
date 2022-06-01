@@ -334,12 +334,6 @@ void FLContext::set_client_learning_rate(float client_learning_rate) { client_le
 
 float FLContext::client_learning_rate() const { return client_learning_rate_; }
 
-void FLContext::set_worker_step_num_per_iteration(uint64_t worker_step_num_per_iteration) {
-  worker_step_num_per_iteration_ = worker_step_num_per_iteration;
-}
-
-uint64_t FLContext::worker_step_num_per_iteration() const { return worker_step_num_per_iteration_; }
-
 void FLContext::set_secure_aggregation(bool secure_aggregation) { secure_aggregation_ = secure_aggregation; }
 
 bool FLContext::secure_aggregation() const { return secure_aggregation_; }

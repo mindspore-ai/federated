@@ -55,7 +55,6 @@ parser.add_argument("--client_epoch_num", type=int, default=20)
 parser.add_argument("--client_batch_size", type=int, default=32)
 # client_learning_rate is also used as the learning rate for Worker.
 parser.add_argument("--client_learning_rate", type=float, default=0.01)
-parser.add_argument("--worker_step_num_per_iteration", type=int, default=65)
 parser.add_argument("--scheduler_manage_port", type=int, default=11202)
 parser.add_argument("--config_file_path", type=str, default="")
 parser.add_argument("--encrypt_type", type=str, default="NOT_ENCRYPT")
@@ -87,7 +86,6 @@ fl_iteration_num = args.fl_iteration_num
 client_epoch_num = args.client_epoch_num
 client_batch_size = args.client_batch_size
 client_learning_rate = args.client_learning_rate
-worker_step_num_per_iteration = args.worker_step_num_per_iteration
 scheduler_manage_port = args.scheduler_manage_port
 config_file_path = args.config_file_path
 encrypt_type = args.encrypt_type
@@ -114,7 +112,6 @@ ctx = {
     "client_epoch_num": client_epoch_num,
     "client_batch_size": client_batch_size,
     "client_learning_rate": client_learning_rate,
-    "worker_step_num_per_iteration": worker_step_num_per_iteration,
     "scheduler_manage_port": scheduler_manage_port,
     "config_file_path": config_file_path,
     "encrypt_type": encrypt_type,

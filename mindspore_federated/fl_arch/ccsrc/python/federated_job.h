@@ -35,6 +35,9 @@ class MS_EXPORT FederatedJob {
 
   static bool StartFLJob(size_t data_size);
   static py::dict UpdateAndGetModel(std::map<std::string, std::vector<float>> weight_datas);
+  static py::dict PullWeight();
+  static bool PushWeight(std::map<std::string, std::vector<float>> &weight_datas);
+  static bool PushMetrics(float loss, float accuracy);
 };
 }  // namespace fl
 }  // namespace mindspore

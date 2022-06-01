@@ -64,6 +64,7 @@ parser.add_argument("--download_compress_type", type=str, default="NO_COMPRESS",
                     choices=["NO_COMPRESS", "QUANT"])
 parser.add_argument("--checkpoint_dir", type=str, default="")
 parser.add_argument("--model_path", type=str, default="")
+parser.add_argument("--dataset_path", type=str, default="")
 
 if __name__ == "__main__":
     args, _ = parser.parse_known_args()
@@ -106,6 +107,7 @@ if __name__ == "__main__":
     download_compress_type = args.download_compress_type
     checkpoint_dir = args.checkpoint_dir
     model_path = args.model_path
+    dataset_path = args.dataset_path
 
     if local_worker_num == -1:
         local_worker_num = worker_num
@@ -157,6 +159,7 @@ if __name__ == "__main__":
         cmd_server += " --download_compress_type=" + str(download_compress_type)
         cmd_server += " --checkpoint_dir=" + str(checkpoint_dir)
         cmd_server += " --model_path=" + str(model_path)
+        cmd_server += " --dataset_path=" + str(dataset_path)
         cmd_server += " > worker.log 2>&1 &"
 
         import time
