@@ -27,7 +27,6 @@ parser.add_argument("--fl_iteration_num", type=int, default=25)
 parser.add_argument("--client_epoch_num", type=int, default=20)
 parser.add_argument("--client_batch_size", type=int, default=32)
 parser.add_argument("--client_learning_rate", type=float, default=0.01)
-parser.add_argument("--worker_step_num_per_iteration", type=int, default=65)
 parser.add_argument("--local_worker_num", type=int, default=-1)
 parser.add_argument("--config_file_path", type=str, default="")
 parser.add_argument("--dataset_path", type=str, default="")
@@ -46,7 +45,6 @@ fl_iteration_num = args.fl_iteration_num
 client_epoch_num = args.client_epoch_num
 client_batch_size = args.client_batch_size
 client_learning_rate = args.client_learning_rate
-worker_step_num_per_iteration = args.worker_step_num_per_iteration
 local_worker_num = args.local_worker_num
 config_file_path = args.config_file_path
 dataset_path = args.dataset_path
@@ -77,7 +75,6 @@ for i in range(local_worker_num):
     cmd_worker += " --client_epoch_num=" + str(client_epoch_num)
     cmd_worker += " --client_batch_size=" + str(client_batch_size)
     cmd_worker += " --client_learning_rate=" + str(client_learning_rate)
-    cmd_worker += " --worker_step_num_per_iteration=" + str(worker_step_num_per_iteration)
     cmd_worker += " --dataset_path=" + str(dataset_path)
     cmd_worker += " --encrypt_type=" + str(encrypt_type)
     cmd_worker += " --user_id=" + str(i)

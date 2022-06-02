@@ -24,7 +24,7 @@
 #include <functional>
 #include <utility>
 #include "worker/kernel/abstract_kernel.h"
-#include "worker/kernel/fl_worker.h"
+#include "worker/fl_worker.h"
 
 namespace mindspore {
 namespace fl {
@@ -39,40 +39,21 @@ class PushMetricsKernelMod : public AbstractKernel {
   PushMetricsKernelMod() : fbb_(nullptr), total_iteration_(0) {}
   ~PushMetricsKernelMod() override = default;
 
-  bool Launch(const std::vector<AddressPtr> &inputs) override {
-      return false;
-  }
-
   void Init() {
     fbb_ = std::make_shared<FBBuilder>();
     MS_EXCEPTION_IF_NULL(fbb_);
   }
 
- private:
-  template <typename T>
-  bool BuildPushMetricsReq(const std::shared_ptr<FBBuilder> &fbb, T loss, T accuracy) {
-    MS_EXCEPTION_IF_NULL(fbb);
-    schema::RequestPushMetricsBuilder req_push_metrics_builder(*(fbb.get()));
-    req_push_metrics_builder.add_loss(loss);
-    req_push_metrics_builder.add_accuracy(accuracy);
-    auto req_push_metrics = req_push_metrics_builder.Finish();
-    fbb->Finish(req_push_metrics);
-    return true;
+  static std::shared_ptr<PushMetricsKernelMod> GetInstance() {
+    static std::shared_ptr<PushMetricsKernelMod> instance = nullptr;
+    if (instance == nullptr) {
+      instance.reset(new PushMetricsKernelMod());
+      instance->Init();
+    }
+    return instance;
   }
 
-  template <typename T>
-  bool LaunchKernel(const std::vector<kernel::AddressPtr> &inputs, const std::vector<kernel::AddressPtr> &,
-                    const std::vector<kernel::AddressPtr> &) {
-    if (inputs.size() != 2) {
-      MS_LOG(EXCEPTION) << "Input number of PushMetricsKernelMod should be " << 2 << ", but got " << inputs.size();
-      return false;
-    }
-
-    MS_EXCEPTION_IF_NULL(inputs[0]->addr);
-    MS_EXCEPTION_IF_NULL(inputs[1]->addr);
-    T loss = *(static_cast<float *>(inputs[0]->addr));
-    T accuracy = *(static_cast<float *>(inputs[1]->addr));
-
+  bool Launch(float loss, float accuracy) {
     if (!BuildPushMetricsReq(fbb_, loss, accuracy)) {
       MS_LOG(EXCEPTION) << "Building request for FusedPushWeight failed.";
       return false;
@@ -120,11 +101,17 @@ class PushMetricsKernelMod : public AbstractKernel {
     return true;
   }
 
-  using PushMetricsFunc =
-    std::function<bool(PushMetricsKernelMod *, const std::vector<kernel::AddressPtr> &,
-                       const std::vector<kernel::AddressPtr> &, const std::vector<kernel::AddressPtr> &)>;
-  static std::vector<std::pair<KernelAttr, PushMetricsFunc>> func_list_;
-  PushMetricsFunc kernel_func_;
+ private:
+  template <typename T>
+  bool BuildPushMetricsReq(const std::shared_ptr<FBBuilder> &fbb, T loss, T accuracy) {
+    MS_EXCEPTION_IF_NULL(fbb);
+    schema::RequestPushMetricsBuilder req_push_metrics_builder(*(fbb.get()));
+    req_push_metrics_builder.add_loss(loss);
+    req_push_metrics_builder.add_accuracy(accuracy);
+    auto req_push_metrics = req_push_metrics_builder.Finish();
+    fbb->Finish(req_push_metrics);
+    return true;
+  }
 
   std::shared_ptr<FBBuilder> fbb_;
   size_t total_iteration_;

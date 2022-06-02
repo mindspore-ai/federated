@@ -34,36 +34,25 @@ namespace kernel {
 constexpr int kRetryDurationOfPushWeights = 200;
 class FusedPushWeightKernelMod : public AbstractKernel {
  public:
-  FusedPushWeightKernelMod()
-      : server_num_(0), indices_({}), weight_full_names_({}), fl_iteration_(0), total_iteration_(0) {}
+  FusedPushWeightKernelMod() : fl_iteration_(0) {}
   ~FusedPushWeightKernelMod() override = default;
 
-  bool Launch(const std::vector<AddressPtr> &inputs) {
-    MS_LOG(DEBUG) << "Launch FusedPushWeightKernelMod.";
-    if (inputs.size() != weight_full_names_.size()) {
-      MS_LOG(EXCEPTION) << "Input number is " << inputs.size() << ", but FusedPushWeightKernelMod needs "
-                        << weight_full_names_.size() << " weights as inputs.";
+  static std::shared_ptr<FusedPushWeightKernelMod> GetInstance() {
+    static std::shared_ptr<FusedPushWeightKernelMod> instance = nullptr;
+    if (instance == nullptr) {
+      instance.reset(new FusedPushWeightKernelMod());
     }
+    return instance;
+  }
 
+  bool Launch(std::map<std::string, std::vector<float>> &weight_datas) {
+    MS_LOG(INFO) << "Launch FusedPushWeightKernelMod.";
     std::shared_ptr<FBBuilder> fbb = std::make_shared<FBBuilder>();
     MS_EXCEPTION_IF_NULL(fbb);
 
-    total_iteration_++;
-    uint64_t step_num_per_iteration = fl::worker::FLWorker::GetInstance().worker_step_num_per_iteration();
-    if (step_num_per_iteration == 0) {
-      MS_LOG(EXCEPTION) << "step number per iterationb should not be 0";
-    }
-    MS_LOG(INFO) << "Try to push weights. Local step number: " << total_iteration_
-                 << ", step number needs to run per iteration: " << step_num_per_iteration;
-    // The worker has to train kWorkerTrainStepNum standalone iterations before it communicates with server.
-    if (step_num_per_iteration != fl::kOneStepPerIteration &&
-        total_iteration_ % step_num_per_iteration != fl::kTrainEndStepNum) {
-      return true;
-    }
-
     fl_iteration_++;
     MS_LOG(INFO) << "Launching pushing weight for federated learning iteration " << fl_iteration_;
-    if (!BuildPushWeightReq(fbb, inputs)) {
+    if (!BuildPushWeightReq(fbb, weight_datas)) {
       MS_LOG(EXCEPTION) << "Building request for FusedPushWeight failed.";
     }
 
@@ -95,7 +84,7 @@ class FusedPushWeightKernelMod : public AbstractKernel {
           fl_iteration_ = push_weight_rsp->iteration();
           MS_LOG(DEBUG) << "Server is not ready for pushing weight yet. Reason: " << push_weight_rsp->reason()->str()
                         << ". Retry later.";
-          if (!BuildPushWeightReq(fbb, inputs)) {
+          if (!BuildPushWeightReq(fbb, weight_datas)) {
             MS_LOG(EXCEPTION) << "Building request for FusedPushWeight failed.";
           }
           continue;
@@ -108,20 +97,22 @@ class FusedPushWeightKernelMod : public AbstractKernel {
       }
     }
 
-    MS_LOG(INFO) << "Push weights for " << weight_full_names_ << " success. Iteration: " << fl_iteration_;
+    MS_LOG(INFO) << "Push weights for iteration: " << fl_iteration_ << " success.";
     return true;
   }
 
   void Init() override {}
 
  private:
-  bool BuildPushWeightReq(std::shared_ptr<FBBuilder> fbb, const std::vector<AddressPtr> &weights) {
+  bool BuildPushWeightReq(std::shared_ptr<FBBuilder> fbb, std::map<std::string, std::vector<float>> &weight_datas) {
     std::vector<flatbuffers::Offset<schema::FeatureMap>> fbs_feature_maps;
-    for (size_t i = 0; i < weight_full_names_.size(); i++) {
-      const std::string &weight_name = weight_full_names_[i];
+    for (auto &weight : weight_datas) {
+      const std::string &weight_name = weight.first;
       auto fbs_weight_fullname = fbb->CreateString(weight_name);
-      auto fbs_weight_data =
-        fbb->CreateVector(reinterpret_cast<const float *>(weights[i]->addr), weights[i]->size / sizeof(float));
+      auto &weight_data = weight_datas[weight_name];
+      float weights[weight_data.size()];
+      std::copy(weight_data.begin(), weight_data.end(), weights);
+      auto fbs_weight_data = fbb->CreateVector(reinterpret_cast<const float *>(weights), weight_data.size());
       auto fbs_feature_map = schema::CreateFeatureMap(*(fbb.get()), fbs_weight_fullname, fbs_weight_data);
       fbs_feature_maps.push_back(fbs_feature_map);
     }
@@ -135,16 +126,7 @@ class FusedPushWeightKernelMod : public AbstractKernel {
     return true;
   }
 
-  template <typename T>
-  void InitFunc() {
-
-  }
-
-  uint32_t server_num_;
-  std::vector<int64_t> indices_;
-  std::vector<std::string> weight_full_names_;
   size_t fl_iteration_;
-  uint64_t total_iteration_;
 };
 }  // namespace kernel
 }  // namespace worker

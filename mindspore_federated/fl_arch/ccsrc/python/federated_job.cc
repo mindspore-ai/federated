@@ -24,12 +24,19 @@
 #include "worker/kernel/start_fl_job_kernel.h"
 #include "worker/kernel/update_model_kernel.h"
 #include "worker/kernel/get_model_kernel.h"
+#include "worker/kernel/fused_pull_weight_kernel.h"
+#include "worker/kernel/fused_push_weight_kernel.h"
+#include "worker/kernel/push_metrics_kernel.h"
 
 namespace mindspore {
 namespace fl {
 using StartFLJobKernelMod = worker::kernel::StartFLJobKernelMod;
 using UpdateModelKernelMod = worker::kernel::UpdateModelKernelMod;
 using GetModelKernelMod = worker::kernel::GetModelKernelMod;
+using FusedPullWeightKernelMod = worker::kernel::FusedPullWeightKernelMod;
+using FusedPushWeightKernelMod = worker::kernel::FusedPushWeightKernelMod;
+using PushMetricsKernelMod = worker::kernel::PushMetricsKernelMod;
+
 void FederatedJob::StartFederatedJob() {
   bool result = false;
   if (FLContext::instance()->is_server()) {
@@ -121,6 +128,18 @@ py::dict FederatedJob::UpdateAndGetModel(std::map<std::string, std::vector<float
     return dict_data;
   }
   return GetModelKernelMod::GetInstance()->Launch();
+}
+
+py::dict FederatedJob::PullWeight() {
+  return FusedPullWeightKernelMod::GetInstance()->Launch();
+}
+
+bool FederatedJob::PushWeight(std::map<std::string, std::vector<float>> &weight_datas) {
+  return FusedPushWeightKernelMod::GetInstance()->Launch(weight_datas);
+}
+
+bool FederatedJob::PushMetrics(float loss, float accuracy) {
+  return PushMetricsKernelMod::GetInstance()->Launch(loss, accuracy);
 }
 }  // namespace fl
 }  // namespace mindspore

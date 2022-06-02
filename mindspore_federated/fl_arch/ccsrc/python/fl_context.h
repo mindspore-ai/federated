@@ -148,9 +148,6 @@ class MS_EXPORT FLContext {
   void set_client_learning_rate(float client_learning_rate);
   float client_learning_rate() const;
 
-  void set_worker_step_num_per_iteration(uint64_t worker_step_num_per_iteration);
-  uint64_t worker_step_num_per_iteration() const;
-
   // Set true if using secure aggregation for federated learning.
   void set_secure_aggregation(bool secure_aggregation);
   bool secure_aggregation() const;
@@ -272,7 +269,6 @@ class MS_EXPORT FLContext {
         client_epoch_num_(25),
         client_batch_size_(32),
         client_learning_rate_(0.001),
-        worker_step_num_per_iteration_(65),
         secure_aggregation_(false),
         cluster_config_(nullptr),
         root_first_ca_path_(""),
@@ -364,9 +360,6 @@ class MS_EXPORT FLContext {
 
   // Client training learning rate. Used in federated learning for now.
   float client_learning_rate_;
-
-  // The worker standalone training step number before communicating with server.
-  uint64_t worker_step_num_per_iteration_;
 
   // Whether to use secure aggregation algorithm. Used in federated learning for now.
   bool secure_aggregation_;
