@@ -88,6 +88,11 @@ parser.add_argument("--download_compress_type", type=str, default="NO_COMPRESS",
                     choices=["NO_COMPRESS", "QUANT"])
 parser.add_argument("--checkpoint_dir", type=str, default="")
 parser.add_argument("--model_path", type=str, default="")
+parser.add_argument("--dataset_path", type=str, default="")
+parser.add_argument("--sync_type", type=str, default="fixed", choices=["fixed", "adaptive"])
+parser.add_argument("--user_id", type=str, default="0")
+parser.add_argument('--img_size', type=int, default=(32, 32, 1), help='the image size of (h,w,c)')
+parser.add_argument('--repeat_size', type=int, default=1, help='the repeat size when create the dataLoader')
 
 args, _ = parser.parse_known_args()
 device_target = args.device_target
@@ -135,6 +140,9 @@ upload_sparse_rate = args.upload_sparse_rate
 download_compress_type = args.download_compress_type
 checkpoint_dir = args.checkpoint_dir
 model_path = args.model_path
+dataset_path = args.dataset_path
+user_id = args.user_id
+sync_type = args.sync_type
 
 ctx = {
     "server_mode": server_mode,
@@ -351,7 +359,7 @@ def train():
     # construct dataset
     ds.config.set_seed(1)
     data_root_path = dataset_path
-    user = "dataset_" + user_id
+    user = "dataset_0"
     train_path = os.path.join(data_root_path, user, "train")
     test_path = os.path.join(data_root_path, user, "test")
 

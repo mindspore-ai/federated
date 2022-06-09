@@ -140,6 +140,8 @@ class MS_EXPORT FLWorker {
   void ProcessAfterScalingOut();
   void ProcessAfterScalingIn();
 
+  void HandleQueryNodeScaleStateRequest(const std::shared_ptr<fl::core::MessageHandler> &message);
+
   std::atomic_bool running_;
   uint32_t server_num_;
   uint32_t worker_num_;
@@ -178,6 +180,10 @@ class MS_EXPORT FLWorker {
   std::vector<EncryptPublicKeys> public_keys_list_;
 
   std::string encrypt_type_;
+
+  std::shared_ptr<fl::core::TaskExecutor> task_executor_;
+
+  std::shared_ptr<fl::core::CommunicatorBase> communicator_;
 };
 }  // namespace worker
 }  // namespace fl

@@ -34,22 +34,19 @@ bool FLWorker::Run() {
     return false;
   }
   running_ = true;
-  worker_num_ = FLContext::instance()->initial_worker_num();
-  server_num_ = FLContext::instance()->initial_server_num();
   scheduler_ip_ = FLContext::instance()->scheduler_ip();
   scheduler_port_ = FLContext::instance()->scheduler_port();
   encrypt_type_ = FLContext::instance()->encrypt_type();
-  FLContext::instance()->cluster_config().scheduler_ip = scheduler_ip_;
-  FLContext::instance()->cluster_config().scheduler_port = scheduler_port_;
-  FLContext::instance()->cluster_config().initial_worker_num = worker_num_;
-  FLContext::instance()->cluster_config().initial_server_num = server_num_;
-  MS_LOG(INFO) << "Initialize cluster config for worker. Worker number:" << worker_num_
-               << ", Server number:" << server_num_ << ", Scheduler ip:" << scheduler_ip_
-               << ", Scheduler port:" << scheduler_port_
-               << ", Encrypt type: " << encrypt_type_;
 
   worker_node_ = std::make_shared<fl::core::WorkerNode>();
   MS_EXCEPTION_IF_NULL(worker_node_);
+  constexpr size_t kExecutorThreadPoolSize = 32;
+  task_executor_ = std::make_shared<fl::core::TaskExecutor>(kExecutorThreadPoolSize);
+  communicator_ = worker_node_->GetOrCreateTcpComm(scheduler_ip_, static_cast<int16_t>(scheduler_port_),
+                                                   FLContext::instance()->initial_worker_num(),
+                                                   FLContext::instance()->initial_server_num(), task_executor_);
+  communicator_->RegisterMsgCallBack(
+    "queryNodeScaleState", std::bind(&FLWorker::HandleQueryNodeScaleStateRequest, this, std::placeholders::_1));
 
   worker_node_->SetCancelSafeModeCallBack([this]() -> void { safemode_ = false; });
   worker_node_->RegisterEventCallback(fl::core::ClusterEvent::SCHEDULER_TIMEOUT, [this]() {
@@ -75,10 +72,12 @@ bool FLWorker::Run() {
   });
 
   InitializeFollowerScaler();
-  if (!worker_node_->Start()) {
-    MS_LOG(EXCEPTION) << "Starting worker node failed.";
+  if (!communicator_->Start()) {
+    MS_LOG(EXCEPTION) << "Starting communicator failed.";
     return false;
   }
+  server_num_ = worker_node_->server_num();
+  worker_num_ = worker_node_->worker_num();
   rank_id_ = worker_node_->rank_id();
 
   std::this_thread::sleep_for(std::chrono::milliseconds(kWorkerSleepTimeForNetworking));
@@ -265,6 +264,22 @@ void FLWorker::ProcessAfterScalingIn() {
                << ". Exit safemode.";
   std::this_thread::sleep_for(std::chrono::milliseconds(kWorkerSleepTimeForNetworking));
   safemode_ = false;
+}
+
+void FLWorker::HandleQueryNodeScaleStateRequest(const std::shared_ptr<fl::core::MessageHandler> &message) {
+  MS_ERROR_IF_NULL_WO_RET_VAL(message);
+
+  nlohmann::basic_json<std::map, std::vector, std::string> response;
+  response["node_scale_state"] = worker_node_->node_scale_state_str();
+
+  auto tcp_comm = std::dynamic_pointer_cast<fl::core::TcpCommunicator>(communicator_);
+  MS_ERROR_IF_NULL_WO_RET_VAL(tcp_comm);
+  if (!tcp_comm->SendResponse(response.dump().c_str(), response.dump().size(), message)) {
+    MS_LOG(ERROR) << "Sending response failed.";
+    return;
+  }
+
+  MS_LOG(INFO) << "Response query node scale state success, response data is " << response.dump().c_str();
 }
 }  // namespace worker
 }  // namespace fl
