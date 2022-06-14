@@ -75,7 +75,7 @@ def test_hybrid_one_server_success():
     http_server_address = "127.0.0.1:3001"
     yaml_config_file = f"temp/yaml_{fl_name}_config.yaml"
     fl_iteration_num = 5
-    server_mode = ms_fl.ServerModeHybrid
+    server_mode = "HYBRID_TRAINING"
     make_yaml_config(fl_name, {}, output_yaml_file=yaml_config_file, fl_iteration_num=fl_iteration_num,
                      server_mode=server_mode)
 
@@ -163,7 +163,7 @@ def test_hybrid_two_server_success():
     http_server_address2 = "127.0.0.1:3002"
     yaml_config_file = f"temp/yaml_{fl_name}_config.yaml"
     fl_iteration_num = 5
-    server_mode = ms_fl.ServerModeHybrid
+    server_mode = "HYBRID_TRAINING"
     make_yaml_config(fl_name, {}, output_yaml_file=yaml_config_file, fl_iteration_num=fl_iteration_num,
                      server_mode=server_mode)
 

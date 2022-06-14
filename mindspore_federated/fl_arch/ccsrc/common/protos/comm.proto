@@ -90,6 +90,7 @@ enum InstanceState {
   kStateRunning = 0;
   kStateDisable = 1;
   kStateFinish = 2;
+  kStateStop = 3;
 }
 
 message ProtoModel {

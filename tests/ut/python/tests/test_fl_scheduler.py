@@ -16,12 +16,12 @@
 import time
 
 import numpy as np
-import json
+import psutil
 
 from common import fl_name_with_idx, make_yaml_config, g_redis_server_address, fl_test
 from common import start_fl_server, start_fl_scheduler
 from common import post_scheduler_new_instance_msg, post_scheduler_query_instance_msg, post_scheduler_state_msg
-from common import post_scheduler_enable_msg, post_scheduler_disable_msg
+from common import post_scheduler_enable_msg, post_scheduler_disable_msg, post_scheduler_stop_msg
 from common_client import post_start_fl_job, post_get_model, post_update_model
 from common_client import server_safemode_rsp, server_disabled_finished_rsp
 from common_client import ResponseCode, ResponseFLJob, ResponseGetModel, ResponseUpdateModel
@@ -456,3 +456,69 @@ def test_fl_scheduler_post_new_instance_success():
     assert isinstance(fl_job_rsp, ResponseFLJob.ResponseFLJob)
     assert fl_job_rsp.Iteration() == 1
     check_feature_map(new_feature_map, client_feature_map)
+
+
+@fl_test
+def test_fl_scheduler_post_stop_success():
+    """
+    Feature: Scheduler
+    Description: Test the function of posting /newInstance and /queryInstance messages to Scheduler
+    Expectation: Scheduler processes the /newInstance and /queryInstance messages as expected
+    """
+    fl_name = fl_name_with_idx("FlTest")
+    http_server_address = "127.0.0.1:3001"
+    http_server_address2 = "127.0.0.1:3002"
+    yaml_config_file = f"temp/yaml_{fl_name}_config.yaml"
+    fl_iteration_num = 5
+    make_yaml_config(fl_name, {}, output_yaml_file=yaml_config_file, fl_iteration_num=fl_iteration_num)
+
+    scheduler_http_address = "127.0.0.1:4000"
+    start_fl_scheduler(yaml_config_file, scheduler_http_address)
+    # post scheduler message before start server
+    # post /newInstance message
+    post_rsp = post_scheduler_stop_msg(scheduler_http_address)
+    assert "message" in post_rsp and "FL job " + fl_name + " has stopped" in post_rsp["message"]
+    assert "code" in post_rsp and post_rsp["code"] == "0"
+
+    np.random.seed(0)
+    feature_map = FeatureMap()
+    init_feature_map = create_default_feature_map()
+    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], requires_aggr=True)
+    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], requires_aggr=True)
+    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], requires_aggr=True)
+    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], requires_aggr=False)
+
+    # start two server
+    server1 = start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file,
+                              http_server_address=http_server_address)
+    server2 = start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file,
+                              http_server_address=http_server_address2)
+
+    for i in range(6):  # for 3s
+        post_rsp = post_scheduler_stop_msg(scheduler_http_address)
+        assert "code" in post_rsp and post_rsp["code"] == "0"
+        assert "message" in post_rsp
+        if "FL job " + fl_name + " has stopped" in post_rsp["message"]:
+            break
+        time.sleep(0.5)
+    assert "FL job " + fl_name + " has stopped" in post_rsp["message"]
+
+    try:
+        process = psutil.Process(server1.pid)
+        assert not process.is_running()
+    except Exception:
+        pass
+    try:
+        process = psutil.Process(server2.pid)
+        assert not process.is_running()
+    except Exception:
+        pass
+
+    make_yaml_config(fl_name, {}, output_yaml_file=yaml_config_file, start_fl_job_threshold=100)
+    start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address)
+    # post /queryInstance message
+    post_rsp = post_scheduler_query_instance_msg(scheduler_http_address)
+    assert "message" in post_rsp and f"Query Instance successful." in post_rsp["message"]
+    assert "code" in post_rsp and post_rsp["code"] == "0"
+    assert "result" in post_rsp
+    assert post_rsp["result"]["start_fl_job_threshold"] == 100
