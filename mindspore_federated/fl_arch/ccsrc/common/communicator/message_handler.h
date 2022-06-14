@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-#ifndef MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_MESSAGE_HANDLER_H_
-#define MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_MESSAGE_HANDLER_H_
+#ifndef MINDSPORE_CCSRC_FL_COMMUNICATOR_MESSAGE_HANDLER_H_
+#define MINDSPORE_CCSRC_FL_COMMUNICATOR_MESSAGE_HANDLER_H_
 
 namespace mindspore {
 namespace fl {
-namespace core {
 typedef void (*RefBufferRelCallback)(const void *data, size_t datalen, void *extra);
 // MessageHandler class is used to handle requests from clients and send response from server.
 // It's the base class of HttpMsgHandler and TcpMsgHandler.
@@ -29,21 +28,25 @@ class MessageHandler {
   virtual ~MessageHandler() = default;
 
   // Raw data of this message in bytes.
-  virtual void *data() const = 0;
+  virtual const void *data() const = 0;
 
   // Raw data size of this message.(Number of bytes)
   virtual size_t len() const = 0;
 
+  bool HasSentResponse() { return has_sent_response_; }
   virtual bool SendResponse(const void *data, const size_t &len) = 0;
   virtual bool SendResponseInference(const void *data, const size_t &len, RefBufferRelCallback cb) {
     auto ret = SendResponse(data, len);
     if (cb) {
       cb(data, len, nullptr);
     }
+    has_sent_response_ = true;
     return ret;
   }
+
+ protected:
+  bool has_sent_response_ = false;
 };
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore
-#endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_MESSAGE_HANDLER_H_
+#endif  // MINDSPORE_CCSRC_FL_COMMUNICATOR_MESSAGE_HANDLER_H_

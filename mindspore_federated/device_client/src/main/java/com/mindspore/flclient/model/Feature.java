@@ -21,7 +21,7 @@ package com.mindspore.flclient.model;
  *
  * @since v1.0
  */
-public class Feature {
+public class FeatureInfo {
     int[] inputIds;
     int[] inputMasks;
     int[] tokenIds;
@@ -37,7 +37,7 @@ public class Feature {
      * @param labelIds label ids
      * @param seqLen seq len
      */
-    public Feature(int[] inputIds, int[] inputMasks, int[] tokenIds, int labelIds, int seqLen) {
+    public FeatureInfo(int[] inputIds, int[] inputMasks, int[] tokenIds, int labelIds, int seqLen) {
         this.inputIds = inputIds;
         this.inputMasks = inputMasks;
         this.tokenIds = tokenIds;

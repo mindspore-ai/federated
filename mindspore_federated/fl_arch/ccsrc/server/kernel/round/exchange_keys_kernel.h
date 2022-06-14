@@ -31,21 +31,15 @@ namespace mindspore {
 namespace fl {
 namespace server {
 namespace kernel {
-// results of signature verification
-enum sigVerifyResult { FAILED, TIMEOUT, PASSED };
-
 class ExchangeKeysKernel : public RoundKernel {
  public:
   ExchangeKeysKernel() = default;
   ~ExchangeKeysKernel() override = default;
   void InitKernel(size_t required_cnt) override;
-  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<fl::core::MessageHandler> &message) override;
-  bool Reset() override;
+  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<MessageHandler> &message) override;
 
  private:
-  Executor *executor_;
-  size_t iteration_time_window_;
-  armour::CipherKeys *cipher_key_;
+  armour::CipherKeys *cipher_key_ = nullptr;
   sigVerifyResult VerifySignature(const schema::RequestExchangeKeys *exchange_keys_req);
   bool ReachThresholdForExchangeKeys(const std::shared_ptr<FBBuilder> &fbb, const size_t iter_num);
   bool CountForExchangeKeys(const std::shared_ptr<FBBuilder> &fbb, const schema::RequestExchangeKeys *exchange_keys_req,

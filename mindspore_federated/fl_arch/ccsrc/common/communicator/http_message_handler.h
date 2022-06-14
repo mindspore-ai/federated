@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_HTTP_MESSAGE_HANDLER_H_
-#define MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_HTTP_MESSAGE_HANDLER_H_
+#ifndef MINDSPORE_CCSRC_FL_COMMUNICATOR_HTTP_MESSAGE_HANDLER_H_
+#define MINDSPORE_CCSRC_FL_COMMUNICATOR_HTTP_MESSAGE_HANDLER_H_
 
 #include <event2/buffer.h>
 #include <event2/event.h>
@@ -36,13 +36,12 @@
 
 #include "common/core/comm_util.h"
 #include "common/utils/log_adapter.h"
-#include "common/communicator/request_process_result_code.h"
 #include "nlohmann/json.hpp"
 #include "common/constants.h"
+#include "common/status.h"
 
 namespace mindspore {
 namespace fl {
-namespace core {
 using HttpHeaders = std::map<std::string, std::list<std::string>>;
 
 class HttpMessageHandler {
@@ -94,13 +93,14 @@ class HttpMessageHandler {
   void QuickResponse(int code, const void *body, size_t len);
   void QuickResponseInference(int code, const void *body, size_t len, evbuffer_ref_cleanup_cb cb);
   void SimpleResponse(int code, const HttpHeaders &headers, const std::string &body);
-  void ErrorResponse(int code, const RequestProcessResult &status);
+  void ErrorResponse(int code, const FlStatus &status);
+  void ErrorResponse(int code, const std::string &error_msg);
 
   // If message is empty, libevent will use default error code message instead
   void RespError(int nCode, const std::string &message);
   // Body length should no more than MAX_POST_BODY_LEN, default 64kB
   void ParsePostParam();
-  RequestProcessResult ParsePostMessageToJson();
+  FlStatus ParsePostMessageToJson();
   void ReceiveMessage(const void *buffer, size_t num);
   void set_content_len(const uint64_t &len);
   uint64_t content_len() const;
@@ -112,10 +112,10 @@ class HttpMessageHandler {
   std::shared_ptr<std::vector<char>> body();
   void set_body(const std::shared_ptr<std::vector<char>> &body);
   nlohmann::json request_message() const;
-  RequestProcessResult ParseValueFromKey(const std::string &key, uint32_t *const value);
+  FlStatus ParseValueFromKey(const std::string &key, uint32_t *const value);
 
   // Parse node ids when receiving an http request for scale in
-  RequestProcessResult ParseNodeIdsFromKey(const std::string &key, std::vector<std::string> *const value);
+  FlStatus ParseNodeIdsFromKey(const std::string &key, std::vector<std::string> *const value);
 
  private:
   struct evhttp_request *event_request_;
@@ -134,7 +134,6 @@ class HttpMessageHandler {
   uint64_t offset_;
   nlohmann::json request_message_;
 };
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore
-#endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_HTTP_MESSAGE_HANDLER_H_
+#endif  // MINDSPORE_CCSRC_FL_COMMUNICATOR_HTTP_MESSAGE_HANDLER_H_

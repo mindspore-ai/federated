@@ -35,13 +35,10 @@
 
 #include "common/utils/log_adapter.h"
 #include "common/core/comm_util.h"
-#include "common/core/configuration.h"
-#include "common/core/file_configuration.h"
 #include "common/constants.h"
 
 namespace mindspore {
 namespace fl {
-namespace core {
 class SSLWrapper {
  public:
   void InitSSL();
@@ -59,9 +56,9 @@ class SSLWrapper {
 
   void CleanSSL();
   time_t ConvertAsn1Time(const ASN1_TIME *const time) const;
-  void StartCheckCertTime(const Configuration &config, const X509 *cert, const std::string &ca_path);
+  void StartCheckCertTime(uint64_t cert_expire_warning_time_in_day, const X509 *cert, const std::string &ca_path);
   void StopCheckCertTime();
-  void InitSSLCtx(const Configuration &config, const X509 *cert, const EVP_PKEY *pkey);
+  void InitSSLCtx(const X509 *cert, const EVP_PKEY *pkey);
 
   SSL_CTX *ssl_ctx_;
 
@@ -76,7 +73,6 @@ class SSLWrapper {
   std::condition_variable cond_;
   std::mutex verify_mutex_;
 };
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_SSL_WRAPPER_H_

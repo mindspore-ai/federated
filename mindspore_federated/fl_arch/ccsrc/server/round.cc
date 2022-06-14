@@ -15,120 +15,87 @@
  */
 
 #include "server/round.h"
-
 #include <memory>
 #include <string>
-
-#include "server/iteration.h"
-#include "server/kernel/round/update_model_kernel.h"
 #include "server/server.h"
+#include "server/iteration.h"
+#include "distributed_cache/counter.h"
+#include "distributed_cache/timer.h"
+#include "distributed_cache/common.h"
+#include "distributed_cache/instance_context.h"
+#include "server/kernel/round/update_model_kernel.h"
 
 namespace mindspore {
 namespace fl {
 namespace server {
 class Server;
 class Iteration;
-std::atomic<uint32_t> kJobNotReadyPrintTimes = 0;
-std::atomic<uint32_t> kJobNotAvailablePrintTimes = 0;
-std::atomic<uint32_t> kClusterSafeModePrintTimes = 0;
-
+std::atomic<uint32_t> kPrintTimes = 0;
 const uint32_t kPrintTimesThreshold = 3000;
-Round::Round(const std::string &name, bool check_timeout, size_t time_window, bool check_count, size_t threshold_count,
-             bool server_num_as_threshold)
+Round::Round(const std::string &name, bool check_timeout, uint64_t time_window, bool check_count,
+             uint64_t threshold_count, bool per_server_count)
     : name_(name),
       check_timeout_(check_timeout),
       time_window_(time_window),
       check_count_(check_count),
       threshold_count_(threshold_count),
-      server_num_as_threshold_(server_num_as_threshold) {}
+      per_server_count_(per_server_count) {}
 
-void Round::RegisterMsgCallBack(const std::shared_ptr<fl::core::CommunicatorBase> &communicator) {
+void Round::RegisterMsgCallBack(const std::shared_ptr<CommunicatorBase> &communicator) {
   MS_EXCEPTION_IF_NULL(communicator);
   MS_LOG(INFO) << "Round " << name_ << " register message callback.";
-  communicator->RegisterMsgCallBack(
-    name_, [this](std::shared_ptr<fl::core::MessageHandler> message) { LaunchRoundKernel(message); });
+  communicator->RegisterRoundMsgCallback(
+    name_, [this](const std::shared_ptr<MessageHandler> &message) { LaunchRoundKernel(message); });
 }
 
-void Round::Initialize(const TimeOutCb &timeout_cb, const FinishIterCb &finish_iteration_cb) {
+void Round::Initialize() {
   MS_LOG(INFO) << "Round " << name_ << " start initialize.";
   if (check_timeout_) {
-    iter_timer_ = std::make_shared<IterationTimer>();
-    MS_EXCEPTION_IF_NULL(iter_timer_);
-
-    // 1.Set the timeout callback for the timer.
-    iter_timer_->SetTimeOutCallBack([this, timeout_cb](bool, const std::string &) -> void {
+    auto time_callback = [this]() {
       std::string reason = "Round " + name_ + " timeout! This iteration is invalid. Proceed to next iteration.";
-      timeout_cb(false, reason);
-    });
-
-    // 2.Stopping timer callback which will be set to the round kernel.
-    stop_timer_cb_ = [this](void) -> void {
-      MS_ERROR_IF_NULL_WO_RET_VAL(iter_timer_);
-      MS_LOG(INFO) << "Round " << name_ << " kernel stops its timer.";
-      iter_timer_->Stop();
+      Iteration::GetInstance().FinishIteration(false, reason);
     };
+    constexpr int msec_to_sec_times = 1000;
+    int64_t time_window_in_seconds = static_cast<int64_t>(time_window_) / msec_to_sec_times;
+    cache::Timer::Instance().RegisterTimer(name_, time_window_in_seconds, time_callback);
   }
-
   // Set counter event callbacks for this round if the round kernel is stateful.
   if (check_count_) {
-    auto first_count_handler = std::bind(&Round::OnFirstCountEvent, this, std::placeholders::_1);
-    auto last_count_handler = std::bind(&Round::OnLastCountEvent, this, std::placeholders::_1);
-    DistributedCountService::GetInstance().RegisterCounter(name_, threshold_count_,
-                                                           {first_count_handler, last_count_handler});
+    auto first_count_handler = [this]() { OnFirstCountEvent(); };
+    auto last_count_handler = [this]() { OnLastCountEvent(); };
+    if (per_server_count_) {
+      cache::Counter::Instance().RegisterPerServerCounter(name_, static_cast<int64_t>(threshold_count_),
+                                                          first_count_handler, last_count_handler);
+    } else {
+      cache::Counter::Instance().RegisterCounter(name_, static_cast<int64_t>(threshold_count_), first_count_handler,
+                                                 last_count_handler);
+    }
   }
 }
 
-bool Round::ReInitForScaling(uint32_t server_num) {
-  // If this round requires up-to-date server number as threshold count, update threshold_count_.
-  if (server_num_as_threshold_) {
-    MS_LOG(INFO) << "Round " << name_ << " uses up-to-date server number " << server_num << " as its threshold count.";
-    threshold_count_ = server_num;
-  }
-  if (check_count_) {
-    auto first_count_handler = std::bind(&Round::OnFirstCountEvent, this, std::placeholders::_1);
-    auto last_count_handler = std::bind(&Round::OnLastCountEvent, this, std::placeholders::_1);
-    DistributedCountService::GetInstance().RegisterCounter(name_, threshold_count_,
-                                                           {first_count_handler, last_count_handler});
-  }
-
-  MS_ERROR_IF_NULL_W_RET_VAL(kernel_, false);
-  if (name_ == "reconstructSecrets") {
-    kernel_->InitKernel(server_num);
-  } else {
-    kernel_->InitKernel(threshold_count_);
-  }
-  return true;
-}
-
-bool Round::ReInitForUpdatingHyperParams(size_t updated_threshold_count, size_t updated_time_window,
-                                         uint32_t server_num) {
+bool Round::ReInitForUpdatingHyperParams(uint64_t updated_threshold_count, uint64_t updated_time_window) {
   time_window_ = updated_time_window;
   threshold_count_ = updated_threshold_count;
   if (check_count_) {
-    if (!DistributedCountService::GetInstance().ReInitCounter(name_, threshold_count_)) {
-      MS_LOG(WARNING) << "Reinitializing count for " << name_ << " failed.";
-      return false;
-    }
+    cache::Counter::Instance().ReinitCounter(name_, static_cast<int64_t>(threshold_count_));
   }
-
+  if (check_timeout_) {
+    cache::Timer::Instance().ReinitTimer(name_, static_cast<int64_t>(time_window_));
+  }
   MS_ERROR_IF_NULL_W_RET_VAL(kernel_, false);
-  if (name_ == "reconstructSecrets") {
-    kernel_->InitKernel(server_num);
-  } else {
-    kernel_->InitKernel(threshold_count_);
-  }
+  kernel_->InitKernel(threshold_count_);
   return true;
 }
 
 void Round::BindRoundKernel(const std::shared_ptr<kernel::RoundKernel> &kernel) {
   MS_EXCEPTION_IF_NULL(kernel);
   kernel_ = kernel;
-  kernel_->set_stop_timer_cb(stop_timer_cb_);
-  return;
 }
 
-void Round::LaunchRoundKernel(const std::shared_ptr<fl::core::MessageHandler> &message) {
+void Round::LaunchRoundKernel(const std::shared_ptr<MessageHandler> &message) {
   MS_ERROR_IF_NULL_WO_RET_VAL(message);
+  MS_ERROR_IF_NULL_WO_RET_VAL(kernel_);
+
   std::string reason = "";
   if (!IsServerAvailable(&reason)) {
     if (!message->SendResponse(reason.c_str(), reason.size())) {
@@ -137,18 +104,38 @@ void Round::LaunchRoundKernel(const std::shared_ptr<fl::core::MessageHandler> &m
     }
     return;
   }
-
-  MS_ERROR_IF_NULL_WO_RET_VAL(kernel_);
-  (void)(Iteration::GetInstance().running_round_num_++);
-  bool ret = kernel_->Launch(reinterpret_cast<const uint8_t *>(message->data()), message->len(), message);
-  // Must send response back no matter what value Launch method returns.
-  if (!ret) {
-    MS_LOG(DEBUG) << "Launching round kernel of round " + name_ + " failed.";
+  Iteration::GetInstance().OnRoundLaunchStart();
+  try {
+    bool ret = kernel_->Launch(reinterpret_cast<const uint8_t *>(message->data()), message->len(), message);
+    if (!ret) {
+      MS_LOG(DEBUG) << "Launching round kernel of round " + name_ + " failed.";
+    }
+  } catch (const cache::DistributedCacheUnavailable &) {
+    if (kPrintTimes % kPrintTimesThreshold == 0) {
+      MS_LOG(WARNING) << "The distributed cache is not available, please retry " << name_ << " later.";
+      kPrintTimes = 0;
+    }
+    kPrintTimes += 1;
+    if (!message->HasSentResponse()) {
+      reason = kJobNotAvailable;
+      if (!message->SendResponse(reason.c_str(), reason.size())) {
+        MS_LOG(WARNING) << "Sending response failed.";
+      }
+    }
+  } catch (const std::exception &e) {
+    MS_LOG(WARNING) << "Catch exception when handle job " << name_ << ": " << e.what();
+    reason = kJobNotAvailable;
+    if (!message->HasSentResponse()) {
+      reason = kServerInnerError;
+      if (!message->SendResponse(reason.c_str(), reason.size())) {
+        MS_LOG(WARNING) << "Sending response failed.";
+      }
+    }
   }
-  (void)(Iteration::GetInstance().running_round_num_--);
-  auto time = fl::core::CommUtil::GetNowTime().time_stamp;
+  Iteration::GetInstance().OnRoundLaunchEnd();
+
+  auto time = fl::CommUtil::GetNowTime().time_stamp;
   kernel_->RecordReceiveData(std::make_pair(time, message->len()));
-  return;
 }
 
 void Round::Reset() {
@@ -164,71 +151,65 @@ bool Round::check_timeout() const { return check_timeout_; }
 
 size_t Round::time_window() const { return time_window_; }
 
-void Round::OnFirstCountEvent(const std::shared_ptr<fl::core::MessageHandler> &message) {
+void Round::OnFirstCountEvent() {
   MS_ERROR_IF_NULL_WO_RET_VAL(kernel_);
   MS_LOG(INFO) << "Round " << name_ << " first count event is triggered.";
   // The timer starts only after the first count event is triggered by DistributedCountService.
   if (check_timeout_) {
-    MS_ERROR_IF_NULL_WO_RET_VAL(iter_timer_);
-    iter_timer_->Start(std::chrono::milliseconds(time_window_));
+    cache::Timer::Instance().StartTimer(name_);
   }
-
   // Some kernels override the OnFirstCountEvent method.
-  kernel_->OnFirstCountEvent(message);
-  return;
+  kernel_->OnFirstCountEvent();
 }
 
-void Round::OnLastCountEvent(const std::shared_ptr<fl::core::MessageHandler> &message) {
+void Round::OnLastCountEvent() {
   MS_ERROR_IF_NULL_WO_RET_VAL(kernel_);
   MS_LOG(INFO) << "Round " << name_ << " last count event is triggered.";
   // Same as the first count event, the timer must be stopped by DistributedCountService.
   if (check_timeout_) {
-    MS_ERROR_IF_NULL_WO_RET_VAL(iter_timer_);
-    iter_timer_->Stop();
+    cache::Timer::Instance().StopTimer(name_);
   }
-
   // Some kernels override the OnLastCountEvent method.
-  kernel_->OnLastCountEvent(message);
-  return;
+  kernel_->OnLastCountEvent();
 }
 
 bool Round::IsServerAvailable(std::string *reason) {
   MS_ERROR_IF_NULL_W_RET_VAL(reason, false);
+  auto &context = cache::InstanceContext::Instance();
+  auto state = context.instance_state();
   // After one instance is completed, the model should be accessed by clients.
-  if (Iteration::GetInstance().instance_state() == InstanceState::kFinish && name_ == "getModel") {
+  if (state == cache::InstanceState::kStateFinish && name_ == "getModel") {
     return true;
   }
 
-  if (!Server::GetInstance().IsReady()) {
-    if (kJobNotReadyPrintTimes % kPrintTimesThreshold == 0) {
-      MS_LOG(WARNING) << "The server's training job is not ready, please retry " + name_ + " later.";
-      kJobNotReadyPrintTimes = 0;
-    }
-    kJobNotReadyPrintTimes += 1;
-    *reason = kJobNotReady;
-    return false;
-  }
-
   // If the server state is Disable or Finish, refuse the request.
-  if (Iteration::GetInstance().instance_state() == InstanceState::kDisable ||
-      Iteration::GetInstance().instance_state() == InstanceState::kFinish) {
-    if (kJobNotAvailablePrintTimes % kPrintTimesThreshold == 0) {
+  if (state == cache::InstanceState::kStateDisable || state == cache::InstanceState::kStateFinish) {
+    if (kPrintTimes % kPrintTimesThreshold == 0) {
       MS_LOG(WARNING) << "The server's training job is disabled or finished, please retry " + name_ + " later.";
-      kJobNotAvailablePrintTimes = 0;
+      kPrintTimes = 0;
     }
-    kJobNotAvailablePrintTimes += 1;
+    kPrintTimes += 1;
     *reason = kJobNotAvailable;
     return false;
   }
 
   // If the server is still in safemode, reject the request.
-  if (Server::GetInstance().IsSafeMode()) {
-    if (kClusterSafeModePrintTimes % kPrintTimesThreshold == 0) {
+  if (context.IsSafeMode()) {
+    if (kPrintTimes % kPrintTimesThreshold == 0) {
       MS_LOG(WARNING) << "The cluster is still in safemode, please retry " << name_ << " later.";
-      kClusterSafeModePrintTimes = 0;
+      kPrintTimes = 0;
     }
-    kClusterSafeModePrintTimes += 1;
+    kPrintTimes += 1;
     *reason = kClusterSafeMode;
+    return false;
+  }
+  if (!cache::DistributedCacheLoader::Instance().available() && name_ != "getModel") {
+    if (kPrintTimes % kPrintTimesThreshold == 0) {
+      MS_LOG(WARNING) << "The distributed cache is not available, please retry " << name_ << " later.";
+      kPrintTimes = 0;
+    }
+    kPrintTimes += 1;
+    *reason = kJobNotAvailable;
     return false;
   }
   return true;
@@ -252,7 +233,7 @@ void Round::InitkernelClientUploadLoss() { kernel_->InitClientUploadLoss(); }
 float Round::kernel_upload_loss() const { return kernel_->upload_loss(); }
 
 std::vector<std::pair<uint64_t, uint32_t>> Round::GetUpdateModelCompleteInfo() const {
-  if (name_ == "updateModel") {
+  if (name_ == kUpdateModelKernel) {
     auto update_model_model_ptr = std::dynamic_pointer_cast<kernel::UpdateModelKernel>(kernel_);
     MS_EXCEPTION_IF_NULL(update_model_model_ptr);
     return update_model_model_ptr->GetCompletePeriodRecord();
@@ -263,7 +244,7 @@ std::vector<std::pair<uint64_t, uint32_t>> Round::GetUpdateModelCompleteInfo() c
 }
 
 void Round::ResetParticipationTimeAndNum() {
-  if (name_ == "updateModel") {
+  if (name_ == kUpdateModelKernel) {
     auto update_model_kernel_ptr = std::dynamic_pointer_cast<kernel::UpdateModelKernel>(kernel_);
     MS_ERROR_IF_NULL_WO_RET_VAL(update_model_kernel_ptr);
     update_model_kernel_ptr->ResetParticipationTimeAndNum();

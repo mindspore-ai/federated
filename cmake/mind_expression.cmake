@@ -29,4 +29,6 @@ include(${CMAKE_SOURCE_DIR}/cmake/external_libs/pybind11.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/external_libs/gtest.cmake)
 include(${CMAKE_SOURCE_DIR}/cmake/external_libs/glog.cmake)
 
+include(${CMAKE_SOURCE_DIR}/cmake/external_libs/hiredis.cmake)
+
 set(CMAKE_CXX_FLAGS ${_ms_tmp_CMAKE_CXX_FLAGS_F})

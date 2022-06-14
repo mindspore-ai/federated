@@ -32,7 +32,7 @@
 #include "schema/cipher_generated.h"
 #include "server/model_store.h"
 #include "common/common.h"
-#include "python/fl_context.h"
+#include "common/fl_context.h"
 
 namespace mindspore {
 namespace fl {

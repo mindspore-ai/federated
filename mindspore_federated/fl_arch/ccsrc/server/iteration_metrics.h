@@ -21,9 +21,7 @@
 #include <string>
 #include <memory>
 #include <fstream>
-#include "python/fl_context.h"
-#include "common/core/configuration.h"
-#include "common/core/file_configuration.h"
+#include "common/fl_context.h"
 #include "server/local_meta_store.h"
 #include "server/iteration.h"
 #include "common/core/comm_util.h"
@@ -45,26 +43,24 @@ constexpr auto kIterationResult = "iterationResult";
 constexpr auto kStartTime = "startTime";
 constexpr auto kEndTime = "endTime";
 constexpr auto kDataRate = "dataRate";
+constexpr auto kFailureEvent = "failureEvent";
 
-const std::map<InstanceState, std::string> kInstanceStateName = {
-  {InstanceState::kRunning, "running"}, {InstanceState::kDisable, "disable"}, {InstanceState::kFinish, "finish"}};
-
-const std::map<IterationResult, std::string> kIterationResultName = {{IterationResult::kSuccess, "success"},
-                                                                     {IterationResult::kFail, "fail"}};
+const std::map<cache::InstanceState, std::string> kInstanceStateName = {
+  {cache::InstanceState::kStateRunning, "running"},
+  {cache::InstanceState::kStateDisable, "disable"},
+  {cache::InstanceState::kStateFinish, "finish"}};
 
 class IterationMetrics {
  public:
-  explicit IterationMetrics(const std::string &config_file)
-      : config_file_path_(config_file),
-        config_(nullptr),
-        fl_name_(""),
+  explicit IterationMetrics()
+      : fl_name_(""),
         fl_iteration_num_(0),
         cur_iteration_num_(0),
-        instance_state_(InstanceState::kFinish),
+        instance_state_(cache::InstanceState::kStateFinish),
         loss_(0.0),
         accuracy_(0.0),
         iteration_time_cost_(0),
-        iteration_result_(IterationResult::kSuccess) {}
+        iteration_result_(true) {}
   ~IterationMetrics() = default;
 
   bool Initialize();
@@ -79,21 +75,17 @@ class IterationMetrics {
   void set_fl_name(const std::string &fl_name);
   void set_fl_iteration_num(size_t fl_iteration_num);
   void set_cur_iteration_num(size_t cur_iteration_num);
-  void set_instance_state(InstanceState state);
+  void set_instance_state(cache::InstanceState state);
   void set_loss(float loss);
   void set_accuracy(float acc);
   void set_iteration_time_cost(uint64_t iteration_time_cost);
   void set_round_client_num_map(const std::map<std::string, size_t> round_client_num_map);
-  void set_iteration_result(IterationResult iteration_result);
-  void SetStartTime(const fl::core::Time &start_time);
-  void SetEndTime(const fl::core::Time &end_time);
+  void set_iteration_result(bool iteration_result);
+  void SetStartTime(const Time &start_time);
+  void SetEndTime(const Time &end_time);
   void SetInstanceName(const std::string &instance_name);
 
  private:
-  // This is the main config file set by fl context.
-  std::string config_file_path_;
-  std::unique_ptr<fl::core::FileConfiguration> config_;
-
   // The metrics file object.
   std::fstream metrics_file_;
 
@@ -114,7 +106,7 @@ class IterationMetrics {
   size_t cur_iteration_num_;
 
   // Current instance state.
-  InstanceState instance_state_;
+  cache::InstanceState instance_state_;
 
   // The training loss after this federated learning iteration, passed by worker.
   float loss_;
@@ -129,10 +121,10 @@ class IterationMetrics {
   uint64_t iteration_time_cost_;
 
   // Current iteration running result.
-  IterationResult iteration_result_;
+  bool iteration_result_;
 
-  fl::core::Time start_time_;
-  fl::core::Time end_time_;
+  Time start_time_;
+  Time end_time_;
 
   std::string instance_name_;
 };

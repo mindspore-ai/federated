@@ -34,29 +34,23 @@ namespace kernel {
 constexpr uint32_t kPrintGetModelForEveryRetryTime = 50;
 class GetModelKernel : public RoundKernel {
  public:
-  GetModelKernel() : executor_(nullptr), iteration_time_window_(0), retry_count_(0) {}
+  GetModelKernel() = default;
   ~GetModelKernel() override = default;
 
   void InitKernel(size_t) override;
-  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<fl::core::MessageHandler> &message) override;
+  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<MessageHandler> &message) override;
   bool Reset() override;
 
  private:
-  void GetModel(const schema::RequestGetModel *get_model_req, const std::shared_ptr<fl::core::MessageHandler> &message);
+  void GetModel(const schema::RequestGetModel *get_model_req, const std::shared_ptr<MessageHandler> &message);
   void BuildGetModelRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
-                        const std::string &reason, const size_t iter,
-                        const std::map<std::string, AddressPtr> &feature_maps, const std::string &timestamp,
+                        const std::string &reason, const size_t iter, const ModelItemPtr &feature_maps,
+                        const std::string &timestamp,
                         const schema::CompressType &compressType = schema::CompressType_NO_COMPRESS,
                         const std::map<std::string, AddressPtr> &compress_feature_maps = {});
 
-  // The executor is for getting model for getModel request.
-  Executor *executor_;
-
-  // The time window of one iteration.
-  size_t iteration_time_window_{0};
-
   // The count of retrying because the iteration is not finished.
-  std::atomic<uint64_t> retry_count_;
+  std::atomic<uint64_t> retry_count_ = 0;
 };
 }  // namespace kernel
 }  // namespace server

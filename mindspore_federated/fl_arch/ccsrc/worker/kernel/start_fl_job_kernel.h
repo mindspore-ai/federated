@@ -21,8 +21,8 @@
 #include <string>
 #include <memory>
 #include "worker/kernel/abstract_kernel.h"
-#include "worker/fl_worker.h"
-#include "python/fl_context.h"
+#include "worker/worker.h"
+#include "common/fl_context.h"
 #include "common/core/comm_util.h"
 #include "common/utils/python_adapter.h"
 #include "server/local_meta_store.h"
@@ -46,17 +46,17 @@ class StartFLJobKernelMod : public AbstractKernel {
   }
 
   bool Launch(size_t data_size) {
-    MS_LOG(INFO)  << "Launching client StartFLJobKernelMod";
-    if (!BuildStartFLJobReq(fbb_, data_size)) {
+    MS_LOG(INFO) << "Launching client StartFLJobKernelMod";
+    FBBuilder fbb;
+    if (!BuildStartFLJobReq(&fbb, data_size)) {
       MS_LOG(EXCEPTION) << "Building request for StartFLJob failed.";
       return false;
     }
 
     std::shared_ptr<std::vector<unsigned char>> start_fl_job_rsp_msg = nullptr;
-    if (!fl::worker::FLWorker::GetInstance().SendToServer(target_server_rank_, fbb_->GetBufferPointer(),
-                                                          fbb_->GetSize(), fl::core::TcpUserCommand::kStartFLJob,
-                                                          &start_fl_job_rsp_msg)) {
-      MS_LOG(EXCEPTION) << "Sending request for StartFLJob to server " << target_server_rank_ << " failed.";
+    if (!fl::worker::Worker::GetInstance().SendToServer(fbb.GetBufferPointer(), fbb.GetSize(),
+                                                        fl::TcpUserCommand::kStartFLJob, &start_fl_job_rsp_msg)) {
+      MS_LOG(EXCEPTION) << "Sending request for StartFLJob to server failed.";
       return false;
     }
     flatbuffers::Verifier verifier(start_fl_job_rsp_msg->data(), start_fl_job_rsp_msg->size());
@@ -76,39 +76,28 @@ class StartFLJobKernelMod : public AbstractKernel {
       default:
         MS_LOG(EXCEPTION) << "Launching start fl job for worker failed. Reason: " << start_fl_job_rsp->reason();
     }
-    fl::worker::FLWorker::GetInstance().set_data_size(data_size);
+    fl::worker::Worker::GetInstance().set_data_size(data_size);
     uint64_t iteration = IntToSize(start_fl_job_rsp->iteration());
-    fl::worker::FLWorker::GetInstance().set_fl_iteration_num(iteration);
+    fl::worker::Worker::GetInstance().set_fl_iteration_num(iteration);
     MS_LOG(INFO) << "Start fl job for iteration " << iteration;
     return true;
   }
 
   void Init() override {
-    server_num_ = fl::worker::FLWorker::GetInstance().server_num();
-    rank_id_ = fl::worker::FLWorker::GetInstance().rank_id();
-    if (rank_id_ == UINT32_MAX) {
-      MS_LOG(EXCEPTION) << "Federated worker is not initialized yet.";
-      return;
-    }
-    target_server_rank_ = rank_id_ % server_num_;
-    fl_name_ = fl::worker::FLWorker::GetInstance().fl_name();
-    fl_id_ = fl::worker::FLWorker::GetInstance().fl_id();
-    MS_LOG(INFO) << "Initializing StartFLJob kernel. fl_name: " << fl_name_ << ", fl_id: " << fl_id_
-                 << ". Request will be sent to server " << target_server_rank_;
-
-    fbb_ = std::make_shared<FBBuilder>();
-    MS_EXCEPTION_IF_NULL(fbb_);
+    fl_name_ = fl::worker::Worker::GetInstance().fl_name();
+    fl_id_ = fl::worker::Worker::GetInstance().fl_id();
+    MS_LOG(INFO) << "Initializing StartFLJob kernel. fl_name: " << fl_name_ << ", fl_id: " << fl_id_;
   }
 
  private:
-  bool BuildStartFLJobReq(const std::shared_ptr<FBBuilder> &fbb, size_t data_size) {
+  bool BuildStartFLJobReq(FBBuilder *fbb, size_t data_size) {
     MS_EXCEPTION_IF_NULL(fbb);
     auto fbs_fl_name = fbb->CreateString(fl_name_);
     auto fbs_fl_id = fbb->CreateString(fl_id_);
-    auto time = fl::core::CommUtil::GetNowTime();
+    auto time = fl::CommUtil::GetNowTime();
     MS_LOG(INFO) << "now time: " << time.time_str_mill;
     auto fbs_timestamp = fbb->CreateString(std::to_string(time.time_stamp));
-    schema::RequestFLJobBuilder req_fl_job_builder(*(fbb.get()));
+    schema::RequestFLJobBuilder req_fl_job_builder(*fbb);
     req_fl_job_builder.add_fl_name(fbs_fl_name);
     req_fl_job_builder.add_fl_id(fbs_fl_id);
     req_fl_job_builder.add_data_size(data_size);
@@ -117,12 +106,8 @@ class StartFLJobKernelMod : public AbstractKernel {
     fbb->Finish(req_fl_job);
     return true;
   }
-  uint32_t rank_id_;
-  uint32_t server_num_;
-  uint32_t target_server_rank_;
   std::string fl_name_;
   std::string fl_id_;
-  std::shared_ptr<FBBuilder> fbb_;
 };
 }  // namespace kernel
 }  // namespace worker

@@ -27,7 +27,6 @@
 #include "armour/secure_protocol/secret_sharing.h"
 #include "schema/fl_job_generated.h"
 #include "schema/cipher_generated.h"
-#include "server/distributed_metadata_store.h"
 #include "common/common.h"
 
 #define IND_IV_INDEX 0
@@ -77,41 +76,39 @@ struct CipherPublicPara {
 
 class CipherMetaStorage {
  public:
-  // Register the shared value involved in the security aggregation.
-  void RegisterClass();
-  void RegisterStablePWClass();
-
   // Register Prime.
-  void RegisterPrime(const char *list_name, const std::string &prime);
+  void RegisterPrime(const std::string &prime);
   // Get tprime from shared server.
-  bool GetPrimeFromServer(const char *prime_name, uint8_t *prime);
-  // Get client shares from shared server.
-  void GetClientSharesFromServer(const char *list_name,
-                                 std::map<std::string, std::vector<clientshare_str>> *clients_shares_list);
-  // Get client list from shared server.
-  void GetClientListFromServer(const char *list_name, std::vector<std::string> *clients_list);
+  bool GetPrimeFromServer(uint8_t *prime);
   // Get client keys from shared server.
-  void GetClientKeysFromServer(const char *list_name,
-                               std::map<std::string, std::vector<std::vector<uint8_t>>> *clients_keys_list);
+  void GetClientKeysFromServer(std::map<std::string, std::vector<std::vector<uint8_t>>> *clients_keys_list);
   // Get stable secure aggregation's client key from shared server.
-  void GetStableClientKeysFromServer(const char *list_name,
-                                     std::map<std::string, std::vector<std::vector<uint8_t>>> *clients_keys_list);
-  void GetClientIVsFromServer(const char *list_name,
-                              std::map<std::string, std::vector<std::vector<uint8_t>>> *clients_ivs_list);
+  void GetStableClientKeysFromServer(std::map<std::string, std::vector<std::vector<uint8_t>>> *clients_keys_list);
+  void GetClientIVsFromServer(std::map<std::string, std::vector<std::vector<uint8_t>>> *clients_ivs_list);
   // Get client noises from shared server.
-  bool GetClientNoisesFromServer(const char *list_name, std::vector<float> *cur_public_noise);
-  // Update client fl_id to shared server.
-  bool UpdateClientToServer(const char *list_name, const std::string &fl_id);
+  bool GetClientNoisesFromServer(std::vector<float> *cur_public_noise);
   // Update client key with signature to shared server.
-  bool UpdateClientKeyToServer(const char *list_name, const schema::RequestExchangeKeys *exchange_keys_req);
+  bool UpdateClientKeyToServer(const schema::RequestExchangeKeys *exchange_keys_req);
   // Update stable secure aggregation's client key to shared server.
-  bool UpdateStableClientKeyToServer(const char *list_name, const schema::RequestExchangeKeys *exchange_keys_req);
+  bool UpdateStableClientKeyToServer(const schema::RequestExchangeKeys *exchange_keys_req);
   // Update client noise to shared server.
-  bool UpdateClientNoiseToServer(const char *list_name, const std::vector<float> &cur_public_noise);
+  bool UpdateClientNoiseToServer(const std::vector<float> &cur_public_noise);
+
+  // Get client shares from shared server.
+  void GetClientReconstructSharesFromServer(std::map<std::string, std::vector<clientshare_str>> *clients_shares_list);
+  void GetClientEncryptedSharesFromServer(std::map<std::string, std::vector<clientshare_str>> *clients_shares_list);
   // Update client share to shared server.
-  bool UpdateClientShareToServer(
-    const char *list_name, const std::string &fl_id,
-    const flatbuffers::Vector<flatbuffers::Offset<schema::ClientShare>> *shares);
+  bool UpdateClientReconstructShareToServer(
+    const std::string &fl_id, const flatbuffers::Vector<flatbuffers::Offset<schema::ClientShare>> *shares);
+  bool UpdateClientEncryptedShareToServer(const std::string &fl_id,
+                                          const flatbuffers::Vector<flatbuffers::Offset<schema::ClientShare>> *shares);
+
+ private:
+  void GetClientSharesFromServerInner(const std::unordered_map<std::string, fl::SharesPb> &value_map,
+                                      std::map<std::string, std::vector<clientshare_str>> *clients_shares_list);
+  bool UpdateClientShareToServerInner(const std::string &fl_id,
+                                      const flatbuffers::Vector<flatbuffers::Offset<schema::ClientShare>> *shares,
+                                      SharesPb *shares_pb);
 };
 }  // namespace armour
 }  // namespace fl

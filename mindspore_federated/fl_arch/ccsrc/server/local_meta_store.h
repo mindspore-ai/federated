@@ -23,6 +23,7 @@
 #include <vector>
 #include <unordered_map>
 #include "common/common.h"
+#include "distributed_cache/instance_context.h"
 
 namespace mindspore {
 namespace fl {
@@ -30,6 +31,14 @@ namespace server {
 // LocalMetaStore class is used for metadata storage of this server process.
 // For example, the current iteration number, time windows for round kernels, etc.
 // LocalMetaStore is threadsafe.
+
+struct Feature {
+  std::vector<size_t> weight_shape;
+  std::string weight_type;
+  size_t weight_size;
+  std::vector<float> weight_data;
+};
+
 class LocalMetaStore {
  public:
   static LocalMetaStore &GetInstance() {
@@ -71,9 +80,9 @@ class LocalMetaStore {
   void set_curr_iter_num(size_t num);
   const size_t curr_iter_num();
 
-  void set_curr_instance_state(InstanceState instance_state);
+  void set_curr_instance_state(cache::InstanceState instance_state);
 
-  const InstanceState curr_instance_state();
+  const cache::InstanceState curr_instance_state();
 
   const void put_aggregation_feature_map(const std::string &name, const Feature &feature);
 
@@ -92,7 +101,7 @@ class LocalMetaStore {
   // This mutex makes sure that the operations on key_to_meta_ is threadsafe.
   std::mutex mtx_;
   size_t curr_iter_num_{0};
-  InstanceState instance_state_;
+  cache::InstanceState instance_state_;
   // aggregation_feature_map_ stores model meta data with weight name and size which will be Aggregated.
   std::unordered_map<std::string, Feature> aggregation_feature_map_;
 };

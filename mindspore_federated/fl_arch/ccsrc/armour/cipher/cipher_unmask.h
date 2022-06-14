@@ -35,7 +35,7 @@ class CipherUnmask {
   CipherUnmask() { cipher_init_ = &CipherInit::GetInstance(); }
   ~CipherUnmask() = default;
   // unmask the data by secret mask.
-  bool UnMask(const std::map<std::string, AddressPtr> &data);
+  bool UnMask(const ModelItemPtr &model);
 
  private:
   CipherInit *cipher_init_;  // the parameter of the secure aggregation

@@ -19,6 +19,7 @@
 
 #include <stdarg.h>
 #include <stdint.h>
+#include <securec.h>
 #include <string>
 #include <sstream>
 #include <memory>
@@ -27,7 +28,6 @@
 #include <functional>
 #include "common/utils/visible.h"
 #include "common/utils/overload.h"
-#include "./securec.h"
 
 #define google mindspore_federated_private
 #include "glog/logging.h"
@@ -78,24 +78,65 @@ struct LocationInfo {
 
 class LogStream {
  public:
-  LogStream() { sstream_ = std::make_shared<std::stringstream>(); }
+  LogStream(const LogStream &other) = delete;
+  LogStream &operator=(const LogStream &other) = delete;
+
+  LogStream() {}
   ~LogStream() = default;
 
   template <typename T>
   LogStream &operator<<(const T &val) noexcept {
-    (*sstream_) << val;
+    (sstream_) << val;
     return *this;
   }
 
   LogStream &operator<<(std::ostream &func(std::ostream &os)) noexcept {
-    (*sstream_) << func;
+    (sstream_) << func;
     return *this;
+  }
+
+  template <typename T>
+  LogStream &operator<<(const std::vector<T> &val) noexcept {
+    (sstream_) << "[";
+    for (size_t i = 0; i < val.size(); i++) {
+      (*this) << val[i];
+      if (i + 1 < val.size()) {
+        (sstream_) << ", ";
+      }
+    }
+    (sstream_) << "]";
+    return *this;
+  }
+
+  template <typename K, typename V>
+  LogStream &operator<<(const std::unordered_map<K, V> &val) noexcept {
+    return OutputMap(val);
+  }
+
+  template <typename K, typename V>
+  LogStream &operator<<(const std::map<K, V> &val) noexcept {
+    return OutputMap(val);
   }
 
   friend class LogWriter;
 
  private:
-  std::shared_ptr<std::stringstream> sstream_;
+  std::stringstream sstream_;
+
+  template <typename T>
+  LogStream &OutputMap(const T &val) noexcept {
+    (sstream_) << "{";
+    size_t index = 0;
+    for (auto &item : val) {
+      (*this) << item.first << ": " << item.second;
+      if (index + 1 < val.size()) {
+        (sstream_) << ", ";
+      }
+      index += 1;
+    }
+    (sstream_) << "}";
+    return *this;
+  }
 };
 
 template <class T, typename std::enable_if<std::is_enum<T>::value, int>::type = 0>

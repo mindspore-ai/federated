@@ -226,7 +226,7 @@ public class CustomTokenizer {
      * @param isKeptFirst if keep first char not change
      * @param isKeptLast if keep last char not change
      */
-    public void addRandomMaskAndReplace(Feature feature, boolean isKeptFirst, boolean isKeptLast) {
+    public void addRandomMaskAndReplace(FeatureInfo feature, boolean isKeptFirst, boolean isKeptLast) {
         if (feature == null) {
             return;
         }
@@ -268,7 +268,7 @@ public class CustomTokenizer {
      * @param label input label
      * @return feature
      */
-    public Optional<Feature> getFeatures(List<Integer> tokens, String label) {
+    public Optional<FeatureInfo> getFeatures(List<Integer> tokens, String label) {
         if (tokens == null || label == null) {
             logger.warning(Common.addTag("tokens or label is null"));
             return Optional.empty();
@@ -286,7 +286,7 @@ public class CustomTokenizer {
         for (int i = 0; i < tokens.size(); i++) {
             inputIds[i] = tokens.get(i);
         }
-        return Optional.of(new Feature(inputIds, masks, segmentIds, labelMap.get(label), tokens.size()));
+        return Optional.of(new FeatureInfo(inputIds, masks, segmentIds, labelMap.get(label), tokens.size()));
     }
 
     /**

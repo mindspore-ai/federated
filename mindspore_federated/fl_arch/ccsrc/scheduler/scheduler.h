@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-#ifndef MINDSPORE_FEDERATED_FL_ARCH_CCSRC_SCHEDULER_SCHEDULER_H_
-#define MINDSPORE_FEDERATED_FL_ARCH_CCSRC_SCHEDULER_SCHEDULER_H_
+#ifndef MINDSPORE_CCSRC_FL_SCHEDULER_H_
+#define MINDSPORE_CCSRC_FL_SCHEDULER_H_
 
 #include <memory>
-#include "common/core/scheduler_node.h"
-#include "python/fl_context.h"
+#include "scheduler/scheduler_node.h"
+#include "common/fl_context.h"
 #include "common/utils/visible.h"
 
 namespace mindspore {
@@ -28,24 +28,20 @@ class MS_EXPORT Scheduler {
  public:
   static Scheduler &GetInstance();
 
-  bool Run();
+  void Run();
+
+  void SetStopFlag();
 
  private:
-  Scheduler() {
-    if (scheduler_node_ == nullptr) {
-      bool is_fl_mode = FLContext::instance()->server_mode() == kServerModeFL ||
-                        FLContext::instance()->server_mode() == kServerModeHybrid;
-      if (is_fl_mode) {
-        scheduler_node_ = std::make_unique<fl::core::SchedulerNode>();
-      }
-    }
-  }
+  Scheduler() {}
 
   ~Scheduler() = default;
   Scheduler(const Scheduler &) = delete;
   Scheduler &operator=(const Scheduler &) = delete;
-  std::unique_ptr<fl::core::SchedulerNode> scheduler_node_;
+  void InitAndLoadDistributedCache();
+  std::unique_ptr<SchedulerNode> scheduler_node_;
+  bool stop_flag_ = false;
 };
 }  // namespace fl
 }  // namespace mindspore
-#endif  // MINDSPORE_CCSRC_PS_SCHEDULER_H_
+#endif  // MINDSPORE_CCSRC_FL_SCHEDULER_H_

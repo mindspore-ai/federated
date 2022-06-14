@@ -30,31 +30,24 @@ namespace mindspore {
 namespace fl {
 namespace server {
 namespace kernel {
-// results of signature verification
-enum sigVerifyResult { FAILED, TIMEOUT, PASSED };
-
 class PushListSignKernel : public RoundKernel {
  public:
   PushListSignKernel() = default;
   ~PushListSignKernel() override = default;
   void InitKernel(size_t required_cnt) override;
-  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<fl::core::MessageHandler> &message) override;
+  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<MessageHandler> &message) override;
   bool LaunchForPushListSign(const schema::SendClientListSign *client_list_sign_req, const size_t &iter_num,
-                             const std::shared_ptr<FBBuilder> &fbb,
-                             const std::shared_ptr<fl::core::MessageHandler> &message);
+                             const std::shared_ptr<FBBuilder> &fbb, const std::shared_ptr<MessageHandler> &message);
   bool Reset() override;
   void BuildPushListSignKernelRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
                                   const std::string &reason, const std::string &next_req_time, const size_t iteration);
 
  private:
-  armour::CipherInit *cipher_init_;
-  Executor *executor_;
-  size_t iteration_time_window_;
+  armour::CipherInit *cipher_init_ = nullptr;
   sigVerifyResult VerifySignature(const schema::SendClientListSign *client_list_sign_req);
   bool PushListSign(const size_t cur_iterator, const std::string &next_req_time,
-                    const schema::SendClientListSign *client_list_sign_req,
-                    const std::shared_ptr<FBBuilder> &fbb,
-                    const std::vector<std::string> &update_model_clients);
+                    const schema::SendClientListSign *client_list_sign_req, const std::shared_ptr<fl::FBBuilder> &fbb,
+                    bool found_in_update_model_clients);
 };
 }  // namespace kernel
 }  // namespace server

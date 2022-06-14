@@ -26,11 +26,19 @@
 #include <condition_variable>
 #include "armour/cipher/cipher_unmask.h"
 #include "common/common.h"
-#include "server/parameter_aggregator.h"
+#include "server/model_store.h"
+#include "server/server_node.h"
 
 namespace mindspore {
 namespace fl {
 namespace server {
+struct ParamAggregationInfo {
+  std::string name;
+  uint8_t *weight_data = nullptr;
+  size_t weight_size = 0;  // bytes len of weight_data
+  size_t data_size = 0;    // batch size
+  bool requires_aggr = false;
+};
 // Executor is the entrance for server to handle aggregation, optimizing, model querying, etc. It handles
 // logics relevant to kernel launching.
 class Executor {
@@ -40,79 +48,88 @@ class Executor {
     return instance;
   }
 
-  void Initialize(size_t aggregation_count);
-
-  // Reinitialize parameter aggregators after scaling operations are done.
-  bool ReInitForScaling();
-
-  // After hyper-parameters are updated, some parameter aggregators should be reinitialized.
-  bool ReInitForUpdatingHyperParams(size_t aggr_threshold);
-
-  // Called in federated learning training mode. Update value for parameter param_name.
-  bool HandleModelUpdate(const std::string &param_name, const UploadData &upload_data);
-
-  // Forcibly overwrite specific weights in overwriteWeights message.
-  bool HandlePushWeight(const std::map<std::string, Address> &feature_map);
-
-  // Returns value for multiple trainable parameters passed by weight_names.
-  std::map<std::string, AddressPtr> HandlePullWeight(const std::vector<std::string> &param_names);
-
-  // Reset the aggregation status for all aggregation kernels in the server.
-  void ResetAggregationStatus();
-
-  // Judge whether aggregation processes for all weights/gradients are completed.
-  bool IsAllWeightAggregationDone();
-
-  bool RunAllWeightAggregation();
-
-  // Judge whether the aggregation processes for the given param_names are completed.
-  bool IsWeightAggrDone(const std::vector<std::string> &param_names);
-
-  // Returns whole model in key-value where key refers to the parameter name.
-  std::map<std::string, AddressPtr> GetModel();
+  void Initialize(const std::vector<InputWeight> &feature_map, const std::shared_ptr<ServerNode> &server_node);
 
   // Returns whether the executor singleton is already initialized.
   bool initialized() const;
 
-  const std::vector<std::string> &param_names() const;
+  FlStatus SyncLatestModelFromOtherServers();
 
-  // The unmasking method for pairwise encrypt algorithm.
-  bool Unmask();
+  FlStatus CheckUpdatedModel(const std::map<std::string, Address> &feature_map, const std::string &update_model_fl_id);
+  // Called in federated learning training mode. Update value for parameters.
+  void HandleModelUpdate(const std::map<std::string, Address> &feature_map, size_t data_size);
 
-  // The setter and getter for unmasked flag to judge whether the unmasking is completed.
-  void set_unmasked(bool unmasked);
-  bool unmasked() const;
+  std::map<std::string, Address> ParseFeatureMap(const schema::RequestPushWeight *push_weight_req);
+  FlStatus HandlePullWeightRequest(const uint8_t *req_data, size_t len, FBBuilder *fbb);
+
+  bool OnReceiveModelWeight(const uint8_t *proto_model_data, size_t len);
+
+  void RunWeightAggregation();
+  // Reset the aggregation status for all aggregation kernels in the server.
+  bool ResetAggregationStatus();
+
+  bool IsAggregationSkip() const;
+
+  // Judge whether aggregation processes for all weights/gradients are completed.
+  bool IsAggregationDone() const;
+
+  void SetIterationModelFinished();
+  bool IsIterationModelFinished(uint64_t iteration_num) const;
+
+  // whether the unmasking is completed.
+  bool IsUnmasked() const;
+  void TodoUnmask();
+  void OnPushMetrics();
+
+  // Returns whole model in key-value where key refers to the parameter name.
+  ModelItemPtr GetModel();
+
+  ModelItemPtr GetModelByIteration(uint64_t iteration_num);
+  bool GetModelByIteration(uint64_t iteration_num, ProtoModel *proto_model);
+
+  void FinishIteration(bool is_last_iter_valid, const std::string &in_reason);
+
+  bool TransModel2ProtoModel(uint64_t iteration_num, const ModelItemPtr &model, ProtoModel *proto_model);
+
+  // Forcibly overwrite specific weights in overwriteWeights message.
+  bool HandlePushWeight(const std::map<std::string, Address> &feature_map);
 
  private:
-  Executor() : initialized_(false), aggregation_count_(0), param_names_({}), param_aggrs_({}), unmasked_(false) {}
+  Executor() = default;
   ~Executor() = default;
   Executor(const Executor &) = delete;
   Executor &operator=(const Executor &) = delete;
 
-  // Server's graph is basically the same as Worker's graph, so we can get all information from func_graph for later
-  // computations. Including forward and backward propagation, aggregation, optimizing, etc.
-  bool InitParamAggregator();
+  bool GetServersForAllReduce(std::map<std::string, std::string> *all_reduce_server_map);
+  void BroadcastModelWeight(const std::map<std::string, std::string> &broadcast_src_server_map);
+  FlStatus BuildPullWeightRsp(size_t iteration, const std::vector<std::string> &param_names, FBBuilder *fbb);
 
-  bool initialized_;
-  size_t aggregation_count_;
-  std::vector<std::string> param_names_;
+  void SetSkipAggregation();
+  bool RunWeightAggregationInner(const std::map<std::string, std::string> &server_map);
+  // The unmasking method for pairwise encrypt algorithm.
+  void Unmask();
 
-  // The map for trainable parameter names and its ParameterAggregator, as noted in the header file
-  // parameter_aggregator.h
-  std::map<std::string, std::shared_ptr<ParameterAggregator>> param_aggrs_;
+  std::mutex parameter_mutex_;
+  ModelItemPtr model_aggregation_ = nullptr;
+  std::map<std::string, ParamAggregationInfo> param_aggregation_info_;
+  // whether model in model_aggregation_ has finished
+  bool model_finished_ = false;
 
-  // The mutex ensures that the operation on whole model is threadsafe.
-  // The whole model is constructed by all trainable parameters.
-  std::mutex model_mutex_;
-
-  // Because ParameterAggregator is not threadsafe, we have to create mutex for each ParameterAggregator so we can
-  // acquire lock before calling its method.
-  std::map<std::string, std::mutex> parameter_mutex_;
+  bool initialized_ = false;
 
   armour::CipherUnmask cipher_unmask_;
 
   // The flag refers to the unmasking status
-  std::atomic<bool> unmasked_;
+  std::atomic<bool> unmasked_ = false;
+  uint64_t finish_model_iteration_num_ = 0;
+  bool is_aggregation_done_ = false;
+  bool is_aggregation_skip_ = false;
+
+  std::shared_ptr<ServerNode> server_node_ = nullptr;
+
+  bool can_unmask_ = false;
+  // servers participating in gradient aggregation
+  std::map<std::string, std::string> all_reduce_server_map_;
 };
 }  // namespace server
 }  // namespace fl

@@ -23,7 +23,7 @@
 #include <functional>
 #include <map>
 
-#include "worker/fl_worker.h"
+#include "worker/worker.h"
 #include "armour/secure_protocol/masking.h"
 #include "common/core/comm_util.h"
 
@@ -56,17 +56,15 @@ class UpdateModelKernelMod : public AbstractKernel {
     if (encrypt_type_.compare("STABLE_PW_ENCRYPT") == 0) {
       EncryptData(weight_datas);
     }
-
-    if (!BuildUpdateModelReq(fbb_, weight_datas)) {
+    FBBuilder builder;
+    if (!BuildUpdateModelReq(&builder, weight_datas)) {
       MS_LOG(EXCEPTION) << "Building request for FusedPushWeight failed.";
       return false;
     }
-
     std::shared_ptr<std::vector<unsigned char>> update_model_rsp_msg = nullptr;
-    if (!fl::worker::FLWorker::GetInstance().SendToServer(target_server_rank_, fbb_->GetBufferPointer(),
-                                                          fbb_->GetSize(), fl::core::TcpUserCommand::kUpdateModel,
-                                                          &update_model_rsp_msg)) {
-      MS_LOG(EXCEPTION) << "Sending request for UpdateModel to server " << target_server_rank_ << " failed.";
+    if (!fl::worker::Worker::GetInstance().SendToServer(builder.GetBufferPointer(), builder.GetSize(),
+                                                        fl::TcpUserCommand::kUpdateModel, &update_model_rsp_msg)) {
+      MS_LOG(EXCEPTION) << "Sending request for UpdateModel to server failed.";
       return false;
     }
     flatbuffers::Verifier verifier(update_model_rsp_msg->data(), update_model_rsp_msg->size());
@@ -89,26 +87,12 @@ class UpdateModelKernelMod : public AbstractKernel {
     return true;
   }
 
-  void Init() {
+  void Init() override {
     MS_LOG(INFO) << "Initializing UpdateModel kernel";
-    fbb_ = std::make_shared<FBBuilder>();
-    MS_EXCEPTION_IF_NULL(fbb_);
-
-    server_num_ = fl::worker::FLWorker::GetInstance().server_num();
-    rank_id_ = fl::worker::FLWorker::GetInstance().rank_id();
-    if (rank_id_ == UINT32_MAX) {
-      MS_LOG(EXCEPTION) << "Federated worker is not initialized yet.";
-      return;
-    }
-    target_server_rank_ = rank_id_ % server_num_;
-    fl_name_ = fl::worker::FLWorker::GetInstance().fl_name();
-    fl_id_ = fl::worker::FLWorker::GetInstance().fl_id();
-    data_size_ = fl::worker::FLWorker::GetInstance().data_size();
-    encrypt_type_ = fl::worker::FLWorker::GetInstance().encrypt_type();
-    auto &feature_maps = FLContext::instance()->feature_maps();
-    for (const auto &item : feature_maps) {
-      weight_full_names_.push_back(item.first);
-    }
+    fl_name_ = fl::worker::Worker::GetInstance().fl_name();
+    fl_id_ = fl::worker::Worker::GetInstance().fl_id();
+    data_size_ = fl::worker::Worker::GetInstance().data_size();
+    encrypt_type_ = fl::worker::Worker::GetInstance().encrypt_type();
     if (encrypt_type_.compare("NOT_ENCRYPT") != 0 && encrypt_type_.compare("STABLE_PW_ENCRYPT") != 0) {
       MS_LOG(EXCEPTION)
         << "Value Error: the parameter 'encrypt_type' of updateModel kernel can only be 'NOT_ENCRYPT' or "
@@ -118,44 +102,42 @@ class UpdateModelKernelMod : public AbstractKernel {
 
     if (encrypt_type_.compare("STABLE_PW_ENCRYPT") == 0) {
       MS_LOG(INFO) << "STABLE_PW_ENCRYPT mode is open, model weights will be encrypted before send to server.";
-      client_keys = fl::worker::FLWorker::GetInstance().public_keys_list();
+      client_keys = fl::worker::Worker::GetInstance().public_keys_list();
       if (client_keys.size() == 0) {
         MS_LOG(EXCEPTION) << "The size of local-stored client_keys_list is 0, please check whether P.ExchangeKeys() "
                              "and P.GetKeys() have been executed before updateModel.";
       }
     }
     MS_LOG(INFO) << "Initializing StartFLJob kernel. fl_name: " << fl_name_ << ", fl_id: " << fl_id_
-                 << ". Request will be sent to server " << target_server_rank_ << ", Encrypt type: " << encrypt_type_
-                 << ", Weight full names: " << weight_full_names_;
+                 << ". Request will be sent to server, Encrypt type: " << encrypt_type_;
   }
 
  private:
-  bool BuildUpdateModelReq(const std::shared_ptr<FBBuilder> &fbb,
-                           std::map<std::string, std::vector<float>> &weight_datas) {
-    MS_EXCEPTION_IF_NULL(fbb_);
+  bool BuildUpdateModelReq(FBBuilder *fbb, std::map<std::string, std::vector<float>> &weight_datas) {
+    MS_EXCEPTION_IF_NULL(fbb);
     auto fbs_fl_name = fbb->CreateString(fl_name_);
     auto fbs_fl_id = fbb->CreateString(fl_id_);
-    auto time = fl::core::CommUtil::GetNowTime();
+    auto time = fl::CommUtil::GetNowTime();
     MS_LOG(INFO) << "now time: " << time.time_str_mill;
     auto fbs_timestamp = fbb->CreateString(std::to_string(time.time_stamp));
     std::vector<flatbuffers::Offset<schema::FeatureMap>> fbs_feature_maps;
-    for (size_t i = 0; i < weight_full_names_.size(); i++) {
-      const std::string &weight_name = weight_full_names_[i];
+    for (auto &weight_item : weight_datas) {
+      const std::string &weight_name = weight_item.first;
+      auto &weight_data = weight_item.second;
       auto fbs_weight_fullname = fbb->CreateString(weight_name);
-      auto &weight_data = weight_datas[weight_name];
       float weights[weight_data.size()];
       std::copy(weight_data.begin(), weight_data.end(), weights);
       auto fbs_weight_data = fbb->CreateVector(reinterpret_cast<const float *>(weights), weight_data.size());
-      auto fbs_feature_map = schema::CreateFeatureMap(*(fbb.get()), fbs_weight_fullname, fbs_weight_data);
+      auto fbs_feature_map = schema::CreateFeatureMap(*fbb, fbs_weight_fullname, fbs_weight_data);
       fbs_feature_maps.push_back(fbs_feature_map);
     }
     auto fbs_feature_maps_vector = fbb->CreateVector(fbs_feature_maps);
 
-    schema::RequestUpdateModelBuilder req_update_model_builder(*(fbb.get()));
+    schema::RequestUpdateModelBuilder req_update_model_builder(*fbb);
     req_update_model_builder.add_fl_name(fbs_fl_name);
     req_update_model_builder.add_fl_id(fbs_fl_id);
     req_update_model_builder.add_timestamp(fbs_timestamp);
-    iteration_ = fl::worker::FLWorker::GetInstance().fl_iteration_num();
+    iteration_ = fl::worker::Worker::GetInstance().fl_iteration_num();
     req_update_model_builder.add_iteration(SizeToInt(iteration_));
     req_update_model_builder.add_feature_map(fbs_feature_maps_vector);
     auto req_update_model = req_update_model_builder.Finish();
@@ -176,18 +158,19 @@ class UpdateModelKernelMod : public AbstractKernel {
   void EncryptData(std::map<std::string, std::vector<float>> &weight_datas) {
     // calculate the sum of all layer's weight size
     size_t total_size = 0;
-    for (size_t i = 0; i < weight_full_names_.size(); i++) {
-      total_size += weight_datas[weight_full_names_[i]].size();
+    for (auto &weight_item : weight_datas) {
+      auto &weight_data = weight_item.second;
+      total_size += weight_data.size();
     }
     // get pairwise encryption noise vector
     std::vector<float> noise_vector = GetEncryptNoise(total_size);
 
     // encrypt original data
     size_t encrypt_num = 0;
-    for (size_t i = 0; i < weight_full_names_.size(); i++) {
-      const std::string &weight_name = weight_full_names_[i];
+    for (auto &weight_item : weight_datas) {
+      const std::string &weight_name = weight_item.first;
+      auto &original_data = weight_item.second;
       MS_LOG(INFO) << "Encrypt weights of layer: " << weight_name;
-      auto &original_data = weight_datas[weight_name];
       size_t weights_size = original_data.size();
       for (size_t j = 0; j < weights_size; j++) {
         original_data[j] += noise_vector[j + encrypt_num];
@@ -209,7 +192,7 @@ class UpdateModelKernelMod : public AbstractKernel {
         continue;
       }
       // get local worker's private key
-      armour::PrivateKey *local_private_key = fl::worker::FLWorker::GetInstance().secret_pk();
+      armour::PrivateKey *local_private_key = fl::worker::Worker::GetInstance().secret_pk();
       if (local_private_key == nullptr) {
         MS_LOG(EXCEPTION) << "Local secret private key is nullptr, get encryption noise failed!";
       }
@@ -218,8 +201,8 @@ class UpdateModelKernelMod : public AbstractKernel {
       std::vector<uint8_t> encrypt_pw_iv;
       std::vector<uint8_t> encrypt_pw_salt;
       if (fl_id_ < remote_fl_id) {
-        encrypt_pw_iv = fl::worker::FLWorker::GetInstance().pw_iv();
-        encrypt_pw_salt = fl::worker::FLWorker::GetInstance().pw_salt();
+        encrypt_pw_iv = fl::worker::Worker::GetInstance().pw_iv();
+        encrypt_pw_salt = fl::worker::Worker::GetInstance().pw_salt();
       } else {
         encrypt_pw_iv = public_key_set_i.pwIV;
         encrypt_pw_salt = public_key_set_i.pwSalt;
@@ -251,16 +234,10 @@ class UpdateModelKernelMod : public AbstractKernel {
     }
     return total_noise;
   }
-
-  std::shared_ptr<FBBuilder> fbb_;
-  uint32_t rank_id_;
-  uint32_t server_num_;
-  uint32_t target_server_rank_;
   std::string fl_name_;
   std::string fl_id_;
   int data_size_;
   uint64_t iteration_;
-  std::vector<std::string> weight_full_names_;
   std::vector<EncryptPublicKeys> client_keys;
   std::string encrypt_type_;
 };

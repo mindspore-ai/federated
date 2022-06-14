@@ -72,7 +72,7 @@ public abstract class DataSet {
     public abstract Status dataPreprocess(List<String> files);
 
     /**
-     * Init dataset.
+     * Load dataset.
      *
      * @param files data files.
      * @return init status.

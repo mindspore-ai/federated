@@ -16,19 +16,11 @@
 
 #include "common/communicator/http_message_handler.h"
 
-#include <event2/event.h>
 #include <event2/buffer.h>
-#include <event2/bufferevent.h>
-#include <event2/bufferevent_compat.h>
 #include <event2/http.h>
-#include <event2/http_compat.h>
 #include <event2/http_struct.h>
-#include <event2/listener.h>
 #include <event2/util.h>
 
-#include <fcntl.h>
-#include <unistd.h>
-#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -36,7 +28,6 @@
 
 namespace mindspore {
 namespace fl {
-namespace core {
 void HttpMessageHandler::InitHttpMessage() {
   MS_EXCEPTION_IF_NULL(event_request_);
   event_uri_ = evhttp_request_get_evhttp_uri(event_request_);
@@ -68,7 +59,9 @@ std::string HttpMessageHandler::GetHeadParam(const std::string &key) const {
 
 std::string HttpMessageHandler::GetPathParam(const std::string &key) const {
   const char *val = evhttp_find_header(&path_params_, key.c_str());
-  MS_EXCEPTION_IF_NULL(val);
+  if (val == nullptr) {
+    return std::string();
+  }
   return std::string(val);
 }
 
@@ -89,29 +82,29 @@ void HttpMessageHandler::ParsePostParam() {
   }
 }
 
-RequestProcessResult HttpMessageHandler::ParsePostMessageToJson() {
+FlStatus HttpMessageHandler::ParsePostMessageToJson() {
   MS_EXCEPTION_IF_NULL(event_request_);
-  RequestProcessResult result(RequestProcessResultCode::kSuccess);
+  FlStatus result(kFlSuccess);
   std::string message;
 
   size_t len = evbuffer_get_length(event_request_->input_buffer);
   if (len == 0) {
-    ERROR_STATUS(result, RequestProcessResultCode::kInvalidInputs, "The post message size is invalid.");
+    ERROR_STATUS(result, kInvalidInputs, "The post message size is invalid.");
     return result;
   } else if (len > kMaxMessageSize) {
-    ERROR_STATUS(result, RequestProcessResultCode::kInvalidInputs, "The post message is bigger than 100mb.");
+    ERROR_STATUS(result, kInvalidInputs, "The post message is bigger than 100mb.");
     return result;
   } else {
     message.resize(len);
     auto buffer = evbuffer_pullup(event_request_->input_buffer, -1);
     if (buffer == nullptr) {
-      ERROR_STATUS(result, RequestProcessResultCode::kInvalidInputs, "Get http post message failed.");
+      ERROR_STATUS(result, kInvalidInputs, "Get http post message failed.");
       return result;
     }
     size_t dest_size = len;
     size_t src_size = len;
     if (memcpy_s(message.data(), dest_size, buffer, src_size) != EOK) {
-      ERROR_STATUS(result, RequestProcessResultCode::kInvalidInputs, "Copy message failed.");
+      ERROR_STATUS(result, kInvalidInputs, "Copy message failed.");
       return result;
     }
 
@@ -119,7 +112,7 @@ RequestProcessResult HttpMessageHandler::ParsePostMessageToJson() {
       request_message_ = nlohmann::json::parse(message);
     } catch (nlohmann::json::exception &e) {
       std::string illegal_exception = e.what();
-      ERROR_STATUS(result, RequestProcessResultCode::kInvalidInputs, "Illegal JSON format:" + illegal_exception);
+      ERROR_STATUS(result, kInvalidInputs, "Illegal JSON format:" + illegal_exception);
       return result;
     }
   }
@@ -191,7 +184,9 @@ std::string HttpMessageHandler::GetRequestPath() {
 std::string HttpMessageHandler::GetUriQuery() const {
   MS_EXCEPTION_IF_NULL(event_uri_);
   const char *query = evhttp_uri_get_query(event_uri_);
-  MS_EXCEPTION_IF_NULL(query);
+  if (query == nullptr) {
+    return std::string();
+  }
   return std::string(query);
 }
 
@@ -288,8 +283,12 @@ void HttpMessageHandler::SimpleResponse(int code, const HttpHeaders &headers, co
   evhttp_send_reply(event_request_, code, nullptr, resp_buf_);
 }
 
-void HttpMessageHandler::ErrorResponse(int code, const RequestProcessResult &result) {
-  nlohmann::json error_json = {{"error_message", result.StatusMessage()}, {"code", kErrorCode}};
+void HttpMessageHandler::ErrorResponse(int code, const FlStatus &result) {
+  ErrorResponse(code, result.StatusMessage());
+}
+
+void HttpMessageHandler::ErrorResponse(int code, const std::string &error_msg) {
+  nlohmann::json error_json = {{"error_message", error_msg}, {"code", kErrorCode}};
   std::string out_error = error_json.dump();
   AddRespString(out_error);
   SetRespCode(code);
@@ -346,25 +345,25 @@ void HttpMessageHandler::set_body(const std::shared_ptr<std::vector<char>> &body
 
 nlohmann::json HttpMessageHandler::request_message() const { return request_message_; }
 
-RequestProcessResult HttpMessageHandler::ParseValueFromKey(const std::string &key, uint32_t *const value) {
+FlStatus HttpMessageHandler::ParseValueFromKey(const std::string &key, uint32_t *const value) {
   MS_EXCEPTION_IF_NULL(value);
-  RequestProcessResult result(RequestProcessResultCode::kSuccess);
+  FlStatus result(kFlSuccess);
   if (!request_message_.contains(key)) {
     std::string message = "The json is not contain the key:" + key;
-    ERROR_STATUS(result, RequestProcessResultCode::kInvalidInputs, message);
+    ERROR_STATUS(result, kInvalidInputs, message);
     return result;
   }
 
   int32_t res = IntToUint(request_message_.at(key));
   if (res < 0) {
     std::string message = "The value should not be less than 0.";
-    ERROR_STATUS(result, RequestProcessResultCode::kInvalidInputs, message);
+    ERROR_STATUS(result, kInvalidInputs, message);
     return result;
   }
 
   if (res > 0 && key == kWorkerNum) {
     std::string message = "The Worker does not currently support scale out.";
-    ERROR_STATUS(result, RequestProcessResultCode::kInvalidInputs, message);
+    ERROR_STATUS(result, kInvalidInputs, message);
     return result;
   }
 
@@ -372,13 +371,12 @@ RequestProcessResult HttpMessageHandler::ParseValueFromKey(const std::string &ke
   return result;
 }
 
-RequestProcessResult HttpMessageHandler::ParseNodeIdsFromKey(const std::string &key,
-                                                             std::vector<std::string> *const value) {
+FlStatus HttpMessageHandler::ParseNodeIdsFromKey(const std::string &key, std::vector<std::string> *const value) {
   MS_EXCEPTION_IF_NULL(value);
-  RequestProcessResult result(RequestProcessResultCode::kSuccess);
+  FlStatus result(kFlSuccess);
   if (!request_message_.contains(key)) {
     std::string message = "The json is not contain the key:" + key;
-    ERROR_STATUS(result, RequestProcessResultCode::kInvalidInputs, message);
+    ERROR_STATUS(result, kInvalidInputs, message);
     return result;
   }
   auto res = request_message_.at(key).get<std::vector<std::string>>();
@@ -388,6 +386,5 @@ RequestProcessResult HttpMessageHandler::ParseNodeIdsFromKey(const std::string &
   }
   return result;
 }
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore

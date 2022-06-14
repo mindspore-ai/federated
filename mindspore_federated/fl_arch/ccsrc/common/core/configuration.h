@@ -33,7 +33,6 @@
 
 namespace mindspore {
 namespace fl {
-namespace core {
 // This is a basic configuration class to store persistent information, which can be stored in a database or file
 class Configuration {
  public:
@@ -64,15 +63,8 @@ class Configuration {
   // Determine whether the configuration item exists.
   virtual bool Exists(const std::string &key) const = 0;
 
-  // storage meta data
-  virtual void PersistFile(const fl::core::ClusterConfig &clusterConfig) const = 0;
-
-  // storage meta data without nodes
-  virtual void PersistNodes(const fl::core::ClusterConfig &clusterConfig) const = 0;
-
   virtual std::string file_path() const = 0;
 };
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_PS_CORE_CONFIGURATION_H_

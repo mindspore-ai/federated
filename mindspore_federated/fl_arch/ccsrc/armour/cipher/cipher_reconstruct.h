@@ -47,15 +47,11 @@ class CipherReconStruct {
   // reconstruct secret mask
   bool ReconstructSecrets(const int cur_iterator, const std::string &next_req_time,
                           const schema::SendReconstructSecret *reconstruct_secret_req,
-                          const std::shared_ptr<FBBuilder> &fbb,
-                          const std::vector<std::string> &client_list);
+                          const std::shared_ptr<FBBuilder> &fbb, const std::vector<std::string> &client_list);
 
   // build response code of reconstruct secret.
   void BuildReconstructSecretsRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
                                   const std::string &reason, const int iteration, const std::string &next_req_time);
-
-  // clear the shared memory.
-  void ClearReconstructSecrets();
 
  private:
   CipherInit *cipher_init_;  // the parameter of the secure aggregation
@@ -87,9 +83,8 @@ class CipherReconStruct {
                    const std::map<std::string, std::vector<std::vector<unsigned char>>> &client_ivs);
   std::vector<uint8_t> GetIndiIV(const std::string fl_id,
                                  const std::map<std::string, std::vector<std::vector<uint8_t>>> &client_ivs) const;
-  bool CheckInputs(const schema::SendReconstructSecret *reconstruct_secret_req,
-                   const std::shared_ptr<FBBuilder> &fbb, const int cur_iterator,
-                   const std::string &next_req_time);
+  bool CheckInputs(const schema::SendReconstructSecret *reconstruct_secret_req, const std::shared_ptr<FBBuilder> &fbb,
+                   const int cur_iterator, const std::string &next_req_time);
 };
 }  // namespace armour
 }  // namespace fl

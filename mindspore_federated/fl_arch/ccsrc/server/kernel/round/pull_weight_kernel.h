@@ -33,23 +33,19 @@ namespace kernel {
 constexpr uint32_t kPrintPullWeightForEveryRetryTime = 3000;
 class PullWeightKernel : public RoundKernel {
  public:
-  PullWeightKernel() : executor_(nullptr), retry_count_(0) {}
+  PullWeightKernel() = default;
   ~PullWeightKernel() override = default;
 
   void InitKernel(size_t required_cnt) override;
-  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<fl::core::MessageHandler> &message) override;
+  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<MessageHandler> &message) override;
   bool Reset() override;
 
  private:
   void PullWeight(const std::shared_ptr<FBBuilder> &fbb, const schema::RequestPullWeight *pull_weight_req);
-  void BuildPullWeightRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
-                          const std::string &reason, size_t iteration,
-                          const std::map<std::string, AddressPtr> &feature_maps);
-
-  Executor *executor_;
+  void BuildErrorPullWeightRsp(const FlStatus &status, size_t iteration, FBBuilder *fbb);
 
   // The count of retrying because the aggregation of the weights is not done.
-  std::atomic<uint64_t> retry_count_;
+  std::atomic<uint64_t> retry_count_ = 0;
 };
 }  // namespace kernel
 }  // namespace server

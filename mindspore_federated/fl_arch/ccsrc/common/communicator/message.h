@@ -14,47 +14,21 @@
  * limitations under the License.
  */
 
-#ifndef MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_MESSAGE_H_
-#define MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_MESSAGE_H_
+#ifndef MINDSPORE_CCSRC_FL_COMMUNICATOR_MESSAGE_H_
+#define MINDSPORE_CCSRC_FL_COMMUNICATOR_MESSAGE_H_
 
 #include <string>
 #include <memory>
 
 namespace mindspore {
 namespace fl {
-namespace core {
 enum class Protos : uint32_t { RAW = 0, PROTOBUF = 1, FLATBUFFERS = 2 };
-
-enum class Command {
-  TERMINATE = 0,
-  REGISTER = 1,
-  HEARTBEAT = 2,
-  SEND_DATA = 3,
-  FETCH_METADATA = 4,
-  FINISH = 5,
-  COLLECTIVE_SEND_DATA = 6,
-  FAILURE_EVENT = 7
-};
-
-enum class Role { SERVER = 0, WORKER = 1, SCHEDULER = 2 };
 
 struct MessageHeader {
   Protos message_proto_ = Protos::RAW;
   uint32_t message_meta_length_ = 0;
   uint64_t message_length_ = 0;
 };
-
-struct CommandMeta {
-  // the command of this message,for example: register,heartbeat,data
-  Command cmd;
-  // the request id of this message
-  uint64_t request_id;
-  // the role of the current node: worker,server,scheduler
-  Role role;
-  // the current Node rank id,the worker node range is:[0,numOfWorker-1], the server node range is:[0, numOfServer-1]
-  int32_t rank_id = 4;
-};
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore
-#endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_MESSAGE_H_
+#endif  // MINDSPORE_CCSRC_FL_COMMUNICATOR_MESSAGE_H_

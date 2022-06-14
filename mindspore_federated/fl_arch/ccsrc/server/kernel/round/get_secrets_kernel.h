@@ -29,21 +29,16 @@ namespace mindspore {
 namespace fl {
 namespace server {
 namespace kernel {
-// results of signature verification
-enum sigVerifyResult { FAILED, TIMEOUT, PASSED };
 
 class GetSecretsKernel : public RoundKernel {
  public:
   GetSecretsKernel() = default;
   ~GetSecretsKernel() override = default;
   void InitKernel(size_t required_cnt) override;
-  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<fl::core::MessageHandler> &message) override;
-  bool Reset() override;
+  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<MessageHandler> &message) override;
 
  private:
-  Executor *executor_;
-  size_t iteration_time_window_;
-  armour::CipherShares *cipher_share_;
+  armour::CipherShares *cipher_share_ = nullptr;
   sigVerifyResult VerifySignature(const schema::GetShareSecrets *get_secrets_req);
   bool CountForGetSecrets(const std::shared_ptr<FBBuilder> &fbb, const schema::GetShareSecrets *get_secrets_req,
                           const size_t iter_num);

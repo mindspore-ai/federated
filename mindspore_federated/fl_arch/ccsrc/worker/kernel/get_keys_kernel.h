@@ -21,7 +21,7 @@
 #include <string>
 #include <memory>
 #include "worker/kernel/abstract_kernel.h"
-#include "worker/fl_worker.h"
+#include "worker/worker.h"
 #include "armour/secure_protocol/key_agreement.h"
 #include "common/core/comm_util.h"
 
@@ -38,15 +38,10 @@ class GetKeysKernelMod : public AbstractKernel {
   bool Launch();
 
  private:
-  void BuildGetKeysReq(const std::shared_ptr<FBBuilder> &fbb);
-  bool SavePublicKeyList(
-    const flatbuffers::Vector<flatbuffers::Offset<schema::ClientPublicKeys>> *remote_public_key);
+  void BuildGetKeysReq(FBBuilder *fbb);
+  bool SavePublicKeyList(const flatbuffers::Vector<flatbuffers::Offset<schema::ClientPublicKeys>> *remote_public_key);
 
-  uint32_t rank_id_;
-  uint32_t server_num_;
-  uint32_t target_server_rank_;
   std::string fl_id_;
-  std::shared_ptr<FBBuilder> fbb_;
 };
 }  // namespace kernel
 }  // namespace worker

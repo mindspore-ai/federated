@@ -46,7 +46,7 @@ public class FileUtil {
      * @param maxSeqLen   max seq len to clamp
      * @return features
      */
-    public static List<Feature> init(String trainFile, String vocabFile, String idsFile, boolean isTrainMode,
+    public static List<FeatureInfo> init(String trainFile, String vocabFile, String idsFile, boolean isTrainMode,
                                      int maxSeqLen) {
         if (trainFile == null || vocabFile == null || idsFile == null) {
             logger.severe(Common.addTag("dataset init failed,trainFile,idsFile,vocabFile cannot be empty"));
@@ -73,13 +73,13 @@ public class FileUtil {
             labels.add(tokens[1]);
         }
 
-        List<Feature> features = new ArrayList<>(examples.size());
+        List<FeatureInfo> features = new ArrayList<>(examples.size());
         for (int i = 0; i < examples.size(); i++) {
             List<Integer> tokens = customTokenizer.tokenize(examples.get(i), isTrainMode);
             if (tokens.isEmpty()) {
                 continue;
             }
-            Optional<Feature> feature = customTokenizer.getFeatures(tokens, labels.get(i));
+            Optional<FeatureInfo> feature = customTokenizer.getFeatures(tokens, labels.get(i));
             if (isTrainMode) {
                 customTokenizer.addRandomMaskAndReplace(feature.get(), true, true);
             }
@@ -97,7 +97,7 @@ public class FileUtil {
      * @param isTrainMode if in train mod
      * @return infer features
      */
-    public static List<Feature> readInferData(String inferFile, String vocabFile, String idsFile, boolean isTrainMode
+    public static List<FeatureInfo> readInferData(String inferFile, String vocabFile, String idsFile, boolean isTrainMode
             , int maxSeqLen) {
         if (inferFile == null || vocabFile == null || idsFile == null) {
             logger.severe(Common.addTag("dataset init failed,trainFile,idsFile,vocabFile cannot be empty"));
@@ -107,7 +107,7 @@ public class FileUtil {
         CustomTokenizer customTokenizer = new CustomTokenizer();
         customTokenizer.init(vocabFile, idsFile, maxSeqLen);
         List<String> allLines = readTxtFile(inferFile);
-        List<Feature> features = new ArrayList<>(allLines.size());
+        List<FeatureInfo> features = new ArrayList<>(allLines.size());
         for (String line : allLines) {
             if (line.isEmpty()) {
                 continue;
@@ -117,7 +117,7 @@ public class FileUtil {
                 line = info[1];
             }
             List<Integer> tokens = customTokenizer.tokenize(line, isTrainMode);
-            Optional<Feature> feature = customTokenizer.getFeatures(tokens, "other");
+            Optional<FeatureInfo> feature = customTokenizer.getFeatures(tokens, "other");
             if (!feature.isPresent()) {
                 continue;
             }

@@ -35,19 +35,18 @@ namespace server {
 namespace kernel {
 class StartFLJobKernel : public RoundKernel {
  public:
-  StartFLJobKernel() : executor_(nullptr), iteration_time_window_(0), iter_next_req_timestamp_(0) {}
+  StartFLJobKernel() = default;
   ~StartFLJobKernel() override = default;
 
   void InitKernel(size_t threshold_count) override;
-  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<fl::core::MessageHandler> &message) override;
+  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<MessageHandler> &message) override;
   bool Reset() override;
 
-  void OnFirstCountEvent(const std::shared_ptr<fl::core::MessageHandler> &message) override;
+  void OnFirstCountEvent() override;
 
  private:
   // Returns whether the startFLJob count of this iteration has reached the threshold.
-  ResultCode ReachThresholdForStartFLJob(const std::shared_ptr<FBBuilder> &fbb,
-                                         const schema::RequestFLJob *start_fl_job_req);
+  ResultCode ReachThresholdForStartFLJob(const std::shared_ptr<FBBuilder> &fbb);
 
   // The metadata of device will be stored and queried in updateModel round.
   DeviceMeta CreateDeviceMetadata(const schema::RequestFLJob *start_fl_job_req);
@@ -69,20 +68,13 @@ class StartFLJobKernel : public RoundKernel {
   // Build response for startFLJob round no matter success or failure.
   void BuildStartFLJobRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
                           const std::string &reason, const bool is_selected, const std::string &next_req_time,
-                          const std::map<std::string, AddressPtr> &feature_maps = {},
+                          const ModelItemPtr &model_item = nullptr,
                           const schema::CompressType &compressType = schema::CompressType_NO_COMPRESS,
                           const std::map<std::string, AddressPtr> &compress_feature_maps = {});
 
   bool VerifyFLJobRequest(const schema::RequestFLJob *start_fl_job_req);
-
-  // The executor is for getting the initial model for startFLJob request.
-  Executor *executor_;
-
-  // The time window of one iteration.
-  size_t iteration_time_window_;
-
   // Timestamp of next request time for this iteration.
-  uint64_t iter_next_req_timestamp_;
+  uint64_t iter_next_req_timestamp_ = 0;
 };
 }  // namespace kernel
 }  // namespace server

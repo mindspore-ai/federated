@@ -91,7 +91,7 @@ public abstract class Client {
     public abstract List<Object> getInferResult(List<Callback> inferCallback);
 
     /**
-     * Init lite session and inputs buffer.
+     * Load lite session and inputs buffer.
      *
      * @param modelPath model file path.
      * @param config session run config.

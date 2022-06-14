@@ -1,5 +1,5 @@
 /**
- * Copyright 2021 Huawei Technologies Co., Ltd
+ * Copyright 2022 Huawei Technologies Co., Ltd
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,67 +20,8 @@ message CollectiveData {
   bytes data = 1;
 }
 
-message CountRequest {
-  string name = 1;
-  string id = 2;
-}
-
-message CountResponse {
-  bool result = 1;
-  string reason = 2;
-}
-
-message CountReachThresholdRequest {
-  string name = 1;
-}
-
-message CountReachThresholdResponse {
-  bool is_enough = 1;
-}
-
-message ResetCounterRequest {
-  string name = 1;
-}
-
-message UpdateMetadataRequest {
-  string name = 1;
-  bytes value = 2;
-}
-
-message GetMetadataRequest {
-  string name = 1;
-}
-
-message GetMetadataResponse {
-  bytes value = 1;
-}
-
-message GetOneDeviceMetaRequest {
-  string fl_id = 1;
-}
-
-message GetOneDeviceMetaResponse {
-  DeviceMeta device_meta = 1;
-  bool found = 2;
-}
-
-enum CounterEventType {
-  FIRST_CNT = 0;
-  LAST_CNT = 1;
-}
-
-message CounterEvent {
-  CounterEventType type = 1;
-  string name = 2;
-  bytes data = 3;
-}
-
 message FLId {
   string fl_id = 1;
-}
-
-message UpdateModelClientList {
-  repeated string fl_id = 1;
 }
 
 message DeviceMeta {
@@ -102,22 +43,12 @@ message ClientShares {
   map<string, SharesPb> client_secret_shares = 1;
 }
 
-message PairClientShares {
-  string fl_id = 1;
-  SharesPb client_shares = 2;
-}
-
 message ClientKeys {
   map<string, KeysPb> client_keys = 1;
 }
 
 message ClientNoises {
   OneClientNoises one_client_noises = 1;
-}
-
-message PairClientKeys {
-  string fl_id = 1;
-  KeysPb client_keys = 2;
 }
 
 message OneClientNoises {
@@ -149,104 +80,15 @@ message Prime {
   bytes prime = 1;
 }
 
-message PairClientListSign {
-  string fl_id = 1;
-  bytes signature = 2;
-}
-
 message ClientListSign {
   map<string, bytes> client_list_sign = 1;
-}
-
-message PairKeyAttestation {
-  string fl_id = 1;
-  string certificate = 2;
 }
 
 message KeyAttestation {
   map<string, string> key_attestations = 1;
 }
 
-message PBMetadata {
-  oneof value {
-    DeviceMeta device_meta = 1;
-    FLIdToDeviceMeta device_metas = 2;
-
-    FLId fl_id = 3;
-    UpdateModelClientList client_list = 4;
-
-    UpdateModelThreshold update_model_threshold = 5;
-
-    PairClientShares pair_client_shares = 6;
-    ClientShares client_shares = 7;
-
-    PairClientKeys pair_client_keys = 8;
-    ClientKeys client_keys = 9;
-
-    OneClientNoises one_client_noises = 10;
-    ClientNoises client_noises = 11;
-
-    Prime prime = 12;
-
-    ClientListSign client_list_sign = 13;
-    PairClientListSign pair_client_list_sign = 14;
-
-    KeyAttestation key_attestation = 15;
-    PairKeyAttestation pair_key_attestation = 16;
-  }
-}
-
-message PBMetadataWithName {
-  string name = 1;
-  PBMetadata metadata = 2;
-}
-
-message SyncIterationRequest {
-  // The rank of the server which sends this synchronizing iteration request to the leader server.
-  uint32 rank = 1;
-}
-
-message SyncIterationResponse {
-  // The current iteration number.
-  uint64 iteration = 1;
-}
-
-message PrepareForNextIterRequest {
-  bool is_last_iter_valid = 2;
-  string reason = 3;
-  uint64 last_iteration = 4;
-}
-
-message PrepareForNextIterResponse {
-  string result = 1;
-}
-
-message NotifyLeaderMoveToNextIterRequest {
-  uint32 rank = 1;
-  bool is_last_iter_valid = 2;
-  uint64 iter_num = 3;
-  string reason = 4;
-}
-
-message NotifyLeaderMoveToNextIterResponse {
-  string result = 1;
-}
-
-message MoveToNextIterRequest {
-  bool is_last_iter_valid = 1;
-  uint64 last_iter_num = 2;
-  string reason = 3;
-}
-
-message MoveToNextIterResponse {
-  string result = 1;
-}
-
-message EndLastIterRequest {
-  uint64 last_iter_num = 1;
-}
-
-message EndLastIterResponse {
+message IterationSummaryMsg {
   string result = 1;
   uint64 startFLJob_total_client_num = 2;
   uint64 startFLJob_accept_client_num = 3;
@@ -261,8 +103,7 @@ message EndLastIterResponse {
   uint64 participation_time_level1_num = 12;
   uint64 participation_time_level2_num = 13;
   uint64 participation_time_level3_num = 14;
-}
 
-message SyncAfterRecover {
-  uint64 current_iter_num = 1;
+  float metrics_loss = 15;
+  float metrics_accuracy = 16;
 }

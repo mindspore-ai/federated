@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_HTTP_SERVER_H_
-#define MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_HTTP_SERVER_H_
+#ifndef MINDSPORE_CCSRC_FL_COMMUNICATOR_HTTP_SERVER_H_
+#define MINDSPORE_CCSRC_FL_COMMUNICATOR_HTTP_SERVER_H_
 
 #include "common/communicator/http_message_handler.h"
 
@@ -43,45 +43,35 @@
 
 namespace mindspore {
 namespace fl {
-namespace core {
-
 class HttpServer {
  public:
   // Server address only support IPV4 now, and should be in format of "x.x.x.x"
   explicit HttpServer(const std::string &address, std::uint16_t port, size_t thread_num = 10)
-      : server_address_(address),
-        server_port_(port),
-        is_stop_(true),
-        request_timeout_(300),
-        thread_num_(thread_num),
-        backlog_(1024),
-        fd_(-1) {}
+      : server_address_(address), server_port_(port), thread_num_(thread_num), backlog_(1024), fd_(-1) {}
 
   ~HttpServer();
-
-  bool InitServer();
-  void SetTimeOut(int seconds);
 
   // Return: true if success, false if failed, check log to find failure reason
   bool RegisterRoute(const std::string &url, OnRequestReceive *func);
 
   bool Start();
-  bool Wait();
-  bool Stop();
+  void Stop();
+  std::string address() const { return server_address_; }
+  uint16_t port() const { return server_port_; }
 
  private:
   std::string server_address_;
   std::uint16_t server_port_;
-  std::atomic<bool> is_stop_;
-  int request_timeout_;
+  std::atomic<bool> has_stopped_ = false;
   size_t thread_num_;
   std::vector<std::shared_ptr<std::thread>> worker_threads_;
   std::vector<std::shared_ptr<HttpRequestHandler>> http_request_handlers;
   int32_t backlog_;
   std::unordered_map<std::string, OnRequestReceive *> request_handlers_;
   int fd_;
+
+  bool InitServer();
 };
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore
-#endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_HTTP_SERVER_H_
+#endif  // MINDSPORE_CCSRC_FL_COMMUNICATOR_HTTP_SERVER_H_

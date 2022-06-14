@@ -41,9 +41,9 @@ const size_t LocalMetaStore::curr_iter_num() {
   return curr_iter_num_;
 }
 
-void LocalMetaStore::set_curr_instance_state(InstanceState instance_state) { instance_state_ = instance_state; }
+void LocalMetaStore::set_curr_instance_state(cache::InstanceState instance_state) { instance_state_ = instance_state; }
 
-const InstanceState LocalMetaStore::curr_instance_state() { return instance_state_; }
+const cache::InstanceState LocalMetaStore::curr_instance_state() { return instance_state_; }
 
 const void LocalMetaStore::put_aggregation_feature_map(const std::string &name, const Feature &feature) {
   if (aggregation_feature_map_.count(name) > 0) {

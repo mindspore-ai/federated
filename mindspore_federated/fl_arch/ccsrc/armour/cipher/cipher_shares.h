@@ -44,23 +44,19 @@ class CipherShares {
 
   // handle the client's request of share secrets.
   bool ShareSecrets(const int cur_iterator, const schema::RequestShareSecrets *share_secrets_req,
-                    const std::shared_ptr<FBBuilder> &share_secrets_resp_builder,
-                    const std::string next_req_time);
+                    const std::shared_ptr<FBBuilder> &share_secrets_resp_builder, const std::string next_req_time);
   // handle the client's request of get secrets.
   bool GetSecrets(const schema::GetShareSecrets *get_secrets_req,
-                  const std::shared_ptr<FBBuilder> &get_secrets_resp_builder,
-                  const std::string &next_req_time);
+                  const std::shared_ptr<FBBuilder> &get_secrets_resp_builder, const std::string &next_req_time);
 
   // build response code of share secrets.
   void BuildShareSecretsRsp(const std::shared_ptr<FBBuilder> &share_secrets_resp_builder,
-                            const schema::ResponseCode retcode, const std::string &reason, const std::string &next_req_time,
-                            const int iteration);
+                            const schema::ResponseCode retcode, const std::string &reason,
+                            const std::string &next_req_time, const int iteration);
   // build response code of get secrets.
   void BuildGetSecretsRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
                           const size_t iteration, const std::string &next_req_time,
                           const std::vector<flatbuffers::Offset<schema::ClientShare>> *encrypted_shares);
-  // clear the shared memory.
-  void ClearShareSecrets();
 
  private:
   CipherInit *cipher_init_;  // the parameter of the secure aggregation

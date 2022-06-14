@@ -72,6 +72,12 @@ py::object CallPyFn(const std::string &module, const std::string &name, T... arg
   }
   return py::none();
 }
+
+struct PyFlCallback {
+  py::object after_started;
+  py::object before_stopped;
+  py::object on_iteration_end;
+};
 }  // namespace python_adapter
 }  // namespace fl
 }  // namespace mindspore

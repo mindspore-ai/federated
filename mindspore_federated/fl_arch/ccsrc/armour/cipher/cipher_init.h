@@ -28,6 +28,19 @@
 namespace mindspore {
 namespace fl {
 namespace armour {
+struct CipherConfig {
+  float share_secrets_ratio = 1.0;
+  uint64_t cipher_time_window = 300000;
+  uint64_t exchange_keys_threshold = 0;
+  uint64_t get_keys_threshold = 0;
+  uint64_t share_secrets_threshold = 0;
+  uint64_t get_secrets_threshold = 0;
+  uint64_t get_client_list_threshold = 0;
+  uint64_t push_list_sign_threshold = 0;
+  uint64_t get_list_sign_threshold = 0;
+  uint64_t minimum_clients_for_reconstruct = 0;
+  uint64_t minimum_secret_shares_for_reconstruct = 0;
+};
 
 // Initialization of secure aggregation.
 class CipherInit {
@@ -38,10 +51,7 @@ class CipherInit {
   }
 
   // Initialize the parameters of the secure aggregation.
-  bool Init(const CipherPublicPara &param, size_t time_out_mutex, size_t cipher_exchange_keys_cnt,
-            size_t cipher_get_keys_cnt, size_t cipher_share_secrets_cnt, size_t cipher_get_secrets_cnt,
-            size_t cipher_get_clientlist_cnt, size_t cipher_push_list_sign_cnt, size_t cipher_get_list_sign_cnt,
-            size_t cipher_clients_threshold_for_reconstruct);
+  bool Init(const CipherPublicPara &param, size_t time_out_mutex, const CipherConfig &cipher_config);
 
   bool ReInitForScaling();
 

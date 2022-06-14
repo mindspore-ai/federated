@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_CLIENT_H_
-#define MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_CLIENT_H_
+#ifndef MINDSPORE_CCSRC_FL_COMMUNICATOR_TCP_CLIENT_H_
+#define MINDSPORE_CCSRC_FL_COMMUNICATOR_TCP_CLIENT_H_
 
 #include <event2/event.h>
 #include <event2/bufferevent.h>
@@ -29,6 +29,7 @@
 #include <thread>
 #include <mutex>
 #include <atomic>
+#include <future>
 #include <condition_variable>
 
 #include "common/core/cluster_config.h"
@@ -37,21 +38,38 @@
 #include "common/communicator/ssl_client.h"
 #include "common/communicator/ssl_wrapper.h"
 #include "common/constants.h"
-#include "python/fl_context.h"
+#include "common/fl_context.h"
 #include "common/communicator/tcp_message_handler.h"
-#include "common/core/file_configuration.h"
 
 namespace mindspore {
 namespace fl {
-namespace core {
+class TcpClientDispatch {
+ public:
+  bufferevent *CreateBufferEvent();
+  void Stop();
+  void StartDispatch();
+
+  static TcpClientDispatch &Instance() {
+    static TcpClientDispatch instance;
+    return instance;
+  }
+
+ private:
+  event_base *event_base_ = nullptr;
+  std::mutex event_base_mutex_;
+  bool is_started_ = false;
+
+  std::thread dispatch_thread_;
+  TcpClientDispatch() = default;
+  ~TcpClientDispatch() { Stop(); }
+};
+
 class TcpClient {
  public:
   using OnConnected = std::function<void()>;
   using OnDisconnected = std::function<void()>;
   using OnRead = std::function<void(const void *, size_t)>;
   using OnTimeout = std::function<void()>;
-  using OnMessage =
-    std::function<void(const std::shared_ptr<MessageMeta> &, const Protos &, const void *, size_t size)>;
   using OnTimer = std::function<void()>;
 
   explicit TcpClient(const std::string &address, std::uint16_t port, NodeRole peer_role);
@@ -62,61 +80,37 @@ class TcpClient {
   void set_connected_callback(const OnConnected &connected);
   bool WaitConnected(
     const uint32_t &connected_timeout = FLContext::instance()->cluster_config().cluster_available_timeout);
-  void Init();
-  void StartWithDelay(int seconds);
   void Stop();
-  void Start();
-  void StartWithNoBlock();
-  void SetMessageCallback(const OnMessage &cb);
-  bool SendMessage(const CommMessage &message) const;
-  bool SendMessage(const std::shared_ptr<MessageMeta> &meta, const Protos &protos, const void *data, size_t size);
-  void set_timer_callback(const OnTimer &timer);
-  const event_base &eventbase() const;
-  int connection_status() { return connection_status_; }
-  static bool is_started() { return is_started_; }
+  bool Start(uint64_t timeout_in_seconds);
+  void SetMessageCallback(const TcpMessageHandler::MessageHandleFun &cb);
+  bool SendMessage(const MessageMeta &meta, const Protos &protos, const void *data, size_t size);
+  bool connected() const { return connected_; }
 
  protected:
   static void SetTcpNoDelay(const evutil_socket_t &fd);
-  static void TimeoutCallback(evutil_socket_t fd, std::int16_t what, void *arg);
   static void ReadCallback(struct bufferevent *bev, void *ctx);
-  void ReadCallbackInner(struct bufferevent *bev);
   static void EventCallback(struct bufferevent *bev, std::int16_t events, void *ptr);
   void EventCallbackInner(struct bufferevent *bev, std::int16_t events);
-  virtual void OnReadHandler(const void *buf, size_t num);
-  static void TimerCallback(evutil_socket_t fd, int16_t event, void *arg);
   void NotifyConnected();
-  bool EstablishSSL();
 
   std::string PeerRoleName() const;
 
  private:
-  OnMessage message_callback_;
   TcpMessageHandler message_handler_;
 
   OnConnected connected_callback_;
   OnDisconnected disconnected_callback_;
   OnRead read_callback_;
-  OnTimeout timeout_callback_;
-  OnTimer on_timer_callback_;
-
-  static event_base *event_base_;
-  static std::mutex event_base_mutex_;
-  static bool is_started_;
 
   std::mutex connection_mutex_;
   std::condition_variable connection_cond_;
-  event *event_timeout_;
   bufferevent *buffer_event_;
 
   std::string server_address_;
   std::uint16_t server_port_;
   NodeRole peer_role_;
-  // -1:disconnected, 0:connecting, 1:connected
-  std::atomic<int> connection_status_;
-  // The Configuration file
-  Configuration *config_;
+  std::atomic<bool> connected_ = false;
 };
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore
-#endif  // MINDSPORE_CCSRC_PS_CORE_COMMUNICATOR_TCP_CLIENT_H_
+#endif  // MINDSPORE_CCSRC_FL_COMMUNICATOR_TCP_CLIENT_H_

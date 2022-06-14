@@ -19,15 +19,9 @@
 
 #include <memory>
 #include <string>
-#include <utility>
-#include <vector>
-#include <map>
-
+#include "communicator/communicator_base.h"
 #include "common/common.h"
-#include "server/distributed_count_service.h"
-#include "server/iteration_timer.h"
 #include "server/kernel/round/round_kernel.h"
-#include "common/communicator/communicator_base.h"
 
 namespace mindspore {
 namespace fl {
@@ -37,25 +31,22 @@ namespace server {
 // and timing. So Round helps register counter and timer so that the round kernels only need to focus on the logic.
 class Round {
  public:
-  explicit Round(const std::string &name, bool check_timeout = true, size_t time_window = 3000,
-                 bool check_count = false, size_t threshold_count = 8, bool server_num_as_threshold = false);
+  Round(const std::string &name, bool check_timeout, uint64_t time_window, bool check_count, uint64_t threshold_count,
+        bool per_server_count);
   ~Round() = default;
 
-  void RegisterMsgCallBack(const std::shared_ptr<fl::core::CommunicatorBase> &communicator);
-  void Initialize(const TimeOutCb &timeout_cb, const FinishIterCb &finish_iteration_cb);
-
-  // Reinitialize count service and round kernel of this round after scaling operations are done.
-  bool ReInitForScaling(uint32_t server_num);
+  void RegisterMsgCallBack(const std::shared_ptr<CommunicatorBase> &communicator);
+  void Initialize();
 
   // After hyper-parameters are updated, some rounds and kernels should be reinitialized.
-  bool ReInitForUpdatingHyperParams(size_t updated_threshold_count, size_t updated_time_window, uint32_t server_num);
+  bool ReInitForUpdatingHyperParams(uint64_t updated_threshold_count, uint64_t updated_time_window);
 
   // Bind a round kernel to this Round. This method should be called after Initialize.
   void BindRoundKernel(const std::shared_ptr<kernel::RoundKernel> &kernel);
 
   // This method is the callback which will be set to the communicator and called after the corresponding round message
   // is sent to the server.
-  void LaunchRoundKernel(const std::shared_ptr<fl::core::MessageHandler> &message);
+  void LaunchRoundKernel(const std::shared_ptr<MessageHandler> &message);
 
   // Round needs to be reset after each iteration is finished or its timer expires.
   void Reset();
@@ -94,12 +85,13 @@ class Round {
 
  private:
   // The callbacks which will be set to DistributedCounterService.
-  void OnFirstCountEvent(const std::shared_ptr<fl::core::MessageHandler> &message);
-  void OnLastCountEvent(const std::shared_ptr<fl::core::MessageHandler> &message);
+  void OnFirstCountEvent();
+  void OnLastCountEvent();
 
   // Judge whether the training service is available.
   bool IsServerAvailable(std::string *reason);
 
+  RoundConfig config_;
   std::string name_;
 
   // Whether this round needs to use timer. Most rounds in federated learning with mobile devices scenario need to set
@@ -117,17 +109,12 @@ class Round {
   // the round message count has reached threshold_count_.
   size_t threshold_count_;
 
-  // Whether this round uses the server number as its threshold count.
-  bool server_num_as_threshold_;
+  // For update model, local data exists on each server, and we use the total count of all valid servers as the final
+  // count.
+  bool per_server_count_ = false;
 
   // The round kernel for this Round.
   std::shared_ptr<kernel::RoundKernel> kernel_;
-
-  // Some rounds may need timer to eliminate the long tail effect.
-  std::shared_ptr<IterationTimer> iter_timer_;
-
-  // The callbacks which will be set to the round kernel.
-  StopTimerCb stop_timer_cb_;
 };
 }  // namespace server
 }  // namespace fl

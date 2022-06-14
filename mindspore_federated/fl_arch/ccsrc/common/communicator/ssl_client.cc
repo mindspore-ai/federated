@@ -29,7 +29,6 @@
 
 namespace mindspore {
 namespace fl {
-namespace core {
 SSLClient::SSLClient() : ssl_ctx_(nullptr), check_time_thread_(nullptr), running_(false), is_ready_(false) {
   InitSSL();
 }
@@ -53,18 +52,13 @@ void SSLClient::InitSSL() {
   if (!ssl_ctx_) {
     MS_LOG(EXCEPTION) << "SSL_CTX_new failed";
   }
-  std::unique_ptr<Configuration> config_ =
-    std::make_unique<FileConfiguration>(FLContext::instance()->config_file_path());
-  MS_EXCEPTION_IF_NULL(config_);
-  if (!config_->Initialize()) {
-    MS_LOG(EXCEPTION) << "The config file is empty.";
-  }
+  auto &ssl_config = FLContext::instance()->ssl_config();
 
   // 1.Parse the client's certificate and the ciphertext of key.
   std::string client_cert = kCertificateChain;
-  std::string path = CommUtil::ParseConfig(*config_, kClientCertPath);
+  std::string path = ssl_config.client_cert_path;
   if (!CommUtil::IsFileExists(path)) {
-    MS_LOG(EXCEPTION) << "The key:" << kClientCertPath << "'s value is not exist.";
+    MS_LOG(EXCEPTION) << "The file path of client_cert_path " << path << " is not exist.";
   }
   client_cert = path;
 
@@ -99,16 +93,16 @@ void SSLClient::InitSSL() {
   }
 
   // 3. load ca cert.
-  std::string ca_path = CommUtil::ParseConfig(*config_, kCaCertPath);
+  std::string ca_path = ssl_config.ca_cert_path;
   if (!CommUtil::IsFileExists(ca_path)) {
-    MS_LOG(WARNING) << "The key:" << kCaCertPath << "'s value is not exist.";
+    MS_LOG(WARNING) << "The file path of ca_cert_path " << ca_path << " is not exist.";
   }
   BIO *ca_bio = BIO_new_file(ca_path.c_str(), "r");
   if (ca_bio == nullptr) {
     MS_LOG(EXCEPTION) << "Read CA cert file failed.";
   }
   X509 *caCert = PEM_read_bio_X509(ca_bio, nullptr, nullptr, nullptr);
-  std::string crl_path = CommUtil::ParseConfig(*(config_), kCrlPath);
+  std::string crl_path = ssl_config.crl_path;
   if (crl_path.empty()) {
     MS_LOG(INFO) << "The crl path is empty.";
   } else if (!CommUtil::checkCRLTime(crl_path)) {
@@ -118,20 +112,21 @@ void SSLClient::InitSSL() {
   }
 
   CommUtil::verifyCertPipeline(caCert, cert);
-  InitSSLCtx(*config_, cert, pkey, ca_path);
-  StartCheckCertTime(*config_, cert);
+  InitSSLCtx(cert, pkey, ca_path);
+  StartCheckCertTime(ssl_config.cert_expire_warning_time_in_day, cert);
 
   EVP_PKEY_free(pkey);
   (void)BIO_free(ca_bio);
 }
 
-void SSLClient::InitSSLCtx(const Configuration &config, const X509 *cert, const EVP_PKEY *pkey, std::string ca_path) {
+void SSLClient::InitSSLCtx(const X509 *cert, const EVP_PKEY *pkey, std::string ca_path) {
   SSL_CTX_set_verify(ssl_ctx_, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, 0);
   if (!SSL_CTX_load_verify_locations(ssl_ctx_, ca_path.c_str(), nullptr)) {
     MS_LOG(EXCEPTION) << "SSL load ca location failed!";
   }
 
-  std::string default_cipher_list = CommUtil::ParseConfig(config, kCipherList);
+  auto &ssl_config = FLContext::instance()->ssl_config();
+  std::string default_cipher_list = ssl_config.cipher_list;
   std::vector<std::string> ciphers = CommUtil::Split(default_cipher_list, kColon);
   if (!CommUtil::VerifyCipherList(ciphers)) {
     MS_LOG(EXCEPTION) << "The cipher is wrong.";
@@ -173,19 +168,15 @@ void SSLClient::CleanSSL() {
   StopCheckCertTime();
 }
 
-void SSLClient::StartCheckCertTime(const Configuration &config, const X509 *cert) {
+void SSLClient::StartCheckCertTime(uint64_t cert_expire_warning_time_in_day, const X509 *cert) {
   MS_EXCEPTION_IF_NULL(cert);
   MS_LOG(INFO) << "The client start check cert.";
   int64_t interval = kCertCheckIntervalInHour;
 
-  int64_t warning_time = kCertExpireWarningTimeInDay;
-  if (config.Exists(kCertExpireWarningTime)) {
-    int64_t res_time = config.GetInt(kCertExpireWarningTime, 0);
-    if (res_time < kMinWarningTime || res_time > kMaxWarningTime) {
-      MS_LOG(EXCEPTION) << "The Certificate expiration warning time should be [7, 180]";
-    }
-    warning_time = res_time;
+  if (cert_expire_warning_time_in_day < kMinWarningTime || cert_expire_warning_time_in_day > kMaxWarningTime) {
+    MS_LOG(EXCEPTION) << "The Certificate expiration warning time should be [7, 180]";
   }
+  int64_t warning_time = static_cast<int64_t>(cert_expire_warning_time_in_day);
   MS_LOG(INFO) << "The interval time is:" << interval << ", the warning time is:" << warning_time;
   running_ = true;
   check_time_thread_ = std::make_unique<std::thread>([&, cert, interval, warning_time]() {
@@ -214,6 +205,5 @@ void SSLClient::StopCheckCertTime() {
 }
 
 SSL_CTX *SSLClient::GetSSLCtx() const { return ssl_ctx_; }
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore

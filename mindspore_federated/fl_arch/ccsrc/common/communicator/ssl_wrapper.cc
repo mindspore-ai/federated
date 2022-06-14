@@ -29,7 +29,6 @@
 
 namespace mindspore {
 namespace fl {
-namespace core {
 SSLWrapper::SSLWrapper()
     : ssl_ctx_(nullptr),
       rootFirstCA_(nullptr),
@@ -62,18 +61,13 @@ void SSLWrapper::InitSSL() {
   if (X509_STORE_set_default_paths(store) != 1) {
     MS_LOG(EXCEPTION) << "X509_STORE_set_default_paths failed";
   }
-  std::unique_ptr<Configuration> config_ =
-    std::make_unique<FileConfiguration>(FLContext::instance()->config_file_path());
-  MS_EXCEPTION_IF_NULL(config_);
-  if (!config_->Initialize()) {
-    MS_LOG(EXCEPTION) << "The config file is empty.";
-  }
 
+  auto &ssl_config = FLContext::instance()->ssl_config();
   // 1.Parse the server's certificate and the ciphertext of key.
   std::string server_cert = kCertificateChain;
-  std::string path = CommUtil::ParseConfig(*(config_), kServerCertPath);
+  std::string path = ssl_config.server_cert_path;
   if (!CommUtil::IsFileExists(path)) {
-    MS_LOG(EXCEPTION) << "The key:" << kServerCertPath << "'s value is not exist.";
+    MS_LOG(EXCEPTION) << "The file path of server_cert_path " << path << " is not exist.";
   }
   server_cert = path;
 
@@ -101,7 +95,7 @@ void SSLWrapper::InitSSL() {
     MS_LOG(EXCEPTION) << "PKCS12_parse failed.";
   }
   PKCS12_free(p12);
-  std::string crl_path = CommUtil::ParseConfig(*(config_), kCrlPath);
+  std::string crl_path = ssl_config.crl_path;
   if (crl_path.empty()) {
     MS_LOG(INFO) << "The crl path is empty.";
   } else if (!CommUtil::checkCRLTime(crl_path)) {
@@ -110,9 +104,9 @@ void SSLWrapper::InitSSL() {
     MS_LOG(EXCEPTION) << "Verify crl failed.";
   }
 
-  std::string ca_path = CommUtil::ParseConfig(*config_, kCaCertPath);
+  std::string ca_path = ssl_config.ca_cert_path;
   if (!CommUtil::IsFileExists(ca_path)) {
-    MS_LOG(WARNING) << "The key:" << kCaCertPath << "'s value is not exist.";
+    MS_LOG(EXCEPTION) << "The file path of ca_cert_path " << ca_path << " is not exist.";
   }
   BIO *ca_bio = BIO_new_file(ca_path.c_str(), "r");
   if (ca_bio == nullptr) {
@@ -127,15 +121,16 @@ void SSLWrapper::InitSSL() {
     MS_LOG(EXCEPTION) << "SSL load ca location failed!";
   }
 
-  InitSSLCtx(*config_, cert, pkey);
-  StartCheckCertTime(*config_, cert, ca_path);
+  InitSSLCtx(cert, pkey);
+  StartCheckCertTime(ssl_config.cert_expire_warning_time_in_day, cert, ca_path);
 
   EVP_PKEY_free(pkey);
   (void)BIO_free(ca_bio);
 }
 
-void SSLWrapper::InitSSLCtx(const Configuration &config, const X509 *cert, const EVP_PKEY *pkey) {
-  std::string default_cipher_list = CommUtil::ParseConfig(config, kCipherList);
+void SSLWrapper::InitSSLCtx(const X509 *cert, const EVP_PKEY *pkey) {
+  auto &ssl_config = FLContext::instance()->ssl_config();
+  std::string default_cipher_list = ssl_config.cipher_list;
   std::vector<std::string> ciphers = CommUtil::Split(default_cipher_list, kColon);
   if (!CommUtil::VerifyCipherList(ciphers)) {
     MS_LOG(EXCEPTION) << "The cipher is wrong.";
@@ -213,19 +208,16 @@ time_t SSLWrapper::ConvertAsn1Time(const ASN1_TIME *const time) const {
   return mktime(&t);
 }
 
-void SSLWrapper::StartCheckCertTime(const Configuration &config, const X509 *cert, const std::string &ca_path) {
+void SSLWrapper::StartCheckCertTime(uint64_t cert_expire_warning_time_in_day, const X509 *cert,
+                                    const std::string &ca_path) {
   MS_EXCEPTION_IF_NULL(cert);
   MS_LOG(INFO) << "The server start check cert.";
   int64_t interval = kCertCheckIntervalInHour;
 
-  int64_t warning_time = kCertExpireWarningTimeInDay;
-  if (config.Exists(kCertExpireWarningTime)) {
-    int64_t res_time = config.GetInt(kCertExpireWarningTime, 0);
-    if (res_time < kMinWarningTime || res_time > kMaxWarningTime) {
-      MS_LOG(EXCEPTION) << "The Certificate expiration warning time should be [7, 180]";
-    }
-    warning_time = res_time;
+  if (cert_expire_warning_time_in_day < kMinWarningTime || cert_expire_warning_time_in_day > kMaxWarningTime) {
+    MS_LOG(EXCEPTION) << "The Certificate expiration warning time should be [7, 180]";
   }
+  int64_t warning_time = static_cast<int64_t>(cert_expire_warning_time_in_day);
   MS_LOG(INFO) << "The interval time is:" << interval << ", the warning time is:" << warning_time;
   BIO *ca_bio = BIO_new_file(ca_path.c_str(), "r");
   MS_EXCEPTION_IF_NULL(ca_bio);
@@ -264,6 +256,5 @@ void SSLWrapper::StopCheckCertTime() {
 }
 
 SSL_CTX *SSLWrapper::GetSSLCtx(bool) { return ssl_ctx_; }
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore

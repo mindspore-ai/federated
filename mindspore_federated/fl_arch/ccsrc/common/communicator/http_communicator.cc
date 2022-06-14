@@ -14,62 +14,30 @@
  * limitations under the License.
  */
 
-#include "common/communicator/http_communicator.h"
+#include "communicator/http_communicator.h"
 #include <memory>
-#include "common/communicator/thread_pool.h"
 
 namespace mindspore {
 namespace fl {
-namespace core {
-bool HttpCommunicator::Start() {
-  MS_EXCEPTION_IF_NULL(http_server_);
-  MS_LOG(INFO) << "Initialize http server IP:" << ip_ << ", PORT:" << port_;
-  if (!http_server_->InitServer()) {
-    MS_LOG(EXCEPTION) << "The communicator init http server failed.";
-  }
-  if (!http_server_->Start()) {
-    MS_LOG(EXCEPTION) << "Http server starting failed.";
-  }
-  MS_LOG(INFO) << "Http communicator started.";
-
-  running_thread_ = std::thread([&]() {
-    while (running_) {
-      std::this_thread::yield();
-    }
-  });
-  return true;
-}
-
-bool HttpCommunicator::Stop() {
-  MS_EXCEPTION_IF_NULL(http_server_);
-  if (!http_server_->Stop()) {
-    MS_LOG(ERROR) << "Stopping http server failed.";
-    return false;
-  }
-  running_ = false;
-  return true;
-}
-
-void HttpCommunicator::RegisterMsgCallBack(const std::string &msg_type, const MessageCallback &cb) {
+void HttpCommunicator::RegisterRoundMsgCallback(const std::string &msg_type, const MessageCallback &callback) {
   MS_LOG(INFO) << "msg_type is: " << msg_type;
-  msg_callbacks_[msg_type] = cb;
-  http_msg_callbacks_[msg_type] = [this, msg_type](std::shared_ptr<HttpMessageHandler> http_msg) -> void {
+  http_msg_callbacks_[msg_type] = [msg_type, callback](const std::shared_ptr<HttpMessageHandler> &http_msg) -> void {
     MS_EXCEPTION_IF_NULL(http_msg);
     try {
       size_t len = 0;
       uint8_t *data = nullptr;
       if (!http_msg->GetPostMsg(&len, &data)) {
-        RequestProcessResult result(RequestProcessResultCode::kInvalidInputs, "Get post message failed");
+        FlStatus result(kInvalidInputs, "Get post message failed");
         http_msg->ErrorResponse(HTTP_INTERNAL, result);
         return;
       }
       std::shared_ptr<MessageHandler> http_msg_handler = std::make_shared<HttpMsgHandler>(http_msg, data, len);
       MS_EXCEPTION_IF_NULL(http_msg_handler);
-      msg_callbacks_[msg_type](http_msg_handler);
+      callback(http_msg_handler);
     } catch (const std::exception &e) {
       MS_LOG(ERROR) << "Catch exception when invoke message handler, msg_type: " << msg_type
                     << " exception: " << e.what();
-      RequestProcessResult result(RequestProcessResultCode::kSystemError, e.what());
+      FlStatus result(kSystemError, e.what());
       http_msg->ErrorResponse(HTTP_INTERNAL, result);
     }
   };
@@ -82,8 +50,6 @@ void HttpCommunicator::RegisterMsgCallBack(const std::string &msg_type, const Me
   if (!is_succeed) {
     MS_LOG(EXCEPTION) << "Http server register handler for url " << url << " failed.";
   }
-  return;
 }
-}  // namespace core
 }  // namespace fl
 }  // namespace mindspore

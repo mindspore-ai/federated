@@ -15,210 +15,94 @@
  */
 
 #include "server/iteration.h"
-
 #include <memory>
-#include <numeric>
-#include <string>
-#include <unordered_map>
 #include <vector>
-
+#include <string>
+#include <numeric>
+#include <unordered_map>
 #include "server/model_store.h"
 #include "server/server.h"
-#include "common/core/comm_util.h"
+#include "server/kernel/round/round_kernel_factory.h"
+#include "distributed_cache/client_infos.h"
+#include "distributed_cache/instance_context.h"
+#include "distributed_cache/server.h"
+#include "distributed_cache/timer.h"
+#include "distributed_cache/counter.h"
+#include "distributed_cache/hyper_params.h"
+#include "distributed_cache/summary.h"
 
 namespace mindspore {
 namespace fl {
 namespace server {
 namespace {
+const char *kGlobalTimer = "globalTimer";
+
 const size_t kParticipationTimeLevelNum = 3;
 const size_t kIndexZero = 0;
 const size_t kIndexOne = 1;
 const size_t kIndexTwo = 2;
 const size_t kLastSecond = 59;
 }  // namespace
-class Server;
+Iteration::~Iteration() { Stop(); }
 
-Iteration::~Iteration() {
-  move_to_next_thread_running_ = false;
-  is_date_rate_thread_running_ = false;
-  next_iteration_cv_.notify_all();
-  if (move_to_next_thread_.joinable()) {
-    move_to_next_thread_.join();
-  }
-  if (data_rate_thread_.joinable()) {
-    data_rate_thread_.join();
-  }
-}
-void Iteration::RegisterMessageCallback(const std::shared_ptr<fl::core::TcpCommunicator> &communicator) {
-  MS_EXCEPTION_IF_NULL(communicator);
-  communicator_ = communicator;
-  MS_EXCEPTION_IF_NULL(communicator_);
-  communicator_->RegisterMsgCallBack("syncIteration",
-                                     std::bind(&Iteration::HandleSyncIterationRequest, this, std::placeholders::_1));
-  communicator_->RegisterMsgCallBack(
-    "notifyLeaderToNextIter",
-    std::bind(&Iteration::HandleNotifyLeaderMoveToNextIterRequest, this, std::placeholders::_1));
-  communicator_->RegisterMsgCallBack(
-    "prepareForNextIter", std::bind(&Iteration::HandlePrepareForNextIterRequest, this, std::placeholders::_1));
-  communicator_->RegisterMsgCallBack("proceedToNextIter",
-                                     std::bind(&Iteration::HandleMoveToNextIterRequest, this, std::placeholders::_1));
-  communicator_->RegisterMsgCallBack("endLastIter",
-                                     std::bind(&Iteration::HandleEndLastIterRequest, this, std::placeholders::_1));
-}
-
-void Iteration::RegisterEventCallback(const std::shared_ptr<fl::core::ServerNode> &server_node) {
-  MS_EXCEPTION_IF_NULL(server_node);
+void Iteration::InitIteration(const std::shared_ptr<ServerNode> &server_node,
+                              const std::vector<RoundConfig> &round_configs,
+                              const std::vector<std::shared_ptr<CommunicatorBase>> &communicators) {
   server_node_ = server_node;
-  server_node->RegisterCustomEventCallback(static_cast<uint32_t>(UserDefineEvent::kIterationRunning),
-                                           std::bind(&Iteration::ProcessIterationRunningEvent, this));
-  server_node->RegisterCustomEventCallback(static_cast<uint32_t>(UserDefineEvent::kIterationCompleted),
-                                           std::bind(&Iteration::ProcessIterationEndEvent, this));
-}
-
-void Iteration::AddRound(const std::shared_ptr<Round> &round) {
-  MS_EXCEPTION_IF_NULL(round);
-  rounds_.push_back(round);
-}
-
-void Iteration::InitRounds(const std::vector<std::shared_ptr<fl::core::CommunicatorBase>> &communicators,
-                           const TimeOutCb &timeout_cb, const FinishIterCb &finish_iteration_cb) {
   if (communicators.empty()) {
     MS_LOG(EXCEPTION) << "Communicators for rounds is empty.";
-    return;
   }
   // The time window for one iteration, which will be used in some round kernels.
   size_t iteration_time_window = 0;
-  for (auto &round : rounds_) {
-    MS_EXCEPTION_IF_NULL(round);
-    round->Initialize(timeout_cb, finish_iteration_cb);
+  for (const RoundConfig &config : round_configs) {
+    if (config.check_timeout) {
+      iteration_time_window += config.time_window;
+    }
+  }
+  MS_LOG(INFO) << "Time window for one iteration is " << iteration_time_window;
+  for (const RoundConfig &config : round_configs) {
+    std::shared_ptr<Round> round =
+      std::make_shared<Round>(config.name, config.check_timeout, config.time_window, config.check_count,
+                              config.threshold_count, config.per_server_count);
+    MS_LOG(INFO) << "Add round " << config.name << ", check_timeout: " << config.check_timeout
+                 << ", time window: " << config.time_window << ", check_count: " << config.check_count
+                 << ", threshold: " << config.threshold_count;
+    round->Initialize();
     for (auto &communicator : communicators) {
       round->RegisterMsgCallBack(communicator);
     }
-    if (round->check_timeout()) {
-      iteration_time_window += round->time_window();
+
+    std::shared_ptr<kernel::RoundKernel> round_kernel = kernel::RoundKernelFactory::GetInstance().Create(config.name);
+    if (round_kernel == nullptr) {
+      MS_LOG(EXCEPTION) << "Round kernel for round " << config.name << " is not registered.";
     }
+    round_kernel->InitKernelCommon(iteration_time_window);
+    // For some round kernels, the threshold count should be set.
+    round_kernel->InitKernel(round->threshold_count());
+    round->BindRoundKernel(round_kernel);
+
+    rounds_.push_back(round);
   }
-  LocalMetaStore::GetInstance().put_value(kCtxTotalTimeoutDuration, iteration_time_window);
-  MS_LOG(INFO) << "Time window for one iteration is " << iteration_time_window;
-
-  // Initialize the thread which will handle the signal from round kernels.
-  move_to_next_thread_ = std::thread([this]() {
-    while (move_to_next_thread_running_.load()) {
-      std::unique_lock<std::mutex> lock(next_iteration_mutex_);
-      next_iteration_cv_.wait(lock);
-      if (!move_to_next_thread_running_.load()) {
-        break;
-      }
-      lock.unlock();
-      MoveToNextIteration(is_last_iteration_valid_, move_to_next_reason_);
-    }
-  });
-  return;
-}
-
-void Iteration::ClearRounds() { rounds_.clear(); }
-
-void Iteration::NotifyNext(bool is_last_iter_valid, const std::string &reason) {
-  std::unique_lock<std::mutex> lock(next_iteration_mutex_);
-  is_last_iteration_valid_ = is_last_iter_valid;
-  move_to_next_reason_ = reason;
-  next_iteration_cv_.notify_one();
-}
-
-void Iteration::MoveToNextIteration(bool is_last_iter_valid, const std::string &reason) {
-  iteration_num_ = LocalMetaStore::GetInstance().curr_iter_num();
-  MS_LOG(INFO) << "Notify cluster starts to proceed to next iteration. Iteration is " << iteration_num_
-               << " validation is " << is_last_iter_valid << ". Reason: " << reason;
-  if (IsMoveToNextIterRequestReentrant(iteration_num_)) {
-    return;
-  }
-
-  MS_ERROR_IF_NULL_WO_RET_VAL(server_node_);
-  if (server_node_->rank_id() == kLeaderServerRank) {
-    std::unique_lock<std::mutex> lock(iter_move_mtx_);
-    if (!BroadcastPrepareForNextIterRequest(iteration_num_, is_last_iter_valid, reason)) {
-      MS_LOG(ERROR) << "Broadcast prepare for next iteration request failed.";
-      return;
-    }
-    if (!BroadcastMoveToNextIterRequest(is_last_iter_valid, reason)) {
-      MS_LOG(ERROR) << "Broadcast proceed to next iteration request failed.";
-      return;
-    }
-    if (!BroadcastEndLastIterRequest(iteration_num_)) {
-      MS_LOG(ERROR) << "Broadcast end last iteration request failed.";
-      return;
-    }
-  } else {
-    // If this server is the follower server, notify leader server to control the cluster to proceed to next iteration.
-    if (!NotifyLeaderMoveToNextIteration(is_last_iter_valid, reason)) {
-      MS_LOG(ERROR) << "Server " << server_node_->rank_id() << " notifying the leader server failed.";
-      return;
-    }
-  }
-}
-
-void Iteration::SetIterationRunning() {
-  MS_LOG(INFO) << "Iteration " << iteration_num_ << " start running.";
-  MS_ERROR_IF_NULL_WO_RET_VAL(server_node_);
-  if (server_node_->rank_id() == kLeaderServerRank) {
-    // This event helps worker/server to be consistent in iteration state.
-    server_node_->BroadcastEvent(static_cast<uint32_t>(UserDefineEvent::kIterationRunning));
-    if (server_recovery_ != nullptr) {
-      // Save data to the persistent storage in case the recovery happens at the beginning.
-      if (!server_recovery_->Save(iteration_num_, instance_state_)) {
-        MS_LOG(WARNING) << "Save recovery data failed.";
-      }
-    }
-  }
-
-  std::unique_lock<std::mutex> lock(iteration_state_mtx_);
-  iteration_state_ = IterationState::kRunning;
-  start_time_ = fl::core::CommUtil::GetNowTime();
-  MS_LOG(INFO) << "Iteratoin " << iteration_num_ << " start global timer.";
+  InitGlobalIterTimer();
   instance_name_ = FLContext::instance()->instance_name();
   if (instance_name_.empty()) {
     MS_LOG(WARNING) << "instance name is empty";
-    instance_name_ = "instance_" + start_time_.time_str_second;
+    instance_name_ = "instance_" + fl::CommUtil::GetNowTime().time_str_second;
   }
-  global_iter_timer_->Start(std::chrono::milliseconds(global_iteration_time_window_));
+  InitConfig();
+  InitEventTxtFile();
 }
 
-void Iteration::SetIterationEnd() {
-  MS_LOG(INFO) << "Iteration " << iteration_num_ << " ends.";
-  MS_ERROR_IF_NULL_WO_RET_VAL(server_node_);
-  if (server_node_->rank_id() == kLeaderServerRank) {
-    // This event helps worker/server to be consistent in iteration state.
-    server_node_->BroadcastEvent(static_cast<uint32_t>(UserDefineEvent::kIterationCompleted));
-  }
-
-  std::unique_lock<std::mutex> lock(iteration_state_mtx_);
-  iteration_state_ = IterationState::kCompleted;
-  complete_time_ = fl::core::CommUtil::GetNowTime();
+void Iteration::FinishIteration(bool is_last_iter_valid, const std::string &reason) {
+  Executor::GetInstance().FinishIteration(is_last_iter_valid, reason);
 }
 
-void Iteration::ScalingBarrier() {
-  MS_LOG(INFO) << "Starting Iteration scaling barrier.";
-  std::unique_lock<std::mutex> lock(iteration_state_mtx_);
-  if (iteration_state_.load() != IterationState::kCompleted) {
-    iteration_state_cv_.wait(lock);
-  }
-  MS_LOG(INFO) << "Ending Iteration scaling barrier.";
-}
-
-bool Iteration::ReInitForScaling(uint32_t server_num, uint32_t server_rank) {
-  for (auto &round : rounds_) {
-    if (!round->ReInitForScaling(server_num)) {
-      MS_LOG(WARNING) << "Reinitializing round " << round->name() << " for scaling failed.";
-      return false;
-    }
-  }
-  if (server_rank != kLeaderServerRank) {
-    if (!SyncIteration(server_rank)) {
-      MS_LOG(ERROR) << "Synchronizing iteration failed.";
-      return false;
-    }
-  }
-  return true;
+void Iteration::SetIterationRunning() {
+  auto iteration_num = cache::InstanceContext::Instance().iteration_num();
+  MS_LOG(INFO) << "Iteration " << iteration_num << " start running.";
+  start_time_ = fl::CommUtil::GetNowTime();
+  MS_LOG(INFO) << "Iteration " << iteration_num << " start global timer.";
+  cache::Timer::Instance().StartTimer(kGlobalTimer);
 }
 
 bool Iteration::ReInitForUpdatingHyperParams(const std::vector<RoundConfig> &updated_rounds_config) {
@@ -226,8 +110,7 @@ bool Iteration::ReInitForUpdatingHyperParams(const std::vector<RoundConfig> &upd
     for (const auto &round : rounds_) {
       if (updated_round.name == round->name()) {
         MS_LOG(INFO) << "Reinitialize for round " << round->name();
-        if (!round->ReInitForUpdatingHyperParams(updated_round.threshold_count, updated_round.time_window,
-                                                 server_node_->server_num())) {
+        if (!round->ReInitForUpdatingHyperParams(updated_round.threshold_count, updated_round.time_window)) {
           MS_LOG(ERROR) << "Reinitializing for round " << round->name() << " failed.";
           return false;
         }
@@ -237,134 +120,21 @@ bool Iteration::ReInitForUpdatingHyperParams(const std::vector<RoundConfig> &upd
   return true;
 }
 
-const std::vector<std::shared_ptr<Round>> &Iteration::rounds() const { return rounds_; }
-
-bool Iteration::is_last_iteration_valid() const { return is_last_iteration_valid_; }
-
-void Iteration::set_metrics(const std::shared_ptr<IterationMetrics> &metrics) { metrics_ = metrics; }
-
 void Iteration::set_loss(float loss) { loss_ = loss; }
 
 void Iteration::set_accuracy(float accuracy) { accuracy_ = accuracy; }
 
-InstanceState Iteration::instance_state() const { return instance_state_.load(); }
-
-bool Iteration::EnableServerInstance(std::string *result) {
-  MS_ERROR_IF_NULL_W_RET_VAL(result, false);
-  // Before enabling server instance, we should judge whether this request should be handled.
-  std::unique_lock<std::mutex> lock(instance_mtx_);
-  if (is_instance_being_updated_) {
-    *result = "The instance is being updated. Please retry enabling server later.";
-    MS_LOG(WARNING) << *result;
-    return false;
-  }
-  if (instance_state_.load() == InstanceState::kFinish) {
-    *result = "The instance is completed. Please do not enabling server now.";
-    MS_LOG(WARNING) << *result;
-    return false;
-  }
-
-  // Start enabling server instance.
-  is_instance_being_updated_ = true;
-
-  instance_state_ = InstanceState::kRunning;
-  *result = "Enabling FL-Server succeeded.";
-  MS_LOG(INFO) << *result;
-
-  // End enabling server instance.
-  is_instance_being_updated_ = false;
-  if (server_node_->rank_id() == kLeaderServerRank) {
-    MS_ERROR_IF_NULL_W_RET_VAL(server_recovery_, false);
-    if (!server_recovery_->Save(iteration_num_, instance_state_)) {
-      MS_LOG(WARNING) << "Save recovery data failed.";
-    }
-  }
-  return true;
-}
-
-bool Iteration::DisableServerInstance(std::string *result) {
-  MS_ERROR_IF_NULL_W_RET_VAL(result, false);
-  // Before disabling server instance, we should judge whether this request should be handled.
-  std::unique_lock<std::mutex> lock(instance_mtx_);
-  if (is_instance_being_updated_) {
-    *result = "The instance is being updated. Please retry disabling server later.";
-    MS_LOG(WARNING) << *result;
-    return false;
-  }
-  if (instance_state_.load() == InstanceState::kFinish) {
-    *result = "The instance is completed. Please do not disabling server now.";
-    MS_LOG(WARNING) << *result;
-    return false;
-  }
-  if (instance_state_.load() == InstanceState::kDisable) {
-    *result = "Disabling FL-Server succeeded.";
-    MS_LOG(INFO) << *result;
-    return true;
-  }
-
-  // Start disabling server instance.
-  is_instance_being_updated_ = true;
-
-  // If instance is running, we should drop current iteration and move to the next.
-  instance_state_ = InstanceState::kDisable;
-  if (!ForciblyMoveToNextIteration()) {
-    *result = "Disabling instance failed. Can't drop current iteration and move to the next.";
-    MS_LOG(ERROR) << result;
-    return false;
-  }
-  *result = "Disabling FL-Server succeeded.";
-  MS_LOG(INFO) << *result;
-
-  // End disabling server instance.
-  is_instance_being_updated_ = false;
-  return true;
-}
-
 void Iteration::StartNewInstance() {
-  iteration_num_ = 1;
-  LocalMetaStore::GetInstance().set_curr_iter_num(iteration_num_);
-  is_instance_being_updated_ = false;
   ModelStore::GetInstance().Reset();
-
-  // Update the hyper-parameters on server and reinitialize rounds.
-  UpdateHyperParams(new_instance_json_);
   if (!ReInitRounds()) {
     MS_LOG(ERROR) << "Reinitializing rounds failed.";
   }
-
-  instance_state_ = InstanceState::kRunning;
   MS_LOG(INFO) << "Process iteration new instance successful.";
 }
 
-bool Iteration::NewInstance(const nlohmann::json &new_instance_json, std::string *result) {
-  MS_ERROR_IF_NULL_W_RET_VAL(result, false);
-  // Before new instance, we should judge whether this request should be handled.
-  std::unique_lock<std::mutex> lock(instance_mtx_);
-  if (is_instance_being_updated_) {
-    *result = "The instance is being updated. Please retry new instance later.";
-    MS_LOG(WARNING) << *result;
-    return false;
-  }
+void Iteration::OnRoundLaunchStart() { running_round_num_++; }
 
-  if (iteration_num_ == 1) {
-    *result = "This is just the first iteration, do not need to new instance.";
-    MS_LOG(WARNING) << *result;
-    return false;
-  }
-
-  // Start new server instance.
-  is_instance_being_updated_ = true;
-
-  new_instance_json_ = new_instance_json;
-  *result = "New FL-Server instance succeeded.";
-
-  if (instance_state_.load() == InstanceState::kFinish || instance_state_.load() == InstanceState::kDisable) {
-    StartNewInstance();
-  } else {
-    MS_LOG(INFO) << "Process new instance success, cluster will start new job after this iteration end.";
-  }
-  return true;
-}
+void Iteration::OnRoundLaunchEnd() { running_round_num_--; }
 
 void Iteration::WaitAllRoundsFinish() const {
   while (running_round_num_.load() != 0) {
@@ -372,354 +142,8 @@ void Iteration::WaitAllRoundsFinish() const {
   }
 }
 
-void Iteration::set_recovery_handler(const std::shared_ptr<ServerRecovery> &server_recovery) {
-  MS_EXCEPTION_IF_NULL(server_recovery);
-  server_recovery_ = server_recovery;
-}
-
-bool Iteration::SyncAfterRecovery(uint64_t) {
-  NotifyNext(false, "Move to next iteration after recovery.");
-  return true;
-}
-
-bool Iteration::SyncIteration(uint32_t rank) {
-  MS_ERROR_IF_NULL_W_RET_VAL(communicator_, false);
-  SyncIterationRequest sync_iter_req;
-  sync_iter_req.set_rank(rank);
-
-  std::shared_ptr<std::vector<unsigned char>> sync_iter_rsp_msg = nullptr;
-  if (!communicator_->SendPbRequest(sync_iter_req, kLeaderServerRank, fl::core::TcpUserCommand::kSyncIteration,
-                                    &sync_iter_rsp_msg)) {
-    MS_LOG(ERROR) << "Sending sync iter message to leader server failed.";
-    return false;
-  }
-
-  MS_ERROR_IF_NULL_W_RET_VAL(sync_iter_rsp_msg, false);
-  SyncIterationResponse sync_iter_rsp;
-  (void)sync_iter_rsp.ParseFromArray(sync_iter_rsp_msg->data(), SizeToInt(sync_iter_rsp_msg->size()));
-  iteration_num_ = sync_iter_rsp.iteration();
-  MS_LOG(INFO) << "After synchronizing, server " << rank << " current iteration number is " << iteration_num_;
-  return true;
-}
-
-void Iteration::HandleSyncIterationRequest(const std::shared_ptr<fl::core::MessageHandler> &message) {
-  MS_ERROR_IF_NULL_WO_RET_VAL(message);
-  MS_ERROR_IF_NULL_WO_RET_VAL(communicator_);
-
-  SyncIterationRequest sync_iter_req;
-  (void)sync_iter_req.ParseFromArray(message->data(), SizeToInt(message->len()));
-  uint32_t rank = sync_iter_req.rank();
-  MS_LOG(INFO) << "Synchronizing iteration request from rank " << rank;
-
-  SyncIterationResponse sync_iter_rsp;
-  sync_iter_rsp.set_iteration(iteration_num_);
-  std::string sync_iter_rsp_msg = sync_iter_rsp.SerializeAsString();
-  if (!communicator_->SendResponse(sync_iter_rsp_msg.data(), sync_iter_rsp_msg.size(), message)) {
-    MS_LOG(ERROR) << "Sending response failed.";
-    return;
-  }
-}
-
-bool Iteration::IsMoveToNextIterRequestReentrant(uint64_t iteration_num) {
-  std::unique_lock<std::mutex> lock(pinned_mtx_);
-  if (pinned_iter_num_ == iteration_num) {
-    MS_LOG(DEBUG) << "MoveToNextIteration is not reentrant. Ignore this call.";
-    return true;
-  }
-  pinned_iter_num_ = iteration_num;
-  return false;
-}
-
-bool Iteration::NotifyLeaderMoveToNextIteration(bool is_last_iter_valid, const std::string &reason) {
-  MS_ERROR_IF_NULL_W_RET_VAL(communicator_, false);
-  MS_LOG(INFO) << "Notify leader server to control the cluster to proceed to next iteration.";
-  NotifyLeaderMoveToNextIterRequest notify_leader_to_next_iter_req;
-  notify_leader_to_next_iter_req.set_rank(server_node_->rank_id());
-  notify_leader_to_next_iter_req.set_is_last_iter_valid(is_last_iter_valid);
-  notify_leader_to_next_iter_req.set_iter_num(iteration_num_);
-  notify_leader_to_next_iter_req.set_reason(reason);
-  while (communicator_->running() && !communicator_->SendPbRequest(notify_leader_to_next_iter_req, kLeaderServerRank,
-                                                                   fl::core::TcpUserCommand::kNotifyLeaderToNextIter)) {
-    MS_LOG(WARNING) << "Sending notify leader server to proceed next iteration request to leader server 0 failed.";
-    std::this_thread::sleep_for(std::chrono::milliseconds(kRetryDurationForPrepareForNextIter));
-  }
-  MS_LOG(INFO) << "Notify leader server to control the cluster to proceed to next iteration success";
-  return true;
-}
-
-void Iteration::HandleNotifyLeaderMoveToNextIterRequest(const std::shared_ptr<fl::core::MessageHandler> &message) {
-  MS_ERROR_IF_NULL_WO_RET_VAL(message);
-  MS_ERROR_IF_NULL_WO_RET_VAL(communicator_);
-  NotifyLeaderMoveToNextIterResponse notify_leader_to_next_iter_rsp;
-  notify_leader_to_next_iter_rsp.set_result("success");
-  if (!communicator_->SendResponse(notify_leader_to_next_iter_rsp.SerializeAsString().data(),
-                                   notify_leader_to_next_iter_rsp.SerializeAsString().size(), message)) {
-    MS_LOG(WARNING) << "Sending response failed.";
-    return;
-  }
-
-  NotifyLeaderMoveToNextIterRequest notify_leader_to_next_iter_req;
-  (void)notify_leader_to_next_iter_req.ParseFromArray(message->data(), SizeToInt(message->len()));
-  const auto &rank = notify_leader_to_next_iter_req.rank();
-  const auto &is_last_iter_valid = notify_leader_to_next_iter_req.is_last_iter_valid();
-  const auto &iter_num = notify_leader_to_next_iter_req.iter_num();
-  const auto &reason = notify_leader_to_next_iter_req.reason();
-  MS_LOG(INFO) << "Leader server receives NotifyLeaderMoveToNextIterRequest from rank " << rank
-               << ". Iteration number: " << iter_num << ". Reason: " << reason;
-
-  if (IsMoveToNextIterRequestReentrant(iter_num)) {
-    return;
-  }
-
-  std::unique_lock<std::mutex> lock(iter_move_mtx_);
-  if (!BroadcastPrepareForNextIterRequest(iter_num, is_last_iter_valid, reason)) {
-    MS_LOG(ERROR) << "Broadcast prepare for next iteration request failed.";
-    return;
-  }
-  if (!BroadcastMoveToNextIterRequest(is_last_iter_valid, reason)) {
-    MS_LOG(ERROR) << "Broadcast proceed to next iteration request failed.";
-    return;
-  }
-  if (!BroadcastEndLastIterRequest(iteration_num_)) {
-    MS_LOG(ERROR) << "Broadcast end last iteration request failed.";
-    return;
-  }
-}
-
-bool Iteration::BroadcastPrepareForNextIterRequest(size_t last_iteration, bool is_last_iter_valid,
-                                                   const std::string &reason) {
-  MS_ERROR_IF_NULL_W_RET_VAL(communicator_, false);
-  PrepareForNextIter(last_iteration, is_last_iter_valid);
-  MS_LOG(INFO) << "Notify all follower servers to prepare for next iteration.";
-  PrepareForNextIterRequest prepare_next_iter_req;
-  prepare_next_iter_req.set_is_last_iter_valid(is_last_iter_valid);
-  prepare_next_iter_req.set_reason(reason);
-  prepare_next_iter_req.set_last_iteration(last_iteration);
-
-  std::vector<uint32_t> offline_servers = {};
-  for (uint32_t i = 1; i < server_node_->server_num(); i++) {
-    if (!communicator_->SendPbRequest(prepare_next_iter_req, i, fl::core::TcpUserCommand::kPrepareForNextIter)) {
-      MS_LOG(WARNING) << "Sending prepare for next iteration request to server " << i << " failed. Retry later.";
-      offline_servers.push_back(i);
-      continue;
-    }
-  }
-
-  // Retry sending to offline servers to notify them to prepare.
-  (void)std::for_each(offline_servers.begin(), offline_servers.end(), [&](uint32_t rank) {
-    // Should avoid endless loop if the server communicator is stopped.
-    while (communicator_->running() &&
-           !communicator_->SendPbRequest(prepare_next_iter_req, rank, fl::core::TcpUserCommand::kPrepareForNextIter)) {
-      MS_LOG(WARNING) << "Retry sending prepare for next iteration request to server " << rank
-                      << " failed. The server has not recovered yet.";
-      std::this_thread::sleep_for(std::chrono::milliseconds(kRetryDurationForPrepareForNextIter));
-    }
-    MS_LOG(INFO) << "Offline server " << rank << " preparing for next iteration success.";
-  });
-  std::this_thread::sleep_for(std::chrono::milliseconds(kServerSleepTimeForNetworking));
-  return true;
-}
-
-void Iteration::HandlePrepareForNextIterRequest(const std::shared_ptr<fl::core::MessageHandler> &message) {
-  MS_ERROR_IF_NULL_WO_RET_VAL(message);
-  MS_ERROR_IF_NULL_WO_RET_VAL(communicator_);
-  PrepareForNextIterRequest prepare_next_iter_req;
-  (void)prepare_next_iter_req.ParseFromArray(message->data(), SizeToInt(message->len()));
-  const auto &reason = prepare_next_iter_req.reason();
-  auto is_last_iter_valid = prepare_next_iter_req.is_last_iter_valid();
-  auto last_iteration = prepare_next_iter_req.last_iteration();
-  MS_LOG(INFO) << "Prepare next iteration for this rank " << server_node_->rank_id()
-               << ", last iteration: " << last_iteration << ", last iteration valid: " << is_last_iter_valid
-               << ", reason: " << reason;
-  PrepareForNextIter(last_iteration, is_last_iter_valid);
-
-  PrepareForNextIterResponse prepare_next_iter_rsp;
-  prepare_next_iter_rsp.set_result("success");
-  if (!communicator_->SendResponse(prepare_next_iter_rsp.SerializeAsString().data(),
-                                   prepare_next_iter_rsp.SerializeAsString().size(), message)) {
-    MS_LOG(ERROR) << "Sending response failed.";
-    return;
-  }
-}
-
-void Iteration::PrepareForNextIter(size_t last_iteration, bool is_last_iter_valid) {
-  MS_LOG(INFO) << "Prepare for next iteration. Switch the server to safemode.";
-  Server::GetInstance().SwitchToSafeMode();
-  if (server_node_) {
-    server_node_->SetIterationResult(last_iteration, is_last_iter_valid);
-  }
-  MS_LOG(INFO) << "Start waiting for rounds to finish.";
-  WaitAllRoundsFinish();
-  MS_LOG(INFO) << "End waiting for rounds to finish.";
-}
-
-bool Iteration::BroadcastMoveToNextIterRequest(bool is_last_iter_valid, const std::string &reason) {
-  MS_ERROR_IF_NULL_W_RET_VAL(communicator_, false);
-  MS_LOG(INFO) << "Notify all follower servers to proceed to next iteration. Set last iteration number "
-               << iteration_num_;
-  MoveToNextIterRequest proceed_to_next_iter_req;
-  proceed_to_next_iter_req.set_is_last_iter_valid(is_last_iter_valid);
-  proceed_to_next_iter_req.set_last_iter_num(iteration_num_);
-  proceed_to_next_iter_req.set_reason(reason);
-  for (uint32_t i = 1; i < server_node_->server_num(); i++) {
-    if (!communicator_->SendPbRequest(proceed_to_next_iter_req, i, fl::core::TcpUserCommand::kProceedToNextIter)) {
-      MS_LOG(WARNING) << "Sending proceed to next iteration request to server " << i << " failed.";
-      continue;
-    }
-  }
-
-  Next(is_last_iter_valid, reason);
-  return true;
-}
-
-void Iteration::HandleMoveToNextIterRequest(const std::shared_ptr<fl::core::MessageHandler> &message) {
-  MS_ERROR_IF_NULL_WO_RET_VAL(message);
-  MS_ERROR_IF_NULL_WO_RET_VAL(communicator_);
-
-  MoveToNextIterRequest proceed_to_next_iter_req;
-  (void)proceed_to_next_iter_req.ParseFromArray(message->data(), SizeToInt(message->len()));
-  const auto &is_last_iter_valid = proceed_to_next_iter_req.is_last_iter_valid();
-  const auto &last_iter_num = proceed_to_next_iter_req.last_iter_num();
-  const auto &reason = proceed_to_next_iter_req.reason();
-
-  MS_LOG(INFO) << "Receive proceeding to next iteration request. This server current iteration is " << iteration_num_
-               << ". The iteration number from leader server is " << last_iter_num
-               << ". Last iteration is valid or not: " << is_last_iter_valid << ". Reason: " << reason;
-  // Synchronize the iteration number with leader server.
-  iteration_num_ = last_iter_num;
-  Next(is_last_iter_valid, reason);
-
-  MoveToNextIterResponse proceed_to_next_iter_rsp;
-  proceed_to_next_iter_rsp.set_result("success");
-  if (!communicator_->SendResponse(proceed_to_next_iter_rsp.SerializeAsString().data(),
-                                   proceed_to_next_iter_rsp.SerializeAsString().size(), message)) {
-    MS_LOG(ERROR) << "Sending response failed.";
-    return;
-  }
-}
-
-void Iteration::Next(bool is_iteration_valid, const std::string &reason) {
-  MS_LOG(INFO) << "Prepare for next iteration.";
-  is_last_iteration_valid_ = is_iteration_valid;
-  if (is_iteration_valid) {
-    // Store the model which is successfully aggregated for this iteration.
-    const auto &model = Executor::GetInstance().GetModel();
-    std::unordered_map<std::string, size_t> feature_map;
-    for (auto weight : model) {
-      std::string weight_fullname = weight.first;
-      if (weight.second == nullptr) {
-        continue;
-      }
-      size_t weight_size = weight.second->size;
-      feature_map[weight_fullname] = weight_size;
-    }
-
-    if (LocalMetaStore::GetInstance().verifyAggregationFeatureMap(feature_map)) {
-      ModelStore::GetInstance().StoreModelByIterNum(iteration_num_, model);
-      ModelStore::GetInstance().StoreCompressModelByIterNum(iteration_num_, model);
-      iteration_result_ = IterationResult::kSuccess;
-      MS_LOG(INFO) << "Iteration " << iteration_num_ << " is successfully finished.";
-    } else {
-      MS_LOG(WARNING) << "Verify feature maps failed, iteration " << iteration_num_ << " will not be stored.";
-    }
-  } else {
-    // Store last iteration's model because this iteration is considered as invalid.
-    const auto &iter_to_model = ModelStore::GetInstance().iteration_to_model();
-    size_t latest_iter_num = iter_to_model.rbegin()->first;
-    const auto &model = ModelStore::GetInstance().GetModelByIterNum(latest_iter_num);
-    ModelStore::GetInstance().StoreModelByIterNum(iteration_num_, model);
-    ModelStore::GetInstance().StoreCompressModelByIterNum(iteration_num_, model);
-    iteration_result_ = IterationResult::kFail;
-    MS_LOG(WARNING) << "Iteration " << iteration_num_ << " is invalid. Reason: " << reason;
-  }
-
-  for (auto &round : rounds_) {
-    MS_ERROR_IF_NULL_WO_RET_VAL(round);
-    round->Reset();
-  }
-  MS_LOG(INFO) << "Iteratoin " << iteration_num_ << " stop global timer.";
-  global_iter_timer_->Stop();
-
-  for (const auto &round : rounds_) {
-    MS_ERROR_IF_NULL_WO_RET_VAL(round);
-    round->KernelSummarize();
-  }
-
-  for (const auto &round : rounds_) {
-    if (round->name() == "startFLJob") {
-      round_client_num_map_[kStartFLJobTotalClientNum] += round->kernel_total_client_num();
-      round_client_num_map_[kStartFLJobAcceptClientNum] += round->kernel_accept_client_num();
-      round_client_num_map_[kStartFLJobRejectClientNum] += round->kernel_reject_client_num();
-    } else if (round->name() == "updateModel") {
-      round_client_num_map_[kUpdateModelTotalClientNum] += round->kernel_total_client_num();
-      round_client_num_map_[kUpdateModelAcceptClientNum] += round->kernel_accept_client_num();
-      round_client_num_map_[kUpdateModelRejectClientNum] += round->kernel_reject_client_num();
-      set_loss(loss_ + round->kernel_upload_loss());
-      auto update_model_complete_info = round->GetUpdateModelCompleteInfo();
-      if (update_model_complete_info.size() != kParticipationTimeLevelNum) {
-        continue;
-      }
-      round_client_num_map_[kParticipationTimeLevel1] += update_model_complete_info[kIndexZero].second;
-      round_client_num_map_[kParticipationTimeLevel2] += update_model_complete_info[kIndexOne].second;
-      round_client_num_map_[kParticipationTimeLevel3] += update_model_complete_info[kIndexTwo].second;
-    } else if (round->name() == "getModel") {
-      round_client_num_map_[kGetModelTotalClientNum] += round->kernel_total_client_num();
-      round_client_num_map_[kGetModelAcceptClientNum] += round->kernel_accept_client_num();
-      round_client_num_map_[kGetModelRejectClientNum] += round->kernel_reject_client_num();
-    }
-  }
-}
-
-bool Iteration::BroadcastEndLastIterRequest(uint64_t last_iter_num) {
-  MS_ERROR_IF_NULL_W_RET_VAL(communicator_, false);
-  MS_LOG(INFO) << "Notify all follower servers to end last iteration.";
-  EndLastIterRequest end_last_iter_req;
-  end_last_iter_req.set_last_iter_num(last_iter_num);
-  for (uint32_t i = 1; i < server_node_->server_num(); i++) {
-    std::shared_ptr<std::vector<unsigned char>> client_info_rsp_msg = nullptr;
-    if (!communicator_->SendPbRequest(end_last_iter_req, i, fl::core::TcpUserCommand::kEndLastIter,
-                                      &client_info_rsp_msg)) {
-      MS_LOG(WARNING) << "Sending ending last iteration request to server " << i << " failed.";
-      continue;
-    }
-    UpdateRoundClientNumMap(client_info_rsp_msg);
-    UpdateRoundClientUploadLoss(client_info_rsp_msg);
-  }
-
-  EndLastIter();
-  if (iteration_fail_num_ == FLContext::instance()->continuous_failure_times()) {
-    std::string node_role = "SERVER";
-    std::string event = "Iteration failed " + std::to_string(iteration_fail_num_) + " times continuously";
-    server_node_->SendFailMessageToScheduler(node_role, event);
-    // Finish sending one message, reset cout num to 0
-    iteration_fail_num_ = 0;
-  }
-  return true;
-}
-
-void Iteration::HandleEndLastIterRequest(const std::shared_ptr<fl::core::MessageHandler> &message) {
-  MS_ERROR_IF_NULL_WO_RET_VAL(message);
-  MS_ERROR_IF_NULL_WO_RET_VAL(communicator_);
-  EndLastIterRequest end_last_iter_req;
-  (void)end_last_iter_req.ParseFromArray(message->data(), SizeToInt(message->len()));
-  const auto &last_iter_num = end_last_iter_req.last_iter_num();
-  // If the iteration number is not matched, return error.
-  if (last_iter_num != iteration_num_) {
-    std::string reason = "The iteration of this server " + std::to_string(server_node_->rank_id()) + " is " +
-                         std::to_string(iteration_num_) + ", iteration to be ended is " + std::to_string(last_iter_num);
-    EndLastIterResponse end_last_iter_rsp;
-    end_last_iter_rsp.set_result(reason);
-    if (!communicator_->SendResponse(end_last_iter_rsp.SerializeAsString().data(),
-                                     end_last_iter_rsp.SerializeAsString().size(), message)) {
-      MS_LOG(ERROR) << "Sending response failed.";
-      return;
-    }
-    return;
-  }
-
-  EndLastIterResponse end_last_iter_rsp;
-  end_last_iter_rsp.set_result("success");
-
+void Iteration::SubmitSummary() {
+  IterationSummaryMsg end_last_iter_rsp;
   for (const auto &round : rounds_) {
     if (round == nullptr) {
       continue;
@@ -747,167 +171,225 @@ void Iteration::HandleEndLastIterRequest(const std::shared_ptr<fl::core::Message
       end_last_iter_rsp.set_getmodel_reject_client_num(round->kernel_reject_client_num());
     }
   }
-
-  EndLastIter();
-  if (!communicator_->SendResponse(end_last_iter_rsp.SerializeAsString().data(),
-                                   end_last_iter_rsp.SerializeAsString().size(), message)) {
-    MS_LOG(ERROR) << "Sending response failed.";
-    return;
+  end_last_iter_rsp.set_metrics_loss(loss_);
+  end_last_iter_rsp.set_metrics_accuracy(accuracy_);
+  auto status = cache::Summary::Instance().SubmitSummary(end_last_iter_rsp.SerializeAsString());
+  if (!status.IsSuccess()) {
+    MS_LOG_WARNING << "Failed to submit summary information to cache";
   }
 }
 
-void Iteration::EndLastIter() {
-  MS_LOG(INFO) << "End the last iteration " << iteration_num_;
-  if (iteration_num_ == FLContext::instance()->fl_iteration_num()) {
-    MS_LOG(INFO) << "Iteration loop " << iteration_loop_count_
-                 << " is completed. Iteration number: " << FLContext::instance()->fl_iteration_num();
-    iteration_loop_count_++;
-    instance_state_ = InstanceState::kFinish;
-  }
+void Iteration::GetAllSummaries() {
+  std::vector<std::string> all_summary;
+  cache::Summary::Instance().GetAllSummaries(&all_summary);
+  MS_LOG_INFO << "Server count for summary " << all_summary.size();
+  round_client_num_map_.clear();
+  float upload_loss = 0.0;
+  float metrics_loss = 0.0;
+  float metrics_accuracy = 0.0;
+  for (auto &item : all_summary) {
+    IterationSummaryMsg summary;
+    auto ret = summary.ParseFromString(item);
+    if (!ret) {
+      MS_LOG_WARNING << "Parse summary info failed";
+      continue;
+    }
+    round_client_num_map_[kStartFLJobTotalClientNum] += summary.startfljob_total_client_num();
+    round_client_num_map_[kStartFLJobAcceptClientNum] += summary.startfljob_accept_client_num();
+    round_client_num_map_[kStartFLJobRejectClientNum] += summary.startfljob_reject_client_num();
 
-  SetIterationEnd();
-  if (!SummarizeIteration()) {
-    MS_LOG(WARNING) << "Summarizing iteration data failed.";
-  }
+    round_client_num_map_[kUpdateModelTotalClientNum] += summary.updatemodel_total_client_num();
+    round_client_num_map_[kUpdateModelAcceptClientNum] += summary.updatemodel_accept_client_num();
+    round_client_num_map_[kUpdateModelRejectClientNum] += summary.updatemodel_reject_client_num();
 
-  if (is_instance_being_updated_) {
-    StartNewInstance();
-  } else {
-    iteration_num_++;
-  }
+    round_client_num_map_[kGetModelTotalClientNum] += summary.getmodel_total_client_num();
+    round_client_num_map_[kGetModelAcceptClientNum] += summary.getmodel_accept_client_num();
+    round_client_num_map_[kGetModelRejectClientNum] += summary.getmodel_reject_client_num();
 
-  LocalMetaStore::GetInstance().set_curr_iter_num(iteration_num_);
+    round_client_num_map_[kParticipationTimeLevel1] += summary.participation_time_level1_num();
+    round_client_num_map_[kParticipationTimeLevel2] += summary.participation_time_level2_num();
+    round_client_num_map_[kParticipationTimeLevel3] += summary.participation_time_level3_num();
 
-  MS_ERROR_IF_NULL_WO_RET_VAL(server_node_);
-  if (server_node_->rank_id() == kLeaderServerRank) {
-    // Save current iteration number for recovery.
-    MS_ERROR_IF_NULL_WO_RET_VAL(server_recovery_);
-    if (!server_recovery_->Save(iteration_num_, instance_state_)) {
-      MS_LOG(WARNING) << "Can't save current iteration number into persistent storage.";
+    upload_loss += summary.upload_loss();
+    if (summary.metrics_loss() != 0.0) {
+      metrics_loss = summary.metrics_loss();
+      metrics_accuracy = summary.metrics_accuracy();
     }
   }
-  for (const auto &round : rounds_) {
+  if (FLContext::instance()->server_mode() == kServerModeFL) {
+    loss_ = upload_loss;
+    uint64_t update_model_threshold =
+      FLContext::instance()->start_fl_job_threshold() * FLContext::instance()->update_model_ratio();
+    if (update_model_threshold > 0) {
+      loss_ = loss_ / update_model_threshold;
+    }
+  } else {
+    loss_ = metrics_loss;
+    accuracy_ = metrics_accuracy;
+  }
+}
+
+bool Iteration::SummarizeIteration() {
+  IterationMetrics metrics;
+  if (!metrics.Initialize()) {
+    MS_LOG(WARNING) << "Initializing metrics failed.";
+    return false;
+  }
+  complete_time_ = fl::CommUtil::GetNowTime();
+  metrics.SetInstanceName(cache::InstanceContext::Instance().instance_name());
+  metrics.SetStartTime(start_time_);
+  metrics.SetEndTime(complete_time_);
+  metrics.set_fl_name(FLContext::instance()->fl_name());
+  metrics.set_fl_iteration_num(FLContext::instance()->fl_iteration_num());
+  metrics.set_cur_iteration_num(cache::InstanceContext::Instance().iteration_num());
+  metrics.set_instance_state(cache::InstanceContext::Instance().instance_state());
+  metrics.set_loss(loss_);
+  metrics.set_accuracy(accuracy_);
+  metrics.set_round_client_num_map(round_client_num_map_);
+  auto iteration_valid = cache::InstanceContext::Instance().last_iteration_valid();
+  metrics.set_iteration_result(iteration_valid);
+
+  if (complete_time_.time_stamp < start_time_.time_stamp) {
+    MS_LOG(ERROR) << "The complete_timestamp_: " << complete_time_.time_stamp
+                  << ", start_timestamp: " << start_time_.time_stamp << ". One of them is invalid.";
+    metrics.set_iteration_time_cost(UINT64_MAX);
+  } else {
+    metrics.set_iteration_time_cost(complete_time_.time_stamp - start_time_.time_stamp);
+  }
+  if (!metrics.Summarize()) {
+    MS_LOG(ERROR) << "Summarizing metrics failed.";
+    return false;
+  }
+  if (iteration_fail_num_ >= FLContext::instance()->continuous_failure_times()) {
+    std::string node_role = "SERVER";
+    std::string event = "Iteration failed " + std::to_string(iteration_fail_num_) + " times continuously";
+    LogFailureEvent(node_role, server_node_->tcp_address(), event);
+    // Finish sending one message, reset cout num to 0
+    iteration_fail_num_ = 0;
+  }
+  return true;
+}
+
+void Iteration::InitEventTxtFile() {
+  MS_LOG(DEBUG) << "Start init event txt";
+  if (CommUtil::CreateDirectory(event_file_path_)) {
+    MS_LOG(INFO) << "Create Directory :" << event_file_path_ << " success.";
+  } else {
+    MS_LOG_EXCEPTION << "Failed to create directory for event file " << event_file_path_;
+  }
+  std::fstream event_txt_file;
+  event_txt_file.open(event_file_path_.c_str(), std::ios::out | std::ios::app);
+  if (!event_txt_file.is_open()) {
+    MS_LOG_EXCEPTION << "Failed to open event txt file " << event_file_path_;
+  }
+  event_txt_file.close();
+  MS_LOG(DEBUG) << "Load event txt success!";
+}
+
+void Iteration::LogFailureEvent(const std::string &node_role, const std::string &node_address,
+                                const std::string &event) {
+  std::fstream event_txt_file;
+  event_txt_file.open(event_file_path_, std::ios::out | std::ios::app);
+  if (!event_txt_file.is_open()) {
+    MS_LOG(WARNING) << "Failed to open event txt file " << event_file_path_;
+    return;
+  }
+  std::string time = fl::CommUtil::GetNowTime().time_str_mill;
+  std::string event_info =
+    "nodeRole:" + node_role + "," + node_address + "," + "currentTime:" + time + "," + "event:" + event + ";";
+  event_txt_file << event_info << "\n";
+  (void)event_txt_file.flush();
+  event_txt_file.close();
+  MS_LOG(INFO) << "Process failure event success!";
+}
+
+// move next(success or fail), disable, sync with cache(new iteration number may != current iteration num + 1)
+void Iteration::SaveModel() {
+  auto &instance_context = cache::InstanceContext::Instance();
+  auto is_iteration_valid = instance_context.last_iteration_valid();
+  auto result = instance_context.last_iteration_result();
+  // new_iteration_num is the iteration to be updated
+  auto store_iteration_num = instance_context.new_iteration_num() - 1;
+  if (is_iteration_valid) {
+    // This iteration of this server may have failed, or weight aggregation may not be performed.
+    // Sync model from other successful servers.
+    if (!Executor::GetInstance().IsIterationModelFinished(store_iteration_num)) {
+      auto status = Executor::GetInstance().SyncLatestModelFromOtherServers();
+      if (!status.IsSuccess()) {
+        MS_LOG_WARNING << "Iteration " << store_iteration_num << " is invalid. Reason: " << status.StatusMessage();
+      }
+      return;
+    }
+  }
+  if (is_iteration_valid) {
+    // Store the model which is successfully aggregated for this iteration.
+    const auto &model = Executor::GetInstance().GetModel();
+    if (model == nullptr || model->weight_data.empty() || model->weight_items.empty()) {
+      MS_LOG(WARNING) << "Verify feature maps failed, iteration " << store_iteration_num << " will not be stored.";
+      return;
+    }
+    ModelStore::GetInstance().StoreModelByIterNum(store_iteration_num, model);
+    MS_LOG(INFO) << "Iteration " << store_iteration_num << " is successfully finished.";
+  } else {
+    // Store last iteration's model because this iteration is considered as invalid.
+    const auto &model_pair = ModelStore::GetInstance().GetLatestModel();
+    ModelStore::GetInstance().StoreModelByIterNum(store_iteration_num, model_pair.second);
+    MS_LOG(WARNING) << "Iteration " << store_iteration_num << " is invalid. Reason: " << result;
+  }
+}
+
+void Iteration::Reset() {
+  for (auto &round : rounds_) {
     MS_ERROR_IF_NULL_WO_RET_VAL(round);
+    round->Reset();
     round->InitkernelClientVisitedNum();
     round->InitkernelClientUploadLoss();
     round->ResetParticipationTimeAndNum();
   }
   round_client_num_map_.clear();
   set_loss(0.0f);
-  Server::GetInstance().CancelSafeMode();
-  iteration_state_cv_.notify_all();
-  if (iteration_num_ > FLContext::instance()->fl_iteration_num()) {
-    MS_LOG(WARNING) << "The server's training job is finished.";
-  } else {
-    MS_LOG(INFO) << "Move to next iteration:" << iteration_num_ << "\n";
+  set_accuracy(0.0f);
+}
+
+void Iteration::SummaryOnIterationFinish(const std::function<void()> &iteration_end_callback) {
+  for (const auto &round : rounds_) {
+    MS_ERROR_IF_NULL_WO_RET_VAL(round);
+    round->KernelSummarize();
   }
-  if (iteration_result_.load() == IterationResult::kFail) {
+  auto iteration_valid = cache::InstanceContext::Instance().last_iteration_valid();
+  if (!iteration_valid) {
     iteration_fail_num_++;
   } else {
     iteration_fail_num_ = 0;
   }
-}
-
-bool Iteration::ForciblyMoveToNextIteration() {
-  NotifyNext(false, "Forcibly move to next iteration.");
-  return true;
-}
-
-bool Iteration::SummarizeIteration() {
-  // If the metrics_ is not initialized or the server is not the leader server, do not summarize.
-  if (server_node_->rank_id() != kLeaderServerRank || metrics_ == nullptr) {
-    MS_LOG(INFO) << "This server will not summarize for iteration.";
-    return true;
+  SubmitSummary();
+  constexpr size_t retry_times = 20 * 5;  // retry 20s = 20*5*200ms
+  constexpr size_t retry_interval_in_ms = 200;
+  for (size_t i = 0; i < retry_times; i++) {
+    bool has_finished = false;
+    bool ret = cache::Summary::TryLockSummary(&has_finished);
+    if (ret) {
+      break;
+    }
+    if (has_finished) {
+      return;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(retry_interval_in_ms));
   }
-
-  metrics_->SetInstanceName(instance_name_);
-  metrics_->SetStartTime(start_time_);
-  metrics_->SetEndTime(complete_time_);
-  metrics_->set_fl_name(FLContext::instance()->fl_name());
-  metrics_->set_fl_iteration_num(FLContext::instance()->fl_iteration_num());
-  metrics_->set_cur_iteration_num(iteration_num_);
-  metrics_->set_instance_state(instance_state_.load());
-  uint64_t update_model_threshold =
-    FLContext::instance()->start_fl_job_threshold() * FLContext::instance()->update_model_ratio();
-  if (update_model_threshold > 0) {
-    metrics_->set_loss(loss_ / update_model_threshold);
+  GetAllSummaries();
+  if (!SummarizeIteration()) {
+    MS_LOG(WARNING) << "Summarizing iteration data failed.";
   }
-  metrics_->set_accuracy(accuracy_);
-  metrics_->set_round_client_num_map(round_client_num_map_);
-  metrics_->set_iteration_result(iteration_result_.load());
-
-  if (complete_time_.time_stamp < start_time_.time_stamp) {
-    MS_LOG(ERROR) << "The complete_timestamp_: " << complete_time_.time_stamp
-                  << ", start_timestamp_: " << start_time_.time_stamp << ". One of them is invalid.";
-    metrics_->set_iteration_time_cost(UINT64_MAX);
-  } else {
-    metrics_->set_iteration_time_cost(complete_time_.time_stamp - start_time_.time_stamp);
+  if (iteration_end_callback != nullptr) {
+    iteration_end_callback();
   }
-
-  if (!metrics_->Summarize()) {
-    MS_LOG(ERROR) << "Summarizing metrics failed.";
-    return false;
-  }
-  return true;
-}
-
-bool Iteration::UpdateHyperParams(const nlohmann::json &json) {
-  for (const auto &item : json.items()) {
-    std::string key = item.key();
-    if (key == "start_fl_job_threshold") {
-      FLContext::instance()->set_start_fl_job_threshold(item.value().get<uint64_t>());
-      continue;
-    }
-    if (key == "start_fl_job_time_window") {
-      FLContext::instance()->set_start_fl_job_time_window(item.value().get<uint64_t>());
-      continue;
-    }
-    if (key == "update_model_ratio") {
-      FLContext::instance()->set_update_model_ratio(item.value().get<float>());
-      continue;
-    }
-    if (key == "update_model_time_window") {
-      FLContext::instance()->set_update_model_time_window(item.value().get<uint64_t>());
-      continue;
-    }
-    if (key == "fl_iteration_num") {
-      FLContext::instance()->set_fl_iteration_num(item.value().get<uint64_t>());
-      continue;
-    }
-    if (key == "client_epoch_num") {
-      FLContext::instance()->set_client_epoch_num(item.value().get<uint64_t>());
-      continue;
-    }
-    if (key == "client_batch_size") {
-      FLContext::instance()->set_client_batch_size(item.value().get<uint64_t>());
-      continue;
-    }
-    if (key == "client_learning_rate") {
-      FLContext::instance()->set_client_learning_rate(item.value().get<float>());
-      continue;
-    }
-    if (key == "global_iteration_time_window") {
-      FLContext::instance()->set_global_iteration_time_window(item.value().get<uint64_t>());
-      continue;
-    }
-  }
-
-  MS_LOG(INFO) << "start_fl_job_threshold: " << FLContext::instance()->start_fl_job_threshold();
-  MS_LOG(INFO) << "start_fl_job_time_window: " << FLContext::instance()->start_fl_job_time_window();
-  MS_LOG(INFO) << "update_model_ratio: " << FLContext::instance()->update_model_ratio();
-  MS_LOG(INFO) << "update_model_time_window: " << FLContext::instance()->update_model_time_window();
-  MS_LOG(INFO) << "fl_iteration_num: " << FLContext::instance()->fl_iteration_num();
-  MS_LOG(INFO) << "client_epoch_num: " << FLContext::instance()->client_epoch_num();
-  MS_LOG(INFO) << "client_batch_size: " << FLContext::instance()->client_batch_size();
-  MS_LOG(INFO) << "client_learning_rate: " << FLContext::instance()->client_learning_rate();
-  MS_LOG(INFO) << "global_iteration_time_window: " << FLContext::instance()->global_iteration_time_window();
-  return true;
+  cache::Summary::UnlockSummary();
 }
 
 bool Iteration::ReInitRounds() {
-  size_t start_fl_job_threshold = FLContext::instance()->start_fl_job_threshold();
+  uint64_t start_fl_job_threshold = FLContext::instance()->start_fl_job_threshold();
   float update_model_ratio = FLContext::instance()->update_model_ratio();
-  size_t update_model_threshold = static_cast<size_t>(std::ceil(start_fl_job_threshold * update_model_ratio));
+  uint64_t update_model_threshold = static_cast<uint64_t>(std::ceil(start_fl_job_threshold * update_model_ratio));
   uint64_t start_fl_job_time_window = FLContext::instance()->start_fl_job_time_window();
   uint64_t update_model_time_window = FLContext::instance()->update_model_time_window();
   std::vector<RoundConfig> new_round_config = {
@@ -917,88 +399,43 @@ bool Iteration::ReInitRounds() {
     MS_LOG(ERROR) << "Reinitializing for updating hyper-parameters failed.";
     return false;
   }
-
-  if (!Executor::GetInstance().ReInitForUpdatingHyperParams(update_model_threshold)) {
-    MS_LOG(ERROR) << "Reinitializing executor failed.";
-    return false;
-  }
   return true;
 }
 
-void Iteration::InitGlobalIterTimer(const TimeOutCb &timeout_cb) {
-  global_iteration_time_window_ = FLContext::instance()->global_iteration_time_window();
-  global_iter_timer_ = std::make_shared<IterationTimer>();
-
-  MS_LOG(INFO) << "Global iteration time window is: " << global_iteration_time_window_;
-  // Set the timeout callback for the timer.
-  global_iter_timer_->SetTimeOutCallBack([this, timeout_cb](bool, const std::string &) -> void {
-    std::string reason = "Global Iteration " + std::to_string(iteration_num_) +
-                         " timeout! This iteration is invalid. Proceed to next iteration.";
-    timeout_cb(false, reason);
-  });
+void Iteration::InitGlobalIterTimer() {
+  auto global_time_window_in_ms = FLContext::instance()->global_iteration_time_window();
+  auto time_callback = []() {
+    std::string reason = "Global timer timeout! This iteration is invalid. Proceed to next iteration.";
+    Iteration::GetInstance().FinishIteration(false, reason);
+  };
+  constexpr int msec_to_sec_times = 1000;
+  int64_t global_time_window_in_seconds = static_cast<int64_t>(global_time_window_in_ms) / msec_to_sec_times;
+  cache::Timer::Instance().RegisterTimer(kGlobalTimer, global_time_window_in_seconds, time_callback);
 }
 
-void Iteration::UpdateRoundClientNumMap(const std::shared_ptr<std::vector<unsigned char>> &client_info_rsp_msg) {
-  MS_ERROR_IF_NULL_WO_RET_VAL(client_info_rsp_msg);
-  EndLastIterResponse end_last_iter_rsp;
-  (void)end_last_iter_rsp.ParseFromArray(client_info_rsp_msg->data(), SizeToInt(client_info_rsp_msg->size()));
-
-  round_client_num_map_[kStartFLJobTotalClientNum] += end_last_iter_rsp.startfljob_total_client_num();
-  round_client_num_map_[kStartFLJobAcceptClientNum] += end_last_iter_rsp.startfljob_accept_client_num();
-  round_client_num_map_[kStartFLJobRejectClientNum] += end_last_iter_rsp.startfljob_reject_client_num();
-
-  round_client_num_map_[kUpdateModelTotalClientNum] += end_last_iter_rsp.updatemodel_total_client_num();
-  round_client_num_map_[kUpdateModelAcceptClientNum] += end_last_iter_rsp.updatemodel_accept_client_num();
-  round_client_num_map_[kUpdateModelRejectClientNum] += end_last_iter_rsp.updatemodel_reject_client_num();
-
-  round_client_num_map_[kGetModelTotalClientNum] += end_last_iter_rsp.getmodel_total_client_num();
-  round_client_num_map_[kGetModelAcceptClientNum] += end_last_iter_rsp.getmodel_accept_client_num();
-  round_client_num_map_[kGetModelRejectClientNum] += end_last_iter_rsp.getmodel_reject_client_num();
-
-  round_client_num_map_[kParticipationTimeLevel1] += end_last_iter_rsp.participation_time_level1_num();
-  round_client_num_map_[kParticipationTimeLevel2] += end_last_iter_rsp.participation_time_level2_num();
-  round_client_num_map_[kParticipationTimeLevel3] += end_last_iter_rsp.participation_time_level3_num();
-}
-
-void Iteration::UpdateRoundClientUploadLoss(const std::shared_ptr<std::vector<unsigned char>> &client_info_rsp_msg) {
-  MS_ERROR_IF_NULL_WO_RET_VAL(client_info_rsp_msg);
-  EndLastIterResponse end_last_iter_rsp;
-  (void)end_last_iter_rsp.ParseFromArray(client_info_rsp_msg->data(), SizeToInt(client_info_rsp_msg->size()));
-
-  set_loss(loss_ + end_last_iter_rsp.upload_loss());
-}
-
-void Iteration::set_instance_state(InstanceState state) {
-  instance_state_ = state;
-  MS_LOG(INFO) << "Server instance state is " << GetInstanceStateStr(instance_state_);
-}
-
-void Iteration::SetFileConfig(const std::shared_ptr<fl::core::FileConfiguration> &file_configuration) {
-  file_configuration_ = file_configuration;
-}
-
-std::string Iteration::GetDataRateFilePath() {
-  fl::core::FileConfig data_rate_config;
-  if (!fl::core::CommUtil::ParseAndCheckConfigJson(file_configuration_.get(), kDataRate, &data_rate_config)) {
-    MS_LOG(EXCEPTION) << "Data rate parament in config is not correct";
-    return "";
+void Iteration::InitConfig() {
+  data_rate_file_path_ = FLContext::instance()->data_rate_dir();
+  if (data_rate_file_path_.empty()) {
+    MS_LOG(EXCEPTION) << "Failed to get data rate file path from config file";
   }
-  return data_rate_config.storage_file_path;
+  event_file_path_ = FLContext::instance()->failure_event_file();
+  if (event_file_path_.empty()) {
+    MS_LOG(EXCEPTION) << "Failed to get event file path from config file";
+  }
 }
 
 void Iteration::StartThreadToRecordDataRate() {
   MS_LOG(INFO) << "Start to create a thread to record data rate";
   data_rate_thread_ = std::thread([&]() {
     std::fstream file_stream;
-    std::string data_rate_path = GetDataRateFilePath();
-    MS_LOG(DEBUG) << "The data rate file path is " << data_rate_path;
-    uint32_t rank_id = server_node_->rank_id();
+    MS_LOG(DEBUG) << "The data rate file path is " << data_rate_file_path_;
+    auto tcp_address = server_node_->tcp_address();
     while (is_date_rate_thread_running_) {
       // record data every 60 seconds
       std::this_thread::sleep_for(std::chrono::seconds(60));
-      auto now_time = fl::core::CommUtil::GetNowTime();
+      auto now_time = fl::CommUtil::GetNowTime();
       std::string data_rate_file =
-        data_rate_path + "/" + now_time.time_str_day + "_flow_server" + std::to_string(rank_id) + ".json";
+        data_rate_file_path_ + "/" + now_time.time_str_day + "_flow_server_" + tcp_address + ".json";
       file_stream.open(data_rate_file, std::ios::out | std::ios::app);
       if (!file_stream.is_open()) {
         MS_LOG(EXCEPTION) << data_rate_file << "is not open!";
@@ -1054,7 +491,13 @@ void Iteration::StartThreadToRecordDataRate() {
       file_stream.close();
     }
   });
-  return;
+}
+
+void Iteration::Stop() {
+  is_date_rate_thread_running_ = false;
+  if (data_rate_thread_.joinable()) {
+    data_rate_thread_.join();
+  }
 }
 }  // namespace server
 }  // namespace fl

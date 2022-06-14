@@ -32,22 +32,16 @@ namespace server {
 namespace kernel {
 class PushWeightKernel : public RoundKernel {
  public:
-  PushWeightKernel() : executor_(nullptr), local_rank_(0) {}
-  ~PushWeightKernel() override = default;
+  PushWeightKernel() = default;
 
   void InitKernel(size_t threshold_count) override;
-  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<fl::core::MessageHandler> &message) override;
-  bool Reset() override;
-  void OnLastCountEvent(const std::shared_ptr<fl::core::MessageHandler> &message) override;
+  bool Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<MessageHandler> &message) override;
 
  private:
-  ResultCode PushWeight(const std::shared_ptr<FBBuilder> &fbb, const schema::RequestPushWeight *push_weight_req);
+  void BuildPushWeightRsp(FBBuilder *fbb, const schema::ResponseCode retcode, const std::string &reason,
+                          size_t iteration);
+  FlStatus OnReceiveModelWeight(const uint8_t *req_data, size_t len);
   std::map<std::string, Address> ParseFeatureMap(const schema::RequestPushWeight *push_weight_req);
-  void BuildPushWeightRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
-                          const std::string &reason, size_t iteration);
-
-  Executor *executor_;
-  uint32_t local_rank_;
 };
 }  // namespace kernel
 }  // namespace server

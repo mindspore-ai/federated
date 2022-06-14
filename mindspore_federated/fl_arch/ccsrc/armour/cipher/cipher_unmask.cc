@@ -22,12 +22,12 @@
 namespace mindspore {
 namespace fl {
 namespace armour {
-bool CipherUnmask::UnMask(const std::map<std::string, AddressPtr> &data) {
+bool CipherUnmask::UnMask(const ModelItemPtr &model) {
   MS_LOG(INFO) << "CipherMgr::UnMask START";
   clock_t start_time = clock();
   std::vector<float> noise;
 
-  bool ret = cipher_init_->cipher_meta_storage_.GetClientNoisesFromServer(kCtxClientNoises, &noise);
+  bool ret = cipher_init_->cipher_meta_storage_.GetClientNoisesFromServer(&noise);
   if (!ret || noise.size() != cipher_init_->featuremap_) {
     MS_LOG(WARNING) << "Client noises is not ready";
     return false;
@@ -38,19 +38,16 @@ bool CipherUnmask::UnMask(const std::map<std::string, AddressPtr> &data) {
     MS_LOG(ERROR) << "FedAvgTotalDataSize equals to 0";
     return false;
   }
-  int sum_size = 0;
-  for (auto iter = data.begin(); iter != data.end(); ++iter) {
-    if (iter->second == nullptr) {
-      MS_LOG(ERROR) << "AddressPtr is nullptr";
-      return false;
+  size_t sum_size = 0;
+  auto weight_data = model->weight_data.data();
+  for (auto &feature : model->weight_items) {
+    auto in_data = reinterpret_cast<float *>(weight_data + feature.second.offset);
+    size_t elems_count = feature.second.size / sizeof(float);
+    for (size_t i = 0; i < elems_count; ++i) {
+      in_data[i] = in_data[i] + noise[i + sum_size] / data_size;
     }
-    size_t size_data = iter->second->size / sizeof(float);
-    float *in_data = reinterpret_cast<float *>(iter->second->addr);
-    for (size_t i = 0; i < size_data; ++i) {
-      in_data[i] = in_data[i] + noise[i + IntToSize(sum_size)] / data_size;
-    }
-    sum_size += IntToSize(size_data);
-    for (size_t i = 0; i < data.size(); ++i) {
+    sum_size += elems_count;
+    for (size_t i = 0; i < std::min(3ul, elems_count); ++i) {
       MS_LOG(INFO) << " index : " << i << " in_data unmask: " << in_data[i] * data_size;
     }
   }

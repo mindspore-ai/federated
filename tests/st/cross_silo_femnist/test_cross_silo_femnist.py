@@ -13,52 +13,25 @@
 # limitations under the License.
 # ============================================================================
 
-import argparse
 import os
-import time
+import argparse
 import numpy as np
 
-import mindspore
-import mindspore.context as context
-import mindspore.nn as nn
-from mindspore.common.initializer import TruncatedNormal
-from mindspore import Tensor
-import mindspore.dataset as ds
-import mindspore.dataset.vision.py_transforms as PV
-import mindspore.dataset.transforms.py_transforms as PT
-import mindspore.dataset.transforms.c_transforms as tC
-from mindspore.train.serialization import save_checkpoint
-from mindspore_federated.python._federated_local import FederatedLearningJob
-from mindspore_federated.python.trainer._fl_manager import FederatedLearningManager
-from mindspore.nn.metrics import Accuracy
-from mindspore.train import Model
-from mindspore.train.callback import Callback
+parser = argparse.ArgumentParser(description="Run test_cross_silo_femnist.py case")
 
-parser = argparse.ArgumentParser(description="test_cross_silo_femnist")
-parser.add_argument("--device_target", type=str, default="CPU")
-parser.add_argument("--server_mode", type=str, default="FEDERATED_LEARNING")
 parser.add_argument("--ms_role", type=str, default="MS_WORKER")
-parser.add_argument("--worker_num", type=int, default=1)
-parser.add_argument("--server_num", type=int, default=1)
-parser.add_argument("--scheduler_ip", type=str, default="127.0.0.1")
-parser.add_argument("--scheduler_port", type=int, default=8113)
-parser.add_argument("--fl_server_port", type=int, default=6666)
-parser.add_argument("--start_fl_job_threshold", type=int, default=1)
-parser.add_argument("--start_fl_job_time_window", type=int, default=3000)
-parser.add_argument("--update_model_ratio", type=float, default=1.0)
-parser.add_argument("--update_model_time_window", type=int, default=3000)
-parser.add_argument("--fl_name", type=str, default="Lenet")
-# fl_iteration_num is also used as the global epoch number for Worker.
-parser.add_argument("--fl_iteration_num", type=int, default=25)
-parser.add_argument("--client_epoch_num", type=int, default=20)
-# client_batch_size is also used as the batch size of each mini-batch for Worker.
-parser.add_argument("--client_batch_size", type=int, default=32)
-# client_learning_rate is also used as the learning rate for Worker.
-parser.add_argument("--client_learning_rate", type=float, default=0.01)
-parser.add_argument("--scheduler_manage_port", type=int, default=11202)
-parser.add_argument("--config_file_path", type=str, default="")
-parser.add_argument("--encrypt_type", type=str, default="NOT_ENCRYPT")
-parser.add_argument("--cipher_time_window", type=int, default=300000)
+# common
+parser.add_argument("--yaml_config", type=str, default="default_yaml_config.yaml")
+# for server
+parser.add_argument("--http_server_address", type=str, default=2)
+parser.add_argument("--tcp_server_ip", type=str, default="127.0.0.1")
+parser.add_argument("--checkpoint_dir", type=str, default="./fl_ckpt/")
+
+# for scheduler
+parser.add_argument("--scheduler_manage_address", type=str, default="127.0.0.1:11202")
+
+# for worker
+parser.add_argument("--device_target", type=str, default="CPU")
 parser.add_argument("--dataset_path", type=str, default="")
 # The user_id is used to set each worker's dataset path.
 parser.add_argument("--user_id", type=str, default="0")
@@ -66,224 +39,73 @@ parser.add_argument("--sync_type", type=str, default="fixed", choices=["fixed", 
 
 parser.add_argument('--img_size', type=int, default=(32, 32, 1), help='the image size of (h,w,c)')
 parser.add_argument('--repeat_size', type=int, default=1, help='the repeat size when create the dataLoader')
-parser.add_argument("--checkpoint_dir", type=str, default="")
+
+# client_batch_size is also used as the batch size of each mini-batch for Worker.
+parser.add_argument("--client_batch_size", type=int, default=32)
+parser.add_argument("--client_learning_rate", type=float, default=0.01)
+parser.add_argument("--fl_iteration_num", type=int, default=25)
 
 args, _ = parser.parse_known_args()
-device_target = args.device_target
-server_mode = args.server_mode
-ms_role = args.ms_role
-worker_num = args.worker_num
-server_num = args.server_num
-scheduler_ip = args.scheduler_ip
-scheduler_port = args.scheduler_port
-fl_server_port = args.fl_server_port
-start_fl_job_threshold = args.start_fl_job_threshold
-start_fl_job_time_window = args.start_fl_job_time_window
-update_model_ratio = args.update_model_ratio
-update_model_time_window = args.update_model_time_window
-fl_name = args.fl_name
-fl_iteration_num = args.fl_iteration_num
-client_epoch_num = args.client_epoch_num
-client_batch_size = args.client_batch_size
-client_learning_rate = args.client_learning_rate
-scheduler_manage_port = args.scheduler_manage_port
-config_file_path = args.config_file_path
-encrypt_type = args.encrypt_type
-cipher_time_window = args.cipher_time_window
-dataset_path = args.dataset_path
-user_id = args.user_id
-sync_type = args.sync_type
-checkpoint_dir = args.checkpoint_dir
-
-ctx = {
-    "server_mode": server_mode,
-    "ms_role": ms_role,
-    "worker_num": worker_num,
-    "server_num": server_num,
-    "scheduler_ip": scheduler_ip,
-    "scheduler_port": scheduler_port,
-    "fl_server_port": fl_server_port,
-    "start_fl_job_threshold": start_fl_job_threshold,
-    "start_fl_job_time_window": start_fl_job_time_window,
-    "update_model_ratio": update_model_ratio,
-    "update_model_time_window": update_model_time_window,
-    "fl_name": fl_name,
-    "fl_iteration_num": fl_iteration_num,
-    "client_epoch_num": client_epoch_num,
-    "client_batch_size": client_batch_size,
-    "client_learning_rate": client_learning_rate,
-    "scheduler_manage_port": scheduler_manage_port,
-    "config_file_path": config_file_path,
-    "encrypt_type": encrypt_type,
-    "cipher_time_window": cipher_time_window,
-    "checkpoint_dir": checkpoint_dir,
-}
-
-context.set_context(mode=context.GRAPH_MODE, device_target=device_target)
-context.set_fl_context(**ctx)
 
 
-def conv(in_channels, out_channels, kernel_size, stride=1, padding=0):
-    """weight initial for conv layer"""
-    weight = weight_variable()
-    return nn.Conv2d(
-        in_channels,
-        out_channels,
-        kernel_size=kernel_size,
-        stride=stride,
-        padding=padding,
-        weight_init=weight,
-        has_bias=False,
-        pad_mode="valid",
-    )
+def get_trainable_params(network):
+    feature_map = {}
+    for param in network.trainable_params():
+        param_np = param.asnumpy()
+        if param_np.dtype != np.float32:
+            continue
+        feature_map[param.name] = param_np
+    return feature_map
 
 
-def fc_with_initialize(input_channels, out_channels):
-    """weight initial for fc layer"""
-    weight = weight_variable()
-    bias = weight_variable()
-    return nn.Dense(input_channels, out_channels, weight, bias)
+def start_one_server():
+    from network import LeNet5
+    from mindspore_federated import FLServerJob
+
+    args, _ = parser.parse_known_args()
+    yaml_config = args.yaml_config
+    tcp_server_ip = args.tcp_server_ip
+    http_server_address = args.http_server_address
+    checkpoint_dir = args.checkpoint_dir
+
+    network = LeNet5()
+    job = FLServerJob(yaml_config=yaml_config, http_server_address=http_server_address, tcp_server_ip=tcp_server_ip,
+                      checkpoint_dir=checkpoint_dir, ssl_config=None)
+    feature_map = get_trainable_params(network)
+    job.run(feature_map)
 
 
-def weight_variable():
-    """weight initial"""
-    return TruncatedNormal(0.02)
+def start_one_scheduler():
+    from mindspore_federated import FlSchedulerJob
+
+    args, _ = parser.parse_known_args()
+    yaml_config = args.yaml_config
+    scheduler_manage_address = args.scheduler_manage_address
+
+    job = FlSchedulerJob(yaml_config=yaml_config, manage_address=scheduler_manage_address)
+    job.run()
 
 
-class LeNet5(nn.Cell):
-    def __init__(self, num_class=10, channel=3):
-        super(LeNet5, self).__init__()
-        self.num_class = num_class
-        self.conv1 = conv(channel, 6, 5)
-        self.conv2 = conv(6, 16, 5)
-        self.fc1 = fc_with_initialize(16 * 5 * 5, 120)
-        self.fc2 = fc_with_initialize(120, 84)
-        self.fc3 = fc_with_initialize(84, self.num_class)
-        self.relu = nn.ReLU()
-        self.max_pool2d = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.flatten = nn.Flatten()
+def start_one_worker():
+    yaml_config = args.yaml_config
+    dataset_path = args.dataset_path
+    user_id = args.user_id
+    sync_type = args.sync_type
+    client_learning_rate = args.client_learning_rate
+    fl_iteration_num = args.fl_iteration_num
+    client_batch_size = args.client_batch_size
+    img_size = args.img_size
+    repeat_size = args.repeat_size
+    device_target = args.device_target
 
-    def construct(self, x):
-        x = self.conv1(x)
-        x = self.relu(x)
-        x = self.max_pool2d(x)
-        x = self.conv2(x)
-        x = self.relu(x)
-        x = self.max_pool2d(x)
-        x = self.flatten(x)
-        x = self.fc1(x)
-        x = self.relu(x)
-        x = self.fc2(x)
-        x = self.relu(x)
-        x = self.fc3(x)
-        return x
-
-
-class LossGet(Callback):
-    # define loss callback for packaged model
-    def __init__(self, per_print_times, data_size):
-        super(LossGet, self).__init__()
-        if not isinstance(per_print_times, int) or per_print_times < 0:
-            raise ValueError("print_step must be int and >= 0.")
-        self._per_print_times = per_print_times
-        self._loss = 0.0
-        self.data_size = data_size
-        self.loss_list = []
-
-    def step_end(self, run_context):
-        cb_params = run_context.original_args()
-        loss = cb_params.net_outputs
-
-        if isinstance(loss, (tuple, list)):
-            if isinstance(loss[0], Tensor) and isinstance(loss[0].asnumpy(), np.ndarray):
-                loss = loss[0]
-
-        if isinstance(loss, Tensor) and isinstance(loss.asnumpy(), np.ndarray):
-            loss = np.mean(loss.asnumpy())
-
-        cur_step_in_epoch = (cb_params.cur_step_num - 1) % cb_params.batch_num + 1
-
-        if isinstance(loss, float) and (np.isnan(loss) or np.isinf(loss)):
-            raise ValueError("epoch: {} step: {}. Invalid loss, terminating training."
-                             .format(cb_params.cur_epoch_num, cur_step_in_epoch))
-        if self._per_print_times != 0 and cb_params.cur_step_num % self._per_print_times == 0:
-            self._loss = loss
-            self.loss_list.append(loss)
-
-    def epoch_begin(self, run_context):
-        self.epoch_time = time.time()
-
-    def epoch_end(self, run_context):
-        epoch_mseconds = (time.time() - self.epoch_time) * 1000
-        self._per_step_mseconds = epoch_mseconds / self.data_size
-
-    def get_loss(self):
-        return self.loss_list  # todo return self._loss
-
-    def get_per_step_time(self):
-        return self._per_step_mseconds
-
-
-def mkdir(path):
-    if not os.path.exists(path):
-        os.mkdir(path)
-
-
-def count_id(path):
-    files = os.listdir(path)
-    ids = {}
-    for i in files:
-        ids[i] = int(i)
-    return ids
-
-
-def create_dataset_from_folder(data_path, img_size, batch_size=32, repeat_size=1, num_parallel_workers=1,
-                               shuffle=False):
-    """ create dataset for train or test
-        Args:
-            data_path: Data path
-            batch_size: The number of data records in each group
-            repeat_size: The number of replicated data records
-            num_parallel_workers: The number of parallel workers
-        """
-    # define dataset
-    ids = count_id(data_path)
-    mnist_ds = ds.ImageFolderDataset(dataset_dir=data_path, decode=False, class_indexing=ids)
-    # define operation parameters
-    resize_height, resize_width = img_size[0], img_size[1]
-
-    transform = [
-        PV.Decode(),
-        PV.Grayscale(1),
-        PV.Resize(size=(resize_height, resize_width)),
-        PV.Grayscale(3),
-        PV.ToTensor()
-    ]
-    compose = PT.Compose(transform)
-
-    # apply map operations on images
-    mnist_ds = mnist_ds.map(input_columns="label", operations=tC.TypeCast(mindspore.int32))
-    mnist_ds = mnist_ds.map(input_columns="image", operations=compose)
-
-    # apply DatasetOps
-    buffer_size = 10000
-    if shuffle:
-        mnist_ds = mnist_ds.shuffle(buffer_size=buffer_size)  # 10000 as in LeNet train script
-    mnist_ds = mnist_ds.batch(batch_size, drop_remainder=True)
-    mnist_ds = mnist_ds.repeat(repeat_size)
-    return mnist_ds
-
-
-def evalute_process(model, eval_data, img_size, batch_size):
-    """Define the evaluation method."""
-    ds_eval = create_dataset_from_folder(eval_data, img_size, batch_size)
-    acc = model.eval(ds_eval, dataset_sink_mode=False)
-    return acc['Accuracy'], acc['Loss']
-
-
-def train():
+    from mindspore import nn, Model, save_checkpoint, context
+    from mindspore_federated import FederatedLearningManager
+    from network import LeNet5, ds, create_dataset_from_folder, LossGet, evalute_process
     epoch = 20
     network = LeNet5(62, 3)
+    from mindspore.nn.metrics import Accuracy
+
+    context.set_context(mode=context.GRAPH_MODE, device_target=device_target)
 
     # construct dataset
     ds.config.set_seed(1)
@@ -292,7 +114,7 @@ def train():
     train_path = os.path.join(data_root_path, user, "train")
     test_path = os.path.join(data_root_path, user, "test")
 
-    dataset = create_dataset_from_folder(train_path, args.img_size, args.client_batch_size, args.repeat_size)
+    dataset = create_dataset_from_folder(train_path, img_size, client_batch_size, repeat_size)
     print("size is ", dataset.get_dataset_size(), flush=True)
     num_batches = dataset.get_dataset_size()
 
@@ -300,12 +122,11 @@ def train():
     net_loss = nn.SoftmaxCrossEntropyWithLogits(sparse=True, reduction='mean')
     # define fl manager
     federated_learning_manager = FederatedLearningManager(
-        server_mode=server_mode,
+        yaml_config=yaml_config,
         model=network,
         sync_frequency=epoch * num_batches,
         data_size=num_batches,
-        sync_type=sync_type,
-        encrypt_type=encrypt_type
+        sync_type=sync_type
     )
     # define the optimizer
     net_opt = nn.Momentum(network.trainable_params(), client_learning_rate, 0.9)
@@ -325,8 +146,8 @@ def train():
         ckpt_name = os.path.join(ckpt_path, ckpt_name)
         save_checkpoint(network, ckpt_name)
 
-        train_acc, _ = evalute_process(model, train_path, args.img_size, args.client_batch_size)
-        test_acc, _ = evalute_process(model, test_path, args.img_size, args.client_batch_size)
+        train_acc, _ = evalute_process(model, train_path, img_size, client_batch_size)
+        test_acc, _ = evalute_process(model, test_path, img_size, client_batch_size)
         loss_list = loss_cb.get_loss()
         loss = sum(loss_list) / len(loss_list)
         print('local epoch: {}, loss: {}, trian acc: {}, test acc: {}'.format(iter_num, loss, train_acc, test_acc),
@@ -334,7 +155,10 @@ def train():
 
 
 if __name__ == "__main__":
-    fl_job = FederatedLearningJob(ctx)
-    fl_job.run()
-    if ms_role == "MS_WORKER":
-        train()
+    ms_role = args.ms_role
+    if ms_role == "MS_SERVER":
+        start_one_server()
+    elif ms_role == "MS_SCHED":
+        start_one_scheduler()
+    elif ms_role == "MS_WORKER":
+        start_one_worker()

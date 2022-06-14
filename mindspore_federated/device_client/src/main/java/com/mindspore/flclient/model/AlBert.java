@@ -41,7 +41,7 @@ public class AlBert extends TrainModel {
 
     private static final int EVAL_BERT_INPUTS = 3;
 
-    List<Feature> features;
+    List<FeatureInfo> features;
 
     int maxSeqLen = 16;
 
@@ -57,7 +57,7 @@ public class AlBert extends TrainModel {
 
     private void fillInputBuffer(int batchIdx, boolean isTrainMode, List<Integer> labels) {
         for (int i = 0; i < batchSize; i++) {
-            Feature feature = features.get(batchIdx * batchSize + i);
+            FeatureInfo feature = features.get(batchIdx * batchSize + i);
             for (int j = 0; j < dataSize; j++) {
                 inputIdBufffer.putInt(feature.inputIds[j]);
                 tokenIdBufffer.putInt(feature.tokenIds[j]);

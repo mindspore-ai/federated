@@ -22,8 +22,8 @@
 #include <string>
 #include <vector>
 #include <functional>
-#include "python/fl_context.h"
-#include "common/core/server_node.h"
+#include "common/fl_context.h"
+#include "server/server_node.h"
 #include "common/common.h"
 
 namespace mindspore {
@@ -33,22 +33,6 @@ namespace server {
 constexpr uint32_t kCollectiveCommTimeout = 30;
 // The max timeout for server collective communication, used in disaster recovery to prevent networking flapping.
 constexpr uint32_t kCollectiveCommMaxTimeout = 300;
-
-// The collective communication groups which are composed of multiple processes. Refer to MPI_Group.
-struct CommunicationGroupInfo {
-  // This group's rank size.
-  uint32_t size;
-
-  // This process's global rank id.
-  uint32_t global_rank;
-
-  // The group ranks consists of global ranks of the processes.
-  std::vector<uint32_t> group_ranks;
-
-  // The mapping of global ranks and group ranks.
-  std::map<uint32_t, uint32_t> global_to_group_ranks;
-  std::map<uint32_t, uint32_t> group_to_global_ranks;
-};
 
 // CollectiveOpsImpl is the collective communication API of the server.
 // For now, it implements two AllReduce algorithms: RingAllReduce and BroadcastAllReduce. Elastic AllReduce is also
@@ -60,32 +44,14 @@ class CollectiveOpsImpl {
     return instance;
   }
 
-  void Initialize(const std::shared_ptr<fl::core::ServerNode> &server_node);
+  void Initialize(const std::shared_ptr<ServerNode> &server_node);
 
   template <typename T>
-  bool AllReduce(const std::string &data_name, void *sendbuff, void *recvbuff, size_t count);
-
-  template <typename T>
-  bool AllGather(const void *sendbuff, void *recvbuff, size_t send_count,
-                 const std::shared_ptr<fl::core::AbstractNode> &node);
-
-  // Collective broadcast within the specified group. The parameter "root" is the group rank of the root process.
-  // Normally 0.
-  template <typename T>
-  bool Broadcast(const void *sendbuff, void *recvbuff, size_t count, uint32_t root,
-                 const std::shared_ptr<fl::core::AbstractNode> &node, const CommunicationGroupInfo &group_info);
-
-  // Reinitialize the ring for collective communication after scaling operations are done.
-  bool ReInitForScaling();
+  bool AllReduce(const std::string &data_name, void *sendbuff, void *recvbuff, size_t count,
+                 const std::map<std::string, std::string> &server_map);
 
  private:
-  CollectiveOpsImpl()
-      : server_node_(nullptr),
-        rank_id_(0),
-        server_num_(0),
-        node_(nullptr),
-        node_role_(fl::core::NodeRole::WORKER),
-        rank_size_(0) {}
+  CollectiveOpsImpl() : server_node_(nullptr), node_(nullptr), node_role_(NodeRole::WORKER), rank_size_(0) {}
   ~CollectiveOpsImpl() = default;
   CollectiveOpsImpl(const CollectiveOpsImpl &) = delete;
   CollectiveOpsImpl &operator=(const CollectiveOpsImpl &) = delete;
@@ -104,27 +70,19 @@ class CollectiveOpsImpl {
   template <typename T>
   bool ReduceBroadcastAllReduce(const std::string &data_name, const void *sendbuff, void *recvbuff, size_t count);
 
-  // Implementation of RingAllGather.
-  template <typename T>
-  bool RingAllGather(const void *sendbuff, void *recvbuff, size_t send_count);
-
-  // Implementation of Broadcast. The parameter "root" is the group rank of the root process. Normally 0.
-  template <typename T>
-  bool Broadcast(const void *sendbuff, void *recvbuff, size_t count, uint32_t root,
-                 const CommunicationGroupInfo &group_info);
-
-  std::shared_ptr<fl::core::ServerNode> server_node_;
-  uint32_t rank_id_;
-  uint32_t server_num_;
+  std::shared_ptr<ServerNode> server_node_;
+  std::string node_id_;
 
   // The mutex to ensure that collective communication is threadsafe.
   std::mutex mtx_;
 
   // The abstract node could be worker or server. Only nodes which have the same role could use collective
   // communication.
-  std::shared_ptr<fl::core::AbstractNode> node_;
-  fl::core::NodeRole node_role_;
-  uint32_t rank_size_;
+  std::shared_ptr<ServerNode> node_;
+  NodeRole node_role_;
+  size_t rank_size_ = 0;
+  size_t rank_id_ = 0;
+  std::vector<std::pair<std::string, std::string>> server_nodes_;
 };
 }  // namespace server
 }  // namespace fl

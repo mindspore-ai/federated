@@ -24,8 +24,8 @@
 #include <utility>
 #include <functional>
 #include "worker/kernel/abstract_kernel.h"
-#include "worker/fl_worker.h"
-#include "python/fl_context.h"
+#include "worker/worker.h"
+#include "common/fl_context.h"
 
 namespace mindspore {
 namespace fl {
@@ -48,7 +48,8 @@ class GetModelKernelMod : public AbstractKernel {
   py::dict Launch() {
     MS_LOG(INFO) << "Launching client GetModelKernelMod";
     py::dict dict_data;
-    if (!BuildGetModelReq(fbb_)) {
+    FBBuilder fbb;
+    if (!BuildGetModelReq(&fbb)) {
       MS_LOG(EXCEPTION) << "Building request for FusedPushWeight failed.";
       return dict_data;
     }
@@ -57,10 +58,13 @@ class GetModelKernelMod : public AbstractKernel {
     std::shared_ptr<std::vector<unsigned char>> get_model_rsp_msg = nullptr;
     int response_code = schema::ResponseCode_SucNotReady;
     while (response_code == schema::ResponseCode_SucNotReady) {
-      if (!fl::worker::FLWorker::GetInstance().SendToServer(target_server_rank_, fbb_->GetBufferPointer(),
-                                                            fbb_->GetSize(), fl::core::TcpUserCommand::kGetModel,
-                                                            &get_model_rsp_msg)) {
-        MS_LOG(EXCEPTION) << "Sending request for GetModel to server " << target_server_rank_ << " failed.";
+      if (fl::worker::Worker::GetInstance().HasStopped()) {
+        MS_LOG(WARNING) << "Worker has finished.";
+        return dict_data;
+      }
+      if (!fl::worker::Worker::GetInstance().SendToServer(fbb.GetBufferPointer(), fbb.GetSize(),
+                                                          fl::TcpUserCommand::kGetModel, &get_model_rsp_msg)) {
+        MS_LOG(EXCEPTION) << "Sending request for GetModel to server failed.";
         return dict_data;
       }
       flatbuffers::Verifier verifier(get_model_rsp_msg->data(), get_model_rsp_msg->size());
@@ -81,14 +85,12 @@ class GetModelKernelMod : public AbstractKernel {
         MS_LOG(EXCEPTION) << "Launching get model for worker failed. Reason: " << get_model_rsp->reason();
       }
     }
-
     auto feature_map = get_model_rsp->feature_map();
     MS_EXCEPTION_IF_NULL(feature_map);
     if (feature_map->size() == 0) {
       MS_LOG(EXCEPTION) << "Feature map after GetModel is empty.";
       return dict_data;
     }
-    auto &feature_maps = FLContext::instance()->feature_maps();
     for (size_t i = 0; i < feature_map->size(); i++) {
       const auto &feature_fbs = feature_map->Get(i);
       const auto &feature_data_fbs = feature_fbs->data();
@@ -96,58 +98,35 @@ class GetModelKernelMod : public AbstractKernel {
       std::string weight_fullname = feature_fbs->weight_fullname()->str();
       float *weight_data = const_cast<float *>(feature_data_fbs->data());
       std::vector<float> weight_data_vec(weight_data, weight_data + feature_data_fbs->size());
-
-      Feature feature = feature_maps[weight_fullname];
-      py::list data_list;
-      data_list.append(feature.weight_type);
-      data_list.append(feature.weight_shape);
-      data_list.append(weight_data_vec);
-      data_list.append(weight_data_vec.size());
-      dict_data[py::str(weight_fullname)] = data_list;
+      dict_data[py::str(weight_fullname)] = weight_data_vec;
     }
-
     return dict_data;
   }
 
-  void Init() {
+  void Init() override {
     MS_LOG(INFO) << "Initializing GetModel kernel";
-    fbb_ = std::make_shared<FBBuilder>();
-    MS_EXCEPTION_IF_NULL(fbb_);
 
-    server_num_ = fl::worker::FLWorker::GetInstance().server_num();
-    rank_id_ = fl::worker::FLWorker::GetInstance().rank_id();
-    if (rank_id_ == UINT32_MAX) {
-      MS_LOG(EXCEPTION) << "Federated worker is not initialized yet.";
-      return;
-    }
-    target_server_rank_ = rank_id_ % server_num_;
-    fl_name_ = fl::worker::FLWorker::GetInstance().fl_name();
-    MS_LOG(INFO) << "Initializing GetModel kernel. fl_name: " << fl_name_ << ". Request will be sent to server "
-                 << target_server_rank_;
+    fl_name_ = fl::worker::Worker::GetInstance().fl_name();
+    MS_LOG(INFO) << "Initializing GetModel kernel. fl_name: " << fl_name_ << ". Request will be sent to server";
   }
 
  private:
-  bool BuildGetModelReq(const std::shared_ptr<FBBuilder> &fbb) {
-    MS_EXCEPTION_IF_NULL(fbb_);
+  bool BuildGetModelReq(FBBuilder *fbb) {
+    MS_EXCEPTION_IF_NULL(fbb);
     auto fbs_fl_name = fbb->CreateString(fl_name_);
-    auto time = fl::core::CommUtil::GetNowTime();
+    auto time = fl::CommUtil::GetNowTime();
     MS_LOG(INFO) << "now time: " << time.time_str_mill;
     auto fbs_timestamp = fbb->CreateString(std::to_string(time.time_stamp));
-    schema::RequestGetModelBuilder req_get_model_builder(*(fbb.get()));
+    schema::RequestGetModelBuilder req_get_model_builder(*fbb);
     req_get_model_builder.add_fl_name(fbs_fl_name);
     req_get_model_builder.add_timestamp(fbs_timestamp);
-    iteration_ = fl::worker::FLWorker::GetInstance().fl_iteration_num();
+    iteration_ = fl::worker::Worker::GetInstance().fl_iteration_num();
     MS_LOG(INFO) << "Get model iteration: " << iteration_;
     req_get_model_builder.add_iteration(SizeToInt(iteration_));
     auto req_get_model = req_get_model_builder.Finish();
     fbb->Finish(req_get_model);
     return true;
   }
-
-  std::shared_ptr<FBBuilder> fbb_;
-  uint32_t rank_id_;
-  uint32_t server_num_;
-  uint32_t target_server_rank_;
   std::string fl_name_;
   uint64_t iteration_;
 };

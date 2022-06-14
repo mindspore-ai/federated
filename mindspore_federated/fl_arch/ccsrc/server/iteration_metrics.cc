@@ -26,20 +26,13 @@ namespace mindspore {
 namespace fl {
 namespace server {
 bool IterationMetrics::Initialize() {
-  config_ = std::make_unique<fl::core::FileConfiguration>(config_file_path_);
-  MS_EXCEPTION_IF_NULL(config_);
-  if (!config_->Initialize()) {
-    MS_LOG(EXCEPTION) << "Initializing for Config file path failed!" << config_file_path_
-                      << " may be invalid or not exist.";
-    return false;
-  }
-  fl::core::FileConfig metrics_config;
-  if (!fl::core::CommUtil::ParseAndCheckConfigJson(config_.get(), kMetrics, &metrics_config)) {
+  metrics_file_path_ = FLContext::instance()->metrics_file();
+  FileConfig metrics_config;
+  if (metrics_file_path_.empty()) {
     MS_LOG(WARNING) << "Metrics parament in config is not correct";
     return false;
   }
-  metrics_file_path_ = metrics_config.storage_file_path;
-  if (fl::core::CommUtil::CreateDirectory(metrics_file_path_)) {
+  if (CommUtil::CreateDirectory(metrics_file_path_)) {
     MS_LOG(INFO) << "Create Directory :" << metrics_file_path_ << " success.";
   }
   metrics_file_.open(metrics_file_path_.c_str(), std::ios::app | std::ios::out);
@@ -65,7 +58,7 @@ bool IterationMetrics::Summarize() {
   js_[kMetricsLoss] = loss_;
   js_[kIterExecutionTime] = iteration_time_cost_;
   js_[kClientVisitedInfo] = round_client_num_map_;
-  js_[kIterationResult] = kIterationResultName.at(iteration_result_);
+  js_[kIterationResult] = iteration_result_ ? "success" : "fail";
 
   metrics_file_ << js_ << "\n";
   (void)metrics_file_.flush();
@@ -88,7 +81,7 @@ void IterationMetrics::set_fl_iteration_num(size_t fl_iteration_num) { fl_iterat
 
 void IterationMetrics::set_cur_iteration_num(size_t cur_iteration_num) { cur_iteration_num_ = cur_iteration_num; }
 
-void IterationMetrics::set_instance_state(InstanceState state) { instance_state_ = state; }
+void IterationMetrics::set_instance_state(cache::InstanceState state) { instance_state_ = state; }
 
 void IterationMetrics::set_loss(float loss) { loss_ = loss; }
 
@@ -102,11 +95,11 @@ void IterationMetrics::set_round_client_num_map(const std::map<std::string, size
   round_client_num_map_ = round_client_num_map;
 }
 
-void IterationMetrics::set_iteration_result(IterationResult iteration_result) { iteration_result_ = iteration_result; }
+void IterationMetrics::set_iteration_result(bool iteration_result) { iteration_result_ = iteration_result; }
 
-void IterationMetrics::SetStartTime(const fl::core::Time &start_time) { start_time_ = start_time; }
+void IterationMetrics::SetStartTime(const Time &start_time) { start_time_ = start_time; }
 
-void IterationMetrics::SetEndTime(const fl::core::Time &end_time) { end_time_ = end_time; }
+void IterationMetrics::SetEndTime(const Time &end_time) { end_time_ = end_time; }
 
 void IterationMetrics::SetInstanceName(const std::string &instance_name) { instance_name_ = instance_name; }
 }  // namespace server
