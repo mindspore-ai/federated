@@ -33,6 +33,7 @@ enum InstanceState : int {
   kStateRunning = 0,  // default running
   kStateDisable = 1,
   kStateFinish = 2,
+  kStateStop = 3,
   kStateMaximum,
 };
 

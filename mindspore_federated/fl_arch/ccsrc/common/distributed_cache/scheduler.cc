@@ -119,6 +119,42 @@ CacheStatus Scheduler::SetEnableState(const std::string &fl_name, bool enable) {
   return client->HSet(key, kFiledRunningState, std::to_string(static_cast<int>(state_new)));
 }
 
+CacheStatus Scheduler::StopFLJob(const std::string &fl_name) {
+  std::string instance_name;
+  auto ret = GetInstanceName(fl_name, &instance_name);
+  if (instance_name.empty()) {
+    return ret;
+  }
+  auto client = DistributedCacheLoader::Instance().GetOneClient();
+  if (client == nullptr) {
+    MS_LOG_WARNING << "Get redis client failed";
+    return kCacheNetErr;
+  }
+  auto key = RedisKeys::GetInstance().InstanceStatusHash(fl_name, instance_name);
+  InstanceState state_new = kStateStop;
+  return client->HSet(key, kFiledRunningState, std::to_string(static_cast<int>(state_new)));
+}
+
+CacheStatus Scheduler::ClearFLJob(const std::string &fl_name) {
+  std::string instance_name;
+  auto ret = GetInstanceName(fl_name, &instance_name);
+  if (instance_name.empty()) {
+    return ret;
+  }
+  auto client = DistributedCacheLoader::Instance().GetOneClient();
+  if (client == nullptr) {
+    MS_LOG_WARNING << "Get redis client failed";
+    return kCacheNetErr;
+  }
+  std::vector<std::string> del_keys = {
+    RedisKeys::GetInstance().InstanceNameString(fl_name),
+    RedisKeys::GetInstance().InstanceStatusHash(fl_name, instance_name),
+    RedisKeys::GetInstance().HyperParamsString(fl_name, instance_name),
+    RedisKeys::GetInstance().ServerHash(fl_name, instance_name),
+  };
+  return client->Del(del_keys);
+}
+
 CacheStatus Scheduler::OnNewInstance(const std::string &fl_name, const std::string &new_instance_name,
                                      const std::string &hyper_params) {
   auto client = DistributedCacheLoader::Instance().GetOneClient();

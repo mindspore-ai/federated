@@ -179,9 +179,10 @@ void Server::InitRoundConfigs() {
 
 void Server::RunMainProcess() {
   MS_EXCEPTION_IF_NULL(server_node_);
+  auto state = cache::InstanceContext::Instance().instance_state();
   MS_LOG_INFO << "Begin run main process, start iteration: " << cache::InstanceContext::Instance().iteration_num()
-              << ", instance name: " << cache::InstanceContext::Instance().instance_name() << ", instance state: "
-              << cache::GetInstanceStateStr(cache::InstanceContext::Instance().instance_state());
+              << ", instance name: " << cache::InstanceContext::Instance().instance_name()
+              << ", instance state: " << cache::GetInstanceStateStr(state);
   Iteration::GetInstance().StartThreadToRecordDataRate();
   cache::IterationTaskThread::Instance().Start();
   while (!HasStopped()) {
@@ -259,6 +260,11 @@ void Server::RunMainProcessInner() {
   cache_ret = instance_context.Sync();
   if (!cache_ret.IsSuccess()) {  // failed to sync with cache, retry later
     MS_LOG_WARNING << "Sync instance context with distributed cache failed";
+    return;
+  }
+  if (instance_context.instance_state() == cache::kStateStop) {
+    MS_LOG_INFO << "Receive /stop message from scheduler and begin exit";
+    SetStopFlag();
     return;
   }
   // sync with cache, trigger counter event: first/last count.
@@ -363,6 +369,9 @@ void Server::InitAndLoadDistributedCache() {
   if (!cache_ret.IsSuccess()) {
     MS_LOG(EXCEPTION) << "Sync instance info with distributed cache failed, distributed_cache_address: "
                       << config.address;
+  }
+  if (cache::InstanceContext::Instance().instance_state() == cache::kStateStop) {
+    MS_LOG_EXCEPTION << "Fl job " << fl_name << " is stopping, please retry again later";
   }
   // sync hyper params
   cache_ret = cache::HyperParams::Instance().InitAndSync();

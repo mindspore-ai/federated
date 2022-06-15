@@ -400,6 +400,10 @@ def post_scheduler_enable_msg(scheduler_http_address):
     return post_scheduler_msg(scheduler_http_address, "enableFLS", None)
 
 
+def post_scheduler_stop_msg(scheduler_http_address):
+    return post_scheduler_msg(scheduler_http_address, "stopFLS", None)
+
+
 def read_metrics(metrics_file="metrics.json"):
     if not os.path.exists(metrics_file):
         raise RuntimeError(f"Cannot find metrics file {metrics_file}")

@@ -175,6 +175,11 @@ void Round::OnLastCountEvent() {
 
 bool Round::IsServerAvailable(std::string *reason) {
   MS_ERROR_IF_NULL_W_RET_VAL(reason, false);
+  if (Server::GetInstance().HasStopped()) {
+    MS_LOG(WARNING) << "This server begin to stop, please retry " + name_ + " later.";
+    *reason = kJobNotAvailable;
+    return false;
+  }
   auto &context = cache::InstanceContext::Instance();
   auto state = context.instance_state();
   // After one instance is completed, the model should be accessed by clients.

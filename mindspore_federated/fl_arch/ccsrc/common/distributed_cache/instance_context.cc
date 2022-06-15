@@ -38,6 +38,7 @@ const char *kFiledPrimeName = "prime";
 const char *kStateRunningStr = "Running";
 const char *kStateDisableStr = "Disable";
 const char *kStateFinishStr = "Finish";
+const char *kStateStopStr = "Stop";
 }  // namespace
 
 std::string GetInstanceStateStr(const InstanceState &instance_state) {
@@ -48,6 +49,8 @@ std::string GetInstanceStateStr(const InstanceState &instance_state) {
       return kStateDisableStr;
     case kStateFinish:
       return kStateFinishStr;
+    case kStateStop:
+      return kStateStopStr;
     default:
       return kStateRunningStr;  // default
   }
@@ -202,6 +205,8 @@ void InstanceContext::OnStateUpdate(InstanceState new_state) {
     MoveToNextIterationLocal(iteration_num_, false, "Disable instance");
   } else if (new_state == kStateRunning && instance_state_ == kStateDisable) {
     set_instance_state(new_state);
+  } else if (new_state == kStateStop) {
+    set_instance_state(kStateStop);
   }
 }
 

@@ -32,6 +32,8 @@ class Scheduler {
   CacheStatus GetAllServersRealtime(const std::string &fl_name, std::map<std::string, std::string> *server_map);
   CacheStatus GetAllClusterState(const std::string &fl_name, InstanceState *state);
   CacheStatus SetEnableState(const std::string &fl_name, bool enable);
+  CacheStatus StopFLJob(const std::string &fl_name);
+  CacheStatus ClearFLJob(const std::string &fl_name);
   CacheStatus OnNewInstance(const std::string &fl_name, const std::string &new_instance_name,
                             const std::string &hyper_params);
   CacheStatus QueryInstance(const std::string &fl_name, std::string *hyper_params);

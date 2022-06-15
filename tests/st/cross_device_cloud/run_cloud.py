@@ -52,7 +52,7 @@ def start_one_server():
     http_server_address = args.http_server_address
     checkpoint_dir = args.checkpoint_dir
 
-    network = LeNet5()
+    network = LeNet5(62, 3)
     job = FLServerJob(yaml_config=yaml_config, http_server_address=http_server_address, tcp_server_ip=tcp_server_ip,
                       checkpoint_dir=checkpoint_dir, ssl_config=None)
     feature_map = get_trainable_params(network)

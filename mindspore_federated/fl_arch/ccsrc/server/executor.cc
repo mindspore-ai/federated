@@ -470,6 +470,8 @@ bool Executor::TransModel2ProtoModel(uint64_t iteration_num, const ModelItemPtr 
     proto_state = InstanceState::kStateDisable;
   } else if (instance_state == cache::InstanceState::kStateFinish) {
     proto_state = InstanceState::kStateFinish;
+  } else if (instance_state == cache::InstanceState::kStateStop) {
+    proto_state = InstanceState::kStateStop;
   }
   proto_model->set_instance_state(proto_state);
   proto_model->set_iteration_num(iteration_num);

@@ -59,6 +59,8 @@ class SchedulerNode {
   // Handle the disable FLS http request Synchronously.
   void ProcessDisableFLS(const std::shared_ptr<HttpMessageHandler> &resp);
 
+  void ProcessStopFLS(const std::shared_ptr<HttpMessageHandler> &resp);
+
   void StartRestfulServer(const std::string &address, std::uint16_t port, size_t thread_num = 10);
 
   void StopRestfulServer();
@@ -66,8 +68,13 @@ class SchedulerNode {
   FlStatus GetClusterState(const std::string &fl_name, cache::InstanceState *state);
   FlStatus GetNodesInfoCommon(const std::string &fl_name, nlohmann::json *js);
 
+  static void StopThreadFunc();
+
   std::shared_ptr<HttpServer> http_server_;
   std::unordered_map<std::string, OnRequestReceive> callbacks_;
+  std::thread stop_thread_;
+  bool stopping_ = false;
+  std::mutex lock_;
 };
 }  // namespace fl
 }  // namespace mindspore
