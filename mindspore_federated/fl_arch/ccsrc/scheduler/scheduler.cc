@@ -15,21 +15,10 @@
  */
 
 #include "scheduler/scheduler.h"
+#include "common/exit_handler.h"
 
 namespace mindspore {
 namespace fl {
-namespace {
-int g_signal = 0;
-}
-void SignalHandler(int signal) {
-  if (g_signal == 0) {
-    g_signal = signal;
-    Scheduler::GetInstance().SetStopFlag();
-  }
-}
-
-void Scheduler::SetStopFlag() { stop_flag_ = true; }
-
 Scheduler &Scheduler::GetInstance() {
   static Scheduler instance{};
   return instance;
@@ -37,8 +26,7 @@ Scheduler &Scheduler::GetInstance() {
 
 void Scheduler::Run() {
   MS_LOG(INFO) << "Start scheduler.";
-  (void)signal(SIGTERM, SignalHandler);
-  (void)signal(SIGINT, SignalHandler);
+  ExitHandler::Instance().InitSignalHandle();
   InitAndLoadDistributedCache();
   scheduler_node_ = std::make_unique<SchedulerNode>();
   if (!scheduler_node_->Start()) {
@@ -46,7 +34,7 @@ void Scheduler::Run() {
   }
   MS_LOG(INFO) << "Scheduler started successfully.";
   constexpr auto time_sleep = std::chrono::seconds(1);
-  while (!stop_flag_) {
+  while (!ExitHandler::Instance().HasStopped()) {
     std::this_thread::sleep_for(time_sleep);
   }
   if (!scheduler_node_->Stop()) {

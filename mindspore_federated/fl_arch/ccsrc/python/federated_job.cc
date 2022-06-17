@@ -85,6 +85,8 @@ void FederatedJob::InitFederatedWorker() {
   worker::Worker::GetInstance().Init();
 }
 
+void FederatedJob::StopFederatedWorker() { worker::Worker::GetInstance().Stop(); }
+
 bool FederatedJob::StartFLJob(size_t data_size) { return StartFLJobKernelMod::GetInstance()->Launch(data_size); }
 
 py::dict FederatedJob::UpdateAndGetModel(std::map<std::string, std::vector<float>> weight_datas) {

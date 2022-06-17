@@ -18,6 +18,7 @@
 #include "common/utils/log_adapter.h"
 #include "common/core/comm_util.h"
 #include "common/common.h"
+#include "common/exit_handler.h"
 #include "distributed_cache/redis_keys.h"
 
 namespace mindspore {
@@ -173,25 +174,53 @@ RedisClient::RedisClient(const std::string &server_address, redisSSLContext *ssl
 
 RedisClient::~RedisClient() { Disconnect(); }
 
-CacheStatus RedisClient::Connect() {
-  struct timeval tv = {0};
-  tv.tv_sec = timeout_;
-  if (IsUnixAddress(server_address_)) {
-    redis_context_ = redisConnectUnixWithTimeout(server_address_.c_str(), tv);
-  } else {
-    std::string ip;
-    uint32_t port;
+CacheStatus RedisClient::Connect(bool retry_connect) {
+  bool is_unix_address = IsUnixAddress(server_address_);
+  std::string ip;
+  uint32_t port;
+  if (!is_unix_address) {
     if (!CommUtil::SplitIpAddress(server_address_, &ip, &port)) {
       auto reason = "Connection error: invalid redis server address: " + server_address_;
       MS_LOG(ERROR) << reason;
       return {kCacheNetErr, reason};
     }
-    redis_context_ = redisConnectWithTimeout(ip.c_str(), static_cast<int>(port), tv);
   }
-  if (redis_context_ == nullptr) {
-    auto reason = "Connection error: cannot allocate redis context, redis address: " + server_address_;
-    MS_LOG(ERROR) << reason;
-    return {kCacheNetErr, reason};
+  size_t retry_times = timeout_;
+  if (retry_times <= 0 || !retry_connect) {
+    retry_times = 1;
+  }
+  MS_LOG_INFO << "Try connect to redis sever " << server_address_ << ", retry time in seconds " << retry_times;
+  const std::string refused_str = "Connection refused";
+  for (size_t i = 0; i < retry_times; i++) {
+    if (ExitHandler::Instance().HasStopped()) {
+      auto reason =
+        std::string("Connection canceled: ") + "receive signal " + std::to_string(ExitHandler::Instance().GetSignal());
+      MS_LOG(ERROR) << reason;
+      return {kCacheNetErr, reason};
+    }
+    if (redis_context_ != nullptr) {
+      redisFree(redis_context_);
+      redis_context_ = nullptr;
+    }
+    if (is_unix_address) {
+      redis_context_ = redisConnectUnix(server_address_.c_str());
+    } else {
+      redis_context_ = redisConnect(ip.c_str(), static_cast<int>(port));
+    }
+    if (redis_context_ == nullptr) {
+      auto reason = "Connection error: cannot allocate redis context, redis address: " + server_address_;
+      MS_LOG(ERROR) << reason;
+      return {kCacheNetErr, reason};
+    }
+    if (!redis_context_->err) {
+      break;
+    }
+    if (redis_context_->errstr != refused_str) {
+      auto reason = std::string("Connection error: ") + redis_context_->errstr + ", redis address: " + server_address_;
+      MS_LOG(ERROR) << reason;
+      return {kCacheNetErr, reason};
+    }
+    std::this_thread::sleep_for(std::chrono::seconds(1));
   }
   if (redis_context_->err) {
     auto reason = std::string("Connection error: ") + redis_context_->errstr + ", redis address: " + server_address_;
@@ -231,7 +260,7 @@ CacheStatus RedisClient::Reconnect() {
 
 CacheStatus RedisClient::ReconnectInner() {
   if (redis_context_ == nullptr) {
-    return Connect();
+    return Connect(false);
   }
   if (redisReconnect(redis_context_) != REDIS_OK) {
     std::string reason = redis_context_->errstr;
@@ -615,7 +644,7 @@ bool RedisDistributedCache::Init(const DistributedCacheConfig &cache_config, int
       MS_LOG_ERROR << "Failed to create RedisClient object";
       return false;
     }
-    auto ret = client->Connect();
+    auto ret = client->Connect(true);
     if (!ret.IsSuccess()) {
       MS_LOG_ERROR << "Connect to redis server failed, server address: " << cache_config_.address;
       return false;

@@ -83,7 +83,7 @@ class RedisClient : public RedisClientBase {
 
   bool IsValid() override;
   void Disconnect() override;
-  CacheStatus Connect() override;
+  CacheStatus Connect(bool retry_connect) override;
   CacheStatus Reconnect() override;
   // Del
   CacheStatus Del(const std::vector<std::string> &keys) override;

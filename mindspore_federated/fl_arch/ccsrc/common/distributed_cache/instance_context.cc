@@ -312,9 +312,8 @@ CacheStatus InstanceContext::SyncInstanceName(const std::shared_ptr<RedisClientB
     return kCacheNetErr;
   }
   auto key = RedisKeys::GetInstance().InstanceNameString();
-  auto ret = client->SetNx(key, instance_name_);
+  auto ret = client->SetExNx(key, instance_name_, Timer::config_expire_time_in_seconds());
   if (ret.IsSuccess()) {
-    (void)client->Expire(key, Timer::config_expire_time_in_seconds());
     return kCacheSuccess;
   }
   if (ret != kCacheExist) {

@@ -94,11 +94,32 @@ FlStatus SchedulerNode::GetNodesInfoCommon(const std::string &fl_name, nlohmann:
     auto message = "Failed to get nodes because of some inner error. Please retry later.";
     return FlStatus(kSystemError, message);
   }
+  std::map<std::string, std::string> worker_map;
+  cache_ret = cache::Scheduler::Instance().GetAllWorkersRealtime(fl_name, &worker_map);
+  if (cache_ret == cache::kCacheNetErr) {
+    auto message = "Failed to access the cache server. Please retry later.";
+    return FlStatus(kSystemError, message);
+  }
+  if (cache_ret == cache::kCacheNil) {
+    auto message = "Cannot find cluster info for " + fl_name;
+    return FlStatus(kSystemError, message);
+  }
+  if (!cache_ret.IsSuccess()) {
+    auto message = "Failed to get nodes because of some inner error. Please retry later.";
+    return FlStatus(kSystemError, message);
+  }
   for (const auto &kvs : server_map) {
     std::unordered_map<std::string, std::string> res;
     res["node_id"] = kvs.first;
     res["tcp_address"] = kvs.second;
     res["role"] = "SERVER";
+    (*js)["nodes"].push_back(res);
+  }
+  for (const auto &kvs : worker_map) {
+    std::unordered_map<std::string, std::string> res;
+    res["node_id"] = kvs.first;
+    res["tcp_address"] = "";
+    res["role"] = "WORKER";
     (*js)["nodes"].push_back(res);
   }
   return FlStatus(kFlSuccess);

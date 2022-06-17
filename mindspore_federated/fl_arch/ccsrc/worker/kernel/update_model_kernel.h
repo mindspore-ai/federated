@@ -26,6 +26,7 @@
 #include "worker/worker.h"
 #include "armour/secure_protocol/masking.h"
 #include "common/core/comm_util.h"
+#include "common/exit_handler.h"
 
 namespace mindspore {
 namespace fl {

@@ -18,27 +18,15 @@
 #include <string>
 #include <vector>
 #include <utility>
+#include "common/exit_handler.h"
 #include "worker/worker.h"
 #include "armour/secure_protocol/key_agreement.h"
 #include "distributed_cache/distributed_cache.h"
+#include "distributed_cache/worker.h"
 
 namespace mindspore {
 namespace fl {
 namespace worker {
-// The handler to capture the signal of SIGTERM. Normally this signal is triggered by cloud cluster manager like K8S.
-namespace {
-int g_signal = 0;
-}
-void SignalHandler(int signal) {
-  if (g_signal == 0) {
-    g_signal = signal;
-    Worker::GetInstance().SetStopFlag();
-  }
-}
-
-void Worker::SetStopFlag() { stop_flag_ = true; }
-bool Worker::HasStopped() const { return stop_flag_; }
-
 Worker &Worker::GetInstance() {
   static Worker instance;
   return instance;
@@ -49,8 +37,7 @@ void Worker::Init() {
     MS_LOG_EXCEPTION << "Worker has been inited";
   }
   running_ = true;
-  (void)signal(SIGTERM, SignalHandler);
-  (void)signal(SIGINT, SignalHandler);
+  ExitHandler::Instance().InitSignalHandle();
 
   InitAndLoadDistributedCache();
   worker_node_ = std::make_shared<fl::WorkerNode>();
@@ -59,6 +46,54 @@ void Worker::Init() {
   if (!worker_node_->Start()) {
     MS_LOG(EXCEPTION) << "Starting worker node failed.";
   }
+  StartPeriodJob();
+}
+
+void Worker::StartPeriodJob() {
+  cache::Worker::Instance().Init(fl_id(), FLContext::instance()->fl_name());
+  auto status = cache::Worker::Instance().Register();
+  if (!status.IsSuccess()) {
+    MS_LOG_EXCEPTION << "Failed to register worker to distributed cache.";
+  }
+  MS_LOG_INFO << "Register worker to distributed cache successfully";
+  auto period_fun = []() {
+    auto cache_link_valid = true;
+    while (!ExitHandler::Instance().HasStopped()) {
+      constexpr int default_sync_duration_ms = 1000;  // 1000ms
+      std::this_thread::sleep_for(std::chrono::milliseconds(default_sync_duration_ms));
+
+      auto cache_ret = cache::Worker::Instance().Sync();
+      if (!cache_ret.IsSuccess()) {
+        constexpr int64_t log_interval = 15000;  // 15s
+        static int64_t last_retry_timestamp_ms = 0;
+        if (cache_link_valid) {
+          cache_link_valid = false;
+          last_retry_timestamp_ms = 0;
+        }
+        int64_t current_timestamp_ms = CURRENT_TIME_MILLI.count();
+        if (current_timestamp_ms - last_retry_timestamp_ms >= log_interval) {
+          last_retry_timestamp_ms = current_timestamp_ms;
+          MS_LOG_ERROR << "Failed to reconnect to distributed cache: " << cache_ret.GetDetail();
+        }
+      } else {
+        if (!cache_link_valid) {
+          cache_link_valid = true;
+          MS_LOG_INFO << "Success to reconnect to distributed cache";
+        }
+      }
+    }
+  };
+  period_thread_ = std::thread(period_fun);
+}
+
+void Worker::Stop() {
+  MS_LOG_INFO << "Start to stop worker";
+  ExitHandler::Instance().SetStopFlag();
+  if (period_thread_.joinable()) {
+    period_thread_.join();
+  }
+  cache::Worker::Instance().Stop();
+  MS_LOG_INFO << "Stop worker successfully";
 }
 
 void Worker::InitAndLoadDistributedCache() {
@@ -77,7 +112,7 @@ bool Worker::SendToServer(const void *data, size_t size, TcpUserCommand command,
   MS_EXCEPTION_IF_NULL(worker_node_);
   MS_EXCEPTION_IF_NULL(data);
   if (output != nullptr) {
-    while (!Worker::GetInstance().HasStopped()) {
+    while (!ExitHandler::Instance().HasStopped()) {
       if (!worker_node_->Send(NodeRole::SERVER, data, size, static_cast<int>(command), output, kWorkerTimeout)) {
         MS_LOG(ERROR) << "Sending message to server failed.";
         return false;

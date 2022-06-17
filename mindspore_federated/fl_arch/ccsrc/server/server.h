@@ -24,6 +24,7 @@
 #include "communicator/tcp_communicator.h"
 #include "armour/cipher/cipher_init.h"
 #include "common/common.h"
+#include "common/exit_handler.h"
 #include "server/executor.h"
 #include "server/iteration.h"
 #include "server/server_node.h"
@@ -65,8 +66,6 @@ class MS_EXPORT Server {
   // InitCipher---->InitExecutor
   void Run(const std::vector<InputWeight> &feature_map, const FlCallback &fl_callback);
 
-  void SetStopFlag();
-  bool HasStopped() const { return stop_flag_; }
   void BroadcastModelWeight(const std::string &proto_model,
                             const std::map<std::string, std::string> &broadcast_server_map = {});
   bool PullWeight(const uint8_t *req_data, size_t len, VectorPtr *output);
@@ -150,10 +149,8 @@ class MS_EXPORT Server {
   std::string equip_crl_path_;
   uint64_t replay_attack_time_diff_;
 
-  std::atomic_bool stop_flag_ = false;
   bool has_stopped_ = false;
 
-  bool own_server_cache_lock_ = false;
   FlCallback fl_callback_;
 };
 }  // namespace server

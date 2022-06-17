@@ -30,8 +30,6 @@ class MS_EXPORT Scheduler {
 
   void Run();
 
-  void SetStopFlag();
-
  private:
   Scheduler() {}
 
@@ -40,7 +38,6 @@ class MS_EXPORT Scheduler {
   Scheduler &operator=(const Scheduler &) = delete;
   void InitAndLoadDistributedCache();
   std::unique_ptr<SchedulerNode> scheduler_node_;
-  bool stop_flag_ = false;
 };
 }  // namespace fl
 }  // namespace mindspore

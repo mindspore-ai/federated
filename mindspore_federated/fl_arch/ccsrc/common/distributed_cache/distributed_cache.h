@@ -44,7 +44,7 @@ class RedisClientBase {
 
   virtual bool IsValid() = 0;
   virtual void Disconnect() = 0;
-  virtual CacheStatus Connect() = 0;
+  virtual CacheStatus Connect(bool retry_connect) = 0;
   virtual CacheStatus Reconnect() = 0;
   // Del
   virtual CacheStatus Del(const std::vector<std::string> &keys) = 0;
