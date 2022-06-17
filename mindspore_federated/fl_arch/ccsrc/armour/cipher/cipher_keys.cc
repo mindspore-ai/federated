@@ -18,6 +18,7 @@
 #include "armour/cipher/cipher_meta_storage.h"
 #include "distributed_cache/client_infos.h"
 #include "distributed_cache/instance_context.h"
+#include "server/distributed_count_service.h"
 
 namespace mindspore {
 namespace fl {
@@ -35,26 +36,18 @@ bool CipherKeys::GetKeys(const size_t cur_iterator, const std::string &next_req_
     return false;
   }
   // get clientlist from memory server.
-  std::map<std::string, std::vector<std::vector<uint8_t>>> client_public_keys;
   std::string encrypt_type = FLContext::instance()->encrypt_type();
-  if (encrypt_type == kPWEncryptType) {
-    cipher_init_->cipher_meta_storage_.GetClientKeysFromServer(&client_public_keys);
-  } else {
-    cipher_init_->cipher_meta_storage_.GetStableClientKeysFromServer(&client_public_keys);
-  }
-
-  size_t cur_exchange_clients_num = client_public_keys.size();
   std::string fl_id = get_exchange_keys_req->fl_id()->str();
 
-  if (cur_exchange_clients_num < cipher_init_->exchange_key_threshold) {
+  bool exchangeKeysOK = fl::server::DistributedCountService::GetInstance().CountReachThreshold("exchangeKeys");
+  if (!exchangeKeysOK) {
     MS_LOG(INFO) << "The server is not ready yet: cur_exchangekey_clients_num < exchange_key_threshold";
-    MS_LOG(INFO) << "cur_exchangekey_clients_num : " << cur_exchange_clients_num
-                 << ", exchange_key_threshold : " << cipher_init_->exchange_key_threshold;
     BuildGetKeysRsp(fbb, schema::ResponseCode_SucNotReady, cur_iterator, next_req_time, false);
     return false;
   }
 
-  if (client_public_keys.find(fl_id) == client_public_keys.end()) {
+  auto found = fl::cache::ClientInfos::GetInstance().HasClientKey(fl_id);
+  if (!found) {
     MS_LOG(INFO) << "Get keys: the fl_id: " << fl_id << "is not in exchange keys clients.";
     BuildGetKeysRsp(fbb, schema::ResponseCode_RequestError, cur_iterator, next_req_time, false);
     return false;
@@ -105,30 +98,11 @@ bool CipherKeys::ExchangeKeys(const size_t cur_iterator, const std::string &next
   }
 
   // step 1: get clientlist and client keys from memory server.
-  std::map<std::string, std::vector<std::vector<uint8_t>>> client_public_keys;
-  std::vector<std::string> client_list;
-  fl::cache::ClientInfos::GetInstance().GetAllExchangeKeyClients(&client_list);
-
   std::string encrypt_type = FLContext::instance()->encrypt_type();
-  if (encrypt_type == kPWEncryptType) {
-    cipher_init_->cipher_meta_storage_.GetClientKeysFromServer(&client_public_keys);
-  } else {
-    cipher_init_->cipher_meta_storage_.GetStableClientKeysFromServer(&client_public_keys);
-  }
 
   // step2: process new item data. and update new item data to memory server.
-  size_t cur_clients_num = client_list.size();
-  size_t cur_clients_has_keys_num = client_public_keys.size();
-  if (cur_clients_num != cur_clients_has_keys_num) {
-    std::string reason = "client num and keys num are not equal.";
-    MS_LOG(WARNING) << reason;
-    MS_LOG(WARNING) << "cur_clients_num is " << cur_clients_num << ". cur_clients_has_keys_num is "
-                    << cur_clients_has_keys_num;
-  }
-  MS_LOG(WARNING) << "exchange_key_threshold " << cipher_init_->exchange_key_threshold << ". cur_clients_num "
-                  << cur_clients_num << ". cur_clients_keys_num " << cur_clients_has_keys_num;
-
-  if (client_public_keys.find(fl_id) != client_public_keys.end()) {  // the client already exists, return false.
+  auto found = fl::cache::ClientInfos::GetInstance().HasClientKey(fl_id);
+  if (found) {  // the client already exists, return false.
     MS_LOG(ERROR) << "The server has received the request, please do not request again.";
     BuildExchangeKeysRsp(fbb, schema::ResponseCode_SUCCEED,
                          "The server has received the request, please do not request again.", next_req_time,
@@ -143,8 +117,7 @@ bool CipherKeys::ExchangeKeys(const size_t cur_iterator, const std::string &next
     retcode_key = cipher_init_->cipher_meta_storage_.UpdateStableClientKeyToServer(exchange_keys_req);
   }
 
-  status = fl::cache::ClientInfos::GetInstance().AddExchangeKeyClient(fl_id);
-  if (retcode_key && status.IsSuccess()) {
+  if (retcode_key) {
     MS_LOG(INFO) << "The client " << fl_id << " CipherMgr::ExchangeKeys Success";
     BuildExchangeKeysRsp(fbb, schema::ResponseCode_SUCCEED, "Success, but the server is not ready yet.", next_req_time,
                          cur_iterator);

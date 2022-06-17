@@ -118,13 +118,47 @@ bool ReconstructSecretsKernel::Launch(const uint8_t *req_data, size_t len,
     return true;
   }
 
-  response = cipher_reconstruct_.ReconstructSecrets(SizeToInt(iter_num), std::to_string(CURRENT_TIME_MILLI.count()),
-                                                    reconstruct_secret_req, fbb, update_model_clients);
+  auto cur_iterator = SizeToInt(iter_num);
+  auto next_req_time = std::to_string(CURRENT_TIME_MILLI.count());
+  response = cipher_reconstruct_.ReconstructSecrets(cur_iterator, next_req_time, reconstruct_secret_req, fbb,
+                                                    update_model_clients);
+
   if (response) {
     (void)DistributedCountService::GetInstance().Count(name_);
   }
   if (DistributedCountService::GetInstance().CountReachThreshold(name_)) {
     MS_LOG(INFO) << "Current amount for ReconstructSecretsKernel is enough.";
+    clock_t start_time = clock();
+    fl::ClientNoises clients_noises_pb;
+    auto ret = fl::cache::ClientInfos::GetInstance().GetClientNoises(&clients_noises_pb);
+    if (ret == fl::cache::kCacheNil) {
+      MS_LOG(INFO) << "Success, the secret will be reconstructed.";
+      if (cipher_reconstruct_.ReconstructSecretsGenNoise(update_model_clients)) {
+        cipher_reconstruct_.BuildReconstructSecretsRsp(
+          fbb, schema::ResponseCode_SUCCEED, "Success,the secret is reconstructing.", cur_iterator, next_req_time);
+        MS_LOG(INFO) << "CipherReconStruct::ReconstructSecrets" << fl_id << " Success, reconstruct ok.";
+      } else {
+        cipher_reconstruct_.BuildReconstructSecretsRsp(fbb, schema::ResponseCode_OutOfTime,
+                                                       "the secret restructs failed.", cur_iterator, next_req_time);
+        MS_LOG(ERROR) << "CipherReconStruct::ReconstructSecrets" << fl_id << " failed.";
+      }
+    } else if (ret.IsSuccess()) {
+      cipher_reconstruct_.BuildReconstructSecretsRsp(fbb, schema::ResponseCode_SUCCEED, "Clients' number is full.",
+                                                     cur_iterator, next_req_time);
+      MS_LOG(INFO) << "CipherReconStruct::ReconstructSecrets" << fl_id << " Success : no need reconstruct.";
+    } else {
+      cipher_reconstruct_.BuildReconstructSecretsRsp(
+        fbb, schema::ResponseCode_OutOfTime, "Get client noises from cache failed.", cur_iterator, next_req_time);
+      MS_LOG(ERROR) << "Get client noises from cache failed.";
+      return false;
+    }
+    clock_t end_time = clock();
+    double duration = static_cast<double>((end_time - start_time) * 1.0 / CLOCKS_PER_SEC);
+    MS_LOG(INFO) << "Reconstruct get + gennoise data time is : " << duration;
+  } else {
+    cipher_reconstruct_.BuildReconstructSecretsRsp(fbb, schema::ResponseCode_SUCCEED,
+                                                   "Success, but the server is not ready to reconstruct secret yet.",
+                                                   SizeToInt(iter_num), std::to_string(CURRENT_TIME_MILLI.count()));
   }
   SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
 
