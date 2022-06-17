@@ -36,7 +36,6 @@ sigVerifyResult ClientListKernel::VerifySignature(const schema::GetClientList *g
 
 bool ClientListKernel::DealClient(const size_t iter_num, const schema::GetClientList *get_clients_req,
                                   const std::shared_ptr<FBBuilder> &fbb) {
-  std::vector<std::string> client_list;
   std::vector<std::string> empty_client_list;
   std::string fl_id = get_clients_req->fl_id()->str();
 
@@ -47,22 +46,16 @@ bool ClientListKernel::DealClient(const size_t iter_num, const schema::GetClient
     return false;
   }
   uint64_t update_model_client_needed = LocalMetaStore::GetInstance().value<uint64_t>(kCtxUpdateModelThld);
-  auto ret = cache::ClientInfos::GetInstance().GetAllUpdateModelClients(&client_list);
-  if (!ret.IsSuccess()) {
-    MS_LOG(INFO) << "The server is not ready. get update model client list failed";
-    BuildClientListRsp(fbb, schema::ResponseCode_SucNotReady, "The server is not ready.", empty_client_list,
-                       std::to_string(CURRENT_TIME_MILLI.count()), iter_num);
-    return false;
-  }
-  if (client_list.size() < update_model_client_needed) {
+  bool updateModelOK = DistributedCountService::GetInstance().CountReachThreshold("updateModel");
+  if (!updateModelOK) {
     MS_LOG(INFO) << "The server is not ready. update_model_client_needed: " << update_model_client_needed;
-    MS_LOG(INFO) << "now update_model_client_num: " << client_list.size();
     BuildClientListRsp(fbb, schema::ResponseCode_SucNotReady, "The server is not ready.", empty_client_list,
                        std::to_string(CURRENT_TIME_MILLI.count()), iter_num);
     return false;
   }
 
-  if (find(client_list.begin(), client_list.end(), fl_id) == client_list.end()) {  // client not in update model clients
+  auto found = fl::cache::ClientInfos::GetInstance().HasUpdateModelClient(fl_id);
+  if (!found) {
     std::string reason = "fl_id: " + fl_id + " is not in the update_model_clients";
     MS_LOG(INFO) << reason;
     BuildClientListRsp(fbb, schema::ResponseCode_RequestError, reason, empty_client_list,
@@ -86,6 +79,14 @@ bool ClientListKernel::DealClient(const size_t iter_num, const schema::GetClient
     return false;
   }
   MS_LOG(INFO) << "update_model_client_needed: " << update_model_client_needed;
+  std::vector<std::string> client_list;
+  auto ret = cache::ClientInfos::GetInstance().GetAllUpdateModelClients(&client_list);
+  if (!ret.IsSuccess()) {
+    MS_LOG(INFO) << "The server is not ready. get update model client list failed";
+    BuildClientListRsp(fbb, schema::ResponseCode_SucNotReady, "The server is not ready.", empty_client_list,
+                       std::to_string(CURRENT_TIME_MILLI.count()), iter_num);
+    return false;
+  }
   BuildClientListRsp(fbb, schema::ResponseCode_SUCCEED, "send clients_list succeed!", client_list,
                      std::to_string(CURRENT_TIME_MILLI.count()), iter_num);
   return true;
@@ -147,7 +148,8 @@ bool ClientListKernel::Launch(const uint8_t *req_data, size_t len, const std::sh
     MS_LOG(ERROR) << "client list iteration number is invalid: server now iteration is " << iter_num
                   << ". client request iteration is " << iter_client;
     BuildClientListRsp(fbb, schema::ResponseCode_OutOfTime, "iter num is error.", client_list,
-                       std::to_string(CURRENT_TIME_MILLI.count()), iter_num);
+                       std::to_string(LocalMetaStore::GetInstance().value<uint64_t>(kCtxIterationNextRequestTimestamp)),
+                       iter_num);
     SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
     return true;
   }

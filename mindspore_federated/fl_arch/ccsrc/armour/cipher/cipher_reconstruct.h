@@ -53,6 +53,9 @@ class CipherReconStruct {
   void BuildReconstructSecretsRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
                                   const std::string &reason, const int iteration, const std::string &next_req_time);
 
+  // generate noise from shares.
+  bool ReconstructSecretsGenNoise(const std::vector<std::string> &client_list);
+
  private:
   CipherInit *cipher_init_;  // the parameter of the secure aggregation
   // get mask symbol by comparing str1 and str2.
@@ -69,8 +72,6 @@ class CipherReconStruct {
   // convert shares from receiving clients to sending clients.
   bool ConvertSharesToShares(const std::map<std::string, std::vector<clientshare_str>> &src,
                              std::map<std::string, std::vector<clientshare_str>> *des);
-  // generate noise from shares.
-  bool ReconstructSecretsGenNoise(const std::vector<std::string> &client_list);
   // get noise masks sum.
   bool GetNoiseMasksSum(std::vector<float> *result, const std::map<std::string, std::vector<float>> &client_noise);
 

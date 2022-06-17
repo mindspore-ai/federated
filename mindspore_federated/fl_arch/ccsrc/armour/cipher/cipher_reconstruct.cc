@@ -226,7 +226,6 @@ bool CipherReconStruct::ReconstructSecrets(const int cur_iterator, const std::st
                                            const std::shared_ptr<FBBuilder> &fbb,
                                            const std::vector<std::string> &client_list) {
   MS_LOG(INFO) << "CipherReconStruct::ReconstructSecrets START";
-  clock_t start_time = clock();
   bool inputs_check = CheckInputs(reconstruct_secret_req, fbb, cur_iterator, next_req_time);
   if (!inputs_check) return false;
 
@@ -240,14 +239,6 @@ bool CipherReconStruct::ReconstructSecrets(const int cur_iterator, const std::st
     return false;
   }
 
-  if (client_list.size() < cipher_init_->clients_threshold_for_reconstruct) {
-    MS_LOG(ERROR) << "illegal parameters. update model client_list size: " << client_list.size();
-    BuildReconstructSecretsRsp(
-      fbb, schema::ResponseCode_RequestError,
-      "illegal parameters: update model client_list size must larger than reconstruct_clients_num_need", cur_iterator,
-      next_req_time);
-    return false;
-  }
   auto found = fl::cache::ClientInfos::GetInstance().HasGetUpdateModelClient(fl_id);
   // client not in get client list.
   if (!found) {
@@ -267,10 +258,8 @@ bool CipherReconStruct::ReconstructSecrets(const int cur_iterator, const std::st
     return false;
   }
 
-  std::map<std::string, std::vector<clientshare_str>> reconstruct_shares;
-  cipher_init_->cipher_meta_storage_.GetClientReconstructSharesFromServer(&reconstruct_shares);
-  size_t count_client_num = reconstruct_shares.size();
-  if (reconstruct_shares.find(fl_id) != reconstruct_shares.end()) {
+  auto found_reconstruct = fl::cache::ClientInfos::GetInstance().HasClientRestructShare(fl_id);
+  if (found_reconstruct) {
     BuildReconstructSecretsRsp(fbb, schema::ResponseCode_SUCCEED, "Client has sended messages.", cur_iterator,
                                next_req_time);
     MS_LOG(INFO) << "Error, client " << fl_id << " has sended messages.";
@@ -278,51 +267,15 @@ bool CipherReconStruct::ReconstructSecrets(const int cur_iterator, const std::st
   }
 
   auto reconstruct_secret_shares = reconstruct_secret_req->reconstruct_secret_shares();
-  auto retcode_client = fl::cache::ClientInfos::GetInstance().AddReconstructClient(fl_id);
   bool retcode_share =
     cipher_init_->cipher_meta_storage_.UpdateClientReconstructShareToServer(fl_id, reconstruct_secret_shares);
-  if (!(retcode_client.IsSuccess() && retcode_share)) {
+  if (!retcode_share) {
     BuildReconstructSecretsRsp(fbb, schema::ResponseCode_OutOfTime, "reconstruct update shares or client failed.",
                                cur_iterator, next_req_time);
     MS_LOG(ERROR) << "reconstruct update shares or client failed.";
     return false;
   }
 
-  count_client_num = count_client_num + 1;
-  if (count_client_num < cipher_init_->clients_threshold_for_reconstruct) {
-    BuildReconstructSecretsRsp(fbb, schema::ResponseCode_SUCCEED,
-                               "Success, but the server is not ready to reconstruct secret yet.", cur_iterator,
-                               next_req_time);
-    MS_LOG(INFO) << "Get reconstruct shares from " << fl_id << " Success, but count " << count_client_num
-                 << " is not enough.";
-    return true;
-  }
-  fl::ClientNoises clients_noises_pb;
-  auto ret = fl::cache::ClientInfos::GetInstance().GetClientNoises(&clients_noises_pb);
-  if (ret == fl::cache::kCacheNil) {
-    MS_LOG(INFO) << "Success, the secret will be reconstructed.";
-    if (ReconstructSecretsGenNoise(client_list)) {
-      BuildReconstructSecretsRsp(fbb, schema::ResponseCode_SUCCEED, "Success,the secret is reconstructing.",
-                                 cur_iterator, next_req_time);
-      MS_LOG(INFO) << "CipherReconStruct::ReconstructSecrets" << fl_id << " Success, reconstruct ok.";
-    } else {
-      BuildReconstructSecretsRsp(fbb, schema::ResponseCode_OutOfTime, "the secret restructs failed.", cur_iterator,
-                                 next_req_time);
-      MS_LOG(ERROR) << "CipherReconStruct::ReconstructSecrets" << fl_id << " failed.";
-    }
-  } else if (ret.IsSuccess()) {
-    BuildReconstructSecretsRsp(fbb, schema::ResponseCode_SUCCEED, "Clients' number is full.", cur_iterator,
-                               next_req_time);
-    MS_LOG(INFO) << "CipherReconStruct::ReconstructSecrets" << fl_id << " Success : no need reconstruct.";
-  } else {
-    BuildReconstructSecretsRsp(fbb, schema::ResponseCode_OutOfTime, "Get client noises from cache failed.",
-                               cur_iterator, next_req_time);
-    MS_LOG(ERROR) << "Get client noises from cache failed.";
-    return false;
-  }
-  clock_t end_time = clock();
-  double duration = static_cast<double>((end_time - start_time) * 1.0 / CLOCKS_PER_SEC);
-  MS_LOG(INFO) << "Reconstruct get + gennoise data time is : " << duration;
   return true;
 }
 

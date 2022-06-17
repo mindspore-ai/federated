@@ -18,6 +18,7 @@
 #include "common/common.h"
 #include "armour/cipher/cipher_meta_storage.h"
 #include "distributed_cache/client_infos.h"
+#include "server/distributed_count_service.h"
 
 namespace mindspore {
 namespace fl {
@@ -55,19 +56,13 @@ bool CipherShares::ShareSecrets(const int cur_iterator, const schema::RequestSha
                          iteration);
     return false;
   }
-  fl::SharesPb shares_pb;
-  auto status = fl::cache::ClientInfos::GetInstance().GetClientEncryptedShare(fl_id_src, &shares_pb);
-  if (status.IsSuccess()) {  // the client is already exists
+  auto found_update = fl::cache::ClientInfos::GetInstance().HasClientEncryptedShare(fl_id_src);
+  if (found_update) {  // the client is already exists
     BuildShareSecretsRsp(share_secrets_resp_builder, schema::ResponseCode_SUCCEED,
                          ("client sharesecret already exists."), next_req_time, iteration);
     return false;
   }
-  if (status != fl::cache::kCacheNil) {
-    BuildShareSecretsRsp(share_secrets_resp_builder, schema::ResponseCode_OutOfTime,
-                         "Get encrypted info from cache failed", next_req_time, iteration);
-    MS_LOG(ERROR) << "CipherShares::Get encrypted info from cache failed";
-    return false;
-  }
+
   // update new item to memory server.
   const flatbuffers::Vector<flatbuffers::Offset<schema::ClientShare>> *encrypted_shares =
     (share_secrets_req->encrypted_shares());
@@ -105,19 +100,18 @@ bool CipherShares::GetSecrets(const schema::GetShareSecrets *get_secrets_req, co
     return false;
   }
   // step 1: get client list and client shares list from memory server.
-  std::map<std::string, std::vector<clientshare_str>> encrypted_shares_all;
-  cipher_init_->cipher_meta_storage_.GetClientEncryptedSharesFromServer(&encrypted_shares_all);
-  size_t encrypted_shares_num = encrypted_shares_all.size();
-  if (cipher_init_->share_secrets_threshold > encrypted_shares_num) {  // the client num is not enough, return false.
+  bool shareSecretsOK = fl::server::DistributedCountService::GetInstance().CountReachThreshold("shareSecrets");
+  if (!shareSecretsOK) {
     BuildGetSecretsRsp(fbb, schema::ResponseCode_SucNotReady, IntToSize(iteration), next_req_time, nullptr);
     MS_LOG(INFO) << "GetSecrets: the encrypted shares num is not enough: share_secrets_threshold: "
-                 << cipher_init_->share_secrets_threshold << "encrypted_shares_num: " << encrypted_shares_num;
+                 << cipher_init_->share_secrets_threshold;
     return false;
   }
 
   std::string fl_id = get_secrets_req->fl_id()->str();
   // the client is not in share secrets client list.
-  if (encrypted_shares_all.find(fl_id) == encrypted_shares_all.end()) {
+  auto found = fl::cache::ClientInfos::GetInstance().HasClientEncryptedShare(fl_id);
+  if (!found) {
     BuildGetSecretsRsp(fbb, schema::ResponseCode_RequestError, IntToSize(iteration), next_req_time, nullptr);
     MS_LOG(ERROR) << "GetSecrets: client is not in share secrets client list.";
     return false;
@@ -131,6 +125,8 @@ bool CipherShares::GetSecrets(const schema::GetShareSecrets *get_secrets_req, co
   }
 
   // get the result client shares.
+  std::map<std::string, std::vector<clientshare_str>> encrypted_shares_all;
+  cipher_init_->cipher_meta_storage_.GetClientEncryptedSharesFromServer(&encrypted_shares_all);
   std::vector<clientshare_str> encrypted_shares_add;
   for (auto encrypted_shares_iterator = encrypted_shares_all.begin();
        encrypted_shares_iterator != encrypted_shares_all.end(); ++encrypted_shares_iterator) {
