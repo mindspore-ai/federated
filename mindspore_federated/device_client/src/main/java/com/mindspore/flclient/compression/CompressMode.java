@@ -19,8 +19,8 @@ package com.mindspore.flclient.compression;
 import java.util.HashMap;
 import java.util.Map;
 
-import static mindspore.schema.CompressType.NO_COMPRESS;
-import static mindspore.schema.CompressType.QUANT;
+import static mindspore.fl.schema.CompressType.NO_COMPRESS;
+import static mindspore.fl.schema.CompressType.QUANT;
 
 /**
  * The compress mod.

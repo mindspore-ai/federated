@@ -18,13 +18,12 @@ package com.mindspore.flclient;
 
 import com.google.flatbuffers.FlatBufferBuilder;
 
-import mindspore.schema.FeatureMap;
+import com.mindspore.flclient.common.FLLoggerGenerater;
+import com.mindspore.flclient.model.Client;
+import mindspore.fl.schema.FeatureMap;
 
 import java.security.SecureRandom;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.List;
-import java.util.HashMap;
+import java.util.*;
 import java.util.logging.Logger;
 
 /**
@@ -33,7 +32,7 @@ import java.util.logging.Logger;
  * @since 2021-06-30
  */
 public class SecureProtocol {
-    private static final Logger LOGGER = Logger.getLogger(SecureProtocol.class.toString());
+    private static final Logger LOGGER = FLLoggerGenerater.getModelLogger(SecureProtocol.class.toString());
     private static double deltaError = 1e-6d;
     private static Map<String, float[]> modelMap;
 
@@ -83,7 +82,7 @@ public class SecureProtocol {
      */
     public void setPWParameter(int iter, int minSecretNum, byte[] prime, int featureSize) {
         if (prime == null || prime.length == 0) {
-            LOGGER.severe(Common.addTag("[PairWiseMask] the input argument <prime> is null, please check!"));
+            LOGGER.severe("[PairWiseMask] the input argument <prime> is null, please check!");
             throw new IllegalArgumentException();
         }
         this.iteration = iter;
@@ -97,32 +96,33 @@ public class SecureProtocol {
      * @param diffEps   privacy budget eps of DP mechanism.
      * @param diffDelta privacy budget delta of DP mechanism.
      * @param diffNorm  normClip factor of DP mechanism.
-     * @param map       model weights.
      * @return the status code corresponding to the response message.
      */
-    public FLClientStatus setDPParameter(int iter, double diffEps, double diffDelta, double diffNorm, Map<String,
-            float[]> map) {
+    public FLClientStatus setDPParameter(int iter, double diffEps, double diffDelta, double diffNorm) {
         this.iteration = iter;
         this.dpEps = diffEps;
         this.dpDelta = diffDelta;
         this.dpNormClip = diffNorm;
-        this.modelMap = map;
         return FLClientStatus.SUCCESS;
     }
 
     /**
      * Setting parameters for dimension select.
      *
-     * @param map model weights.
-     * @return the status code corresponding to the response message.
+     * @param signK
+     * @param signEps
+     * @param signThrRatio
+     * @param signGlobalLr
+     * @param signDimOut
+     * @return
      */
-    public FLClientStatus setDSParameter(float signK, float signEps, float signThrRatio, float signGlobalLr, int signDimOut, Map<String, float[]> map) {
+    public FLClientStatus setDSParameter(float signK, float signEps, float signThrRatio,
+                                         float signGlobalLr, int signDimOut) {
         this.signK = signK;
         this.signEps = signEps;
         this.signThrRatio = signThrRatio;
         this.signGlobalLr = signGlobalLr;
         this.signDimOut = signDimOut;
-        this.modelMap = map;
         return FLClientStatus.SUCCESS;
     }
 
@@ -153,6 +153,16 @@ public class SecureProtocol {
         return cipherClient.getNextRequestTime();
     }
 
+
+    /**
+     * Get the DpNormClip
+     *
+     * @return dpNormClip
+     */
+    public double getDpNormClip() {
+        return dpNormClip;
+    }
+
     /**
      * Generate pairwise mask and individual mask.
      *
@@ -163,7 +173,7 @@ public class SecureProtocol {
                 localFLParameter.getFlID()));
         // round 0
         if (localFLParameter.isStopJobFlag()) {
-            LOGGER.info(Common.addTag("the stopJObFlag is set to true, the job will be stop"));
+            LOGGER.info("the stopJObFlag is set to true, the job will be stop");
             return status;
         }
         status = cipherClient.exchangeKeys();
@@ -175,7 +185,7 @@ public class SecureProtocol {
         }
         // round 1
         if (localFLParameter.isStopJobFlag()) {
-            LOGGER.info(Common.addTag("the stopJObFlag is set to true, the job will be stop"));
+            LOGGER.info("the stopJObFlag is set to true, the job will be stop");
             return status;
         }
         status = cipherClient.shareSecrets();
@@ -187,13 +197,13 @@ public class SecureProtocol {
         }
         // round2
         if (localFLParameter.isStopJobFlag()) {
-            LOGGER.info(Common.addTag("the stopJObFlag is set to true, the job will be stop"));
+            LOGGER.info("the stopJObFlag is set to true, the job will be stop");
             return status;
         }
         featureMask = cipherClient.doubleMaskingWeight();
         if (featureMask == null || featureMask.length <= 0) {
-            LOGGER.severe(Common.addTag("[Encrypt] the returned featureMask from cipherClient.doubleMaskingWeight" +
-                    " is null, please check!"));
+            LOGGER.severe("[Encrypt] the returned featureMask from cipherClient.doubleMaskingWeight" +
+                    " is null, please check!");
             return FLClientStatus.FAILED;
         }
         retCode = cipherClient.getRetCode();
@@ -202,41 +212,33 @@ public class SecureProtocol {
     }
 
     /**
-     * Add the pairwise mask and individual mask to model weights.
+     * Add the pairwise mask and individual mask to one weight.
      *
-     * @param builder       the FlatBufferBuilder object used for serialization model weights.
-     * @param trainDataSize trainDataSize tne size of train data set.
-     * @return the serialized model weights after adding masks.
+     * @param trainDataSize the record num of train data
+     * @param feature       the feature that need to do pwMask
+     * @param maskIndex     the start pos of featureMask
+     * @return encrypt result
      */
-    public Map<String, List<Float>> pwMaskModel(FlatBufferBuilder builder, int trainDataSize, Map<String,
-            float[]> trainedMap) {
+    public float[] pwMaskWeight(int trainDataSize, float[] feature, int maskIndex) {
         Map<String, List<Float>> featureMaps = new HashMap<>();
         if (featureMask == null || featureMask.length == 0) {
-            LOGGER.severe("[Encrypt] feature mask is null, please check");
-            return new HashMap<>();
+            throw new RuntimeException("[pwMaskWeight] feature mask is null, please check");
         }
-        LOGGER.info(String.format("[Encrypt] feature mask size: %s", featureMask.length));
-        int featureSize = updateFeatureName.size();
-        int maskIndex = 0;
-        for (int i = 0; i < featureSize; i++) {
-            String key = updateFeatureName.get(i);
-            float[] data = trainedMap.get(key);
-            List<Float> featureMap = new ArrayList<>();
-            LOGGER.info(String.format("[Encrypt] feature name: %s feature size: %s", key, data.length));
-            for (int j = 0; j < data.length; j++) {
-                float rawData = data[j];
-                if (maskIndex >= featureMask.length) {
-                    LOGGER.severe("[Encrypt] the maskIndex is out of range for array featureMask, please check");
-                    return new HashMap<>();
-                }
-                float maskData = rawData * trainDataSize + featureMask[maskIndex];
-                maskIndex += 1;
-                featureMap.add(maskData);
-            }
-            featureMaps.put(key, featureMap);
+
+        if (featureMask.length < maskIndex + feature.length) {
+            throw new RuntimeException("[pwMaskWeight] the data length is out of range for array featureMask, " +
+                    "featureMask length:" + featureMask.length + " data length:" + feature.length);
         }
-        return featureMaps;
+
+        LOGGER.info(String.format("[pwMaskWeight] feature mask size: %s", featureMask.length));
+        float[] maskedData = new float[feature.length];
+        LOGGER.info(String.format("[pwMaskWeight] feature  size: %s", feature.length));
+        for (int j = 0; j < feature.length; j++) {
+            maskedData[j] = feature[j] * trainDataSize + featureMask[maskIndex + j];
+        }
+        return maskedData;
     }
+
 
     /**
      * Reconstruct the secrets used for unmasking model weights.
@@ -342,102 +344,19 @@ public class SecureProtocol {
         return sMid;
     }
 
-    private static double calculateSigma(double clipNorm, double eps, double targetDelta) {
-        double deltaZero = calculateBPositive(eps, 0);
+    public double calculateSigma() {
+        double deltaZero = calculateBPositive(dpEps, 0);
         double alpha = 1d;
-        if (targetDelta > deltaZero) {
-            double sPositive = calculateSPositive(eps, targetDelta, 0, 1);
+        if (dpDelta > deltaZero) {
+            double sPositive = calculateSPositive(dpEps, dpDelta, 0, 1);
             alpha = Math.sqrt(1.0 + sPositive / 2.0) - Math.sqrt(sPositive / 2.0);
-        } else if (targetDelta < deltaZero) {
-            double sNegative = calculateSNegative(eps, targetDelta, 0, 1);
+        } else if (dpDelta < deltaZero) {
+            double sNegative = calculateSNegative(dpEps, dpDelta, 0, 1);
             alpha = Math.sqrt(1.0 + sNegative / 2.0) + Math.sqrt(sNegative / 2.0);
         } else {
-            LOGGER.info(Common.addTag("[Encrypt] targetDelta = deltaZero"));
+            LOGGER.info("[Encrypt] targetDelta = deltaZero");
         }
-        return alpha * clipNorm / Math.sqrt(2.0 * eps);
-    }
-
-    /**
-     * Add differential privacy mask to model weights.
-     *
-     * @param builder       the FlatBufferBuilder object used for serialization model weights.
-     * @param trainDataSize tne size of train data set.
-     * @return the serialized model weights after adding masks.
-     */
-    public Map<String, List<Float>> dpMaskModel(FlatBufferBuilder builder, int trainDataSize,
-                                                Map<String, float[]> trainedMap) {
-        Map<String, List<Float>> featureMaps = new HashMap<>();
-        // get feature map
-        Map<String, float[]> mapBeforeTrain = modelMap;
-        int featureSize = updateFeatureName.size();
-        // calculate sigma
-        double gaussianSigma = calculateSigma(dpNormClip, dpEps, dpDelta);
-        LOGGER.info(Common.addTag("[Encrypt] =============Noise sigma of DP is: " + gaussianSigma + "============="));
-
-        // calculate l2-norm of all layers' update array
-        double updateL2Norm = 0d;
-        for (int i = 0; i < featureSize; i++) {
-            String key = updateFeatureName.get(i);
-            float[] data = trainedMap.get(key);
-            float[] dataBeforeTrain = mapBeforeTrain.get(key);
-            for (int j = 0; j < data.length; j++) {
-                float rawData = data[j];
-                if (j >= dataBeforeTrain.length) {
-                    LOGGER.severe("[Encrypt] the index j is out of range for array dataBeforeTrain, please check");
-                    return new HashMap<>();
-                }
-                float rawDataBeforeTrain = dataBeforeTrain[j];
-                float updateData = rawData - rawDataBeforeTrain;
-                updateL2Norm += updateData * updateData;
-            }
-        }
-        updateL2Norm = Math.sqrt(updateL2Norm);
-        if (updateL2Norm == 0) {
-            LOGGER.severe(Common.addTag("[Encrypt] updateL2Norm is 0, please check"));
-            return new HashMap<>();
-        }
-        double clipFactor = Math.min(1.0, dpNormClip / updateL2Norm);
-
-        // clip and add noise
-        for (int i = 0; i < featureSize; i++) {
-            String key = updateFeatureName.get(i);
-            if (!trainedMap.containsKey(key)) {
-                LOGGER.severe("[Encrypt] the key: " + key + " is not in map, please check!");
-                return new HashMap<>();
-            }
-            float[] data = trainedMap.get(key);
-            float[] data2 = new float[data.length];
-            List<Float> featureMap = new ArrayList<>();
-            if (!mapBeforeTrain.containsKey(key)) {
-                LOGGER.severe("[Encrypt] the key: " + key + " is not in mapBeforeTrain, please check!");
-                return new HashMap<>();
-            }
-            float[] dataBeforeTrain = mapBeforeTrain.get(key);
-
-            // prepare gaussian noise
-            SecureRandom secureRandom = Common.getSecureRandom();
-            for (int j = 0; j < data.length; j++) {
-                float rawData = data[j];
-                if (j >= dataBeforeTrain.length) {
-                    LOGGER.severe("[Encrypt] the index j is out of range for array dataBeforeTrain, please check");
-                    return new HashMap<>();
-                }
-                float rawDataBeforeTrain = dataBeforeTrain[j];
-                float updateData = rawData - rawDataBeforeTrain;
-
-                // clip
-                updateData *= clipFactor;
-
-                // add noise
-                double gaussianNoise = secureRandom.nextGaussian() * gaussianSigma;
-                updateData += gaussianNoise;
-                data2[j] = rawDataBeforeTrain + updateData;
-                data2[j] = data2[j] * trainDataSize;
-                featureMap.add(data2[j]);
-            }
-            featureMaps.put(key, featureMap);
-        }
-        return featureMaps;
+        return alpha * dpNormClip / Math.sqrt(2.0 * dpEps);
     }
 
     /**
@@ -504,7 +423,7 @@ public class SecureProtocol {
             pmfSum += pmf.get(i);
         }
         if (pmfSum == 0) {
-            LOGGER.severe(Common.addTag("[SignDS] probability mass function is 0, please check"));
+            LOGGER.severe("[SignDS] probability mass function is 0, please check");
             return new ArrayList<>();
         }
         for (int i = 0; i < pmf.size(); i++) {
@@ -619,28 +538,26 @@ public class SecureProtocol {
      *
      * @param secureRandom cryptographically strong random number generator.
      * @param inputList    select index from inputList.
+     * @param selectNums   the number of select indexes.
      * @param outputList   put random index into outputList.
-     * @param num          the number of select indexes.
+     * @param outStartPos  the start pos of outputList
      */
-    private static void randomSelect(SecureRandom secureRandom, List<Integer> inputList, List<Integer> outputList, int num) {
-        if (num <= 0) {
-            LOGGER.severe(Common.addTag("[SignDS] The number to be selected is set incorrectly!"));
+    private static void randomSelect(SecureRandom secureRandom, int[] inputList, int selectNums,
+                                     int[] outputList, int outStartPos) {
+        if (selectNums <= 0) {
+            LOGGER.severe("[SignDS] The number to be selected is set incorrectly!");
             return;
         }
-        if (inputList.isEmpty()) {
-            LOGGER.severe(Common.addTag("[SignDS] The input List is empty!"));
+        if (inputList.length < selectNums) {
+            LOGGER.severe("[SignDS] The size of inputList is small than num!");
             return;
         }
-        if (inputList.size() < num) {
-            LOGGER.severe(Common.addTag("[SignDS] The size of inputList is small than num!"));
-            return;
-        }
-        for (int i = inputList.size(); i > inputList.size() - num; i--) {
+        for (int i = inputList.length; i > inputList.length - selectNums; i--) {
             int randomIndex = secureRandom.nextInt(i);
-            int randomSelectTopkIndex = inputList.get(randomIndex);
-            inputList.set(randomIndex, inputList.get(i - 1));
-            inputList.set(i - 1, randomSelectTopkIndex);
-            outputList.add(randomSelectTopkIndex);
+            int randomSelectTopkIndex = inputList[randomIndex];
+            inputList[randomIndex] = inputList[i - 1];
+            inputList[i - 1] = randomSelectTopkIndex;
+            outputList[outStartPos + inputList.length - i] = randomSelectTopkIndex;
         }
     }
 
@@ -651,24 +568,14 @@ public class SecureProtocol {
      * @param sign       random sign value.
      * @return index list.
      */
-    public int[] signDSModel(Map<String, float[]> trainedMap, boolean sign) {
-        Map<String, float[]> mapBeforeTrain = modelMap;
+    public int[] signDSModel(Client client, boolean sign) {
         int layerNum = updateFeatureName.size();
-        SecureRandom secureRandom = Common.getSecureRandom();
-        List<Integer> nonTopkKeyList = new ArrayList<>();
-        List<Integer> topkKeyList = new ArrayList<>();
-        Map<Integer, Float> allUpdateMap = new HashMap<>();
-        int index = 0;
+        int inputDim = 0;
         for (int i = 0; i < layerNum; i++) {
             String key = updateFeatureName.get(i);
-            float[] dataAfterTrain = trainedMap.get(key);
-            float[] dataBeforeTrain = mapBeforeTrain.get(key);
-            for (int j = 0; j < dataAfterTrain.length; j++) {
-                float updateData = dataAfterTrain[j] - dataBeforeTrain[j];
-                allUpdateMap.put(index++, updateData);
-            }
+            float[] dataBeforeTrain = client.getPreFeature(key);
+            inputDim += dataBeforeTrain.length;
         }
-        int inputDim = allUpdateMap.size();
         int topkDim = (int) (signK * inputDim);
         if (signDimOut == 0) {
             signDimOut = findOptOutputDim(signThrRatio, topkDim, inputDim, signEps);
@@ -684,7 +591,7 @@ public class SecureProtocol {
         }
         double denominator = combLessInter + Math.exp(signEps) * combMoreInter;
         if (denominator == 0) {
-            LOGGER.severe(Common.addTag("[SignDS] denominator is 0, please check"));
+            LOGGER.severe("[SignDS] denominator is 0, please check");
             return new int[0];
         }
         int numInter = countInters(thrDim, denominator, topkDim, inputDim, signDimOut, signEps);
@@ -693,23 +600,45 @@ public class SecureProtocol {
             LOGGER.severe("[SignDS] topkDim or signDimOut is ERROR! please check");
             return new int[0];
         }
-        List<Map.Entry<Integer, Float>> allUpdateList = new ArrayList<>(allUpdateMap.entrySet());
+
+        float[] originData = new float[inputDim];
+        Integer[] originIndex = new Integer[inputDim];
+        int index = 0;
+        for (int i = 0; i < layerNum; i++) {
+            String key = updateFeatureName.get(i);
+            float[] dataAfterTrain = client.getFeature(key);
+            float[] dataBeforeTrain = client.getPreFeature(key);
+            for (int j = 0; j < dataAfterTrain.length; j++) {
+                float updateData = dataAfterTrain[j] - dataBeforeTrain[j];
+                originData[index] = updateData;
+                originIndex[index] = index;
+                index++;
+            }
+        }
+
         if (sign) {
-            allUpdateList.sort((o1, o2) -> Float.compare(o2.getValue(), o1.getValue()));
+            Arrays.sort(originIndex, (l, r) -> {
+                return Float.compare(originData[r], originData[l]);
+            });
         } else {
-            allUpdateList.sort((o1, o2) -> Float.compare(o1.getValue(), o2.getValue()));
+            Arrays.sort(originIndex, (l, r) -> {
+                return Float.compare(originData[l], originData[r]);
+            });
         }
+        int[] nonTopkKeyList = new int[inputDim - topkDim];
+        int[] topkKeyList = new int[topkDim];
         for (int i = 0; i < topkDim; i++) {
-            topkKeyList.add(allUpdateList.get(i).getKey());
+            topkKeyList[i] = originIndex[i];
         }
-        for (int i = topkDim; i < allUpdateList.size(); i++) {
-            nonTopkKeyList.add(allUpdateList.get(i).getKey());
+        for (int i = topkDim; i < inputDim; i++) {
+            nonTopkKeyList[i - topkDim] = originIndex[i];
         }
-        List<Integer> outputDimensionIndexList = new ArrayList<>();
-        randomSelect(secureRandom, topkKeyList, outputDimensionIndexList, numInter);
-        randomSelect(secureRandom, nonTopkKeyList, outputDimensionIndexList, numOuter);
-        outputDimensionIndexList.sort(Integer::compare);
-        LOGGER.info(Common.addTag("[SignDS] outputDimension size is " + outputDimensionIndexList.size()));
-        return outputDimensionIndexList.stream().mapToInt(i -> i).toArray();
+        int[] outputDimensionIndexList = new int[numInter + numOuter];
+        SecureRandom secureRandom = Common.getSecureRandom();
+        randomSelect(secureRandom, topkKeyList, numInter, outputDimensionIndexList, 0);
+        randomSelect(secureRandom, nonTopkKeyList, numOuter, outputDimensionIndexList, numInter);
+        Arrays.sort(outputDimensionIndexList);
+        LOGGER.info("[SignDS] outputDimension size is " + outputDimensionIndexList.length);
+        return outputDimensionIndexList;
     }
 }

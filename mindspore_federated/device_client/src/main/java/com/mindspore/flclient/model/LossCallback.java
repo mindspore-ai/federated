@@ -16,10 +16,12 @@
 
 package com.mindspore.flclient.model;
 
+import com.mindspore.Model;
 import com.mindspore.flclient.Common;
-import com.mindspore.lite.LiteSession;
-import com.mindspore.lite.MSTensor;
+import com.mindspore.flclient.common.FLLoggerGenerater;
+import com.mindspore.MSTensor;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.logging.Logger;
 
@@ -29,7 +31,7 @@ import java.util.logging.Logger;
  * @since v1.0
  */
 public class LossCallback extends Callback {
-    private static final Logger logger = Logger.getLogger(LossCallback.class.toString());
+    private static final Logger logger = FLLoggerGenerater.getModelLogger(LossCallback.class.toString());
 
     private float lossSum = 0.0f;
 
@@ -38,8 +40,8 @@ public class LossCallback extends Callback {
     /**
      * Defining a constructor of loss callback.
      */
-    public LossCallback(LiteSession session) {
-        super(session);
+    public LossCallback(com.mindspore.Model model) {
+        super(model);
     }
 
     @Override
@@ -49,17 +51,18 @@ public class LossCallback extends Callback {
 
     @Override
     public Status stepEnd() {
-        Optional<MSTensor> tensor = searchOutputsForSize(1);
-        if (!tensor.isPresent()) {
-            logger.severe(Common.addTag("cannot find loss tensor"));
+        Map<String, float[]> outputs = getOutputsBySize(1);
+        if (outputs.isEmpty()) {
+            logger.severe("cannot find loss tensor");
             return Status.NULLPTR;
         }
-        float loss = tensor.get().getFloatData()[0];
-        if (Float.isNaN(loss)) {
-            logger.severe(Common.addTag("loss is nan"));
+        Map.Entry<String, float[]> first = outputs.entrySet().iterator().next();
+        if (first.getValue().length < 1 || Float.isNaN(first.getValue()[0])) {
+            logger.severe("loss is nan");
             return Status.FAILED;
         }
-        logger.info(Common.addTag("batch:" + steps + ",loss:" + loss));
+        float loss = first.getValue()[0];
+        logger.info("batch:" + steps + ",loss:" + loss);
         lossSum += loss;
         steps++;
         return Status.SUCCESS;
@@ -72,7 +75,7 @@ public class LossCallback extends Callback {
 
     @Override
     public Status epochEnd() {
-        logger.info(Common.addTag("----------epoch:" + epochs + ",average loss:" + lossSum / steps + "----------"));
+        logger.info("----------epoch:" + epochs + ",average loss:" + lossSum / steps + "----------");
         setUploadLoss(lossSum / steps);
         steps = 0;
         epochs++;
