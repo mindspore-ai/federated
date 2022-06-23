@@ -46,8 +46,8 @@ dependencies {
     // https://mvnrepository.com/artifact/com.google.flatbuffers/flatbuffers-java
     compile('com.google.flatbuffers:flatbuffers-java:2.0.0')
     compile('org.bouncycastle:bcprov-jdk15on:1.68')
-    compile project(':common')
-    compile project(':linux_x86')
+//    compile fileTree(dir:'libs', include:['*.jar'])
+    compile files('libs/mindspore-lite-java.jar')
 
     // Use JUnit test framework
     // Using compile to replace Implementation, because we need resolve the path.
@@ -58,8 +58,10 @@ dependencies {
     testCompile('com.alibaba:fastjson:1.2.58')
     testCompile('commons-io:commons-io:2.0.1')
     // the module jar for test, need change to your local path while UTTest
-    testCompile(files('ut_data/test_data/jar/quick_start_flclient.jar'))
+    testCompile(files('/ut_data/test_data/jar/quick_start_flclient.jar'))
+    testCompile(files('/ut_data/test_data/jar/flclient_models.jar'))
 }
+
 
 test {
     // need add the frame lib path to LD_LIBRARY_PATH
@@ -67,9 +69,11 @@ test {
     environment "LD_LIBRARY_PATH", "../linux_x86/libs/"
     // need set MS_FL_UT_BASE_PATH the path of ut_data
     // now ut data on the private repository https://gitee.com/zhangzhaoju/mindspore_fl_test_data
-    environment "MS_FL_UT_BASE_PATH", "/home/zhangzhaoju/ms_dev/mindspore_fl_test_data/ut_data"
+    environment "MS_FL_UT_BASE_PATH", "/ut_data"
+    // set MS_CATCH_MSG we can using real server to catch msg
+    // environment "MS_CATCH_MSG", "True"
     jvmArgs "-javaagent:${project.configurations.testCompile.find { it.name.startsWith("jmockit") }}"
-    reports {junitXml.outputLocation.set(layout.buildDirectory.dir("ut_test_result"))}
+    reports { junitXml.outputLocation.set(layout.buildDirectory.dir("ut_test_result")) }
 }
 
 def getFlatVersion(path) {
@@ -86,28 +90,30 @@ def getFlatVersion(path) {
 import io.netifi.flatbuffers.plugin.tasks.FlatBuffers
 
 flatbuffers {
-    String msLib = System.getenv("MSLIBS_CACHE_PATH").toString()
-    FileTree msLibTree = fileTree(dir: msLib, include: ["flatbuffers_*/bin/flatc"])
-    String msLibPath = ''
-    String libPath = ''
-    msLibTree.find { File file ->
-        libPath = file.toString()
-        String version = getFlatVersion(libPath)
+    String flatExePath = System.getenv("FLAT_EXE_PATH").toString()
+    println('FLAT_EXE_PATH is : ' + flatExePath)
+    if (file(flatExePath).exists()) {
+        String version = getFlatVersion(flatExePath)
+        println('server flatc version: ' + version)
         if ('2.0.0' == version) {
-            msLibPath = libPath
-            return true
-        }
-    }
-    if (file('../../../build/_deps/flatbuffers-src/_build/flatc').exists()) {
-        String version = getFlatVersion('../../../build/_deps/flatbuffers-src/_build/flatc')
-        println('version: ' + version)
-        if ('2.0.0' == version) {
-            flatcPath = '../../../build/_deps/flatbuffers-src/_build/flatc'
+            flatcPath = flatExePath
+            return
         } else {
-            println('the version of build flatc is not valid, will find the other flatc')
+            println('the version of " + flatExePath " is not valid, try to find flac from server deps')
         }
-    } else if (msLibPath != '' && file(msLibPath).exists()) {
-        flatcPath = msLibPath
+    } else {
+        println('no env FLAT_EXE_PATH setted, try to find flac from server deps')
+    }
+
+    String serFlatPath = projectDir.path + "/../../build/mindspore_federated/_deps/flatbuffers-src/_build/flatc"
+    if (file(serFlatPath).exists()) {
+        String version = getFlatVersion(serFlatPath)
+        println('server flatc version: ' + version)
+        if ('2.0.0' == version) {
+            flatcPath = serFlatPath
+        } else {
+            println('the version of build flatc is not valid, find flatc failed..')
+        }
     } else {
         println("the needed flatc of version 2.0.0 is not exist, please check")
     }
@@ -115,37 +121,33 @@ flatbuffers {
 }
 
 task createFlatBuffers(type: FlatBuffers) {
-    inputDir = file("../../../../schema")
+    inputDir = file("../schema")
     outputDir = file("src/main/java/")
     language = 'java'
     extraArgs = "--gen-mutable"
 }
 
-
 task clearJar(type: Delete) {
     delete 'build/libs/jarAAR/mindspore-lite-java-flclient.jar'
     delete 'build/libs/jarX86/mindspore-lite-java-flclient.jar'
+    delete 'build/libs/mindspore-lite-java-flclient.jar'
 }
 
 archivesBaseName = 'mindspore-lite-java-flclient'
 
-task flReleaseJarAAR(type: Jar, dependsOn: ['compileJava', 'createFlatBuffers']) {
+task flReleaseJarAAR(type: Jar, dependsOn: ['compileJava']) {
     manifest {
         attributes "Main-Class": "com.mindspore.flclient.SyncFLJob"
     }
     from('build/classes/java/main')
-//    from(zipTree(project.configurations.testCompile.find { it.name.startsWith("bcprov-jdk15on") }))
-//    from(zipTree(project.configurations.testCompile.find { it.name.startsWith("flatbuffers-java") }))
     destinationDirectory = file('build/libs/jarAAR')
 }
 
-task packFLJarX86(type: Jar, dependsOn: ['compileJava', 'createFlatBuffers']) {
+task packFLJarX86(type: Jar, dependsOn: ['compileJava']) {
     manifest {
         attributes "Main-Class": "com.mindspore.flclient.SyncFLJob"
     }
     from('build/classes/java/main')
-    from('../common/build/classes/java/main')
-    from('../linux_x86/build/classes/java/main')
     from {
         configurations.compile.collect {
             it.isDirectory() ? it : zipTree(it)
@@ -154,7 +156,7 @@ task packFLJarX86(type: Jar, dependsOn: ['compileJava', 'createFlatBuffers']) {
     destinationDirectory = file('build/libs/jarX86')
 }
 
-task packFLJarX86UT(type: Jar, dependsOn: ['compileTestJava', 'createFlatBuffers']) {
+task packFLJarX86UT(type: Jar, dependsOn: ['compileTestJava']) {
     manifest {
         attributes "Main-Class": "com.mindspore.flclient.SyncFLJobTest"
     }

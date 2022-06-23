@@ -1,5 +1,6 @@
 package com.mindspore.flclient;
 
+import com.mindspore.flclient.common.FLLoggerGenerater;
 import mindspore.schema.RequestFLJob;
 import mindspore.schema.ResponseFLJob;
 import mindspore.schema.ResponseGetModel;
@@ -21,19 +22,23 @@ import java.util.logging.Logger;
  * @since  : 2022/4/14
  */
 class FLMockServer {
-    private static final Logger LOGGER = Logger.getLogger("FL_UT");
+    private static final Logger LOGGER = FLLoggerGenerater.getModelLogger(FLMockServer.class.toString());
     private ArrayList<FLHttpRes> httpRes;
     private int httpResCnt = 0;
+    private int curIter = 0;
+    private int maxIter = 1;
     private MockWebServer server = new MockWebServer();
     private final Dispatcher dispatcher = new Dispatcher() {
         @Override
         public MockResponse dispatch(RecordedRequest request) throws InterruptedException {
-            if (httpRes == null || httpRes.size() < httpResCnt + 1) {
+            // Pop req from the request queue, avoid memory leak.
+            server.takeRequest();
+            if (httpRes == null) {
                 LOGGER.severe("httpRes size is:" + Integer.toString(httpRes.size()) + " httpResCnt is:" + Integer.toString(httpResCnt));
                 return new MockResponse().setResponseCode(404);
             }
 
-            FLHttpRes curRes = httpRes.get(httpResCnt);
+            FLHttpRes curRes = httpRes.get(httpResCnt % httpRes.size());
             httpResCnt++;
 
             if(!reqMsgCheck(request, curRes)){
@@ -87,11 +92,12 @@ class FLMockServer {
          String msgName = curRes.getResName();
         byte[] msgBody = getMsgBodyFromFile(curRes.getContentData());
         if (msgName.equals("startFLJob")){
+            curIter++;
             ByteBuffer resBuffer = ByteBuffer.wrap(msgBody);
             ResponseFLJob responseDataBuf = ResponseFLJob.getRootAsResponseFLJob(resBuffer);
             responseDataBuf.flPlanConfig().mutateEpochs(1);  // change the flbuffer
-            responseDataBuf.flPlanConfig().mutateIterations(1); // only hase one iteration
-            responseDataBuf.mutateIteration(1); // cur iteration
+            responseDataBuf.flPlanConfig().mutateIterations(maxIter); // only hase one iteration
+            responseDataBuf.mutateIteration(curIter); // cur iteration
             Buffer buffer = new Buffer();
             buffer.write(responseDataBuf.getByteBuffer().array());
             return buffer;
@@ -109,7 +115,7 @@ class FLMockServer {
             Buffer buffer = new Buffer();
             ByteBuffer resBuffer = ByteBuffer.wrap(msgBody);
             ResponseGetModel responseDataBuf = ResponseGetModel.getRootAsResponseGetModel(resBuffer);
-            responseDataBuf.mutateIteration(1);
+            responseDataBuf.mutateIteration(curIter);
             buffer.write(responseDataBuf.getByteBuffer().array());
             return buffer;
         }

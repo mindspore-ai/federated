@@ -18,33 +18,28 @@ package com.mindspore.flclient;
 
 import com.google.flatbuffers.FlatBufferBuilder;
 
+import com.mindspore.flclient.common.FLLoggerGenerater;
 import com.mindspore.flclient.compression.DecodeExecutor;
-import com.mindspore.flclient.model.AlInferBert;
-import com.mindspore.flclient.model.AlTrainBert;
 import com.mindspore.flclient.model.Client;
 import com.mindspore.flclient.model.ClientManager;
 import com.mindspore.flclient.model.RunType;
-import com.mindspore.flclient.model.SessionUtil;
 import com.mindspore.flclient.model.Status;
-import com.mindspore.flclient.model.TrainLenet;
 import com.mindspore.flclient.pki.PkiBean;
 import com.mindspore.flclient.pki.PkiUtil;
 
-import mindspore.schema.*;
-import mindspore.schema.FLPlan;
-import mindspore.schema.FeatureMap;
-import mindspore.schema.RequestFLJob;
-import mindspore.schema.ResponseCode;
-import mindspore.schema.ResponseFLJob;
+import mindspore.fl.schema.*;
+import mindspore.fl.schema.FLPlan;
+import mindspore.fl.schema.FeatureMap;
+import mindspore.fl.schema.RequestFLJob;
+import mindspore.fl.schema.ResponseCode;
+import mindspore.fl.schema.ResponseFLJob;
 
 import java.io.IOException;
 import java.security.cert.Certificate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.logging.Logger;
-
-import static com.mindspore.flclient.LocalFLParameter.ALBERT;
-import static com.mindspore.flclient.LocalFLParameter.LENET;
 
 /**
  * StartFLJob
@@ -52,7 +47,7 @@ import static com.mindspore.flclient.LocalFLParameter.LENET;
  * @since 2021-08-25
  */
 public class StartFLJob {
-    private static final Logger LOGGER = Logger.getLogger(StartFLJob.class.toString());
+    private static final Logger LOGGER = FLLoggerGenerater.getModelLogger(StartFLJob.class.toString());
     private static volatile StartFLJob startFLJob;
 
     static {
@@ -112,7 +107,7 @@ public class StartFLJob {
 
         if (flParameter.isPkiVerify()) {
             if (pkiBean == null) {
-                LOGGER.severe(Common.addTag("[startFLJob] the parameter of <pkiBean> is null, please check!"));
+                LOGGER.severe("[startFLJob] the parameter of <pkiBean> is null, please check!");
                 throw new IllegalArgumentException();
             }
             return builder.flName(flParameter.getFlName())
@@ -142,323 +137,133 @@ public class StartFLJob {
         return updateFeatureName;
     }
 
-    private FLClientStatus deprecatedParseResponseAlbert(ResponseFLJob flJob) {
-        FLClientStatus status;
-        int fmCount = flJob.featureMapLength();
-        updateFeatureName.clear();
-        if (fmCount <= 0) {
-            LOGGER.severe(Common.addTag("[startFLJob] the feature size get from server is zero"));
-            return FLClientStatus.FAILED;
+    abstract class FeatureGenerator {
+        protected ResponseFLJob responseDataBuf;
+        protected int curPos = 0;
+        protected int size = 0;
+
+        public FeatureGenerator(ResponseFLJob responseDataBuf) {
+            this.responseDataBuf = responseDataBuf;
         }
 
-        if (localFLParameter.getServerMod().equals(ServerMod.HYBRID_TRAINING.toString())) {
-            LOGGER.info(Common.addTag("[startFLJob] parseResponseAlbert by " + localFLParameter.getServerMod()));
-            ArrayList<FeatureMap> albertFeatureMaps = new ArrayList<FeatureMap>();
-            ArrayList<FeatureMap> inferFeatureMaps = new ArrayList<FeatureMap>();
-            featureSize = 0;
-            List<FeatureMap> featureMapList = parseFeatureMapList(flJob);
-            for (int i = 0; i < featureMapList.size(); i++) {
-                FeatureMap feature = featureMapList.get(i);
-                if (feature == null) {
-                    LOGGER.severe(Common.addTag("[startFLJob] the feature returned from server is null"));
-                    return FLClientStatus.FAILED;
-                }
-                String featureName = feature.weightFullname();
-                if (localFLParameter.getAlbertWeightName().contains(featureName)) {
-                    albertFeatureMaps.add(feature);
-                    inferFeatureMaps.add(feature);
-                    featureSize += feature.dataLength();
-                    updateFeatureName.add(feature.weightFullname());
-                } else if (localFLParameter.getClassifierWeightName().contains(featureName)) {
-                    inferFeatureMaps.add(feature);
-                } else {
-                    continue;
-                }
-                LOGGER.info(Common.addTag("[startFLJob] weightFullname: " + feature.weightFullname() + ", " +
-                        "weightLength: " + feature.dataLength()));
-            }
-            status = Common.initSession(flParameter.getTrainModelPath());
-            if (status == FLClientStatus.FAILED) {
-                retCode = ResponseCode.RequestError;
-                return status;
-            }
-            int tag = 0;
-            LOGGER.info(Common.addTag("[startFLJob] ----------------loading weight into inference " +
-                    "model-----------------"));
-            AlInferBert alInferBert = AlInferBert.getInstance();
-            tag = SessionUtil.updateFeatures(alInferBert.getTrainSession(), flParameter.getInferModelPath(),
-                    inferFeatureMaps);
-            if (tag == -1) {
-                LOGGER.severe(Common.addTag("[startFLJob] unsolved error code in <SessionUtil.updateFeatures>"));
-                return FLClientStatus.FAILED;
-            }
-            LOGGER.info(Common.addTag("[startFLJob] ----------------loading weight into train model-----------------"));
-            AlTrainBert alTrainBert = AlTrainBert.getInstance();
-            tag = SessionUtil.updateFeatures(alTrainBert.getTrainSession(), flParameter.getTrainModelPath(),
-                    albertFeatureMaps);
-            if (tag == -1) {
-                LOGGER.severe(Common.addTag("[startFLJob] unsolved error code in <SessionUtil.updateFeatures>"));
-                return FLClientStatus.FAILED;
-            }
-            Common.freeSession();
-        } else if (localFLParameter.getServerMod().equals(ServerMod.FEDERATED_LEARNING.toString())) {
-            LOGGER.info(Common.addTag("[startFLJob] parseResponseAlbert by " + localFLParameter.getServerMod()));
-            ArrayList<FeatureMap> featureMaps = new ArrayList<FeatureMap>();
-            featureSize = 0;
-            for (int i = 0; i < fmCount; i++) {
-                FeatureMap feature = flJob.featureMap(i);
-                if (feature == null) {
-                    LOGGER.severe(Common.addTag("[startFLJob] the feature returned from server is null"));
-                    return FLClientStatus.FAILED;
-                }
-                String featureName = feature.weightFullname();
-                featureMaps.add(feature);
-                featureSize += feature.dataLength();
-                updateFeatureName.add(featureName);
-                LOGGER.info(Common.addTag("[startFLJob] weightFullname: " + feature.weightFullname() + ", " +
-                        "weightLength: " + feature.dataLength()));
-            }
-            status = Common.initSession(flParameter.getTrainModelPath());
-            if (status == FLClientStatus.FAILED) {
-                retCode = ResponseCode.RequestError;
-                return status;
-            }
-            int tag = 0;
-            LOGGER.info(Common.addTag("[startFLJob] ----------------loading weight into model-----------------"));
-            AlTrainBert alTrainBert = AlTrainBert.getInstance();
-            tag = SessionUtil.updateFeatures(alTrainBert.getTrainSession(), flParameter.getTrainModelPath(),
-                    featureMaps);
-            if (tag == -1) {
-                LOGGER.severe(Common.addTag("[startFLJob] unsolved error code in <SessionUtil.updateFeatures>"));
-                return FLClientStatus.FAILED;
-            }
-            Common.freeSession();
+        public abstract FeatureMap next();
+
+        public boolean isEnd() {
+            return curPos >= size;
         }
-        return FLClientStatus.SUCCESS;
     }
 
-    private FLClientStatus deprecatedParseResponseLenet(ResponseFLJob flJob) {
-        FLClientStatus status;
+    class NormalFeatureGenerator extends FeatureGenerator {
+        public NormalFeatureGenerator(ResponseFLJob responseDataBuf) {
+            super(responseDataBuf);
+            this.size = responseDataBuf.featureMapLength();
+        }
+
+        @Override
+        public FeatureMap next() {
+            if (curPos >= size) {
+                return null;
+            }
+            int pre = curPos++;
+            return responseDataBuf.featureMap(pre);
+        }
+    }
+
+    class QuatFeatureGenerator extends FeatureGenerator {
+        public QuatFeatureGenerator(ResponseFLJob responseDataBuf) {
+            super(responseDataBuf);
+            this.size = responseDataBuf.compressFeatureMapLength();
+        }
+
+        @Override
+        public FeatureMap next() {
+            if (curPos >= size) {
+                return null;
+            }
+            int pre = curPos++;
+            CompressFeatureMap cmpfeatureMap = responseDataBuf.compressFeatureMap(pre);
+            return DecodeExecutor.quantDeCompress(cmpfeatureMap);
+        }
+    }
+
+
+    private FeatureGenerator FeatureGeneratorCtr(ResponseFLJob responseDataBuf) {
+        byte compressType = responseDataBuf.downloadCompressType();
+        switch (compressType) {
+            case CompressType.NO_COMPRESS:
+                return new NormalFeatureGenerator(responseDataBuf);
+            case CompressType.QUANT:
+                return new QuatFeatureGenerator(responseDataBuf);
+            default:
+                LOGGER.severe("[FeatureGeneratorCtr] Unsupported compress type:" + compressType);
+                return null;
+        }
+    }
+
+    private FLClientStatus updateFeatureForFederated(Client client, FeatureGenerator featureGenerator) {
+        FLClientStatus result = FLClientStatus.SUCCESS;
+        Status status = Status.SUCCESS;
         updateFeatureName.clear();
         featureSize = 0;
-        List<FeatureMap> featureMapList = parseFeatureMapList(flJob);
-
-        ArrayList<FeatureMap> featureMaps = new ArrayList<>();
-
-        for (int i = 0; i < featureMapList.size(); i++) {
-            FeatureMap feature = featureMapList.get(i);
-            if (feature == null) {
-                LOGGER.severe(Common.addTag("[startFLJob] the feature returned from server is null"));
-                return FLClientStatus.FAILED;
-            }
-            String featureName = feature.weightFullname();
-            featureMaps.add(feature);
-            featureSize += feature.dataLength();
-            updateFeatureName.add(featureName);
-            LOGGER.info(Common.addTag("[startFLJob] weightFullname: " +
-                    feature.weightFullname() + ", weightLength: " + feature.dataLength()));
-        }
-        status = Common.initSession(flParameter.getTrainModelPath());
-        if (status == FLClientStatus.FAILED) {
-            retCode = ResponseCode.RequestError;
-            return status;
-        }
-        int tag = 0;
-        LOGGER.info(Common.addTag("[startFLJob] ----------------loading weight into model-----------------"));
-        TrainLenet trainLenet = TrainLenet.getInstance();
-        tag = SessionUtil.updateFeatures(trainLenet.getTrainSession(), flParameter.getTrainModelPath(), featureMaps);
-        if (tag == -1) {
-            LOGGER.severe(Common.addTag("[startFLJob] unsolved error code in <SessionUtil.updateFeatures>"));
-            return FLClientStatus.FAILED;
-        }
-        Common.freeSession();
-        return FLClientStatus.SUCCESS;
-    }
-
-    private List<FeatureMap> parseFeatureMapList(ResponseFLJob flJob) {
-        List<FeatureMap> featureMaps;
-        byte compressType = flJob.downloadCompressType();
-        if (flJob.downloadCompressType() == mindspore.schema.CompressType.NO_COMPRESS) {
-            LOGGER.info(Common.addTag("[parseFeatureMapList] create no compress feature map."));
-            featureMaps = new ArrayList<>();
-            for (int i = 0; i < flJob.featureMapLength(); i++) {
-                featureMaps.add(flJob.featureMap(i));
-            }
-        } else {
-            List<CompressFeatureMap> compressFeatureMapList = new ArrayList<>();
-            for (int i = 0; i < flJob.compressFeatureMapLength(); i++) {
-                compressFeatureMapList.add(flJob.compressFeatureMap(i));
-            }
-            featureMaps = DecodeExecutor.getInstance().deCompressWeight(compressType, compressFeatureMapList);
-        }
-        return featureMaps;
-    }
-
-    private FLClientStatus hybridFeatures(ResponseFLJob flJob) {
-        FLClientStatus status;
-        Client client = ClientManager.getClient(flParameter.getFlName());
-        int fmCount = flJob.featureMapLength();
-        ArrayList<FeatureMap> trainFeatureMaps = new ArrayList<FeatureMap>();
-        ArrayList<FeatureMap> inferFeatureMaps = new ArrayList<FeatureMap>();
-        featureSize = 0;
-        List<FeatureMap> featureMaps;
-        byte compressType = flJob.downloadCompressType();
-        if (compressType == CompressType.NO_COMPRESS) {
-            featureMaps = new ArrayList<>();
-            for (int i = 0; i < fmCount; i++) {
-                featureMaps.add(flJob.featureMap(i));
-            }
-        } else {
-            List<CompressFeatureMap> compressFeatureMapList = new ArrayList<>();
-            for (int i = 0; i < flJob.compressFeatureMapLength(); i++) {
-                compressFeatureMapList.add(flJob.compressFeatureMap(i));
-            }
-            featureMaps = DecodeExecutor.getInstance().deCompressWeight(compressType, compressFeatureMapList);
-            fmCount = featureMaps.size();
-        }
-        for (int i = 0; i < fmCount; i++) {
-            FeatureMap feature = featureMaps.get(i);
-            if (feature == null) {
-                LOGGER.severe(Common.addTag("[startFLJob] the feature returned from server is null"));
-                retCode = ResponseCode.SystemError;
-                return FLClientStatus.FAILED;
-            }
-            String featureName = feature.weightFullname();
-            if (flParameter.getHybridWeightName(RunType.TRAINMODE).contains(featureName)) {
-                trainFeatureMaps.add(feature);
-                featureSize += feature.dataLength();
-                updateFeatureName.add(feature.weightFullname());
-                LOGGER.info(Common.addTag("[startFLJob] trainWeightFullname: " + feature.weightFullname() + ", " +
-                        "trainWeightLength: " + feature.dataLength()));
-            }
-            if (flParameter.getHybridWeightName(RunType.INFERMODE).contains(featureName)) {
-                inferFeatureMaps.add(feature);
-                LOGGER.info(Common.addTag("[startFLJob] inferWeightFullname: " + feature.weightFullname() + ", " +
-                        "inferWeightLength: " + feature.dataLength()));
-            }
-        }
-        Status tag;
-        LOGGER.info(Common.addTag("[startFLJob] ----------------loading weight into inference " +
-                "model-----------------"));
-        status = Common.initSession(flParameter.getInferModelPath());
-        if (status == FLClientStatus.FAILED) {
-            retCode = ResponseCode.RequestError;
-            return status;
-        }
-        tag = client.updateFeatures(flParameter.getInferModelPath(), inferFeatureMaps);
-        Common.freeSession();
-        if (!Status.SUCCESS.equals(tag)) {
-            LOGGER.severe(Common.addTag("[startFLJob] unsolved error code in <Client.updateFeatures>"));
-            retCode = ResponseCode.RequestError;
-            return FLClientStatus.FAILED;
-        }
-        LOGGER.info(Common.addTag("[startFLJob] ----------------loading weight into train model-----------------"));
-        status = Common.initSession(flParameter.getTrainModelPath());
-        if (status == FLClientStatus.FAILED) {
-            retCode = ResponseCode.RequestError;
-            return status;
-        }
-        LOGGER.info(Common.addTag("[startFLJob] set <batch size> for client: " + batchSize));
+        LOGGER.info("[startFLJob] set <batch size> for client: " + batchSize);
         client.setBatchSize(batchSize);
-        tag = client.updateFeatures(flParameter.getTrainModelPath(), trainFeatureMaps);
-        Common.freeSession();
-        if (!Status.SUCCESS.equals(tag)) {
-            LOGGER.severe(Common.addTag("[startFLJob] unsolved error code in <Client.updateFeatures>"));
-            retCode = ResponseCode.RequestError;
-            return FLClientStatus.FAILED;
+        while (!featureGenerator.isEnd()) {
+            FeatureMap featureMap = featureGenerator.next();
+            featureSize += featureMap.dataLength();
+            updateFeatureName.add(featureMap.weightFullname());
+            status = client.updateFeature(featureMap, true);
+            if (status != Status.SUCCESS) {
+                LOGGER.severe("[updateFeatureForFederated] Update feature failed.");
+                break;
+            }
         }
-        return status;
+
+        return status == Status.SUCCESS ? FLClientStatus.SUCCESS : FLClientStatus.FAILED;
     }
 
-    private FLClientStatus normalFeatures(ResponseFLJob flJob) {
-        FLClientStatus status;
-        Client client = ClientManager.getClient(flParameter.getFlName());
-        int fmCount = flJob.featureMapLength();
-        ArrayList<FeatureMap> featureMaps = new ArrayList<FeatureMap>();
+    private FLClientStatus updateFeatureForHybrid(Client client, FeatureGenerator featureGenerator) {
+        FLClientStatus result = FLClientStatus.SUCCESS;
+        Status status = Status.SUCCESS;
+        updateFeatureName.clear();
         featureSize = 0;
-        byte compressType = flJob.downloadCompressType();
-        List<FeatureMap> parseFeatureMaps;
-        if (compressType == CompressType.NO_COMPRESS) {
-            parseFeatureMaps = new ArrayList<>();
-            for (int i = 0; i < fmCount; i++) {
-                parseFeatureMaps.add(flJob.featureMap(i));
-            }
-        } else {
-            List<CompressFeatureMap> compressFeatureMapList = new ArrayList<>();
-            for (int i = 0; i < flJob.compressFeatureMapLength(); i++) {
-                compressFeatureMapList.add(flJob.compressFeatureMap(i));
-            }
-            parseFeatureMaps = DecodeExecutor.getInstance().deCompressWeight(compressType, compressFeatureMapList);
-            fmCount = parseFeatureMaps.size();
-        }
-        for (int i = 0; i < fmCount; i++) {
-            FeatureMap feature = parseFeatureMaps.get(i);
-            if (feature == null) {
-                LOGGER.severe(Common.addTag("[startFLJob] the feature returned from server is null"));
-                retCode = ResponseCode.SystemError;
-                return FLClientStatus.FAILED;
-            }
-            String featureName = feature.weightFullname();
-            featureMaps.add(feature);
-            featureSize += feature.dataLength();
-            updateFeatureName.add(featureName);
-            LOGGER.info(Common.addTag("[startFLJob] weightFullname: " + feature.weightFullname() + ", " +
-                    "weightLength: " + feature.dataLength()));
-        }
-        Status tag;
-        LOGGER.info(Common.addTag("[startFLJob] ----------------loading weight into model-----------------"));
-        status = Common.initSession(flParameter.getTrainModelPath());
-        if (status == FLClientStatus.FAILED) {
-            retCode = ResponseCode.RequestError;
-            return status;
-        }
-        LOGGER.info(Common.addTag("[startFLJob] set <batch size> for client: " + batchSize));
+        LOGGER.info("[startFLJob] set <batch size> for client: " + batchSize);
         client.setBatchSize(batchSize);
-        tag = client.updateFeatures(flParameter.getTrainModelPath(), featureMaps);
-        LOGGER.info(Common.addTag("[startFLJob] ===========free session============="));
-        Common.freeSession();
-        if (!Status.SUCCESS.equals(tag)) {
-            LOGGER.severe(Common.addTag("[startFLJob] unsolved error code in <Client.updateFeatures>"));
-            retCode = ResponseCode.RequestError;
-            return FLClientStatus.FAILED;
+        while (!featureGenerator.isEnd()) {
+            FeatureMap featureMap = featureGenerator.next();
+            if (flParameter.getHybridWeightName(RunType.TRAINMODE).contains(featureMap.weightFullname())) {
+                featureSize += featureMap.dataLength();
+                updateFeatureName.add(featureMap.weightFullname());
+                status = client.updateFeature(featureMap, true);
+            }
+            if (status != Status.SUCCESS) {
+                LOGGER.severe("[updateFeatureForFederated] Update feature failed.");
+                break;
+            }
+            if (flParameter.getHybridWeightName(RunType.INFERMODE).contains(featureMap.weightFullname())) {
+                status = client.updateFeature(featureMap, false);
+            }
+            if (status != Status.SUCCESS) {
+                LOGGER.severe("[updateFeatureForFederated] Update feature failed.");
+                break;
+            }
         }
-        return status;
+        return status == Status.SUCCESS ? FLClientStatus.SUCCESS : FLClientStatus.FAILED;
     }
+
 
     private FLClientStatus parseResponseFeatures(ResponseFLJob flJob) {
-        FLClientStatus status;
-        int fmCount = flJob.featureMapLength();
-        updateFeatureName.clear();
-
+        FLClientStatus status = FLClientStatus.FAILED;
+        Client client = ClientManager.getClient(flParameter.getFlName());
+        FeatureGenerator featureGenerator = FeatureGeneratorCtr(flJob);
         if (localFLParameter.getServerMod().equals(ServerMod.HYBRID_TRAINING.toString())) {
-            LOGGER.info(Common.addTag("[startFLJob] parseResponseFeatures by " + localFLParameter.getServerMod()));
-            status = hybridFeatures(flJob);
-            if (status == FLClientStatus.FAILED) {
-                return status;
-            }
+            LOGGER.info("[startFLJob] parseResponseFeatures by " + localFLParameter.getServerMod());
+            status = updateFeatureForHybrid(client, featureGenerator);
         } else if (localFLParameter.getServerMod().equals(ServerMod.FEDERATED_LEARNING.toString())) {
-            LOGGER.info(Common.addTag("[startFLJob] parseResponseFeatures by " + localFLParameter.getServerMod()));
-            status = normalFeatures(flJob);
-            if (status == FLClientStatus.FAILED) {
-                return status;
-            }
-        }
-        return FLClientStatus.SUCCESS;
-    }
-
-    private FLClientStatus deprecatedParseFeatures(ResponseFLJob flJob) {
-        FLClientStatus status = FLClientStatus.SUCCESS;
-        if (ALBERT.equals(flParameter.getFlName())) {
-            LOGGER.info(Common.addTag("[startFLJob] into <parseResponseAlbert>"));
-            status = deprecatedParseResponseAlbert(flJob);
-        }
-        if (LENET.equals(flParameter.getFlName())) {
-            LOGGER.info(Common.addTag("[startFLJob] into <parseResponseLenet>"));
-            status = deprecatedParseResponseLenet(flJob);
+            LOGGER.info("[startFLJob] parseResponseFeatures by " + localFLParameter.getServerMod());
+            status = updateFeatureForFederated(client, featureGenerator);
         }
         return status;
     }
-
 
     /**
      * response res
@@ -468,33 +273,33 @@ public class StartFLJob {
      */
     public FLClientStatus doResponse(ResponseFLJob flJob) {
         if (flJob == null) {
-            LOGGER.severe(Common.addTag("[startFLJob] the input parameter flJob is null"));
+            LOGGER.severe("[startFLJob] the input parameter flJob is null");
             retCode = ResponseCode.SystemError;
             return FLClientStatus.FAILED;
         }
         FLPlan flPlanConfig = flJob.flPlanConfig();
         if (flPlanConfig == null) {
-            LOGGER.severe(Common.addTag("[startFLJob] the flPlanConfig is null"));
+            LOGGER.severe("[startFLJob] the flPlanConfig is null");
             retCode = ResponseCode.SystemError;
             return FLClientStatus.FAILED;
         }
 
         retCode = flJob.retcode();
-        LOGGER.info(Common.addTag("[startFLJob] ==========the response message of startFLJob is:================"));
-        LOGGER.info(Common.addTag("[startFLJob] return retCode: " + retCode));
-        LOGGER.info(Common.addTag("[startFLJob] reason: " + flJob.reason()));
-        LOGGER.info(Common.addTag("[startFLJob] iteration: " + flJob.iteration()));
-        LOGGER.info(Common.addTag("[startFLJob] is selected: " + flJob.isSelected()));
-        LOGGER.info(Common.addTag("[startFLJob] next request time: " + flJob.nextReqTime()));
+        LOGGER.info("[startFLJob] ==========the response message of startFLJob is:================");
+        LOGGER.info("[startFLJob] return retCode: " + retCode);
+        LOGGER.info("[startFLJob] reason: " + flJob.reason());
+        LOGGER.info("[startFLJob] iteration: " + flJob.iteration());
+        LOGGER.info("[startFLJob] is selected: " + flJob.isSelected());
+        LOGGER.info("[startFLJob] next request time: " + flJob.nextReqTime());
         nextRequestTime = flJob.nextReqTime();
-        LOGGER.info(Common.addTag("[startFLJob] timestamp: " + flJob.timestamp()));
+        LOGGER.info("[startFLJob] timestamp: " + flJob.timestamp());
         FLClientStatus status;
         int responseRetCode = flJob.retcode();
 
         switch (responseRetCode) {
             case (ResponseCode.SUCCEED):
                 if (flJob.downloadCompressType() == CompressType.NO_COMPRESS && flJob.featureMapLength() <= 0) {
-                    LOGGER.warning(Common.addTag("[startFLJob] the feature size get from server is zero"));
+                    LOGGER.warning("[startFLJob] the feature size get from server is zero");
                     retCode = ResponseCode.SystemError;
                     return FLClientStatus.FAILED;
                 }
@@ -502,27 +307,23 @@ public class StartFLJob {
                 if (flPlanConfig.lr() != 0) {
                     lr = flPlanConfig.lr();
                 } else {
-                    LOGGER.info(Common.addTag("[startFLJob] the GlobalParameter <lr> from server: " + lr + " is not " +
+                    LOGGER.info("[startFLJob] the GlobalParameter <lr> from server: " + lr + " is not " +
                             "valid, " +
-                            "will use the default value 0.1"));
+                            "will use the default value 0.1");
                 }
                 localFLParameter.setLr(lr);
                 batchSize = flPlanConfig.miniBatch();
-                if (Common.checkFLName(flParameter.getFlName())) {
-                    status = deprecatedParseFeatures(flJob);
-                } else {
-                    LOGGER.info(Common.addTag("[startFLJob] into <parseResponseFeatures>"));
-                    status = parseResponseFeatures(flJob);
-                }
+                LOGGER.info("[startFLJob] into <parseResponseFeatures>");
+                status = parseResponseFeatures(flJob);
                 return status;
             case (ResponseCode.OutOfTime):
                 return FLClientStatus.RESTART;
             case (ResponseCode.RequestError):
             case (ResponseCode.SystemError):
-                LOGGER.info(Common.addTag("[startFLJob] catch RequestError or SystemError"));
+                LOGGER.info("[startFLJob] catch RequestError or SystemError");
                 return FLClientStatus.FAILED;
             default:
-                LOGGER.severe(Common.addTag("[startFLJob] the return <retCode> from server is invalid: " + retCode));
+                LOGGER.severe("[startFLJob] the return <retCode> from server is invalid: " + retCode);
                 return FLClientStatus.FAILED;
         }
     }
@@ -554,7 +355,7 @@ public class StartFLJob {
          */
         public RequestStartFLJobBuilder flName(String name) {
             if (name == null || name.isEmpty()) {
-                LOGGER.severe(Common.addTag("[startFLJob] the parameter of <name> is null or empty, please check!"));
+                LOGGER.severe("[startFLJob] the parameter of <name> is null or empty, please check!");
                 throw new IllegalArgumentException();
             }
             this.nameOffset = this.builder.createString(name);
@@ -569,7 +370,7 @@ public class StartFLJob {
          */
         public RequestStartFLJobBuilder id(String id) {
             if (id == null || id.isEmpty()) {
-                LOGGER.severe(Common.addTag("[startFLJob] the parameter of <id> is null or empty, please check!"));
+                LOGGER.severe("[startFLJob] the parameter of <id> is null or empty, please check!");
                 throw new IllegalArgumentException();
             }
             this.idOffset = this.builder.createString(id);
@@ -596,7 +397,7 @@ public class StartFLJob {
         public RequestStartFLJobBuilder dataSize(int dataSize) {
             // temp code need confirm
             this.dataSize = dataSize;
-            LOGGER.info(Common.addTag("[startFLJob] the train data size: " + dataSize));
+            LOGGER.info("[startFLJob] the train data size: " + dataSize);
             return this;
         }
 
@@ -620,7 +421,7 @@ public class StartFLJob {
         public RequestStartFLJobBuilder signData(byte[] signData) {
             if (signData == null || signData.length == 0) {
                 LOGGER.severe(
-                        Common.addTag("[startFLJob] the parameter of <signData> is null or empty, please check!"));
+                        "[startFLJob] the parameter of <signData> is null or empty, please check!");
                 throw new IllegalArgumentException();
             }
             this.signDataOffset = RequestFLJob.createSignDataVector(builder, signData);
@@ -635,8 +436,8 @@ public class StartFLJob {
          */
         public RequestStartFLJobBuilder certificateChain(Certificate[] certificates) {
             if (certificates == null || certificates.length < 4) {
-                LOGGER.severe(Common.addTag("[startFLJob] the parameter of <certificates> is null or the length "
-                        + "is not valid (should be >= 4), please check!"));
+                LOGGER.severe("[startFLJob] the parameter of <certificates> is null or the length "
+                        + "is not valid (should be >= 4), please check!");
                 throw new IllegalArgumentException();
             }
             try {
@@ -650,15 +451,15 @@ public class StartFLJob {
                 this.equipCACertOffset = this.builder.createString(equipCACertPem);
                 this.rootCertOffset = this.builder.createString(rootCertPem);
             } catch (IOException e) {
-                LOGGER.severe(Common.addTag("[StartFLJob] catch IOException in certificateChain: " + e.getMessage()));
+                LOGGER.severe("[StartFLJob] catch IOException in certificateChain: " + e.getMessage());
             }
             return this;
         }
 
         private RequestStartFLJobBuilder downloadCompressTypesBuilder(byte[] downloadCompressTypes) {
             if (downloadCompressTypes == null || downloadCompressTypes.length == 0) {
-                LOGGER.severe(Common.addTag("[StartFLJob] the parameter of <downloadCompressTypes> is null or empty," +
-                        " please check!"));
+                LOGGER.severe("[StartFLJob] the parameter of <downloadCompressTypes> is null or empty," +
+                        " please check!");
                 throw new IllegalArgumentException();
             }
             this.downloadCompressTypesOffset = RequestFLJob.createDownloadCompressTypesVector(builder,
