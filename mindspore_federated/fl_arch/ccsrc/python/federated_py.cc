@@ -37,6 +37,7 @@ PYBIND11_MODULE(_mindspore_federated, m) {
     .def_static("start_federated_server", &FederatedJob::StartFederatedServer)
     .def_static("start_federated_scheduler", &FederatedJob::StartFederatedScheduler)
     .def_static("init_federated_worker", &FederatedJob::InitFederatedWorker)
+    .def_static("stop_federated_worker", &FederatedJob::StopFederatedWorker)
     .def_static("start_fl_job", &FederatedJob::StartFLJob)
     .def_static("update_and_get_model", &FederatedJob::UpdateAndGetModel)
     .def_static("pull_weight", &FederatedJob::PullWeight)

@@ -58,7 +58,7 @@ class GetModelKernelMod : public AbstractKernel {
     std::shared_ptr<std::vector<unsigned char>> get_model_rsp_msg = nullptr;
     int response_code = schema::ResponseCode_SucNotReady;
     while (response_code == schema::ResponseCode_SucNotReady) {
-      if (fl::worker::Worker::GetInstance().HasStopped()) {
+      if (ExitHandler::Instance().HasStopped()) {
         MS_LOG(WARNING) << "Worker has finished.";
         return dict_data;
       }

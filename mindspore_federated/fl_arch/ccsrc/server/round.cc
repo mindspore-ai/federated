@@ -17,6 +17,7 @@
 #include "server/round.h"
 #include <memory>
 #include <string>
+#include "common/exit_handler.h"
 #include "server/server.h"
 #include "server/iteration.h"
 #include "distributed_cache/counter.h"
@@ -175,7 +176,7 @@ void Round::OnLastCountEvent() {
 
 bool Round::IsServerAvailable(std::string *reason) {
   MS_ERROR_IF_NULL_W_RET_VAL(reason, false);
-  if (Server::GetInstance().HasStopped()) {
+  if (ExitHandler::Instance().HasStopped()) {
     MS_LOG(WARNING) << "This server begin to stop, please retry " + name_ + " later.";
     *reason = kJobNotAvailable;
     return false;

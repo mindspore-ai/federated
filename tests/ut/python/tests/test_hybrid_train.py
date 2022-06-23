@@ -14,8 +14,9 @@
 # ============================================================================
 """Test the functions of server and worker in server mode HYBRID_TRAINING"""
 import os
+import subprocess
 import time
-
+from multiprocessing import Pipe
 import numpy as np
 
 from common import fl_name_with_idx, make_yaml_config, start_fl_server, g_redis_server_address, fl_test
@@ -23,7 +24,7 @@ from common_client import post_start_fl_job, post_get_model, post_update_model
 from common_client import server_safemode_rsp, server_disabled_finished_rsp
 from common_client import ResponseCode, ResponseFLJob, ResponseGetModel, ResponseUpdateModel
 from common import start_fl_job_expect_success, update_model_expect_success, get_model_expect_success
-from common import check_feature_map
+from common import check_feature_map, post_scheduler_state_msg, start_fl_scheduler, stop_processes
 from common import run_worker_client_task, wait_worker_client_task_result, read_metrics
 
 from mindspore_federated import FeatureMap
@@ -112,6 +113,9 @@ def test_hybrid_one_server_success():
     loss = 6.9
     acc = 10.1
 
+    scheduler_http_address = "127.0.0.1:4000"
+    start_fl_scheduler(yaml_config_file, scheduler_http_address)
+
     def worker_fun():
         num_batches = 4
         # define fl manager
@@ -136,6 +140,18 @@ def test_hybrid_one_server_success():
         federated_learning_manager.step_end(run_context)
         push_metrics.construct(loss, acc)
 
+        # get state
+        post_rsp = post_scheduler_state_msg(scheduler_http_address)
+        print("get state:", post_rsp)
+        assert "code" in post_rsp and post_rsp["code"] == "0"
+        assert "cluster_state" in post_rsp and post_rsp["cluster_state"] == "CLUSTER_READY"
+        assert "nodes" in post_rsp and len(post_rsp["nodes"]) == 2
+        node0 = post_rsp["nodes"][0]
+        assert node0["tcp_address"] in node0["node_id"]
+        assert node0["role"] == "SERVER"
+        node1 = post_rsp["nodes"][1]
+        assert node1["role"] == "WORKER"
+
     worker_process, worker_recv_pipe = run_worker_client_task(worker_fun)
     wait_worker_client_task_result(worker_process, worker_recv_pipe, max_run_secs=3)
 
@@ -149,6 +165,17 @@ def test_hybrid_one_server_success():
     last_metrics = metrics[-1]
     assert "metricsLoss" in last_metrics and last_metrics["metricsLoss"] == loss
     assert "metricsAuc" in last_metrics and last_metrics["metricsAuc"] == acc
+
+    # stop(wait) worker process
+    assert stop_processes(worker_process)
+    post_rsp = post_scheduler_state_msg(scheduler_http_address)
+    print("get state:", post_rsp)
+    assert "code" in post_rsp and post_rsp["code"] == "0"
+    assert "cluster_state" in post_rsp and post_rsp["cluster_state"] == "CLUSTER_READY"
+    assert "nodes" in post_rsp and len(post_rsp["nodes"]) == 1
+    node0 = post_rsp["nodes"][0]
+    assert node0["tcp_address"] in node0["node_id"]
+    assert node0["role"] == "SERVER"
 
 
 @fl_test

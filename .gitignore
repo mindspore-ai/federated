@@ -4,6 +4,8 @@ cmake-build-debug/
 mindspore_federated/.commit_id
 mindspore_federated/default_config.py
 mindspore_federated/version.py
+logs/
+*.core
 
 # Prerequisites
 *.d

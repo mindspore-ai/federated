@@ -19,7 +19,7 @@ import numpy as np
 import psutil
 
 from common import fl_name_with_idx, make_yaml_config, g_redis_server_address, fl_test
-from common import start_fl_server, start_fl_scheduler
+from common import start_fl_server, start_fl_scheduler, stop_processes
 from common import post_scheduler_new_instance_msg, post_scheduler_query_instance_msg, post_scheduler_state_msg
 from common import post_scheduler_enable_msg, post_scheduler_disable_msg, post_scheduler_stop_msg
 from common_client import post_start_fl_job, post_get_model, post_update_model
@@ -121,7 +121,8 @@ def test_fl_scheduler_post_state_success():
     feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], requires_aggr=True)
     feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], requires_aggr=False)
 
-    start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address)
+    server0 = start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file,
+                              http_server_address=http_server_address)
     # post message after start one server
     # post /state message
     post_rsp = post_scheduler_state_msg(scheduler_http_address)
@@ -133,8 +134,9 @@ def test_fl_scheduler_post_state_success():
     assert node0["role"] == "SERVER"
 
     # start one more server
-    http_server_address = "127.0.0.1:3002"
-    start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address)
+    http_server_address2 = "127.0.0.1:3002"
+    server1 = start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file,
+                              http_server_address=http_server_address2)
     # post message after start one more server
     # post /state message
     post_rsp = post_scheduler_state_msg(scheduler_http_address)
@@ -147,6 +149,20 @@ def test_fl_scheduler_post_state_success():
     node1 = post_rsp["nodes"][1]
     assert node1["tcp_address"] in node1["node_id"]
     assert node1["role"] == "SERVER"
+
+    # stop one server
+    assert stop_processes(server0)
+    # post /state message
+    post_rsp = post_scheduler_state_msg(scheduler_http_address)
+    assert "code" in post_rsp and post_rsp["code"] == "0"
+    assert "cluster_state" in post_rsp and post_rsp["cluster_state"] == "CLUSTER_READY"
+    assert "nodes" in post_rsp and len(post_rsp["nodes"]) == 1
+    # stop one more server
+    assert stop_processes(server1)
+    # post /state message
+    post_rsp = post_scheduler_state_msg(scheduler_http_address)
+    assert "code" in post_rsp and post_rsp["code"] == "0"
+    assert "nodes" not in post_rsp
 
 
 @fl_test
@@ -494,7 +510,7 @@ def test_fl_scheduler_post_stop_success():
     server2 = start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file,
                               http_server_address=http_server_address2)
 
-    for i in range(6):  # for 3s
+    for i in range(10):  # for 5s
         post_rsp = post_scheduler_stop_msg(scheduler_http_address)
         assert "code" in post_rsp and post_rsp["code"] == "0"
         assert "message" in post_rsp

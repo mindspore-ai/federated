@@ -120,6 +120,15 @@ class RedisKeys {
   std::string IterationSummaryHash() const { return PrefixIteration() + ":summary:Hash"; }
   std::string IterationSummaryLockString() const { return PrefixIteration() + ":summaryLock:String"; }
 
+  // worker
+  std::string WorkerHash(const std::string &fl_name, const std::string &instance_name) const {
+    return Prefix(fl_name, instance_name) + "worker:Hash";
+  }
+  std::string WorkerHeartbeatString(const std::string &fl_name, const std::string &instance_name,
+                                    const std::string &node_id) const {
+    return Prefix(fl_name, instance_name) + "worker:heartbeat:" + node_id + ":String";
+  }
+
  private:
   std::string model_name_;
   std::string GetFlSetKey(const std::string &set_name) const {

@@ -75,6 +75,45 @@ CacheStatus Scheduler::GetAllServersRealtime(const std::string &fl_name,
   return kCacheSuccess;
 }
 
+CacheStatus Scheduler::GetAllWorkersRealtime(const std::string &fl_name,
+                                             std::map<std::string, std::string> *worker_map) {
+  std::string instance_name;
+  auto ret = GetInstanceName(fl_name, &instance_name);
+  if (instance_name.empty()) {
+    return ret;
+  }
+  auto client = DistributedCacheLoader::Instance().GetOneClient();
+  if (client == nullptr) {
+    MS_LOG_WARNING << "Get redis client failed";
+    return kCacheNetErr;
+  }
+  std::unordered_map<std::string, std::string> worker_registered;
+  auto worker_key = RedisKeys::GetInstance().WorkerHash(fl_name, instance_name);
+  ret = client->HGetAll(worker_key, &worker_registered);
+  if (!ret.IsSuccess()) {
+    return ret;
+  }
+  std::map<std::string, std::string> worker_alive;
+  for (auto &item : worker_registered) {
+    const auto &node_id = item.first;
+    const auto &node_address = item.second;
+    auto heartbeat_key = RedisKeys::GetInstance().WorkerHeartbeatString(fl_name, instance_name, node_id);
+    std::string temp_val;
+    ret = client->Get(heartbeat_key, &temp_val);
+    if (ret == kCacheNil) {
+      MS_LOG_WARNING << "Worker " << node_id << " heartbeat timeout";
+      (void)client->HDel(worker_key, node_id);
+      continue;
+    }
+    if (!ret.IsSuccess()) {
+      return ret;
+    }
+    worker_alive[node_id] = node_address;
+  }
+  *worker_map = std::move(worker_alive);
+  return kCacheSuccess;
+}
+
 CacheStatus Scheduler::GetAllClusterState(const std::string &fl_name, InstanceState *state) {
   std::string instance_name;
   auto ret = GetInstanceName(fl_name, &instance_name);

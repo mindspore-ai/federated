@@ -136,6 +136,7 @@ def make_yaml_config(fl_name, update_configs, output_yaml_file,
 
 def start_fl_server(feature_map, yaml_config, http_server_address, tcp_server_ip="127.0.0.1",
                     checkpoint_dir="./fl_ckpt/"):
+    print("new server process", flush=True)
     signal.signal(signal.SIGCHLD, signal.SIG_IGN)
     send_pipe, recv_pipe = Pipe()
 
@@ -162,7 +163,7 @@ def start_fl_server(feature_map, yaml_config, http_server_address, tcp_server_ip
     global g_server_processes
     g_server_processes.append(server_process)
     index = 0
-    while index < 100 and server_process.is_alive():  # wait max 10 s
+    while index < 100:  # wait max 10 s
         index += 1
         if recv_pipe.poll(0.1):
             msg = recv_pipe.recv()
@@ -170,12 +171,17 @@ def start_fl_server(feature_map, yaml_config, http_server_address, tcp_server_ip
             if isinstance(msg, Exception):
                 raise msg
             break
+        try:
+            process = psutil.Process(server_process.pid)
+            assert process.is_running()
+        except psutil.NoSuchProcess:
+            pass
     assert index < 100
-    assert server_process.is_alive()
     return server_process
 
 
 def start_fl_scheduler(yaml_config, scheduler_http_address):
+    print("new scheduler process", flush=True)
     signal.signal(signal.SIGCHLD, signal.SIG_IGN)
     send_pipe, recv_pipe = Pipe()
 
@@ -207,7 +213,7 @@ def start_fl_scheduler(yaml_config, scheduler_http_address):
         http_ip = None
         scheduler_http_port = None
 
-    while index < 100 and scheduler_process.is_alive():  # wait max 10 s
+    while index < 100:  # wait max 10 s
         index += 1
         if recv_pipe.poll(0.1):
             msg = recv_pipe.recv()
@@ -215,6 +221,11 @@ def start_fl_scheduler(yaml_config, scheduler_http_address):
             if isinstance(msg, Exception):
                 raise msg
             break
+        try:
+            process = psutil.Process(scheduler_process.pid)
+            assert process.is_running()
+        except psutil.NoSuchProcess:
+            pass
         if http_ip and scheduler_http_port:
             try:
                 conn_server.connect((http_ip, scheduler_http_port))
@@ -222,7 +233,6 @@ def start_fl_scheduler(yaml_config, scheduler_http_address):
             except socket.error:
                 pass
     assert index < 100
-    assert scheduler_process.is_alive()
     return scheduler_process
 
 
@@ -248,7 +258,7 @@ def run_worker_client_task(task):
 
 def wait_worker_client_task_result(worker_task_process, recv_pipe, max_run_secs=3):
     index = 0
-    while index < max_run_secs * 2 and worker_task_process.is_alive():
+    while index < max_run_secs * 2:
         index += 1
         if recv_pipe.poll(0.1):
             msg = recv_pipe.recv()

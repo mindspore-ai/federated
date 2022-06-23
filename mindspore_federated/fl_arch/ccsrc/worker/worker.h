@@ -63,11 +63,9 @@ class MS_EXPORT Worker {
  public:
   static Worker &GetInstance();
   void Init();
+  void Stop();
   bool SendToServer(const void *data, size_t size, fl::TcpUserCommand command,
                     std::shared_ptr<std::vector<unsigned char>> *output = nullptr);
-
-  void SetStopFlag();
-  bool HasStopped() const;
 
   // These methods set the worker's iteration state.
   void SetIterationRunning();
@@ -101,7 +99,9 @@ class MS_EXPORT Worker {
   Worker(const Worker &) = delete;
   Worker &operator=(const Worker &) = delete;
   void InitAndLoadDistributedCache();
+  void StartPeriodJob();
 
+  std::thread period_thread_;
   std::atomic_bool running_ = false;
   std::shared_ptr<fl::WorkerNode> worker_node_ = nullptr;
 
@@ -127,7 +127,6 @@ class MS_EXPORT Worker {
   std::vector<EncryptPublicKeys> public_keys_list_;
 
   std::string encrypt_type_;
-  bool stop_flag_ = false;
 };
 }  // namespace worker
 }  // namespace fl

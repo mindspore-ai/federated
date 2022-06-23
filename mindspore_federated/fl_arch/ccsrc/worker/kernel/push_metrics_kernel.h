@@ -56,7 +56,7 @@ class PushMetricsKernelMod : public AbstractKernel {
     uint32_t retry_time = 0;
     std::shared_ptr<std::vector<unsigned char>> push_metrics_rsp_msg = nullptr;
     do {
-      if (fl::worker::Worker::GetInstance().HasStopped()) {
+      if (ExitHandler::Instance().HasStopped()) {
         MS_LOG(WARNING) << "Worker has finished.";
         return true;
       }

@@ -40,16 +40,16 @@ void Server::Stop() {
   auto server_key = RedisKeys::GetInstance().ServerHash();
   auto cache_ret = client->HDel(server_key, node_id_);
   if (!cache_ret.IsSuccess()) {
-    MS_LOG_WARNING << "Failed to del info of server " << server_key;
+    MS_LOG_WARNING << "Failed to del info of server " << node_id_;
   } else {
-    MS_LOG_INFO << "Success to del info of server " << server_key;
+    MS_LOG_INFO << "Success to del info of server " << node_id_;
   }
   auto heartbeat_key = RedisKeys::GetInstance().ServerHeartbeatString(node_id_);
   cache_ret = client->Del(heartbeat_key);
   if (!cache_ret.IsSuccess()) {
-    MS_LOG_WARNING << "Failed to del heartbeat of server " << server_key;
+    MS_LOG_WARNING << "Failed to del heartbeat of server " << node_id_;
   } else {
-    MS_LOG_INFO << "Success to del heartbeat of server " << server_key;
+    MS_LOG_INFO << "Success to del heartbeat of server " << node_id_;
   }
 }
 

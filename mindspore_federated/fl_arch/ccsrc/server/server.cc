@@ -39,16 +39,6 @@
 namespace mindspore {
 namespace fl {
 namespace server {
-// The handler to capture the signal of SIGTERM. Normally this signal is triggered by cloud cluster manager like K8S.
-namespace {
-int g_signal = 0;
-}
-void SignalHandler(int signal) {
-  if (g_signal == 0) {
-    g_signal = signal;
-    Server::GetInstance().SetStopFlag();
-  }
-}
 
 Server &Server::GetInstance() {
   static Server instance;
@@ -57,11 +47,8 @@ Server &Server::GetInstance() {
 
 Server::~Server() = default;
 
-void Server::SetStopFlag() { stop_flag_ = true; }
-
 void Server::Run(const std::vector<InputWeight> &feature_map, const FlCallback &fl_callback) {
-  (void)signal(SIGTERM, SignalHandler);
-  (void)signal(SIGINT, SignalHandler);
+  ExitHandler::Instance().InitSignalHandle();
   fl_callback_ = fl_callback;
   try {
     InitServer();
@@ -89,8 +76,9 @@ void Server::Run(const std::vector<InputWeight> &feature_map, const FlCallback &
     UnlockCache();
     MsException::Instance().SetException();
   }
-  if (g_signal != 0) {
-    MS_LOG_INFO << "Receive signal message " << g_signal << " and begin exit";
+  auto signal = ExitHandler::Instance().GetSignal();
+  if (signal != 0) {
+    MS_LOG_INFO << "Receive signal message " << signal << " and begin exit";
   }
   CallServerStoppedCallback();
   Stop();
@@ -185,7 +173,7 @@ void Server::RunMainProcess() {
               << ", instance state: " << cache::GetInstanceStateStr(state);
   Iteration::GetInstance().StartThreadToRecordDataRate();
   cache::IterationTaskThread::Instance().Start();
-  while (!HasStopped()) {
+  while (!ExitHandler::Instance().HasStopped()) {
     RunMainProcessInner();
     constexpr int default_sync_duration_ms = 1000;  // 1000ms
     std::this_thread::sleep_for(std::chrono::milliseconds(default_sync_duration_ms));
@@ -264,7 +252,7 @@ void Server::RunMainProcessInner() {
   }
   if (instance_context.instance_state() == cache::kStateStop) {
     MS_LOG_INFO << "Receive /stop message from scheduler and begin exit";
-    SetStopFlag();
+    ExitHandler::Instance().SetStopFlag();
     return;
   }
   // sync with cache, trigger counter event: first/last count.
@@ -328,6 +316,7 @@ void Server::Stop() {
   if (has_stopped_) {
     return;
   }
+  fl_callback_ = FlCallback();
   if (server_node_) {
     server_node_->Stop();
   }

@@ -60,7 +60,7 @@ class FusedPullWeightKernelMod : public AbstractKernel {
     const schema::ResponsePullWeight *pull_weight_rsp = nullptr;
     int retcode = schema::ResponseCode_SucNotReady;
     while (retcode == schema::ResponseCode_SucNotReady) {
-      if (fl::worker::Worker::GetInstance().HasStopped()) {
+      if (ExitHandler::Instance().HasStopped()) {
         MS_LOG(WARNING) << "Worker has finished.";
         return dict_data;
       }

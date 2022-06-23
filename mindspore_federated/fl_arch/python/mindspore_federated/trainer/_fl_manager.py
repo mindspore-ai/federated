@@ -172,6 +172,9 @@ class FederatedLearningManager(Callback):
             self._as_wrap_cell()
         logger.info("Step number needs to run per iteration: {}".format(self._next_sync_iter_id))
 
+    def __del__(self):
+        Federated_.stop_federated_worker()
+
     def _is_adaptive_sync(self):
         """
         Determine whether adaptive frequency synchronization is required.

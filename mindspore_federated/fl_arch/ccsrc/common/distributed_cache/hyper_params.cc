@@ -152,8 +152,7 @@ CacheStatus HyperParams::SyncLocal2Cache(const std::shared_ptr<RedisClientBase> 
 
   auto val = obj.dump();
   auto key = RedisKeys::GetInstance().HyperParamsString();
-  auto result = client->SetNx(key, val);
-  client->Expire(key, Timer::config_expire_time_in_seconds());
+  auto result = client->SetExNx(key, val, Timer::config_expire_time_in_seconds());
   if (result.IsSuccess()) {
     MS_LOG_INFO << "Sync hyper params to cache success";
   }
