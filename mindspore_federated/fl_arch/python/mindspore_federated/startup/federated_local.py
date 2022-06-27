@@ -18,7 +18,8 @@ import numpy as np
 from ..common import _fl_context
 from .feature_map import FeatureMap
 from .. import log as logger
-from .ssl_config import init_ssl_config
+from .ssl_config import init_ssl_config, SSLConfig
+from ..common import check_type
 from .yaml_config import load_yaml_config
 from mindspore_federated._mindspore_federated import Federated_, FLContext, FeatureItem_
 
@@ -107,31 +108,17 @@ class Callback:
         pass
 
 
-class SSLConfig:
-    def __init__(self, server_password, client_password):
-        self.server_password = server_password
-        self.client_password = client_password
-
-
-def _check_str(arg_name, str_val):
-    """Check whether the input parameters are reasonable str input"""
-    if not isinstance(str_val, str):
-        raise RuntimeError(f"Parameter '{arg_name}' should be str, but actually {type(str_val)}")
-    if not str_val:
-        raise RuntimeError(f"Parameter '{arg_name}' should not be empty str")
-
-
 class FLServerJob:
     def __init__(self, yaml_config, http_server_address, tcp_server_ip="127.0.0.1",
                  checkpoint_dir="./fl_ckpt/", ssl_config=None):
-        _check_str("yaml_config", yaml_config)
-        _check_str("http_server_address", http_server_address)
-        _check_str("tcp_server_ip", tcp_server_ip)
-        _check_str("checkpoint_dir", checkpoint_dir)
+        check_type.check_str("yaml_config", yaml_config)
+        check_type.check_str("http_server_address", http_server_address)
+        check_type.check_str("tcp_server_ip", tcp_server_ip)
+        check_type.check_str("checkpoint_dir", checkpoint_dir)
 
         if ssl_config is not None and not isinstance(ssl_config, SSLConfig):
             raise RuntimeError(
-                f"Parameter 'ssl_config' should be None or instance of SSLConfig, but actually {type(ssl_config)}")
+                f"Parameter 'ssl_config' should be None or instance of SSLConfig, but got {type(ssl_config)}")
 
         ctx = FLContext.get_instance()
         ctx.set_http_server_address(http_server_address)
@@ -153,7 +140,7 @@ class FLServerJob:
         feature_list_cxx = []
         for _, feature in feature_map.feature_map().items():
             feature_cxx = FeatureItem_(feature.feature_name, feature.data, feature.shape, "fp32",
-                                       feature.requires_aggr)
+                                       feature.require_aggr)
             feature_list_cxx.append(feature_cxx)
         Federated_.start_federated_server(feature_list_cxx, self.after_started_callback,
                                           self.before_stopped_callback, self.on_iteration_end_callback)
@@ -181,7 +168,7 @@ class FLServerJob:
             try:
                 feature_map = FeatureMap()
                 for feature in feature_list:
-                    feature_map.add_feature(feature.feature_name, feature.data, feature.requires_aggr)
+                    feature_map.add_feature(feature.feature_name, feature.data, feature.require_aggr)
                 checkpoint_file = self._save_feature_map(feature_map, iteration_num)
                 context = CallbackContext(feature_map, checkpoint_file, fl_name, instance_name,
                                           iteration_num, iteration_valid, iteration_reason)
@@ -197,7 +184,7 @@ class FLServerJob:
         new_ckpt_file_path = os.path.join(self.checkpoint_dir, file_name)
         save_ms_checkpoint(new_ckpt_file_path, feature_map)
         if len(recovery_ckpt_file) >= 3:
-            for _, _, file in recovery_ckpt_file[:-2]:
+            for _, _, file in recovery_ckpt_file[2:]:
                 os.remove(file)
         return new_ckpt_file_path
 
@@ -205,21 +192,29 @@ class FLServerJob:
         if isinstance(feature_map, dict):
             new_feature_map = FeatureMap()
             for feature_name, val in feature_map.items():
-                new_feature_map.add_feature(feature_name, val, requires_aggr=True)
+                new_feature_map.add_feature(feature_name, val, require_aggr=True)
             feature_map = new_feature_map
 
         # load checkpoint file in self.checkpoint_dir
         recovery_ckpt_file = self._get_current_recovery_ckpt_file()
         if recovery_ckpt_file:
-            latest_ckpt_file = recovery_ckpt_file[-1][2]
-            feature_map_ckpt = load_ms_checkpoint(latest_ckpt_file)
-            if not isinstance(feature_map, FeatureMap):
+            feature_map_ckpt = None
+            for _, _, ckpt_file in recovery_ckpt_file:
+                try:
+                    feature_map_ckpt = load_ms_checkpoint(ckpt_file)
+                    logger.info(f"Load recovery checkpoint file {ckpt_file} successfully")
+                    break
+                except Exception as e:
+                    logger.warning(f"Failed to load recovery checkpoint file {ckpt_file}: {str(e)}")
+                    continue
+            if feature_map_ckpt is not None:
+                if not isinstance(feature_map, FeatureMap):
+                    return feature_map_ckpt
+                feature_map_dict = feature_map.feature_map()
+                for key, val in feature_map_ckpt.feature_map().items():
+                    if key in feature_map_dict:
+                        val.require_aggr = feature_map_dict[key].require_aggr
                 return feature_map_ckpt
-            feature_map_dict = feature_map.feature_map()
-            for key, val in feature_map_ckpt.feature_map().items():
-                if key in feature_map_dict:
-                    val.requires_aggr = feature_map_dict[key].requires_aggr
-            return feature_map_ckpt
 
         if isinstance(feature_map, FeatureMap):
             return feature_map
@@ -236,7 +231,7 @@ class FLServerJob:
             f"or a checkpoint or mindir file path, but got '{type(feature_map)}'")
 
     def _get_current_recovery_ckpt_file(self):
-        # get checkpoint file in self.checkpoint_dir: {checkpoint_dir}/
+        # get checkpoint files from the latest to the next new in self.checkpoint_dir: {checkpoint_dir}/
         # checkpoint file: {fl_name}_recovery_iteration_xxx_20220601_164030.ckpt
         if not os.path.exists(self.checkpoint_dir) or not os.path.isdir(self.checkpoint_dir):
             return None
@@ -255,14 +250,14 @@ class FLServerJob:
                 iteration_num = int(strs[0])
                 timestamp = strs[1] + strs[2]
                 recovery_ckpt_files.append((iteration_num, timestamp, file_path))
-        recovery_ckpt_files.sort(key=lambda elem: elem[1])
+        recovery_ckpt_files.sort(key=lambda elem: elem[1], reverse=True)
         return recovery_ckpt_files
 
 
 class FlSchedulerJob:
     def __init__(self, yaml_config, manage_address):
-        _check_str("yaml_config", yaml_config)
-        _check_str("manage_address", manage_address)
+        check_type.check_str("yaml_config", yaml_config)
+        check_type.check_str("manage_address", manage_address)
 
         ctx = FLContext.get_instance()
         ctx.set_scheduler_manage_address(manage_address)

@@ -105,6 +105,7 @@ class MS_EXPORT Server {
   void LockCache();
   void UnlockCache();
 
+  void SyncAndCheckModelInfo(const std::vector<InputWeight> &init_feature_map);
   FlStatus SyncAndInitModel(const std::vector<InputWeight> &init_feature_map);
 
   // Initialize cipher according to the public param.

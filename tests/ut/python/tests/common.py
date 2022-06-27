@@ -47,6 +47,7 @@ def fl_test(func):
     @wraps(func)
     def wrap_test(*args, **kwargs):
         try:
+            recover_redis_server()
             clean_temp_files()
             try:
                 os.mkdir("temp")
@@ -56,7 +57,6 @@ def fl_test(func):
                 os.mkdir("fl_ckpt")
             except FileExistsError:
                 pass
-            # start_redis_server()
             func(*args, **kwargs)
         except Exception:
             logger.error("FL test catch exception")
@@ -67,7 +67,6 @@ def fl_test(func):
             logger.info("Fl test begin to clear")
             global g_server_processes
             stop_processes(g_server_processes)
-            # stop_redis_server()
             clean_temp_files()
             logger.info("Fl test end clear")
 
@@ -90,13 +89,49 @@ def fl_name_with_idx(fl_name):
     return new_fl_name
 
 
+def get_default_ssl_config():
+    cert_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../fl_ssl_cert/"))
+    print(f"cert_dir: {cert_dir}")
+    server_cert_path = os.path.join(cert_dir, "server.p12")
+    client_cert_path = os.path.join(cert_dir, "client.p12")
+    ca_cert_path = os.path.join(cert_dir, "ca.crt")
+    server_password = "server_password_12345"
+    client_password = "client_password_12345"
+    return server_cert_path, client_cert_path, ca_cert_path, server_password, client_password
+
+
+def get_default_redis_ssl_config():
+    cert_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "../fl_redis_ssl_cert/"))
+    print(f"fl_redis_ssl_cert: {cert_dir}")
+    server_cert_path = os.path.join(cert_dir, "server.crt")
+    server_key_path = os.path.join(cert_dir, "serverkey.pem")
+    client_cert_path = os.path.join(cert_dir, "client.crt")
+    client_key_path = os.path.join(cert_dir, "clientkey.pem")
+    ca_cert_path = os.path.join(cert_dir, "ca.crt")
+    return server_cert_path, server_key_path, client_cert_path, client_key_path, ca_cert_path
+
+
 def make_yaml_config(fl_name, update_configs, output_yaml_file,
                      server_mode=None, distributed_cache_address=None, fl_iteration_num=None,
                      start_fl_job_threshold=None, update_model_ratio=None,
-                     start_fl_job_time_window=None, update_model_time_window=None, global_iteration_time_window=None):
+                     start_fl_job_time_window=None, update_model_time_window=None, global_iteration_time_window=None,
+                     pki_verify=None, rmv_configs=[]):
+
     with open("default_yaml_config.yaml") as fp:
         yaml_file_content = fp.read()
     yaml_configs = yaml.load(yaml_file_content, yaml.Loader)
+
+    # convert multi layer dict to one layer
+    def multi_layer_dict_as_one_layer(dst_dict, prefix, input_dict):
+        for key, val in input_dict.items():
+            if isinstance(val, dict):
+                multi_layer_dict_as_one_layer(dst_dict, prefix + key + ".", val)
+            else:
+                dst_dict[prefix + key] = val
+    yaml_configs_new = {}
+    multi_layer_dict_as_one_layer(yaml_configs_new, "", yaml_configs)
+    yaml_configs = yaml_configs_new
+
     update_configs["fl_name"] = fl_name
 
     def set_when_not_none(dst, key, val):
@@ -105,37 +140,59 @@ def make_yaml_config(fl_name, update_configs, output_yaml_file,
 
     set_when_not_none(update_configs, "server_mode", server_mode)
     set_when_not_none(update_configs, "fl_iteration_num", fl_iteration_num)
-    if "round" not in update_configs:
-        update_configs["round"] = {}
-    round_configs = update_configs["round"]
-    set_when_not_none(round_configs, "start_fl_job_threshold", start_fl_job_threshold)
-    set_when_not_none(round_configs, "update_model_ratio", update_model_ratio)
-    set_when_not_none(round_configs, "start_fl_job_time_window", start_fl_job_time_window)
-    set_when_not_none(round_configs, "update_model_time_window", update_model_time_window)
-    set_when_not_none(round_configs, "global_iteration_time_window", global_iteration_time_window)
+    set_when_not_none(update_configs, "round.start_fl_job_threshold", start_fl_job_threshold)
+    set_when_not_none(update_configs, "round.update_model_ratio", update_model_ratio)
+    set_when_not_none(update_configs, "round.start_fl_job_time_window", start_fl_job_time_window)
+    set_when_not_none(update_configs, "round.update_model_time_window", update_model_time_window)
+    set_when_not_none(update_configs, "round.global_iteration_time_window", global_iteration_time_window)
 
-    if "distributed_cache" not in update_configs:
-        update_configs["distributed_cache"] = {}
-    cache_configs = update_configs["distributed_cache"]
-    set_when_not_none(cache_configs, "address", distributed_cache_address)
+    if pki_verify is not None:
+        update_configs["client_verify.pki_verify"] = pki_verify
+        update_configs["client_verify.root_first_ca_path"] = "xxxx"
+        update_configs["client_verify.root_second_ca_path"] = "xxxx"
+        update_configs["client_verify.equip_crl_path"] = "xxxx"
 
-    def update_one_dict(dst_dict, src_dict):
-        for key, val in src_dict.items():
-            if key not in dst_dict:
-                dst_dict[key] = val
-            elif isinstance(val, dict):
-                update_one_dict(dst_dict[key], val)
+    server_cert_path, client_cert_path, ca_cert_path, _, _ = get_default_ssl_config()
+    if "ssl.server_cert_path" not in update_configs:
+        update_configs["ssl.server_cert_path"] = server_cert_path
+    if "ssl.client_cert_path" not in update_configs:
+        update_configs["ssl.client_cert_path"] = client_cert_path
+    if "ssl.ca_cert_path" not in update_configs:
+        update_configs["ssl.ca_cert_path"] = ca_cert_path
+
+    set_when_not_none(update_configs, "distributed_cache.address", distributed_cache_address)
+
+    for key, val in update_configs.items():
+        yaml_configs[key] = val
+
+    rmv_list_real = []
+    for key, val in yaml_configs.items():
+        if any(key == item or key[:len(item)+1] == item + "." for item in rmv_configs):
+            rmv_list_real.append(key)
+    for item in rmv_list_real:
+        yaml_configs.pop(item)
+
+    # convert one layer dict to multi layer
+    yaml_configs_new = {}
+    for key, val in yaml_configs.items():
+        keys = key.split(".")
+        cur = yaml_configs_new
+        for i in range(len(keys)):
+            item = keys[i]
+            if i == len(keys) - 1:
+                cur[item] = val
             else:
-                dst_dict[key] = val
-
-    update_one_dict(yaml_configs, update_configs)
+                if item not in cur:
+                    cur[item] = {}
+                cur = cur[item]
+    yaml_configs = yaml_configs_new
     new_yaml_content = yaml.dump(yaml_configs, Dumper=yaml.Dumper)
     with open(output_yaml_file, "w") as fp:
         fp.write(new_yaml_content)
 
 
 def start_fl_server(feature_map, yaml_config, http_server_address, tcp_server_ip="127.0.0.1",
-                    checkpoint_dir="./fl_ckpt/"):
+                    checkpoint_dir="./fl_ckpt/", ssl_config=None, max_time_sec_wait=10):
     print("new server process", flush=True)
     signal.signal(signal.SIGCHLD, signal.SIG_IGN)
     send_pipe, recv_pipe = Pipe()
@@ -151,7 +208,8 @@ def start_fl_server(feature_map, yaml_config, http_server_address, tcp_server_ip
 
     def server_process_fun():
         try:
-            server_job = FLServerJob(yaml_config, http_server_address, tcp_server_ip, checkpoint_dir)
+            server_job = FLServerJob(yaml_config, http_server_address, tcp_server_ip, checkpoint_dir,
+                                     ssl_config=ssl_config)
             server_job.run(feature_map, callback=callback)
         except Exception as e:
             traceback.print_exc()
@@ -163,7 +221,7 @@ def start_fl_server(feature_map, yaml_config, http_server_address, tcp_server_ip
     global g_server_processes
     g_server_processes.append(server_process)
     index = 0
-    while index < 100:  # wait max 10 s
+    while index < max_time_sec_wait * 10:  # wait max max_time_sec_wait s
         index += 1
         if recv_pipe.poll(0.1):
             msg = recv_pipe.recv()
@@ -176,7 +234,7 @@ def start_fl_server(feature_map, yaml_config, http_server_address, tcp_server_ip
             assert process.is_running()
         except psutil.NoSuchProcess:
             pass
-    assert index < 100
+    assert index < max_time_sec_wait * 10
     return server_process
 
 
@@ -306,24 +364,70 @@ def stop_processes(server_processes):
     return False
 
 
+g_redis_server_running = True
+g_redis_with_ssl = False
+
+
 def stop_redis_server():
+    # SIGNAL 15
+    cmd = f"pid=`ps aux | grep 'redis-server' | grep :{g_redis_server_port}"
+    cmd += " | grep -v \"grep\" |awk '{print $2}'` && "
+    cmd += "for id in $pid; do kill -15 $id && echo \"killed $id\"; done"
+    subprocess.call(['bash', '-c', cmd])
+    time.sleep(0.5)
+    # SIGNAL 9
     cmd = f"pid=`ps aux | grep 'redis-server' | grep :{g_redis_server_port}"
     cmd += " | grep -v \"grep\" |awk '{print $2}'` && "
     cmd += "for id in $pid; do kill -9 $id && echo \"killed $id\"; done"
     subprocess.call(['bash', '-c', cmd])
     print(f"stop redis server {g_redis_server_port}")
 
+    global g_redis_server_running
+    g_redis_server_running = False
+
 
 def start_redis_server():
-    stop_redis_server()
-    cmd = f"redis-server --port {g_redis_server_port} &"
+    cmd = f"redis-server --port {g_redis_server_port} --save \"\" &"
     subprocess.call(['bash', '-c', cmd])
+    time.sleep(0.5)
     print(f"start redis server {g_redis_server_port}")
 
+    global g_redis_server_running, g_redis_with_ssl
+    g_redis_server_running = True
+    g_redis_with_ssl = False
 
-def start_fl_job_expect_success(http_server_address, fl_name, fl_id, data_size):
+
+def restart_redis_server():
+    stop_redis_server()
+    start_redis_server()
+
+
+def start_redis_with_ssl():
+    stop_redis_server()
+    server_crt, server_key,_,_,ca_crt = get_default_redis_ssl_config()
+    cmd = f"redis-server --port 0 --tls-port {g_redis_server_port} --tls-cert-file {server_crt} " \
+          f"--tls-key-file {server_key} --tls-ca-cert-file {ca_crt} --save \"\" &"
+    print(cmd)
+    subprocess.call(['bash', '-c', cmd])
+    time.sleep(0.5)
+    print(f"start redis server {g_redis_server_port}")
+
+    global g_redis_server_running, g_redis_with_ssl
+    g_redis_server_running = True
+    g_redis_with_ssl = True
+
+
+def recover_redis_server():
+    if g_redis_server_running and not g_redis_with_ssl:
+        return
+    stop_redis_server()
+    start_redis_server()
+
+
+def start_fl_job_expect_success(http_server_address, fl_name, fl_id, data_size, verify=None):
     for i in range(10):  # 0.5*10=5s
-        client_feature_map, fl_job_rsp = post_start_fl_job(http_server_address, fl_name, fl_id, data_size)
+        client_feature_map, fl_job_rsp = post_start_fl_job(http_server_address, fl_name, fl_id, data_size,
+                                                           verify=verify)
         if client_feature_map is None:
             if isinstance(fl_job_rsp, str) and fl_job_rsp != server_safemode_rsp:
                 raise RuntimeError(f"Failed to post startFLJob: {fl_job_rsp}")
@@ -339,9 +443,10 @@ def start_fl_job_expect_success(http_server_address, fl_name, fl_id, data_size):
     raise RuntimeError(f"Failed to post startFLJob: {fl_job_rsp.Retcode()} {fl_job_rsp.Reason().decode()}")
 
 
-def update_model_expect_success(http_server_address, fl_name, fl_id, iteration, update_feature_map, upload_loss=0.0):
+def update_model_expect_success(http_server_address, fl_name, fl_id, iteration, update_feature_map, upload_loss=0.0,
+                                verify=None):
     result, update_model_rsp = post_update_model(http_server_address, fl_name, fl_id, iteration, update_feature_map,
-                                                 upload_loss=upload_loss)
+                                                 upload_loss=upload_loss, verify=verify)
     if result is None:
         if isinstance(update_model_rsp, str):
             raise RuntimeError(f"Failed to post updateModel: {update_model_rsp}")
@@ -350,10 +455,10 @@ def update_model_expect_success(http_server_address, fl_name, fl_id, iteration, 
     return result, update_model_rsp
 
 
-def get_model_expect_success(http_server_address, fl_name, iteration):
+def get_model_expect_success(http_server_address, fl_name, iteration, verify=None):
     # get model
     for i in range(10):  # 0.5*10=5s
-        client_feature_map, get_model_rsp = post_get_model(http_server_address, fl_name, iteration)
+        client_feature_map, get_model_rsp = post_get_model(http_server_address, fl_name, iteration, verify=verify)
         if client_feature_map is None:
             if isinstance(get_model_rsp, str) and get_model_rsp != server_safemode_rsp:
                 raise RuntimeError(f"Failed to post getModel: {get_model_rsp}")
@@ -408,10 +513,6 @@ def post_scheduler_disable_msg(scheduler_http_address):
 
 def post_scheduler_enable_msg(scheduler_http_address):
     return post_scheduler_msg(scheduler_http_address, "enableFLS", None)
-
-
-def post_scheduler_stop_msg(scheduler_http_address):
-    return post_scheduler_msg(scheduler_http_address, "stopFLS", None)
 
 
 def read_metrics(metrics_file="metrics.json"):

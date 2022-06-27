@@ -92,6 +92,7 @@ class TcpClient {
   static void EventCallback(struct bufferevent *bev, std::int16_t events, void *ptr);
   void EventCallbackInner(struct bufferevent *bev, std::int16_t events);
   void NotifyConnected();
+  void NotifyNotConnected();
 
   std::string PeerRoleName() const;
 

@@ -59,6 +59,13 @@ CacheStatus DistributedCacheLoader::RetryConnect() {
   return cache_impl_->RetryConnect();
 }
 
+void DistributedCacheLoader::Clear() {
+  if (cache_impl_) {
+    cache_impl_->Clear();
+  }
+  cache_impl_ = nullptr;
+}
+
 CacheStatus RedisClientBase::HMSet(const std::string &key, const std::unordered_map<std::string, uint64_t> &items) {
   std::unordered_map<std::string, std::string> items_str;
   for (auto &item : items) {

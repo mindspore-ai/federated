@@ -41,9 +41,9 @@ struct FeatureInfo {
 struct EncryptConfig {
   std::string encrypt_type = kNotEncryptType;
   // pw encrypt
-  float share_secrets_ratio = 0.0f;
-  uint64_t cipher_time_window = 0;
-  uint64_t reconstruct_secrets_threshold = 0;
+  float share_secrets_ratio = 1.0;
+  uint64_t cipher_time_window = 1;
+  uint64_t reconstruct_secrets_threshold = 1;
   // dp encrypt
   float dp_eps = 50.0;
   float dp_delta = 0.01;

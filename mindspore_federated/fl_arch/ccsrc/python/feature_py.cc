@@ -18,14 +18,14 @@
 namespace mindspore {
 namespace fl {
 FeatureItemPy::FeatureItemPy(const std::string &feature_name, const py::array &data, const std::vector<size_t> &shape,
-                             const std::string &dtype, bool requires_aggr)
+                             const std::string &dtype, bool require_aggr)
     : data_(data) {
   weight_.name = feature_name;
   weight_.data = data.data();
   weight_.shape = shape;
   weight_.size = std::accumulate(shape.begin(), shape.end(), sizeof(float), std::multiplies<size_t>());
   weight_.type = dtype;
-  weight_.requires_aggr = requires_aggr;
+  weight_.require_aggr = require_aggr;
 }
 
 static std::vector<ssize_t> GetStrides(const std::vector<ssize_t> &shape, ssize_t item_size) {
@@ -71,7 +71,7 @@ std::shared_ptr<FeatureItemPy> FeatureItemPy::CreateFeatureFromModel(const Model
   py::object self = py::cast(model);
   py::array buffer_data(py::dtype(info), info.shape, info.strides, info.ptr, self);
   return std::make_shared<FeatureItemPy>(weight_item.name, buffer_data, weight_item.shape, weight_item.type,
-                                         weight_item.requires_aggr);
+                                         weight_item.require_aggr);
 }
 }  // namespace fl
 }  // namespace mindspore

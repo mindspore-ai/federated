@@ -25,7 +25,7 @@ void YamlConfig::Load(const std::unordered_map<std::string, YamlConfigItem> &ite
                       const std::string &role, bool enable_ssl) {
   items_ = items;
   yaml_config_file_ = yaml_config_file;
-  enable_ssl_ = false;
+  enable_ssl_ = enable_ssl;
   InitCommonConfig();
   if (role == kEnvRoleOfServer) {
     InitRoundConfig();
@@ -99,7 +99,7 @@ void YamlConfig::InitSslConfig() {
   // common
   Get("ssl.ca_cert_path", &ssl_config.ca_cert_path, true);
   Get("ssl.crl_path", &ssl_config.crl_path, false);
-  Get("ssl.cipher_list", &ssl_config.cipher_list, false);
+  Get("ssl.cipher_list", &ssl_config.cipher_list, true);
   Get("ssl.cert_expire_warning_time_in_day", &ssl_config.cert_expire_warning_time_in_day, false,
       CheckInt(kMinWarningTime, kMaxWarningTime, INC_BOTH));
   FLContext::instance()->set_ssl_config(ssl_config);
@@ -163,11 +163,11 @@ void YamlConfig::InitCompressionConfig() {
 
 void YamlConfig::InitClientVerifyConfig() {
   ClientVerifyConfig http_config;
-  Get("http.pki_verify", &http_config.pki_verify, false);
-  Get("http.root_first_ca_path", &http_config.root_first_ca_path, false);
-  Get("http.root_second_ca_path", &http_config.root_second_ca_path, false);
-  Get("http.equip_crl_path", &http_config.equip_crl_path, false);
-  Get("http.replay_attack_time_diff", &http_config.replay_attack_time_diff, false, CheckInt(0, GE));
+  Get("client_verify.pki_verify", &http_config.pki_verify, false);
+  Get("client_verify.root_first_ca_path", &http_config.root_first_ca_path, false);
+  Get("client_verify.root_second_ca_path", &http_config.root_second_ca_path, false);
+  Get("client_verify.equip_crl_path", &http_config.equip_crl_path, false);
+  Get("client_verify.replay_attack_time_diff", &http_config.replay_attack_time_diff, false, CheckInt(0, GE));
   FLContext::instance()->set_client_verify_config(http_config);
 }
 

@@ -148,7 +148,7 @@ void ServerNode::HandleBroadcastEvent(const std::shared_ptr<TcpConnection> &conn
 bool ServerNode::ServerPingPong() {
   MS_LOG_INFO << "Begin ping all other servers";
   const auto &send_node = node_info_.node_id_;
-  constexpr int ping_max_retry_times = 10;
+  constexpr int ping_max_retry_times = 15;
   for (int i = 0; i < ping_max_retry_times; i++) {
     std::map<std::string, std::string> node_map;
     auto cache_ret = cache::Server::Instance().GetAllServersRealtime(&node_map);

@@ -83,7 +83,7 @@ message ProtoParams {
   bytes data = 2;
   repeated int64 shape = 3;
   string type = 4;
-  bool requires_aggr = 5;
+  bool require_aggr = 5;
 }
 
 enum InstanceState {

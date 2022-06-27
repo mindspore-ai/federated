@@ -178,6 +178,13 @@ void TcpClient::NotifyConnected() {
   connection_cond_.notify_all();
 }
 
+void TcpClient::NotifyNotConnected() {
+  MS_LOG(INFO) << "Client failed to connect to the server! Peer " << PeerRoleName() << " ip: " << server_address_
+               << ", port: " << server_port_;
+  connected_ = false;
+  connection_cond_.notify_all();
+}
+
 void TcpClient::EventCallback(struct bufferevent *bev, std::int16_t events, void *const ptr) {
   try {
     MS_EXCEPTION_IF_NULL(ptr);
@@ -201,8 +208,15 @@ void TcpClient::EventCallbackInner(struct bufferevent *bev, std::int16_t events)
     MS_LOG(INFO) << "Client connected! Peer " << PeerRoleName() << " ip: " << server_address_
                  << ", port: " << server_port_;
   } else if (events & BEV_EVENT_ERROR) {
-    MS_LOG(WARNING) << "The client will retry to connect to the server! Peer " << PeerRoleName()
-                    << " ip: " << server_address_ << ", port: " << server_port_;
+    MS_LOG(WARNING) << "BEV_EVENT_ERROR event is trigger!";
+    if (FLContext::instance()->enable_ssl()) {
+      uint64_t err = bufferevent_get_openssl_error(bev);
+      MS_LOG(WARNING) << "The error number is:" << err;
+
+      MS_LOG(WARNING) << "Error message:" << ERR_reason_error_string(err)
+                      << ", the error lib:" << ERR_lib_error_string(err)
+                      << ", the error func:" << ERR_func_error_string(err);
+    }
     connected_ = false;
     if (disconnected_callback_) {
       disconnected_callback_();

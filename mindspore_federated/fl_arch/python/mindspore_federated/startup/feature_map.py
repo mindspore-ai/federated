@@ -17,7 +17,7 @@ import numpy as np
 
 
 class FeatureItem:
-    def __init__(self, feature_name, data, requires_aggr=True):
+    def __init__(self, feature_name, data, require_aggr=True):
         if not isinstance(data, np.ndarray):
             raise RuntimeError(f"The type of parameter 'data' is expected to be instance of numpy.ndarray")
         if data.dtype != np.float32:
@@ -28,7 +28,7 @@ class FeatureItem:
             data = np.ascontiguousarray(data)
         self.data_ = data
         self.feature_name_ = feature_name
-        self.requires_aggr_ = requires_aggr
+        self.require_aggr_ = require_aggr
 
     @property
     def feature_name(self):
@@ -43,20 +43,20 @@ class FeatureItem:
         return self.data_.shape
 
     @property
-    def requires_aggr(self):
-        return self.requires_aggr_
+    def require_aggr(self):
+        return self.require_aggr_
 
-    @requires_aggr.setter
-    def requires_aggr(self, requires_aggr):
-        self.requires_aggr_ = requires_aggr
+    @require_aggr.setter
+    def require_aggr(self, require_aggr):
+        self.require_aggr_ = require_aggr
 
 
 class FeatureMap:
     def __init__(self):
         self.feature_map_ = {}
 
-    def add_feature(self, feature_name, tensor, requires_aggr=True):
-        feature = FeatureItem(feature_name, tensor, requires_aggr)
+    def add_feature(self, feature_name, tensor, require_aggr=True):
+        feature = FeatureItem(feature_name, tensor, require_aggr)
         self.feature_map_[feature_name] = feature
         return feature
 

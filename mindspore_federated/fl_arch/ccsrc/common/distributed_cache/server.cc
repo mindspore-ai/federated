@@ -18,6 +18,8 @@
 #include "distributed_cache/redis_keys.h"
 #include "distributed_cache/timer.h"
 #include "common/common.h"
+#include "common/exit_handler.h"
+
 namespace mindspore {
 namespace fl {
 namespace cache {
@@ -142,8 +144,13 @@ bool Server::LockCache() {
   }
   auto key = RedisKeys::GetInstance().ServerRegLockString();
   int time_register_timeout = 60 * 15;        // 15 minutes
-  constexpr int expire_time_in_seconds = 30;  // lock for 30 seconds
+  constexpr int expire_time_in_seconds = 60;  // lock for 60 seconds
   for (int i = 0; i < time_register_timeout; i++) {
+    if (ExitHandler::Instance().HasStopped()) {
+      MS_LOG_WARNING << "Lock server failed, the server has receive exit signal "
+                     << ExitHandler::Instance().GetSignal();
+      return false;
+    }
     auto status = client->SetExNx(key, node_id(), expire_time_in_seconds);
     if (status == kCacheExist) {
       std::this_thread::sleep_for(std::chrono::seconds(1));

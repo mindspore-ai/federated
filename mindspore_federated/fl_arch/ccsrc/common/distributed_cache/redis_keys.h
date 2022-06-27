@@ -48,6 +48,11 @@ class RedisKeys {
     return InstanceNameString(fl_name);
   }
 
+  std::string ModelInfoString() const {
+    auto fl_name = InstanceContext::Instance().fl_name();
+    return "ms_fl:" + fl_name + ":ModelInfo:String";
+  }
+
   // for scheduler
   std::string InstanceNameString(const std::string &fl_name) const {
     return "ms_fl:" + fl_name + ":InstanceName:String";

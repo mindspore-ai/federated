@@ -54,7 +54,7 @@ class MS_EXPORT InstanceContext {
   }
   InstanceContext();
 
-  CacheStatus Sync();
+  CacheStatus Sync(bool *is_cache_empty = nullptr);
   void ClearCache();
   void ClearInstance();
 
@@ -109,7 +109,7 @@ class MS_EXPORT InstanceContext {
   void OnStateUpdate(InstanceState new_state);
   void OnNewInstance();
   void OnNewIteration();
-  CacheStatus SyncInner();
+  CacheStatus SyncInner(bool *is_cache_empty);
   CacheStatus SyncInstanceName(const std::shared_ptr<RedisClientBase> &client);
 };
 }  // namespace cache

@@ -85,7 +85,7 @@ def test_hybrid_one_server_success():
     init_feature_map = get_trainable_params(network)
     for param_name, param_np in init_feature_map.items():
         print(f"----------------{param_name} {param_np.shape}")
-        feature_map.add_feature(param_name, param_np, requires_aggr=True)
+        feature_map.add_feature(param_name, param_np, require_aggr=True)
 
     start_fl_server(feature_map, yaml_config_file, http_server_address)
 
@@ -153,7 +153,7 @@ def test_hybrid_one_server_success():
         assert node1["role"] == "WORKER"
 
     worker_process, worker_recv_pipe = run_worker_client_task(worker_fun)
-    wait_worker_client_task_result(worker_process, worker_recv_pipe, max_run_secs=3)
+    wait_worker_client_task_result(worker_process, worker_recv_pipe, max_run_secs=6)
 
     # get model
     client_feature_map, get_model_rsp = get_model_expect_success(http_server_address, fl_name, iteration)
@@ -199,7 +199,7 @@ def test_hybrid_two_server_success():
     init_feature_map = get_trainable_params(network)
     for param_name, param_np in init_feature_map.items():
         print(f"----------------{param_name} {param_np.shape}")
-        feature_map.add_feature(param_name, param_np, requires_aggr=True)
+        feature_map.add_feature(param_name, param_np, require_aggr=True)
 
     start_fl_server(feature_map, yaml_config_file, http_server_address)
     start_fl_server(feature_map, yaml_config_file, http_server_address2)
@@ -287,8 +287,8 @@ def test_hybrid_two_server_success():
 
     client_process, client_recv_pipe = run_worker_client_task(client_fun)
     worker_process, worker_recv_pipe = run_worker_client_task(worker_fun)
-    wait_worker_client_task_result(client_process, client_recv_pipe, max_run_secs=6)
-    wait_worker_client_task_result(worker_process, worker_recv_pipe, max_run_secs=6)
+    wait_worker_client_task_result(client_process, client_recv_pipe, max_run_secs=10)
+    wait_worker_client_task_result(worker_process, worker_recv_pipe, max_run_secs=10)
 
     metrics = read_metrics()
     assert len(metrics) > 1
