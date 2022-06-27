@@ -4,7 +4,7 @@ PROJECT_PATH=$(cd "$(dirname "$0")"; pwd)
 # Init default values of build options
 FL_THIRD_PKG_PATH="${PROJECT_PATH}/third/"
 USE_CACHED_PKG="on"
-MS_LITE_PKG_VER="1.7.0"
+MS_LITE_PKG_VER="1.8.0"
 MS_LITE_PKG_NAME="mindspore-lite-${MS_LITE_PKG_VER}-linux-x64"
 MS_PKG_URL="https://ms-release.obs.cn-north-4.myhuaweicloud.com/${MS_LITE_PKG_VER}/MindSpore/lite/release/linux/x86_64/${MS_LITE_PKG_NAME}.tar.gz"
 export FLAT_EXE_PATH="$FL_THIRD_PKG_PATH/flatbuffers-2.0.0/build/flatc"
@@ -74,7 +74,7 @@ load_ms_lite_pkg(){
   rm -f "$FL_THIRD_PKG_PATH"/${MS_LITE_PKG_NAME}.tar.gz
   rm -rf "$FL_THIRD_PKG_PATH"/${MS_LITE_PKG_NAME}
   wget ${MS_PKG_URL}
-  if [ -ne "${MS_LITE_PKG_NAME}.tar.gz" ] ; then
+  if [ ! -e "${MS_LITE_PKG_NAME}.tar.gz" ] ; then
     echo "down load ${MS_LITE_PKG_NAME} failed, please download manually or check your net config ..."
     exit
   fi
@@ -97,7 +97,7 @@ load_flat_buffer_pkg(){
   cd "$FL_THIRD_PKG_PATH"/flatbuffers-2.0.0/build
   cmake ..
   make -j4
-  if [ -ne "flatc" ]; then
+  if [ ! -e "flatc" ]; then
     echo "down load or compile flatc failed, please do manually ..."
     exit
   fi

@@ -126,7 +126,6 @@ public class ModelProxy {
             ByteBuffer inputBuffer = ByteBuffer.allocateDirect((int) input.size());
             inputBuffer.order(ByteOrder.nativeOrder());
             inputsBuffer.add(inputBuffer);
-//            input.free();
         }
         List<MSTensor> features = model.getFeatureMaps();
         for(MSTensor item: features){
@@ -150,7 +149,6 @@ public class ModelProxy {
         }
         inputs = model.getInputs();
         boolean isSuccess = model.resize(inputs, inputShapes);
-//        inputs.forEach(MSTensor::free);
         if (!isSuccess) {
             model.free();
             logger.severe("session resize failed");
@@ -220,13 +218,17 @@ public class ModelProxy {
             for (Callback callBack : callbacks) {
                 callBack.epochEnd();
                 if (callBack instanceof LossCallback && i == epochs - 1) {
-                    LossCallback lossCallback = (LossCallback)callBack;
+                    LossCallback lossCallback = (LossCallback) callBack;
                     setUploadLoss(lossCallback.getUploadLoss());
                 }
             }
         }
         long endTime = System.currentTimeMillis();
         logger.info("total run time:" + (endTime - startTime) + "ms");
+        if (Float.isNaN(uploadLoss)) {
+            logger.severe("uploadLoss is nan, can't upload loss.");
+            return Status.FAILED;
+        }
         return Status.SUCCESS;
     }
 
