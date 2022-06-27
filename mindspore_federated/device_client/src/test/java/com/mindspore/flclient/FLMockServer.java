@@ -1,10 +1,10 @@
 package com.mindspore.flclient;
 
 import com.mindspore.flclient.common.FLLoggerGenerater;
-import mindspore.schema.RequestFLJob;
-import mindspore.schema.ResponseFLJob;
-import mindspore.schema.ResponseGetModel;
-import mindspore.schema.ResponseUpdateModel;
+import mindspore.fl.schema.RequestFLJob;
+import mindspore.fl.schema.ResponseFLJob;
+import mindspore.fl.schema.ResponseGetModel;
+import mindspore.fl.schema.ResponseUpdateModel;
 import okhttp3.mockwebserver.Dispatcher;
 import okhttp3.mockwebserver.MockResponse;
 import okhttp3.mockwebserver.MockWebServer;

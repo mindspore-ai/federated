@@ -336,7 +336,7 @@ public abstract class Client {
      * @return execute status.
      */
     public Status setLearningRate(float lr) {
-        if (model.setLearningRate(lr)) {
+        if (trainModelProxy != null && trainModelProxy.getModel().setLearningRate(lr)) {
             return Status.SUCCESS;
         }
         logger.severe("set learning rate failed");
