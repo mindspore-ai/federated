@@ -76,6 +76,11 @@ bool UpdateModelKernel::VerifyUpdateModelRequest(const schema::RequestUpdateMode
     }
   }
   MS_ERROR_IF_NULL_W_RET_VAL(update_model_req->timestamp(), false);
+  float upload_loss = update_model_req->upload_loss();
+  if (isNaN(upload_loss)) {
+    MS_LOG(WARNING) << "The upload loss is nan, client fl id is " << update_model_req->fl_id()->str();
+    return false;
+  }
   return true;
 }
 

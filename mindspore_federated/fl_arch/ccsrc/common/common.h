@@ -190,6 +190,9 @@ inline std::string GetEnv(const std::string &env_var) {
   return std::string(value);
 }
 
+inline bool isNaN(float num) {
+    return num != num;
+}
 }  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_FL_COMMON_COMMON_H_
