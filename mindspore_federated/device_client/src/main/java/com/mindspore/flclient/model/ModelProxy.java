@@ -225,10 +225,6 @@ public class ModelProxy {
         }
         long endTime = System.currentTimeMillis();
         logger.info("total run time:" + (endTime - startTime) + "ms");
-        if (Float.isNaN(uploadLoss)) {
-            logger.severe("uploadLoss is nan, can't upload loss.");
-            return Status.FAILED;
-        }
         return Status.SUCCESS;
     }
 

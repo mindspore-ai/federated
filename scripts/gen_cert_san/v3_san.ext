@@ -1,0 +1,12 @@
+basicConstraints=CA:FALSE
+subjectKeyIdentifier=hash
+authorityKeyIdentifier=keyid,issuer
+keyUsage=digitalSignature, nonRepudiation, keyEncipherment, dataEncipherment
+subjectAltName=@alt_names
+
+[alt_names]
+DNS.1=www.flserver.com
+DNS.2=www.flclient.com
+IP.1 = 192.168.0.111
+IP.2 = 192.168.43.37
+
