@@ -118,9 +118,12 @@ class ExceptionPost:
         self.text = text
 
 
-def post_msg(http_address, request_url, post_data):
+def post_msg(http_address, request_url, post_data, verify=None):
     try:
-        return requests.post(f"http://{http_address}/{request_url}", data=post_data)
+        if verify:
+            return requests.post(f"https://{http_address}/{request_url}", data=post_data, verify=verify)
+        else:
+            return requests.post(f"http://{http_address}/{request_url}", data=post_data)
     except Exception as e:
         return e
 
@@ -130,9 +133,9 @@ class ServerNotAvailableException(Exception):
         super(ServerNotAvailableException, self).__init__(info)
 
 
-def post_start_fl_job(http_address, fl_name, fl_id, data_size=32):
+def post_start_fl_job(http_address, fl_name, fl_id, data_size=32, verify=None):
     buffer = build_start_fl_job(fl_name, fl_id, data_size)
-    result = post_msg(http_address, "startFLJob", buffer)
+    result = post_msg(http_address, "startFLJob", buffer, verify)
     if isinstance(result, Exception):
         raise result
     if result.text in server_not_available_rsp:
@@ -153,9 +156,9 @@ def post_start_fl_job(http_address, fl_name, fl_id, data_size=32):
     return feature_map, fl_job_rsp
 
 
-def post_update_model(http_address, fl_name, fl_id, iteration, feature_map, upload_loss=0.0):
+def post_update_model(http_address, fl_name, fl_id, iteration, feature_map, upload_loss=0.0, verify=None):
     buffer = build_update_model(fl_name, fl_id, iteration, feature_map, upload_loss=upload_loss)
-    result = post_msg(http_address, "updateModel", buffer)
+    result = post_msg(http_address, "updateModel", buffer, verify)
     if isinstance(result, Exception):
         raise result
     if result.text in server_not_available_rsp:
@@ -168,9 +171,9 @@ def post_update_model(http_address, fl_name, fl_id, iteration, feature_map, uplo
     return True, update_model_rsp
 
 
-def post_get_model(http_address, fl_name, iteration):
+def post_get_model(http_address, fl_name, iteration, verify=None):
     buffer = build_get_model(fl_name, iteration)
-    result = post_msg(http_address, "getModel", buffer)
+    result = post_msg(http_address, "getModel", buffer, verify)
     if isinstance(result, Exception):
         raise result
     if result.text in server_not_available_rsp:

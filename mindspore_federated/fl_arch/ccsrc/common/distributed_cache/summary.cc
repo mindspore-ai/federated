@@ -74,11 +74,12 @@ void Summary::GetAllSummaries(std::vector<std::string> *summary_pbs) {
   }
 }
 
-bool Summary::TryLockSummary(bool *has_finished) {
-  if (!has_finished) {
+bool Summary::TryLockSummary(bool *has_finished, bool *has_locked) {
+  if (!has_finished || !has_locked) {
     return false;
   }
   *has_finished = false;
+  *has_locked = false;
   MS_LOG_INFO << "Begin to lock summary lock";
   auto client = DistributedCacheLoader::Instance().GetOneClient();
   if (client == nullptr) {
@@ -90,17 +91,43 @@ bool Summary::TryLockSummary(bool *has_finished) {
   constexpr int expire_time_in_seconds = 10;  // lock for 10 seconds
   auto status = client->SetExNx(key, node_id, expire_time_in_seconds);
   if (status == kCacheExist) {
+    *has_locked = true;
     std::string val;
     status = client->Get(key, &val);
+    if (!status.IsSuccess()) {
+      return false;
+    }
     *has_finished = (val == kSummaryFinishFlag);
     return false;
   }
   if (!status.IsSuccess()) {
-    MS_LOG_WARNING << "Failed to acquire summary lock, cache server is available or some inner error happened";
     return false;
   }
   MS_LOG_INFO << "Acquire summary lock successfully";
   return true;
+}
+
+void Summary::GetSummaryLockInfo(bool *has_finished, bool *lock_expired) {
+  if (!has_finished || !lock_expired) {
+    return;
+  }
+  *lock_expired = false;
+  *has_finished = false;
+  auto client = DistributedCacheLoader::Instance().GetOneClient();
+  if (client == nullptr) {
+    MS_LOG_WARNING << "Get redis client failed";
+    return;
+  }
+  auto key = RedisKeys::GetInstance().IterationSummaryLockString();
+  std::string val;
+  auto status = client->Get(key, &val);
+  if (!status.IsSuccess()) {
+    if (status == kCacheNil) {
+      *lock_expired = true;
+    }
+    return;
+  }
+  *has_finished = (val == kSummaryFinishFlag);
 }
 
 void Summary::UnlockSummary() {

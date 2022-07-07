@@ -27,7 +27,7 @@ export PYTHONPATH=${ROOT_DIR}/build/package:${ROOT_DIR}/tests/ut/python/tests:$P
 
 echo "PYTHONPATH=$PYTHONPATH"
 export GLOG_v=1
-export REDIS_SERVER_PORT=2345
+export REDIS_SERVER_PORT=12345
 
 unset http_proxy
 unset https_proxy
@@ -44,7 +44,7 @@ function clear_port()
 
 function start_redis_server() {
   echo "begin start redis server"
-  redis-server --port ${REDIS_SERVER_PORT} &
+  redis-server --port ${REDIS_SERVER_PORT} --save "" &
   pid=$(ps aux | grep 'redis-server' | grep :${REDIS_SERVER_PORT} | grep -v grep | awk '{print $2}')
   if [ ! $pid ]
   then
@@ -72,6 +72,14 @@ for port in ${port_list[*]}; do
 done
 
 cd ${ROOT_DIR}/tests/ut/python/tests/
+
+bash ${BASEPATH}/generate_certs.sh
+echo "ls fl_ssl_cert:"
+ls ${BASEPATH}/fl_ssl_cert
+
+bash ${BASEPATH}/generate_certs_redis.sh
+echo "ls fl_redis_ssl_cert:"
+ls ${BASEPATH}/fl_redis_ssl_cert
 
 stop_redis_server
 start_redis_server

@@ -27,7 +27,7 @@ from mindspore_federated import log as logger
 
 from ..startup.ssl_config import init_ssl_config
 from ..startup.yaml_config import load_yaml_config
-from ..common import _fl_context
+from ..common import _fl_context, check_type
 
 from mindspore_federated._mindspore_federated import Federated_, FLContext
 
@@ -145,6 +145,7 @@ class FederatedLearningManager(Callback):
 
     def __init__(self, yaml_config, model, sync_frequency, data_size=1, sync_type='fixed', ssl_config=None, **kwargs):
         super(FederatedLearningManager, self).__init__()
+        check_type.check_str("yaml_config", yaml_config)
         enable_ssl = init_ssl_config(ssl_config)
         load_yaml_config(yaml_config, _fl_context.RoleOfServer, enable_ssl)
         Federated_.init_federated_worker()

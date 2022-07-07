@@ -189,7 +189,6 @@ CacheStatus RedisClient::Connect(bool retry_connect) {
   if (retry_times <= 0 || !retry_connect) {
     retry_times = 1;
   }
-  MS_LOG_INFO << "Try connect to redis sever " << server_address_ << ", retry time in seconds " << retry_times;
   const std::string refused_str = "Connection refused";
   for (size_t i = 0; i < retry_times; i++) {
     if (ExitHandler::Instance().HasStopped()) {
@@ -220,7 +219,9 @@ CacheStatus RedisClient::Connect(bool retry_connect) {
       MS_LOG(ERROR) << reason;
       return {kCacheNetErr, reason};
     }
-    std::this_thread::sleep_for(std::chrono::seconds(1));
+    if (i < retry_times - 1) {
+      std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
   }
   if (redis_context_->err) {
     auto reason = std::string("Connection error: ") + redis_context_->errstr + ", redis address: " + server_address_;
@@ -264,6 +265,19 @@ CacheStatus RedisClient::ReconnectInner() {
   }
   if (redisReconnect(redis_context_) != REDIS_OK) {
     std::string reason = redis_context_->errstr;
+    return {kCacheNetErr, reason};
+  }
+  if (ssl_context_ != nullptr) {
+    if (redisInitiateSSLWithContext(redis_context_, ssl_context_) != REDIS_OK) {
+      auto reason =
+        std::string("Initialize SSL error: ") + redis_context_->errstr + ", redis address: " + server_address_;
+      MS_LOG(ERROR) << reason;
+      return {kCacheNetErr, reason};
+    }
+  }
+  if (redisEnableKeepAlive(redis_context_) != REDIS_OK) {
+    auto reason = "Connection error: failed to enable keep alive option";
+    MS_LOG(ERROR) << reason;
     return {kCacheNetErr, reason};
   }
   return kCacheSuccess;
@@ -575,43 +589,17 @@ RedisDistributedCache::~RedisDistributedCache() {
 CacheStatus RedisDistributedCache::ParseSSLConfig(const std::unordered_map<std::string, std::string> &configs,
                                                   RedisSSLConfig *ssl_config_p) {
   RedisSSLConfig &ssl_config = *ssl_config_p;
-  auto get_item = [&configs](const std::string &name, bool required, std::string *val) -> CacheStatus {
+  auto get_item = [&configs](const std::string &name, bool required, std::string *val) {
     auto it = configs.find(name);
-    if (it == configs.end()) {
-      if (required) {
-        return {kCacheParamFailed,
-                "Config item '" + name + "' is missing in distributed_cache config when 'enable_ssl' is true"};
-      }
+    if (it != configs.end()) {
+      *val = it->second;
     }
-    auto val_str = it->second;
-    if (val_str.empty()) {
-      if (required) {
-        return {kCacheParamFailed,
-                "Config item '" + name + "' cannot be empty in distributed_cache config 'enable_ssl' is true"};
-      }
-    }
-    return kCacheSuccess;
   };
-  auto ret = get_item("cacert_filename", false, &ssl_config.cacert_filename);
-  if (!ret.IsSuccess()) {
-    return ret;
-  }
-  ret = get_item("capath", false, &ssl_config.capath);
-  if (!ret.IsSuccess()) {
-    return ret;
-  }
-  ret = get_item("cert_filename", false, &ssl_config.cert_filename);
-  if (!ret.IsSuccess()) {
-    return ret;
-  }
-  ret = get_item("private_key_filename", false, &ssl_config.private_key_filename);
-  if (!ret.IsSuccess()) {
-    return ret;
-  }
-  ret = get_item("server_name", false, &ssl_config.server_name);
-  if (!ret.IsSuccess()) {
-    return ret;
-  }
+  get_item("cacert_filename", false, &ssl_config.cacert_filename);
+  get_item("capath", false, &ssl_config.capath);
+  get_item("cert_filename", false, &ssl_config.cert_filename);
+  get_item("private_key_filename", false, &ssl_config.private_key_filename);
+  get_item("server_name", false, &ssl_config.server_name);
   return kCacheSuccess;
 }
 
@@ -630,14 +618,21 @@ bool RedisDistributedCache::Init(const DistributedCacheConfig &cache_config, int
     }
     redisInitOpenSSL();
     redisSSLContextError ssl_error;
-    ssl_context_ = redisCreateSSLContext(ssl_config.cacert_filename.c_str(), ssl_config.capath.c_str(),
-                                         ssl_config.cert_filename.c_str(), ssl_config.private_key_filename.c_str(),
-                                         ssl_config.server_name.c_str(), &ssl_error);
+    auto c_str = [](const std::string &str) -> const char * {
+      if (str.empty()) {
+        return nullptr;
+      }
+      return str.c_str();
+    };
+    ssl_context_ = redisCreateSSLContext(c_str(ssl_config.cacert_filename), c_str(ssl_config.capath),
+                                         c_str(ssl_config.cert_filename), c_str(ssl_config.private_key_filename),
+                                         c_str(ssl_config.server_name), &ssl_error);
     if (!ssl_context_) {
       MS_LOG_ERROR << "Redis SSL context error: " << redisSSLContextGetError(ssl_error);
       return false;
     }
   }
+  MS_LOG_INFO << "Try connect to redis sever " << cache_config_.address << ", retry time in seconds " << timeout;
   for (size_t i = 0; i < thread_pool_size_; i++) {
     auto client = std::make_shared<RedisClient>(cache_config_.address, ssl_context_, timeout);
     if (client == nullptr) {
@@ -651,6 +646,7 @@ bool RedisDistributedCache::Init(const DistributedCacheConfig &cache_config, int
     }
     client_pool_.push_back(client);
   }
+  MS_LOG_INFO << "Connect to redis sever " << cache_config_.address << " successfully";
   return true;
 }
 
@@ -682,6 +678,13 @@ CacheStatus RedisDistributedCache::RetryConnect() {
     }
   }
   return kCacheSuccess;
+}
+
+void RedisDistributedCache::Clear() {
+  for (auto &item : client_pool_) {
+    item->Disconnect();
+  }
+  client_pool_.clear();
 }
 }  // namespace cache
 }  // namespace fl

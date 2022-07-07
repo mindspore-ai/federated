@@ -98,7 +98,8 @@ build_dependencies()
 required_package = [
     'numpy >= 1.17.0',
     'protobuf >= 3.13.0',
-    'psutil >= 5.6.1'
+    'psutil >= 5.6.1',
+    'flatbuffers >= 2.0'
 ]
 
 package_data = {

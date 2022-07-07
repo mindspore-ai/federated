@@ -86,3 +86,5 @@ test_temp_summary_event_file/
 python/tests/temp/
 python/tests/metrics.json
 python/tests/server_recovery.json
+fl_ssl_cert/
+fl_redis_ssl_cert/

@@ -215,7 +215,7 @@ bool Round::IsServerAvailable(std::string *reason) {
       kPrintTimes = 0;
     }
     kPrintTimes += 1;
-    *reason = kJobNotAvailable;
+    *reason = kClusterSafeMode;
     return false;
   }
   return true;

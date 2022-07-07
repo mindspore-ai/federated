@@ -76,7 +76,7 @@ void ModelStore::InitModel(const std::vector<InputWeight> &feature_map) {
     weight_item.size = feature.size;
     weight_item.shape = feature.shape;
     weight_item.type = feature.type;
-    weight_item.requires_aggr = feature.requires_aggr;
+    weight_item.require_aggr = feature.require_aggr;
     cur_offset += feature.size;
 
     Feature feature_set;
@@ -149,7 +149,7 @@ bool ModelStore::StoreModelByIterNum(size_t iteration, const std::map<std::strin
       return false;
     }
     auto &weight_item = it->second;
-    if (!weight_item.requires_aggr) {
+    if (!weight_item.require_aggr) {
       continue;
     }
     auto src_addr = weight.second.addr;
@@ -299,7 +299,7 @@ ModelItemPtr ModelStore::AssignNewModelMemory() {
   auto src_weight_base = initial_model_->weight_data.data();
   for (auto &weight : initial_model_->weight_items) {
     auto &weight_info = weight.second;
-    if (!weight_info.requires_aggr) {
+    if (!weight_info.require_aggr) {
       auto dst_size = weight_data.size() - weight_info.offset;
       ret = memcpy_s(new_weight_base + weight_info.offset, dst_size, src_weight_base + weight_info.offset,
                      weight_info.size);

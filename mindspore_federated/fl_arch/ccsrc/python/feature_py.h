@@ -29,7 +29,7 @@ namespace fl {
 class FeatureItemPy {
  public:
   FeatureItemPy(const std::string &feature_name, const py::array &data, const std::vector<size_t> &shape,
-                const std::string &dtype, bool requires_aggr);
+                const std::string &dtype, bool require_aggr);
 
   InputWeight GetWeight() const { return weight_; }
 
@@ -37,7 +37,7 @@ class FeatureItemPy {
   py::array data() { return data_; }
   std::vector<size_t> shape() const { return weight_.shape; }
   std::string dtype() const { return weight_.type; }
-  bool requires_aggr() const { return weight_.requires_aggr; }
+  bool require_aggr() const { return weight_.require_aggr; }
 
   static std::shared_ptr<FeatureItemPy> CreateFeatureFromModel(const ModelItemPtr &model,
                                                                const WeightItem &weight_item);

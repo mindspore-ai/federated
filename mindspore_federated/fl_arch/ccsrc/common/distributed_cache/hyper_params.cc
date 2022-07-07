@@ -62,6 +62,7 @@ DEFINE_HYPER_VAR(upload_sparse_rate)
 DEFINE_HYPER_VAR(download_compress_type)
 
 DEFINE_HYPER_VAR(enable_ssl)
+DEFINE_HYPER_VAR(pki_verify)
 }  // namespace
 
 CacheStatus HyperParams::InitAndSync() { return SyncOnNewInstance(); }
@@ -149,6 +150,7 @@ CacheStatus HyperParams::SyncLocal2Cache(const std::shared_ptr<RedisClientBase> 
   obj[HYPER_VAR(download_compress_type)] = compression_config.download_compress_type;
 
   obj[HYPER_VAR(enable_ssl)] = context->enable_ssl();
+  obj[HYPER_VAR(pki_verify)] = context->pki_verify();
 
   auto val = obj.dump();
   auto key = RedisKeys::GetInstance().HyperParamsString();
@@ -214,9 +216,22 @@ CacheStatus HyperParams::SyncCache2Local(const std::shared_ptr<RedisClientBase> 
     compression_config.download_compress_type = obj[HYPER_VAR(download_compress_type)];
     context->set_compression_config(compression_config);
 
-    context->set_enable_ssl(obj[HYPER_VAR(enable_ssl)]);
+    auto bool_as_str = [](bool val) -> std::string { return val ? "true" : "false"; };
+    bool cache_enable_ssl = obj[HYPER_VAR(enable_ssl)];
+    if (cache_enable_ssl != context->enable_ssl()) {
+      MS_LOG_ERROR << "Context 'enable_ssl' " << bool_as_str(context->enable_ssl()) << " of local != that "
+                   << bool_as_str(cache_enable_ssl) << " declared in distributed cache.";
+      return kCacheParamFailed;
+    }
+    bool cache_pki_verify = obj[HYPER_VAR(pki_verify)];
+    if (cache_pki_verify != context->pki_verify()) {
+      MS_LOG_ERROR << "Context 'pki_verify' " << bool_as_str(context->pki_verify()) << " of local != that "
+                   << bool_as_str(cache_pki_verify) << " declared in distributed cache.";
+      return kCacheParamFailed;
+    }
     MS_LOG_INFO << "Sync hyper params from cache success";
   } catch (const std::exception &e) {
+    MS_LOG_ERROR << "Catch exception when parse hyper params: " << e.what();
     return kCacheInnerErr;
   }
   return kCacheSuccess;

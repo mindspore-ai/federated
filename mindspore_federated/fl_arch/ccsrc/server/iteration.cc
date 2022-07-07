@@ -363,18 +363,56 @@ void Iteration::SummaryOnIterationFinish(const std::function<void()> &iteration_
     iteration_fail_num_ = 0;
   }
   SubmitSummary();
-  constexpr size_t retry_times = 20 * 5;  // retry 20s = 20*5*200ms
+  auto iteration_num = cache::InstanceContext::Instance().iteration_num();
   constexpr size_t retry_interval_in_ms = 200;
-  for (size_t i = 0; i < retry_times; i++) {
-    bool has_finished = false;
-    bool ret = cache::Summary::TryLockSummary(&has_finished);
+  size_t i = 0;
+  bool has_finished = false;
+  bool has_locked = false;
+  constexpr size_t retry_lock_times = 5 * 5;  // retry 5s = 5*5*200ms
+  // retry to acquire summary lock for 10s, until it has been acquired by other server
+  for (; i < retry_lock_times; i++) {
+    bool ret = cache::Summary::TryLockSummary(&has_finished, &has_locked);
     if (ret) {
       break;
     }
     if (has_finished) {
+      MS_LOG_INFO << "Metrics and model checkpoint of iteration " << iteration_num
+                  << " are successfully recorded by other server.";
       return;
     }
+    // has been acquired by other server
+    if (has_locked) {
+      break;
+    }
     std::this_thread::sleep_for(std::chrono::milliseconds(retry_interval_in_ms));
+  }
+  if (i >= retry_lock_times) {
+    MS_LOG_WARNING << "Failed to access the distributed cache server to acquire the summary lock";
+    return;
+  }
+  if (has_locked) {
+    bool has_expired = false;
+    constexpr size_t retry_check_times = 20 * 5;  // retry 20s = 20*5*200ms
+    for (; i < retry_check_times; i++) {
+      cache::Summary::GetSummaryLockInfo(&has_finished, &has_expired);
+      if (has_finished) {
+        MS_LOG_INFO << "Metrics and model checkpoint of iteration " << iteration_num
+                    << " are successfully recorded by other server.";
+        return;
+      }
+      if (has_expired) {
+        break;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(retry_interval_in_ms));
+    }
+    if (i >= retry_check_times) {
+      MS_LOG_WARNING << "Failed to access the distributed cache server to acquire info of the summary lock";
+      return;
+    }
+    if (has_expired) {
+      MS_LOG_WARNING << "Summary lock has been acquired by other server, and the job has not finished in 10s";
+    }
+    return;
   }
   GetAllSummaries();
   if (!SummarizeIteration()) {
@@ -384,6 +422,7 @@ void Iteration::SummaryOnIterationFinish(const std::function<void()> &iteration_
     iteration_end_callback();
   }
   cache::Summary::UnlockSummary();
+  MS_LOG_INFO << "Metrics and model checkpoint of iteration " << iteration_num << " are successfully recorded.";
 }
 
 bool Iteration::ReInitRounds() {

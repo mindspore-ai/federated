@@ -94,7 +94,7 @@ PYBIND11_MODULE(_mindspore_federated, m) {
     .def_property_readonly("feature_name", &FeatureItemPy::feature_name, "Get feature name.")
     .def_property_readonly("shape", &FeatureItemPy::shape, "Get shape.")
     .def_property_readonly("data", &FeatureItemPy::data, "Get data.")
-    .def_property_readonly("requires_aggr", &FeatureItemPy::requires_aggr, "Whether requires aggr.");
+    .def_property_readonly("require_aggr", &FeatureItemPy::require_aggr, "Whether requires aggr.");
 
   // for zero copy
   (void)py::class_<ModelItem, std::shared_ptr<ModelItem>>(m, "ModelItem_");

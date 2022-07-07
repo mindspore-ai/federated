@@ -49,7 +49,7 @@ struct InputWeight {
   size_t size = 0;
   std::vector<size_t> shape;
   std::string type;
-  bool requires_aggr = true;
+  bool require_aggr = true;
 };
 
 struct WeightItem {
@@ -58,7 +58,7 @@ struct WeightItem {
   size_t size = 0;
   std::vector<size_t> shape;
   std::string type;
-  bool requires_aggr = true;
+  bool require_aggr = true;
 };
 
 struct ModelItem {

@@ -18,7 +18,7 @@ import time
 import numpy as np
 
 from common import fl_name_with_idx, make_yaml_config, start_fl_server, g_redis_server_address, fl_test
-from common import stop_processes
+from common import stop_processes, restart_redis_server, get_default_ssl_config
 from common_client import post_start_fl_job, post_get_model, post_update_model
 from common_client import server_safemode_rsp, server_disabled_finished_rsp
 from common_client import ResponseCode, ResponseFLJob, ResponseGetModel, ResponseUpdateModel
@@ -26,7 +26,7 @@ from common import start_fl_job_expect_success, update_model_expect_success, get
 from common import check_feature_map, read_metrics
 
 from mindspore_fl.schema import CompressType
-from mindspore_federated import FeatureMap
+from mindspore_federated import FeatureMap, SSLConfig
 
 start_fl_job_reach_threshold_rsp = "Current amount for startFLJob has reached the threshold"
 update_model_reach_threshold_rsp = "Current amount for updateModel is enough."
@@ -56,10 +56,10 @@ def test_fl_server_one_server_one_client_multi_iterations_success():
     np.random.seed(0)
     feature_map = FeatureMap()
     init_feature_map = create_default_feature_map()
-    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], requires_aggr=True)
-    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], requires_aggr=True)
-    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], requires_aggr=True)
-    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], requires_aggr=False)
+    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], require_aggr=True)
+    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], require_aggr=True)
+    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], require_aggr=True)
+    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
 
     start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address)
 
@@ -140,10 +140,10 @@ def test_fl_server_one_server_two_client_start_fl_job_invalid():
     np.random.seed(0)
     feature_map = FeatureMap()
     init_feature_map = create_default_feature_map()
-    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], requires_aggr=True)
-    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], requires_aggr=True)
-    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], requires_aggr=True)
-    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], requires_aggr=False)
+    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], require_aggr=True)
+    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], require_aggr=True)
+    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], require_aggr=True)
+    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
 
     start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address)
 
@@ -204,10 +204,10 @@ def test_fl_server_one_server_two_client_update_model_invalid():
     np.random.seed(0)
     feature_map = FeatureMap()
     init_feature_map = create_default_feature_map()
-    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], requires_aggr=True)
-    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], requires_aggr=True)
-    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], requires_aggr=True)
-    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], requires_aggr=False)
+    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], require_aggr=True)
+    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], require_aggr=True)
+    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], require_aggr=True)
+    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
 
     start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address)
 
@@ -303,10 +303,10 @@ def test_fl_server_one_server_two_client_all_reduce_success():
     np.random.seed(0)
     feature_map = FeatureMap()
     init_feature_map = create_default_feature_map()
-    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], requires_aggr=True)
-    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], requires_aggr=True)
-    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], requires_aggr=True)
-    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], requires_aggr=False)
+    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], require_aggr=True)
+    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], require_aggr=True)
+    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], require_aggr=True)
+    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
 
     start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address)
 
@@ -357,19 +357,19 @@ def test_fl_server_two_server_two_client_multi_iterations_success():
     np.random.seed(0)
     feature_map = FeatureMap()
     init_feature_map = create_default_feature_map()
-    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], requires_aggr=True)
-    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], requires_aggr=True)
-    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], requires_aggr=True)
-    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], requires_aggr=False)
+    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], require_aggr=True)
+    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], require_aggr=True)
+    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], require_aggr=True)
+    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
     start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address)
 
     # init server2 with different feature map, but server2 feature map will be synced from server1
     feature_map2 = FeatureMap()
     init_feature_map2 = create_default_feature_map()
-    feature_map2.add_feature("feature_conv", init_feature_map2["feature_conv"], requires_aggr=True)
-    feature_map2.add_feature("feature_bn", init_feature_map2["feature_bn"], requires_aggr=True)
-    feature_map2.add_feature("feature_bn2", init_feature_map2["feature_bn2"], requires_aggr=True)
-    feature_map2.add_feature("feature_conv2", init_feature_map2["feature_conv2"], requires_aggr=False)
+    feature_map2.add_feature("feature_conv", init_feature_map2["feature_conv"], require_aggr=True)
+    feature_map2.add_feature("feature_bn", init_feature_map2["feature_bn"], require_aggr=True)
+    feature_map2.add_feature("feature_bn2", init_feature_map2["feature_bn2"], require_aggr=True)
+    feature_map2.add_feature("feature_conv2", init_feature_map2["feature_conv2"], require_aggr=False)
     start_fl_server(feature_map=feature_map2, yaml_config=yaml_config_file, http_server_address=http_server_address2)
 
     iteration = 1
@@ -481,29 +481,31 @@ def test_fl_server_three_server_two_client_one_iterations_success():
     np.random.seed(0)
     feature_map = FeatureMap()
     init_feature_map = create_default_feature_map()
-    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], requires_aggr=True)
-    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], requires_aggr=True)
-    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], requires_aggr=True)
-    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], requires_aggr=False)
+    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], require_aggr=True)
+    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], require_aggr=True)
+    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], require_aggr=True)
+    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
     start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address)
 
-    # init server2 with different feature map, but will be synced from server1
+    # init server2 with different feature map values, but will be synced from server1
     feature_map2 = FeatureMap()
     init_feature_map2 = create_default_feature_map()
-    feature_map2.add_feature("xfeature_conv", init_feature_map2["feature_conv"], requires_aggr=True)
-    feature_map2.add_feature("xfeature_bn", init_feature_map2["feature_bn"], requires_aggr=True)
-    feature_map2.add_feature("xfeature_bn2", init_feature_map2["feature_bn2"], requires_aggr=True)
-    feature_map2.add_feature("xfeature_conv2", init_feature_map2["feature_conv2"], requires_aggr=False)
+    feature_map2.add_feature("feature_conv", init_feature_map2["feature_conv"], require_aggr=True)
+    feature_map2.add_feature("feature_bn", init_feature_map2["feature_bn"], require_aggr=True)
+    feature_map2.add_feature("feature_bn2", init_feature_map2["feature_bn2"], require_aggr=True)
+    feature_map2.add_feature("feature_conv2", init_feature_map2["feature_conv2"], require_aggr=False)
     # init server2 with different yaml config, but will be synced from server1
     yaml_config_file2 = f"temp/yaml_{fl_name}_config2.yaml"
     make_yaml_config(fl_name, {}, output_yaml_file=yaml_config_file2, start_fl_job_threshold=1)
     start_fl_server(feature_map=feature_map2, yaml_config=yaml_config_file2, http_server_address=http_server_address2)
 
-    # init server3 with different missing feature map, but will be synced from server1
+    # init server3 with different feature map values, but will be synced from server1
     feature_map3 = FeatureMap()
     init_feature_map3 = create_default_feature_map()
-    feature_map3.add_feature("feature_conv", init_feature_map3["feature_conv"], requires_aggr=True)
-    feature_map3.add_feature("feature_conv2", init_feature_map3["feature_conv2"], requires_aggr=False)
+    feature_map3.add_feature("feature_conv", init_feature_map3["feature_conv"], require_aggr=True)
+    feature_map3.add_feature("feature_bn", init_feature_map3["feature_bn"], require_aggr=True)
+    feature_map3.add_feature("feature_bn2", init_feature_map3["feature_bn2"], require_aggr=True)
+    feature_map3.add_feature("feature_conv2", init_feature_map3["feature_conv2"], require_aggr=False)
     # init server2 with different yaml config, but will be synced from server1
     yaml_config_file3 = f"temp/yaml_{fl_name}_config3.yaml"
     make_yaml_config(fl_name, {}, output_yaml_file=yaml_config_file3, start_fl_job_threshold=3)
@@ -555,6 +557,95 @@ def test_fl_server_three_server_two_client_one_iterations_success():
 
 
 @fl_test
+def test_fl_server_check_model_infos_success():
+    """
+    Feature: Server
+    Description: Test the function of aggregation of three server with two client.
+    Expectation: The aggregation weights of all servers meets the expectation.
+    """
+    fl_name = fl_name_with_idx("FlTest")
+    http_server_address = "127.0.0.1:3001"
+    http_server_address2 = "127.0.0.1:3002"
+    http_server_address3 = "127.0.0.1:3003"
+    yaml_config_file = f"temp/yaml_{fl_name}_config.yaml"
+    make_yaml_config(fl_name, {}, output_yaml_file=yaml_config_file, start_fl_job_threshold=2)
+
+    np.random.seed(0)
+    feature_map = FeatureMap()
+    init_feature_map = create_default_feature_map()
+    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], require_aggr=True)
+    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], require_aggr=True)
+    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], require_aggr=True)
+    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
+    server0 = start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file,
+                              http_server_address=http_server_address)
+
+    # init server2 with different feature map
+    feature_map = FeatureMap()
+    feature_map.add_feature("xfeature_conv", init_feature_map["feature_conv"], require_aggr=True)
+    feature_map.add_feature("xfeature_bn", init_feature_map["feature_bn"], require_aggr=True)
+    feature_map.add_feature("xfeature_bn2", init_feature_map["feature_bn2"], require_aggr=True)
+    feature_map.add_feature("xfeature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
+    # init server2 with different yaml config, but will be synced from server1
+    yaml_config_file2 = f"temp/yaml_{fl_name}_config2.yaml"
+    make_yaml_config(fl_name, {}, output_yaml_file=yaml_config_file2, start_fl_job_threshold=1)
+    try:
+        start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file2,
+                        http_server_address=http_server_address2)
+        assert False
+    except Exception as e:
+        assert "The features are inconsistent with that declared in distributed cache: cannot find feature" in str(e)
+
+    # init server3 with different missing feature map, but will be synced from server1
+    feature_map = FeatureMap()
+    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], require_aggr=True)
+    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
+    # init server2 with different yaml config, but will be synced from server1
+    yaml_config_file3 = f"temp/yaml_{fl_name}_config3.yaml"
+    make_yaml_config(fl_name, {}, output_yaml_file=yaml_config_file3, start_fl_job_threshold=3)
+    try:
+        start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file3,
+                        http_server_address=http_server_address3)
+        assert False
+    except Exception as e:
+        assert "The number 2 of local features != the number 4 declared in the the distributed cache" in str(e)
+    assert stop_processes(server0)
+
+    try:
+        start_fl_server(feature_map=FeatureMap(), yaml_config=yaml_config_file3,
+                        http_server_address=http_server_address3)
+        assert False
+    except Exception as e:
+        assert "The number 0 of local features != the number 4 declared in the the distributed cache" in str(e)
+
+    # require_aggr not match
+    feature_map = FeatureMap()
+    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], require_aggr=True)
+    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], require_aggr=False)  # not match
+    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], require_aggr=True)
+    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
+    try:
+        start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file3,
+                        http_server_address=http_server_address3)
+        assert False
+    except Exception as e:
+        assert "The feature require_aggr 0 of local != that 1 declared in the distributed cache" in str(e)
+
+    # size not match
+    feature_map = FeatureMap()
+    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"][0], require_aggr=True)  # not match
+    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], require_aggr=True)
+    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], require_aggr=True)
+    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
+    try:
+        start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file3,
+                        http_server_address=http_server_address3)
+        assert False
+    except Exception as e:
+        assert "The feature size 12 of local != that 24 declared in the distributed cache" in str(e)
+
+
+@fl_test
 def test_fl_server_checkpoint_save_load_success():
     """
     Feature: Server
@@ -570,10 +661,10 @@ def test_fl_server_checkpoint_save_load_success():
     np.random.seed(0)
     feature_map = FeatureMap()
     init_feature_map = create_default_feature_map()
-    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], requires_aggr=True)
-    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], requires_aggr=True)
-    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], requires_aggr=True)
-    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], requires_aggr=False)
+    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], require_aggr=True)
+    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], require_aggr=True)
+    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], require_aggr=True)
+    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
 
     # start for first time
     server_process = \
@@ -670,10 +761,10 @@ def test_fl_server_exit_move_next_iteration_success():
     np.random.seed(0)
     feature_map = FeatureMap()
     init_feature_map = create_default_feature_map()
-    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], requires_aggr=True)
-    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], requires_aggr=True)
-    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], requires_aggr=True)
-    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], requires_aggr=False)
+    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], require_aggr=True)
+    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], require_aggr=True)
+    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], require_aggr=True)
+    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
 
     # start for first time
     server_process = \
@@ -726,10 +817,10 @@ def test_fl_server_exit_move_next_iteration_with_two_server_success():
     np.random.seed(0)
     feature_map = FeatureMap()
     init_feature_map = create_default_feature_map()
-    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], requires_aggr=True)
-    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], requires_aggr=True)
-    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], requires_aggr=True)
-    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], requires_aggr=False)
+    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], require_aggr=True)
+    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], require_aggr=True)
+    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], require_aggr=True)
+    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
 
     # start for first time
     server_process = \
@@ -782,10 +873,10 @@ def test_fl_server_exit_no_move_next_iteration_with_two_server_success():
     np.random.seed(0)
     feature_map = FeatureMap()
     init_feature_map = create_default_feature_map()
-    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], requires_aggr=True)
-    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], requires_aggr=True)
-    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], requires_aggr=True)
-    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], requires_aggr=False)
+    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], require_aggr=True)
+    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], require_aggr=True)
+    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], require_aggr=True)
+    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
 
     # start for first time
     server_process = \
@@ -827,3 +918,33 @@ def test_fl_server_exit_no_move_next_iteration_with_two_server_success():
 
     # get model
     get_model_expect_success(http_server_address2, fl_name, iteration)
+
+
+@fl_test
+def test_fl_server_connect_to_killed_server_start_success():
+    """
+    Feature: Server
+    Description: Kill the first server, and the second server retry connect for 15s
+    Expectation: The first server expired(heartbeat 10s timeout) and the second server start successfully.
+    """
+    fl_name = fl_name_with_idx("FlTest")
+    http_server_address = "127.0.0.1:3001"
+    yaml_config_file = f"temp/yaml_{fl_name}_config.yaml"
+    make_yaml_config(fl_name, {}, output_yaml_file=yaml_config_file, start_fl_job_threshold=2)
+
+    np.random.seed(0)
+    feature_map = FeatureMap()
+    init_feature_map = create_default_feature_map()
+    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], require_aggr=True)
+    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], require_aggr=True)
+    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], require_aggr=True)
+    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
+
+    server0 = start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file,
+                              http_server_address=http_server_address)
+    # kill first server
+    server0.kill()
+    # start other server
+    http_server_address = "127.0.0.1:3002"
+    start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address,
+                    max_time_sec_wait=20)

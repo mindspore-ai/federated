@@ -51,9 +51,6 @@ bool SchedulerNode::Stop() {
                     << ", the port:" << scheduler_address;
     StopRestfulServer();
   }
-  if (stop_thread_.joinable()) {
-    stop_thread_.join();
-  }
   return true;
 }
 
@@ -334,104 +331,6 @@ void SchedulerNode::ProcessDisableFLS(const std::shared_ptr<HttpMessageHandler> 
   resp->SendResponse();
 }
 
-void SchedulerNode::StopThreadFunc() {
-  std::string fl_name = FLContext::instance()->fl_name();
-  // for 20s
-  constexpr uint64_t max_wait_stop_time = 20;
-  for (size_t i = 0; i < max_wait_stop_time; i++) {
-    std::this_thread::sleep_for(std::chrono::seconds(1));
-    std::map<std::string, std::string> server_map;
-    auto cache_ret = cache::Scheduler::Instance().GetAllServersRealtime(fl_name, &server_map);
-    if (cache_ret == cache::kCacheNetErr) {
-      MS_LOG_WARNING << "Failed to get nodes because of network error";
-      continue;
-    }
-    if (cache_ret == cache::kCacheNil) {
-      break;
-    }
-    if (!cache_ret.IsSuccess()) {
-      MS_LOG_WARNING << "Failed to get nodes because of some inner error";
-      continue;
-    }
-    if (server_map.empty()) {
-      MS_LOG_INFO << "All servers has exited successfully";
-      break;
-    }
-  }
-  auto cache_ret = cache::Scheduler::Instance().ClearFLJob(fl_name);
-  if (cache_ret == cache::kCacheNetErr) {
-    MS_LOG_WARNING << "Failed to clear fl job " << fl_name << " because of network error";
-    return;
-  }
-  MS_LOG_INFO << "Stop fl job " << fl_name << " successfully";
-}
-
-void SchedulerNode::ProcessStopFLS(const std::shared_ptr<HttpMessageHandler> &resp) {
-  if (resp == nullptr) {
-    return;
-  }
-  auto response_ok = [&resp](const std::string &msg) {
-    nlohmann::json js;
-    js["message"] = msg;
-    js["code"] = kSuccessCode;
-
-    resp->AddRespString(js.dump());
-    resp->AddRespHeadParam("Content-Type", "application/json");
-
-    resp->SetRespCode(HTTP_OK);
-    resp->SendResponse();
-  };
-  std::string fl_name = FLContext::instance()->fl_name();
-  cache::InstanceState state;
-  auto status = cache::Scheduler::Instance().GetAllClusterState(fl_name, &state);
-  if (status == cache::kCacheNetErr) {
-    auto message = "Failed to access the cache server. Please retry later.";
-    resp->ErrorResponse(HTTP_BADREQUEST, message);
-    return;
-  }
-  if (status == cache::kCacheNil) {
-    response_ok("FL job " + fl_name + " has stopped");
-    return;
-  }
-  if (!status.IsSuccess()) {
-    auto message = "Failed to get cluster state because of some inner error.";
-    resp->ErrorResponse(HTTP_BADREQUEST, message);
-    return;
-  }
-  if (state == cache::kStateStop) {
-    response_ok("FL job " + fl_name + " is stopping.");
-    return;
-  }
-  auto cache_ret = cache::Scheduler::Instance().StopFLJob(fl_name);
-  if (cache_ret == cache::kCacheNetErr) {
-    auto message = "Failed to access the cache server. Please retry later.";
-    resp->ErrorResponse(HTTP_BADREQUEST, message);
-    return;
-  }
-  if (cache_ret == cache::kCacheNil) {
-    response_ok("FL job " + fl_name + " has stopped");
-    return;
-  }
-  if (!cache_ret.IsSuccess()) {
-    auto message = "Failed to stop cluster because of some inner error. Please retry later.";
-    resp->ErrorResponse(HTTP_BADREQUEST, message);
-    return;
-  }
-  std::unique_lock<std::mutex> lock(lock_);
-  if (!stopping_) {
-    stopping_ = true;
-    if (stop_thread_.joinable()) {
-      stop_thread_.join();
-    }
-    stop_thread_ = std::thread([this]() {
-      StopThreadFunc();
-      std::unique_lock<std::mutex> lock(lock_);
-      stopping_ = false;
-    });
-  }
-  response_ok("FL job " + fl_name + " starts to stop. Post the same request repeatedly later to obtain the result.");
-}
-
 void SchedulerNode::StartRestfulServer(const std::string &address, std::uint16_t port, size_t thread_num) {
   MS_LOG(INFO) << "Scheduler start https server.";
   http_server_ = std::make_shared<HttpServer>(address, port, thread_num);
@@ -456,10 +355,6 @@ void SchedulerNode::StartRestfulServer(const std::string &address, std::uint16_t
   OnRequestReceive disable_fls = std::bind(&SchedulerNode::ProcessDisableFLS, this, std::placeholders::_1);
   callbacks_["/disableFLS"] = disable_fls;
   (void)http_server_->RegisterRoute("/disableFLS", &callbacks_["/disableFLS"]);
-
-  OnRequestReceive stop_fls = std::bind(&SchedulerNode::ProcessStopFLS, this, std::placeholders::_1);
-  callbacks_["/stopFLS"] = stop_fls;
-  (void)http_server_->RegisterRoute("/stopFLS", &callbacks_["/stopFLS"]);
 
   if (!http_server_->Start()) {
     MS_LOG(EXCEPTION) << "The scheduler start http server failed, server address: " << address << ":" << port;

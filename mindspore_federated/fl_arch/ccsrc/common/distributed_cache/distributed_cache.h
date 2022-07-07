@@ -89,6 +89,7 @@ class DistributedCacheBase {
   virtual std::shared_ptr<RedisClientBase> GetOneClient() = 0;
   virtual bool HasInvalid() const = 0;
   virtual CacheStatus RetryConnect() = 0;
+  virtual void Clear() = 0;
 };
 
 class DistributedCacheLoader {
@@ -101,6 +102,7 @@ class DistributedCacheLoader {
   std::shared_ptr<RedisClientBase> GetOneClient();
   bool HasInvalid() const;
   CacheStatus RetryConnect();
+  void Clear();
 
   void set_available(bool available) { available_ = available; }
   bool available() const { return available_; }

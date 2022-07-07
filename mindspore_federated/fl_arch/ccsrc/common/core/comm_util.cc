@@ -42,7 +42,7 @@ bool CommUtil::CheckIpWithRegex(const std::string &ip) {
     "[.](25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[0-9])"
     "[.](25[0-4]|2[0-4][0-9]|1[0-9][0-9]|[1-9][0-9]|[1-9])");
   std::smatch res;
-  if (regex_match(ip, res, pattern)) {
+  if (std::regex_match(ip, res, pattern)) {
     return true;
   }
   return false;

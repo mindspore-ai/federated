@@ -133,6 +133,7 @@ class RedisDistributedCache : public DistributedCacheBase {
   std::shared_ptr<RedisClientBase> GetOneClient() override;
   bool HasInvalid() const override;
   CacheStatus RetryConnect() override;
+  void Clear() override;
 
  private:
   DistributedCacheConfig cache_config_;

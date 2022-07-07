@@ -187,6 +187,8 @@ void InstanceContext::OnNewIteration() {
   }
   // clear cache
   ClearCache();
+  // Sync server when distributed cache restart cause move to next
+  (void)Server::Instance().Sync();
   auto fl_iteration_num = FLContext::instance()->fl_iteration_num();
   if (new_iteration_num_ > fl_iteration_num) {
     set_instance_state(kStateFinish);
@@ -296,10 +298,10 @@ std::string InstanceContext::GetPrime() {
   return prime;
 }
 
-CacheStatus InstanceContext::Sync() {
+CacheStatus InstanceContext::Sync(bool *is_cache_empty) {
   std::unique_lock<std::mutex> lock(lock_);
   need_sync_ = true;
-  auto ret = SyncInner();
+  auto ret = SyncInner(is_cache_empty);
   if (ret.IsSuccess()) {
     need_sync_ = false;
   }
@@ -335,7 +337,10 @@ CacheStatus InstanceContext::SyncInstanceName(const std::shared_ptr<RedisClientB
   return kCacheSuccess;
 }
 
-CacheStatus InstanceContext::SyncInner() {
+CacheStatus InstanceContext::SyncInner(bool *is_cache_empty) {
+  if (is_cache_empty != nullptr) {
+    *is_cache_empty = false;
+  }
   auto client = DistributedCacheLoader::Instance().GetOneClient();
   if (client == nullptr) {
     MS_LOG_ERROR << "Get redis client failed";
@@ -358,6 +363,9 @@ CacheStatus InstanceContext::SyncInner() {
   // key not exist
   if (values.empty()) {
     MS_LOG_WARNING << "Running status in distributed cache is empty";
+    if (is_cache_empty != nullptr) {
+      *is_cache_empty = true;
+    }
     return UpdateCacheWhenCacheEmpty(client);
   }
   // sync state

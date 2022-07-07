@@ -13,28 +13,41 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef MINDSPORE_FL_CACHE_SUMMARY_H
-#define MINDSPORE_FL_CACHE_SUMMARY_H
+#ifndef MINDSPORE_FL_CACHE_MODEL_H
+#define MINDSPORE_FL_CACHE_MODEL_H
 #include <string>
 #include <vector>
-#include "distributed_cache/cache_status.h"
+#include <map>
+#include "distributed_cache/distributed_cache.h"
+
 namespace mindspore {
 namespace fl {
 namespace cache {
-class Summary {
+struct WeightInfo {
+  std::string name;
+  size_t size = 0;
+  std::vector<size_t> shape;  // no check
+  std::string type;
+  bool require_aggr = true;
+};
+
+class ModelInfo {
  public:
-  static Summary &Instance() {
-    static Summary instance;
+  static ModelInfo &Instance() {
+    static ModelInfo instance;
     return instance;
   }
-  static CacheStatus SubmitSummary(const std::string &summary_pb);
-  static void GetAllSummaries(std::vector<std::string> *summary_pbs);
+  void Init(const std::map<std::string, WeightInfo> &weight_infos);
 
-  static bool TryLockSummary(bool *has_finished, bool *has_locked);
-  static void GetSummaryLockInfo(bool *has_finished, bool *lock_expired);
-  static void UnlockSummary();
+  CacheStatus SyncPeriod();
+
+  static CacheStatus SyncLocal2Cache(const std::map<std::string, WeightInfo> &weight_infos);
+  static CacheStatus SyncCache2Local(std::map<std::string, WeightInfo> *weight_infos);
+
+ private:
+  std::map<std::string, WeightInfo> weight_infos_;
 };
 }  // namespace cache
 }  // namespace fl
 }  // namespace mindspore
-#endif  // MINDSPORE_FL_CACHE_SUMMARY_H
+#endif  // MINDSPORE_FL_CACHE_MODEL_H

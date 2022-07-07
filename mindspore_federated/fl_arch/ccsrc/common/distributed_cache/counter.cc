@@ -298,12 +298,14 @@ bool Counter::GetCountInner(const std::shared_ptr<RedisClientBase> &client, cons
       MS_LOG_WARNING << "Get hash count " << name << " failed";
       return false;
     }
+    bool has_server_exit = false;
     for (auto &count_item : count_map) {
       if (!server_map.count(count_item.first)) {
-        info.has_server_exit = true;
+        has_server_exit = true;
       }
       cur_count += count_item.second;
     }
+    info.has_server_exit = has_server_exit;
   } else {
     auto key = RedisKeys::GetInstance().CountHash();
     std::string count_str;
@@ -355,9 +357,6 @@ void Counter::Sync() {
   for (auto &item : counter_map_) {
     const auto &name = item.first;
     auto &info = item.second;
-    if (info.first_triggered && info.last_triggered) {
-      continue;
-    }
     uint64_t cur_count = 0;
     if (info.server_hash_) {
       if (!GetCountInner(client, name, &cur_count)) {

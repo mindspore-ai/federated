@@ -46,7 +46,7 @@ FlStatus Executor::CheckUpdatedModel(const std::map<std::string, Address> &featu
   for (auto &param_item : param_aggregation_info_) {
     auto &param_name = param_item.first;
     auto &param_aggr = param_item.second;
-    if (!param_aggr.requires_aggr) {
+    if (!param_aggr.require_aggr) {
       continue;
     }
     auto it = feature_map.find(param_name);
@@ -71,7 +71,7 @@ void Executor::HandleModelUpdate(const std::map<std::string, Address> &feature_m
   for (auto &param_item : param_aggregation_info_) {
     auto &param_name = param_item.first;
     auto &param_aggr = param_item.second;
-    if (!param_aggr.requires_aggr) {
+    if (!param_aggr.require_aggr) {
       continue;
     }
     auto it = feature_map.find(param_name);
@@ -391,7 +391,7 @@ bool Executor::RunWeightAggregationInner(const std::map<std::string, std::string
   std::unique_lock<std::mutex> lock(parameter_mutex_);
   for (auto &item : param_aggregation_info_) {
     auto &param_aggr = item.second;
-    if (!param_aggr.requires_aggr) {
+    if (!param_aggr.require_aggr) {
       continue;
     }
     if (!kernel::FedAvgKernel<float, size_t>::AllReduce(server_map, &param_aggr)) {
@@ -429,7 +429,7 @@ bool Executor::ResetAggregationStatus() {
     info.weight_data = weight_data + weight_item.offset;
     info.weight_size = weight_item.size;
     info.data_size = 0;
-    info.requires_aggr = weight_item.requires_aggr;
+    info.require_aggr = weight_item.require_aggr;
     param_aggregation_info_[info.name] = info;
   }
   return true;
@@ -481,7 +481,7 @@ bool Executor::TransModel2ProtoModel(uint64_t iteration_num, const ModelItemPtr 
     auto proto_weight = proto_model->add_weights();
     proto_weight->set_name(weight.name);
     proto_weight->set_type(weight.type);
-    proto_weight->set_requires_aggr(weight.requires_aggr);
+    proto_weight->set_require_aggr(weight.require_aggr);
     for (auto &dim : weight.shape) {
       proto_weight->add_shape(static_cast<int64_t>(dim));
     }

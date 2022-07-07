@@ -14,10 +14,13 @@
 # ============================================================================
 """SSL config for start up FL"""
 from mindspore_federated._mindspore_federated import FLContext
+from ..common import check_type
 
 
 class SSLConfig:
     def __init__(self, server_password, client_password):
+        check_type.check_str("server_password", server_password)
+        check_type.check_str("client_password", client_password)
         self.server_password = server_password
         self.client_password = client_password
 

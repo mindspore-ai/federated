@@ -34,6 +34,7 @@
 #include "distributed_cache/server.h"
 #include "distributed_cache/timer.h"
 #include "distributed_cache/counter.h"
+#include "distributed_cache/model_info.h"
 #include "python/feature_py.h"
 
 namespace mindspore {
@@ -245,7 +246,8 @@ void Server::RunMainProcessInner() {
   }
   // sync with cache, get info about iteration and instance
   auto &instance_context = cache::InstanceContext::Instance();
-  cache_ret = instance_context.Sync();
+  bool is_cache_empty = false;
+  cache_ret = instance_context.Sync(&is_cache_empty);
   if (!cache_ret.IsSuccess()) {  // failed to sync with cache, retry later
     MS_LOG_WARNING << "Sync instance context with distributed cache failed";
     return;
@@ -254,6 +256,13 @@ void Server::RunMainProcessInner() {
     MS_LOG_INFO << "Receive /stop message from scheduler and begin exit";
     ExitHandler::Instance().SetStopFlag();
     return;
+  }
+  if (is_cache_empty) {
+    auto curr_iter_num = cache::InstanceContext::Instance().iteration_num();
+    std::string reason = "The instance status info stored in distributed cache is empty, current iteration: " +
+                         std::to_string(curr_iter_num);
+    MS_LOG_WARNING << reason;
+    Executor::GetInstance().FinishIteration(false, reason);
   }
   // sync with cache, trigger counter event: first/last count.
   // result: start/stop timer, AllReduce
@@ -321,6 +330,7 @@ void Server::Stop() {
     server_node_->Stop();
   }
   cache::Server::Instance().Stop();
+  cache::DistributedCacheLoader::Instance().Clear();
   has_stopped_ = true;
 }
 
@@ -500,10 +510,56 @@ void Server::InitCipher() {
 void Server::InitExecutor(const std::vector<InputWeight> &init_feature_map) {
   auto status = SyncAndInitModel(init_feature_map);
   if (!status.IsSuccess()) {
-    MS_LOG_EXCEPTION << "Load model failed: " << status.StatusMessage();
+    MS_LOG_EXCEPTION << "Sync and init model failed: " << status.StatusMessage();
   }
   // reset weight memory to 0 after get model
   Executor::GetInstance().ResetAggregationStatus();
+}
+
+void Server::SyncAndCheckModelInfo(const std::vector<InputWeight> &init_feature_map) {
+  std::map<std::string, cache::WeightInfo> model_infos;
+  for (auto &item : init_feature_map) {
+    auto &feature_info = model_infos[item.name];
+    feature_info.name = item.name;
+    feature_info.size = item.size;
+    feature_info.shape = item.shape;
+    feature_info.type = item.type;
+    feature_info.require_aggr = item.require_aggr;
+  }
+  auto cache_ret = cache::ModelInfo::SyncLocal2Cache(model_infos);
+  if (cache_ret == cache::kCacheExist) {
+    std::map<std::string, cache::WeightInfo> cache_infos;
+    cache_ret = cache::ModelInfo::SyncCache2Local(&cache_infos);
+    if (!cache_ret.IsSuccess()) {
+      MS_LOG_EXCEPTION << "Failed to get model info from distributed cache";
+    }
+    if (model_infos.size() != cache_infos.size()) {
+      MS_LOG_EXCEPTION << "The number " << model_infos.size() << " of local features != the number "
+                       << cache_infos.size() << " declared in the the distributed cache";
+    }
+    for (auto &cache_item : cache_infos) {
+      auto &cache_info = cache_item.second;
+      auto it = model_infos.find(cache_info.name);
+      if (it == model_infos.end()) {
+        MS_LOG_EXCEPTION
+          << "The features are inconsistent with that declared in distributed cache: cannot find feature "
+          << cache_info.name << " in local";
+      }
+      auto &local_info = it->second;
+      if (local_info.size != cache_info.size) {
+        MS_LOG_EXCEPTION << "The feature size " << local_info.size << " of local != that " << cache_info.size
+                         << " declared in the distributed cache, feature: " << cache_info.name;
+      }
+      if (local_info.require_aggr != cache_info.require_aggr) {
+        MS_LOG_EXCEPTION << "The feature require_aggr " << local_info.require_aggr << " of local != that "
+                         << cache_info.require_aggr
+                         << " declared in the distributed cache, feature: " << cache_info.name;
+      }
+    }
+  } else if (!cache_ret.IsSuccess()) {
+    MS_LOG_EXCEPTION << "Failed to set model info to distributed cache";
+  }
+  cache::ModelInfo::Instance().Init(model_infos);
 }
 
 FlStatus Server::SyncAndInitModel(const std::vector<InputWeight> &init_feature_map) {
@@ -512,6 +568,9 @@ FlStatus Server::SyncAndInitModel(const std::vector<InputWeight> &init_feature_m
     MS_LOG_ERROR << reason;
     return {kFlFailed, reason};
   }
+  // check model info
+  SyncAndCheckModelInfo(init_feature_map);
+
   // new_iteration_num is the iteration to be updated
   auto updated_iteration = cache::InstanceContext::Instance().new_iteration_num();
   if (updated_iteration <= 0) {
@@ -522,8 +581,8 @@ FlStatus Server::SyncAndInitModel(const std::vector<InputWeight> &init_feature_m
   VectorPtr output = nullptr;
   if (server_node_->GetModelWeight(model_latest_iteration, &output)) {
     ProtoModel proto_model;
-    if (!proto_model.ParseFromArray(output->data(), output->size())) {
-      auto reason = "Failed to store model synced from other servers";
+    if (!proto_model.ParseFromArray(output->data(), static_cast<int>(output->size()))) {
+      auto reason = "Failed to parse model proto synced from other servers";
       return {kFlFailed, reason};
     }
     std::vector<InputWeight> feature_map;
@@ -533,7 +592,7 @@ FlStatus Server::SyncAndInitModel(const std::vector<InputWeight> &init_feature_m
       weight.type = proto_weight.type();
       weight.size = proto_weight.data().size();
       weight.data = proto_weight.data().data();
-      weight.requires_aggr = proto_weight.requires_aggr();
+      weight.require_aggr = proto_weight.require_aggr();
       auto &proto_shape = proto_weight.shape();
       std::copy(proto_shape.begin(), proto_shape.end(), std::back_inserter(weight.shape));
       feature_map.push_back(weight);
