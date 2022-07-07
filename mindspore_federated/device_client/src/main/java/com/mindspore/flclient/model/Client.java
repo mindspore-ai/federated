@@ -28,8 +28,11 @@ import com.mindspore.MSTensor;
 import com.mindspore.Model;
 import mindspore.fl.schema.FeatureMap;
 
+import java.io.File;
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.file.Files;
 import java.util.*;
 import java.util.logging.Logger;
 import java.util.stream.IntStream;
@@ -100,6 +103,53 @@ public abstract class Client {
      */
     public abstract List<Object> getInferResult(List<Callback> inferCallback);
 
+    private void backupModelFile(String origFile) {
+        File ofile = new File(origFile);
+        // the backup file of model
+        String bakFile = ofile.getParent() + "/bak_" + ofile.getName();
+        File dfile = new File(bakFile);
+        if (dfile.exists() || !ofile.exists()) {
+            return;
+        }
+
+        try {
+            logger.info("Backup model file:" + origFile + " to :" + bakFile);
+            Files.copy(ofile.toPath(), dfile.toPath());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    /**
+     * restore model file from bak
+     *
+     * @param fileName
+     */
+    public void restoreModelFile(String fileName) {
+        File dfile = new File(fileName);
+        // the backup file of model
+        String bakFile = dfile.getParent() + "/bak_" + dfile.getName();
+        File bfile = new File(bakFile);
+        if (!bfile.exists()) {
+            logger.severe("Restore failed, backup file:" + bfile.getName() + " not exist.");
+            return;
+        }
+
+        if (dfile.exists()) {
+            logger.severe("Delete the origin file:" + dfile.getName());
+            dfile.delete();
+        }
+
+        try {
+            logger.info("Restore model file:" + dfile.getName() + " from :" + bfile.getName());
+            Files.copy(bfile.toPath(), dfile.toPath());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
     public Status initModel(FLParameter flParameter) {
         String trainModelPath = flParameter.getTrainModelPath();
         String inferModelPath = flParameter.getInferModelPath();
@@ -107,6 +157,7 @@ public abstract class Client {
 
         Status initRet = Status.FAILED;
         if (trainModelPath != null && !trainModelPath.isEmpty()) {
+            backupModelFile(trainModelPath);
             trainModelProxy = new ModelProxy();
             initRet = trainModelProxy.initModel(trainModelPath, inputShapes);
         }

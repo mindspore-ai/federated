@@ -488,8 +488,8 @@ public class SyncFLJob {
         String serverMod = args[19];
         String inputShape = args[21];
         int batchSize = Integer.parseInt(args[20]);
-        FLParameter flParameter = FLParameter.getInstance();
 
+        FLParameter flParameter = FLParameter.getInstance();
         if (!("null".equals(inputShape) || inputShape == null)) {
             flParameter.setInputShape(getInputShapeArray(inputShape));
         }
