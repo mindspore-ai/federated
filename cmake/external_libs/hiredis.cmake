@@ -13,7 +13,7 @@ mindspore_add_pkg(hiredis
         MD5 ${MD5}
         CMAKE_OPTION -DCMAKE_BUILD_TYPE:STRING=Release
         -DENABLE_SSL:BOOL=ON
-        -DDISABLE_TESTS:BOOL=ON)
+        -DDISABLE_TESTS:BOOL=ON -DOPENSSL_ROOT_DIR:PATH=${openssl_ROOT})
 
 include_directories(${hiredis_INC})
 add_library(mindspore_federated::hiredis ALIAS hiredis::hiredis)

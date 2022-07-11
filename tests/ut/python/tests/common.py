@@ -67,6 +67,7 @@ def fl_test(func):
             logger.info("Fl test begin to clear")
             global g_server_processes
             stop_processes(g_server_processes)
+            g_server_processes = []
             clean_temp_files()
             logger.info("Fl test end clear")
 

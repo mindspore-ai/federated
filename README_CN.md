@@ -71,7 +71,7 @@ sudo apt-get install redis
 运行Redis服务器：
 
 ```shell
-redis-server --port 2345
+redis-server --port 2345 --save ""
 ```
 
 #### 安装MindSpore

@@ -57,7 +57,7 @@ diff -Npur grpc/CMakeLists.txt grpc-patch/CMakeLists.txt
    SOVERSION ${gRPC_CORE_SOVERSION}
  )
 
-+set_target_properties(address_sorting PROPERTIES OUTPUT_NAME mindspore_serving_address_sorting)
++set_target_properties(address_sorting PROPERTIES OUTPUT_NAME mindspore_federated_address_sorting)
 +
  if(WIN32 AND MSVC)
    set_target_properties(address_sorting PROPERTIES COMPILE_PDB_NAME "address_sorting"
@@ -66,7 +66,7 @@ diff -Npur grpc/CMakeLists.txt grpc-patch/CMakeLists.txt
    SOVERSION ${gRPC_CORE_SOVERSION}
  )
 
-+set_target_properties(gpr PROPERTIES OUTPUT_NAME mindspore_serving_gpr)
++set_target_properties(gpr PROPERTIES OUTPUT_NAME mindspore_federated_gpr)
 +
  if(WIN32 AND MSVC)
    set_target_properties(gpr PROPERTIES COMPILE_PDB_NAME "gpr"
@@ -75,7 +75,7 @@ diff -Npur grpc/CMakeLists.txt grpc-patch/CMakeLists.txt
    SOVERSION ${gRPC_CORE_SOVERSION}
  )
 
-+set_target_properties(grpc PROPERTIES OUTPUT_NAME mindspore_serving_grpc)
++set_target_properties(grpc PROPERTIES OUTPUT_NAME mindspore_federated_grpc)
 +
  if(WIN32 AND MSVC)
    set_target_properties(grpc PROPERTIES COMPILE_PDB_NAME "grpc"
@@ -84,7 +84,7 @@ diff -Npur grpc/CMakeLists.txt grpc-patch/CMakeLists.txt
    SOVERSION ${gRPC_CPP_SOVERSION}
  )
 
-+set_target_properties(grpc++ PROPERTIES OUTPUT_NAME mindspore_serving_grpc++)
++set_target_properties(grpc++ PROPERTIES OUTPUT_NAME mindspore_federated_grpc++)
 +
  if(WIN32 AND MSVC)
    set_target_properties(grpc++ PROPERTIES COMPILE_PDB_NAME "grpc++"
@@ -93,7 +93,7 @@ diff -Npur grpc/CMakeLists.txt grpc-patch/CMakeLists.txt
    SOVERSION ${gRPC_CPP_SOVERSION}
  )
 
-+set_target_properties(grpc++_reflection PROPERTIES OUTPUT_NAME mindspore_serving_grpc++_reflection)
++set_target_properties(grpc++_reflection PROPERTIES OUTPUT_NAME mindspore_federated_grpc++_reflection)
 +
  if(WIN32 AND MSVC)
    set_target_properties(grpc++_reflection PROPERTIES COMPILE_PDB_NAME "grpc++_reflection"
@@ -102,7 +102,7 @@ diff -Npur grpc/CMakeLists.txt grpc-patch/CMakeLists.txt
    SOVERSION ${gRPC_CORE_SOVERSION}
  )
 
-+set_target_properties(upb PROPERTIES OUTPUT_NAME mindspore_serving_upb)
++set_target_properties(upb PROPERTIES OUTPUT_NAME mindspore_federated_upb)
 +
  if(WIN32 AND MSVC)
    set_target_properties(upb PROPERTIES COMPILE_PDB_NAME "upb"

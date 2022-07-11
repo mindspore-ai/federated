@@ -18,4 +18,4 @@ mindspore_add_pkg(re2
         CMAKE_OPTION -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=TRUE)
 
 include_directories(${re2_INC})
-add_library(mindspore_serving::re2 ALIAS re2::re2)
+add_library(mindspore_federated::re2 ALIAS re2::re2)

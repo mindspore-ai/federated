@@ -19,4 +19,4 @@ mindspore_add_pkg(c-ares
         PATCHES ${CMAKE_SOURCE_DIR}/third_party/patch/c-ares/CVE-2021-3672.patch)
 
 include_directories(${c-ares_INC})
-add_library(mindspore_serving::cares ALIAS c-ares::cares)
+add_library(mindspore_federated::cares ALIAS c-ares::cares)

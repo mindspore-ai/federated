@@ -46,6 +46,7 @@ check_pie_supported()
 set_property(TARGET federated PROPERTY POSITION_INDEPENDENT_CODE TRUE)
 
 target_link_libraries(federated PRIVATE PROTO_SRC_LIB)
+target_link_libraries(federated PRIVATE mindspore_federated::ssl mindspore_federated::crypto)
 target_link_libraries(federated PRIVATE mindspore_federated::protobuf pthread rt)
 target_link_libraries(federated PRIVATE mindspore_federated::event mindspore_federated::event_pthreads)
 target_link_libraries(federated PRIVATE mindspore_federated::event_core)

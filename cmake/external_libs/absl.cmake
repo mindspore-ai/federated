@@ -19,8 +19,8 @@ mindspore_add_pkg(absl
 
 include_directories(${absl_INC})
 
-add_library(mindspore_serving::absl_strings ALIAS absl::absl_strings)
-add_library(mindspore_serving::absl_throw_delegate ALIAS absl::absl_throw_delegate)
-add_library(mindspore_serving::absl_raw_logging_internal ALIAS absl::absl_raw_logging_internal)
-add_library(mindspore_serving::absl_int128 ALIAS absl::absl_int128)
-add_library(mindspore_serving::absl_bad_optional_access ALIAS absl::absl_bad_optional_access)
+add_library(mindspore_federated::absl_strings ALIAS absl::absl_strings)
+add_library(mindspore_federated::absl_throw_delegate ALIAS absl::absl_throw_delegate)
+add_library(mindspore_federated::absl_raw_logging_internal ALIAS absl::absl_raw_logging_internal)
+add_library(mindspore_federated::absl_int128 ALIAS absl::absl_int128)
+add_library(mindspore_federated::absl_bad_optional_access ALIAS absl::absl_bad_optional_access)
