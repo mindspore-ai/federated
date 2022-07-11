@@ -123,14 +123,13 @@ public class SyncFLJob {
                 break;
             }
             LOGGER.info("flName: " + flParameter.getFlName());
-            int trainDataSize = flLiteClient.setInput();
-            if (trainDataSize <= 0) {
+            boolean initFlg = flLiteClient.initDataSets();
+            if (!initFlg) {
                 curStatus = FLClientStatus.FAILED;
                 failed("unsolved error code in <flLiteClient.setInput>: the return trainDataSize<=0, setInput",
                         flLiteClient);
                 break;
             }
-            flLiteClient.setTrainDataSize(trainDataSize);
 
             // startFLJob
             curStatus = flLiteClient.startFLJob();
@@ -144,6 +143,20 @@ public class SyncFLJob {
             }
             LOGGER.info("[startFLJob] startFLJob succeed, curIteration: " + flLiteClient.getIteration());
             updateTryTimePerIter(flLiteClient);
+
+            // evaluate model after start model, need upload evaluate Accuracy, so evaluate before updateModel and
+            // before local train
+            if (!checkEvalPath()) {
+                LOGGER.info("[evaluate] the data map set by user do not contain evaluation dataset, " +
+                        "don't evaluate the model after getting model from server");
+            } else {
+                curStatus = flLiteClient.evaluateModel();
+                if (curStatus != FLClientStatus.SUCCESS) {
+                    failed("[evaluate] evaluate", flLiteClient);
+                    break;
+                }
+                LOGGER.info("[evaluate] evaluate succeed");
+            }
 
             // Copy weights before training.
             Client client = ClientManager.getClient(flParameter.getFlName());
@@ -199,18 +212,6 @@ public class SyncFLJob {
             // get the feature map after averaging and update dp_norm_clip
             flLiteClient.updateDpNormClip();
 
-            // evaluate model after getting model from server
-            if (!checkEvalPath()) {
-                LOGGER.info("[evaluate] the data map set by user do not contain evaluation dataset, " +
-                        "don't evaluate the model after getting model from server");
-            } else {
-                curStatus = flLiteClient.evaluateModel();
-                if (curStatus != FLClientStatus.SUCCESS) {
-                    failed("[evaluate] evaluate", flLiteClient);
-                    break;
-                }
-                LOGGER.info("[evaluate] evaluate succeed");
-            }
             LOGGER.info("========================================================the total response of "
                     + flLiteClient.getIteration() + ": " + curStatus +
                     "======================================================================");
