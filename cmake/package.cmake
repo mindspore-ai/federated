@@ -21,16 +21,6 @@ set(INSTALL_LIB_DIR "lib")
 
 message("INSTALL_LIB_DIR:::" ${INSTALL_LIB_DIR})
 
-# libevent
-install(FILES ${libevent_LIBPATH}/libevent-2.1.so.7.0.1
-        DESTINATION ${INSTALL_LIB_DIR} RENAME libevent-2.1.so.7 COMPONENT mindspore_federated)
-install(FILES ${libevent_LIBPATH}/libevent_core-2.1.so.7.0.1
-        DESTINATION ${INSTALL_LIB_DIR} RENAME libevent_core-2.1.so.7 COMPONENT mindspore)
-install(FILES ${libevent_LIBPATH}/libevent_openssl-2.1.so.7.0.1
-        DESTINATION ${INSTALL_LIB_DIR} RENAME libevent_openssl-2.1.so.7 COMPONENT mindspore_federated)
-install(FILES ${libevent_LIBPATH}/libevent_pthreads-2.1.so.7.0.1
-        DESTINATION ${INSTALL_LIB_DIR} RENAME libevent_pthreads-2.1.so.7 COMPONENT mindspore_federated)
-
 # glog
 install(FILES ${glog_LIBPATH}/libmindspore_federated_glog.so.0.4.0
         DESTINATION ${INSTALL_LIB_DIR} RENAME libmindspore_federated_glog.so.0 COMPONENT mindspore_federated)

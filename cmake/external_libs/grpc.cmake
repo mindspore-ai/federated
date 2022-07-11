@@ -1,12 +1,12 @@
 set(grpc_USE_STATIC_LIBS OFF)
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set(grpc_CXXFLAGS "-fstack-protector-all -Wno-uninitialized -Wno-unused-parameter -fPIC -D_FORTIFY_SOURCE=2 -O2 \
-        -Dgrpc=mindspore_serving_grpc -Dgrpc_impl=mindspore_serving_grpc_impl -Dgrpc_core=mindspore_serving_grpc_core")
+        -Dgrpc=mindspore_federated_grpc -Dgrpc_impl=mindspore_federated_grpc_impl -Dgrpc_core=mindspore_federated_grpc_core")
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     set(grpc_CXXFLAGS "-fstack-protector-all -Wno-maybe-uninitialized -Wno-unused-parameter -D_FORTIFY_SOURCE=2 -O2")
 else()
     set(grpc_CXXFLAGS "-fstack-protector-all -Wno-maybe-uninitialized -Wno-unused-parameter -D_FORTIFY_SOURCE=2 -O2 \
-        -Dgrpc=mindspore_serving_grpc -Dgrpc_impl=mindspore_serving_grpc_impl -Dgrpc_core=mindspore_serving_grpc_core")
+        -Dgrpc=mindspore_federated_grpc -Dgrpc_impl=mindspore_federated_grpc_impl -Dgrpc_core=mindspore_federated_grpc_core")
     if(NOT ENABLE_GLIBCXX)
         set(grpc_CXXFLAGS "${grpc_CXXFLAGS} -D_GLIBCXX_USE_CXX11_ABI=0")
     endif()
@@ -51,8 +51,8 @@ endif()
 
 mindspore_add_pkg(grpc
         VER 1.36.1
-        LIBS mindspore_serving_grpc++ mindspore_serving_grpc mindspore_serving_gpr mindspore_serving_upb
-        mindspore_serving_address_sorting
+        LIBS mindspore_federated_grpc++ mindspore_federated_grpc mindspore_federated_gpr mindspore_federated_upb
+        mindspore_federated_address_sorting
         EXE grpc_cpp_plugin grpc_python_plugin
         URL ${REQ_URL}
         MD5 ${MD5}
@@ -78,16 +78,16 @@ mindspore_add_pkg(grpc
 
 include_directories(${grpc_INC})
 
-add_library(mindspore_serving::grpc++ ALIAS grpc::mindspore_serving_grpc++)
+add_library(mindspore_federated::grpc++ ALIAS grpc::mindspore_federated_grpc++)
 
 # link other grpc libs
-target_link_libraries(grpc::mindspore_serving_grpc++ INTERFACE grpc::mindspore_serving_grpc grpc::mindspore_serving_gpr
-  grpc::mindspore_serving_upb grpc::mindspore_serving_address_sorting)
+target_link_libraries(grpc::mindspore_federated_grpc++ INTERFACE grpc::mindspore_federated_grpc grpc::mindspore_federated_gpr
+  grpc::mindspore_federated_upb grpc::mindspore_federated_address_sorting)
 
 # modify mindspore macro define
-add_compile_definitions(grpc=mindspore_serving_grpc)
-add_compile_definitions(grpc_impl=mindspore_serving_grpc_impl)
-add_compile_definitions(grpc_core=mindspore_serving_grpc_core)
+add_compile_definitions(grpc=mindspore_federated_grpc)
+add_compile_definitions(grpc_impl=mindspore_federated_grpc_impl)
+add_compile_definitions(grpc_core=mindspore_federated_grpc_core)
 
 function(ms_grpc_generate c_var h_var)
     if(NOT ARGN)
@@ -106,9 +106,9 @@ function(ms_grpc_generate c_var h_var)
         get_filename_component(proto_I_DIR "${file_dir}/../../" ABSOLUTE)
         get_filename_component(proto_file ${proto_file_absolute} NAME)
         get_filename_component(proto_file_prefix ${proto_file_absolute} NAME_WE)
-        set(proto_file_relative "mindspore_serving/proto/${proto_file}")
+        set(proto_file_relative "mindspore_federated/proto/${proto_file}")
 
-        set(protoc_output_prefix ${CMAKE_BINARY_DIR}/mindspore_serving/proto)
+        set(protoc_output_prefix ${CMAKE_BINARY_DIR}/mindspore_federated/proto)
         set(hw_proto_srcs "${protoc_output_prefix}/${proto_file_prefix}.pb.cc")
         set(hw_proto_hdrs "${protoc_output_prefix}/${proto_file_prefix}.pb.h")
         set(hw_grpc_srcs "${protoc_output_prefix}/${proto_file_prefix}.grpc.pb.cc")

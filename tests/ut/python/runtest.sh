@@ -34,11 +34,14 @@ unset https_proxy
 
 function clear_port()
 {
-  PROCESS=`netstat -nlp | grep :$1 | awk '{print $7}' | awk -F"/" '{print $1}'`
-  for i in $PROCESS
-     do
-     echo "Kill the process [ $i ]"
-     kill -9 $i
+  for port in [ 3001 3002 3003 3004 ]
+  do
+    PROCESS=$(netstat -nlp | grep :$port | awk '{print $7}' | awk -F"/" '{print $1}')
+    for i in $PROCESS
+       do
+       echo "Kill the process [ $i ]"
+       kill -9 $i
+    done
   done
 }
 
@@ -49,7 +52,7 @@ function start_redis_server() {
   if [ ! $pid ]
   then
     echo "Failed to start redis server, server port: ${REDIS_SERVER_PORT}"
-    exit $?
+    exit 1
   fi
   echo "end start redis server"
 }
@@ -66,10 +69,7 @@ function stop_redis_server()
     ps aux | grep 'redis-server'
 }
 
-port_list=(${REDIS_SERVER_PORT} 3001 3002 3003 3004)
-for port in ${port_list[*]}; do
-  clear_port ${port}
-done
+clear_port
 
 cd ${ROOT_DIR}/tests/ut/python/tests/
 
