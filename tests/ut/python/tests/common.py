@@ -117,8 +117,8 @@ def make_yaml_config(fl_name, update_configs, output_yaml_file,
                      start_fl_job_threshold=None, update_model_ratio=None,
                      start_fl_job_time_window=None, update_model_time_window=None, global_iteration_time_window=None,
                      pki_verify=None, rmv_configs=[]):
-
-    with open("default_yaml_config.yaml") as fp:
+    cur_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(cur_dir, "default_yaml_config.yaml")) as fp:
         yaml_file_content = fp.read()
     yaml_configs = yaml.load(yaml_file_content, yaml.Loader)
 

@@ -126,9 +126,7 @@ class UpdateModelKernelMod : public AbstractKernel {
       const std::string &weight_name = weight_item.first;
       auto &weight_data = weight_item.second;
       auto fbs_weight_fullname = fbb->CreateString(weight_name);
-      float weights[weight_data.size()];
-      std::copy(weight_data.begin(), weight_data.end(), weights);
-      auto fbs_weight_data = fbb->CreateVector(reinterpret_cast<const float *>(weights), weight_data.size());
+      auto fbs_weight_data = fbb->CreateVector(weight_data);
       auto fbs_feature_map = schema::CreateFeatureMap(*fbb, fbs_weight_fullname, fbs_weight_data);
       fbs_feature_maps.push_back(fbs_feature_map);
     }
