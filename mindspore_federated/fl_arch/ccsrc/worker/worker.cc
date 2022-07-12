@@ -107,8 +107,7 @@ void Worker::InitAndLoadDistributedCache() {
   }
 }
 
-bool Worker::SendToServer(const void *data, size_t size, TcpUserCommand command,
-                          std::shared_ptr<std::vector<unsigned char>> *output) {
+bool Worker::SendToServer(const void *data, size_t size, TcpUserCommand command, VectorPtr *output) {
   MS_EXCEPTION_IF_NULL(worker_node_);
   MS_EXCEPTION_IF_NULL(data);
   if (output != nullptr) {

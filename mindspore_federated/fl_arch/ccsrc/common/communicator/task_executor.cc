@@ -21,7 +21,6 @@ namespace fl {
 TaskExecutor::TaskExecutor(size_t thread_num, size_t max_task_num, size_t submit_timeout)
     : submit_timeout_(submit_timeout), max_task_num_(max_task_num) {
   auto task_fun = [this]() {
-    std::function<void()> task;
     while (true) {
       std::unique_lock<std::mutex> lock(mtx_);
       if (has_stopped_) {
@@ -33,7 +32,7 @@ TaskExecutor::TaskExecutor(size_t thread_num, size_t max_task_num, size_t submit
           return;
         }
       }
-      task = task_queue_.front();
+      auto task = task_queue_.front();
       task_queue_.pop();
       lock.unlock();
       task();
@@ -42,6 +41,27 @@ TaskExecutor::TaskExecutor(size_t thread_num, size_t max_task_num, size_t submit
   for (size_t i = 0; i < thread_num; i++) {
     working_threads_.emplace_back(task_fun);
   }
+}
+
+bool TaskExecutor::Submit(const std::function<void()> &task) {
+  constexpr int64_t kSubmitTaskIntervalInMs = 1;
+  for (size_t i = 0; i < submit_timeout_; i++) {
+    std::unique_lock<std::mutex> lock(mtx_);
+    if (has_stopped_) {
+      MS_LOG(INFO) << "Submit task failed, task executor has stopped";
+      return false;
+    }
+    if (task_queue_.size() < max_task_num_) {
+      task_queue_.push(task);
+      lock.unlock();
+      cv_.notify_all();
+      return true;
+    }
+    lock.unlock();
+    std::this_thread::sleep_for(std::chrono::milliseconds(kSubmitTaskIntervalInMs));
+  }
+  MS_LOG(WARNING) << "Submit task failed after " << submit_timeout_ << " ms.";
+  return false;
 }
 
 void TaskExecutor::Stop() {
@@ -56,6 +76,8 @@ void TaskExecutor::Stop() {
     }
   }
   working_threads_.clear();
+  std::unique_lock<std::mutex> lock(mtx_);
+  task_queue_ = std::queue<std::function<void()>>();  // clear
 }
 
 TaskExecutor::~TaskExecutor() { Stop(); }

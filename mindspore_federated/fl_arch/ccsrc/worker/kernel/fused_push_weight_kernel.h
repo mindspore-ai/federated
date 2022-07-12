@@ -45,7 +45,7 @@ class FusedPushWeightKernelMod : public AbstractKernel {
     return instance;
   }
 
-  bool Launch(std::map<std::string, std::vector<float>> &weight_datas) {
+  bool Launch(const std::map<std::string, std::vector<float>> &weight_datas) {
     MS_LOG(INFO) << "Launch FusedPushWeightKernelMod.";
     FBBuilder fbb;
 
@@ -100,15 +100,17 @@ class FusedPushWeightKernelMod : public AbstractKernel {
   void Init() override {}
 
  private:
-  bool BuildPushWeightReq(FBBuilder *fbb, std::map<std::string, std::vector<float>> &weight_datas) {
+  bool BuildPushWeightReq(FBBuilder *fbb, const std::map<std::string, std::vector<float>> &weight_datas) {
+    if (fbb == nullptr) {
+      return false;
+    }
+    fbb->Clear();
     std::vector<flatbuffers::Offset<schema::FeatureMap>> fbs_feature_maps;
     for (auto &weight : weight_datas) {
       const std::string &weight_name = weight.first;
+      auto &weight_data = weight.second;
       auto fbs_weight_fullname = fbb->CreateString(weight_name);
-      auto &weight_data = weight_datas[weight_name];
-      float weights[weight_data.size()];
-      std::copy(weight_data.begin(), weight_data.end(), weights);
-      auto fbs_weight_data = fbb->CreateVector(reinterpret_cast<const float *>(weights), weight_data.size());
+      auto fbs_weight_data = fbb->CreateVector(weight_data);
       auto fbs_feature_map = schema::CreateFeatureMap(*fbb, fbs_weight_fullname, fbs_weight_data);
       fbs_feature_maps.push_back(fbs_feature_map);
     }

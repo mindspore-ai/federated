@@ -64,8 +64,7 @@ class MS_EXPORT Worker {
   static Worker &GetInstance();
   void Init();
   void Stop();
-  bool SendToServer(const void *data, size_t size, fl::TcpUserCommand command,
-                    std::shared_ptr<std::vector<unsigned char>> *output = nullptr);
+  bool SendToServer(const void *data, size_t size, fl::TcpUserCommand command, VectorPtr *output = nullptr);
 
   // These methods set the worker's iteration state.
   void SetIterationRunning();

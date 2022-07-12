@@ -79,7 +79,6 @@ constexpr char kNodeId[] = "node_id";
 constexpr char kSuccessCode[] = "0";
 constexpr char kErrorCode[] = "1";
 
-constexpr int64_t kSubmitTaskIntervalInMs = 1;
 constexpr int64_t kMaxTaskNum = 10240;
 constexpr int64_t kSubmitTimeOutInMs = 30000;
 constexpr int64_t kRetryCount = 60;
@@ -181,7 +180,7 @@ const std::map<std::string, size_t> kCiphers = {
   {"ECDHE-ECDSA-AES128-CCM", 6},        {"ECDHE-ECDSA-AES256-CCM", 7},        {"ECDHE-ECDSA-CHACHA20-POLY1305", 8}};
 
 using DataPtr = std::unique_ptr<uint8_t[]>;
-using VectorPtr = std::shared_ptr<std::vector<unsigned char>>;
+using VectorPtr = std::shared_ptr<std::vector<uint8_t>>;
 using EventCallback = std::function<void(void)>;
 
 constexpr char kClusterNotReady[] =

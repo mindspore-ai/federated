@@ -101,7 +101,7 @@ py::dict FederatedJob::PullWeight(const std::vector<std::string> &pull_weight_na
   return FusedPullWeightKernelMod::GetInstance()->Launch(pull_weight_names);
 }
 
-bool FederatedJob::PushWeight(std::map<std::string, std::vector<float>> &weight_datas) {
+bool FederatedJob::PushWeight(const std::map<std::string, std::vector<float>> &weight_datas) {
   return FusedPushWeightKernelMod::GetInstance()->Launch(weight_datas);
 }
 

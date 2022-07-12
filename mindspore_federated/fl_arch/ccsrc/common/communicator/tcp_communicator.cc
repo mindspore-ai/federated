@@ -89,7 +89,8 @@ FlStatus TcpCommunicator::HandleRoundRequestInner(const std::shared_ptr<TcpConne
   if (task_executor_ == nullptr) {
     return FlStatus(kFlFailed, "Task executor is not inited");
   }
-  if (!task_executor_->Submit(msg_handler, tcp_msg_handler)) {
+  auto task = [msg_handler, tcp_msg_handler]() { msg_handler(tcp_msg_handler); };
+  if (!task_executor_->Submit(task)) {
     return FlStatus(kFlFailed, "Submit tcp msg handler failed.");
   }
   return kFlSuccess;
