@@ -15,12 +15,13 @@
  */
 #ifndef MINDSPORE_FEDERATED_FEATURE_PY_H
 #define MINDSPORE_FEDERATED_FEATURE_PY_H
-#include <string>
-#include <memory>
-#include "common/common.h"
-#include "server/model_store.h"
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
+#include <string>
+#include <memory>
+#include <vector>
+#include "common/common.h"
+#include "server/model_store.h"
 
 namespace py = pybind11;
 

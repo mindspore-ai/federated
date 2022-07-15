@@ -13,7 +13,7 @@ if(ENABLE_GITEE)
     set(MD5 "0d5a27436bf7ff8253420c8cf09f47ca")
 else()
     set(REQ_URL
-            "https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz")
+        "https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz")
     set(MD5 "b5333f021f880fe76490d8a799cd79f4")
 endif()
 

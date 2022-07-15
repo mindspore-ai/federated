@@ -19,6 +19,9 @@
 
 #include <memory>
 #include <string>
+#include <map>
+#include <utility>
+#include <vector>
 #include "communicator/communicator_base.h"
 #include "common/common.h"
 #include "server/kernel/round/round_kernel.h"

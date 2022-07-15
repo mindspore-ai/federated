@@ -25,6 +25,7 @@
 #include <utility>
 #include <vector>
 #include <unordered_map>
+#include <map>
 #include <functional>
 
 #include "common/fl_context.h"

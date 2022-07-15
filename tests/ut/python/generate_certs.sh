@@ -21,7 +21,6 @@ openssl x509 -req -days 3650 -in ca.csr -signkey ca.key -out ca.crt -extfile ca_
 
 IP=127.0.0.1
 DNS=MindSporeFederated
-CN=federated.mindspore.cn
 
 echo "subjectKeyIdentifier=hash
 authorityKeyIdentifier=keyid,issuer

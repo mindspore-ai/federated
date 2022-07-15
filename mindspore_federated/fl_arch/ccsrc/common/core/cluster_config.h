@@ -32,9 +32,8 @@ namespace fl {
  * Configuration information read through environment variables and configuration files, generally immutable
  */
 struct ClusterConfig {
-  explicit ClusterConfig() : cluster_available_timeout(900) {}
   // Timeout period for cluster preparation is 900 seconds.
-  uint32_t cluster_available_timeout;
+  uint32_t cluster_available_timeout = 900;
 };
 }  // namespace fl
 }  // namespace mindspore

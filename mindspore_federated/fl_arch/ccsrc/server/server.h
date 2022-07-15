@@ -20,6 +20,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <map>
 #include "communicator/communicator_base.h"
 #include "communicator/tcp_communicator.h"
 #include "armour/cipher/cipher_init.h"
@@ -71,15 +72,7 @@ class MS_EXPORT Server {
   bool PullWeight(const uint8_t *req_data, size_t len, VectorPtr *output);
 
  private:
-  Server()
-      : server_node_(nullptr),
-        communicator_with_server_(nullptr),
-        communicators_with_worker_({}),
-        pki_verify_(false),
-        root_first_ca_path_(""),
-        root_second_ca_path_(""),
-        equip_crl_path_(""),
-        replay_attack_time_diff_(kDefaultReplayAttackTimeDiff) {}
+  Server() = default;
   ~Server();
   Server(const Server &) = delete;
   Server &operator=(const Server &) = delete;
@@ -127,29 +120,21 @@ class MS_EXPORT Server {
   void CallServerStoppedCallback();
 
   // The server node is initialized in Server.
-  std::shared_ptr<ServerNode> server_node_;
+  std::shared_ptr<ServerNode> server_node_ = nullptr;
 
   // The configuration of all rounds.
   std::vector<RoundConfig> rounds_config_;
   armour::CipherConfig cipher_config_;
-  armour::CipherInit *cipher_init_;
+  armour::CipherInit *cipher_init_ = nullptr;
 
   // Server need a tcp communicator to communicate with other servers for counting, metadata storing, collective
   // operations, etc.
-  std::shared_ptr<CommunicatorBase> communicator_with_server_;
+  std::shared_ptr<CommunicatorBase> communicator_with_server_ = nullptr;
 
   // The communication with workers(including mobile devices), has multiple protocol types: HTTP and TCP.
   // In some cases, both types should be supported in one distributed training job. So here we may have multiple
   // communicators.
   std::vector<std::shared_ptr<CommunicatorBase>> communicators_with_worker_;
-
-  bool pki_verify_;
-
-  std::string root_first_ca_path_;
-  std::string root_second_ca_path_;
-  std::string equip_crl_path_;
-  uint64_t replay_attack_time_diff_;
-
   bool has_stopped_ = false;
 
   FlCallback fl_callback_;

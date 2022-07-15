@@ -22,6 +22,7 @@
 #include <memory>
 #include <functional>
 #include <utility>
+#include <map>
 #include "worker/kernel/abstract_kernel.h"
 #include "common/fl_context.h"
 #include "worker/worker.h"

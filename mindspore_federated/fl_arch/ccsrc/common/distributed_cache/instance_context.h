@@ -20,6 +20,8 @@
 #include <string>
 #include <mutex>
 #include <atomic>
+#include <memory>
+#include <unordered_map>
 #include <condition_variable>
 #include "distributed_cache/cache_status.h"
 #include "distributed_cache/distributed_cache.h"
@@ -110,6 +112,10 @@ class MS_EXPORT InstanceContext {
   void OnNewInstance();
   void OnNewIteration();
   CacheStatus SyncInner(bool *is_cache_empty);
+  CacheStatus SyncInstanceState(const std::shared_ptr<RedisClientBase> &client,
+                                const std::unordered_map<std::string, std::string> &values);
+  CacheStatus SyncIterationInfo(const std::shared_ptr<RedisClientBase> &client,
+                                const std::unordered_map<std::string, std::string> &values);
   CacheStatus SyncInstanceName(const std::shared_ptr<RedisClientBase> &client);
 };
 }  // namespace cache

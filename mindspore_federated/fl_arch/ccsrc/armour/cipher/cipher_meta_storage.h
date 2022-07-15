@@ -23,6 +23,7 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <unordered_map>
 #include "common/utils/log_adapter.h"
 #include "armour/secure_protocol/secret_sharing.h"
 #include "schema/fl_job_generated.h"

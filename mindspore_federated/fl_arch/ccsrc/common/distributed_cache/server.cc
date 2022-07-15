@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 #include "distributed_cache/server.h"
+#include <utility>
 #include "distributed_cache/distributed_cache.h"
 #include "distributed_cache/redis_keys.h"
 #include "distributed_cache/timer.h"

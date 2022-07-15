@@ -1,12 +1,14 @@
 set(grpc_USE_STATIC_LIBS OFF)
 if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set(grpc_CXXFLAGS "-fstack-protector-all -Wno-uninitialized -Wno-unused-parameter -fPIC -D_FORTIFY_SOURCE=2 -O2 \
-        -Dgrpc=mindspore_federated_grpc -Dgrpc_impl=mindspore_federated_grpc_impl -Dgrpc_core=mindspore_federated_grpc_core")
+        -Dgrpc=mindspore_federated_grpc -Dgrpc_impl=mindspore_federated_grpc_impl \
+        -Dgrpc_core=mindspore_federated_grpc_core")
 elseif(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     set(grpc_CXXFLAGS "-fstack-protector-all -Wno-maybe-uninitialized -Wno-unused-parameter -D_FORTIFY_SOURCE=2 -O2")
 else()
     set(grpc_CXXFLAGS "-fstack-protector-all -Wno-maybe-uninitialized -Wno-unused-parameter -D_FORTIFY_SOURCE=2 -O2 \
-        -Dgrpc=mindspore_federated_grpc -Dgrpc_impl=mindspore_federated_grpc_impl -Dgrpc_core=mindspore_federated_grpc_core")
+        -Dgrpc=mindspore_federated_grpc -Dgrpc_impl=mindspore_federated_grpc_impl \
+        -Dgrpc_core=mindspore_federated_grpc_core")
     if(NOT ENABLE_GLIBCXX)
         set(grpc_CXXFLAGS "${grpc_CXXFLAGS} -D_GLIBCXX_USE_CXX11_ABI=0")
     endif()
@@ -81,8 +83,9 @@ include_directories(${grpc_INC})
 add_library(mindspore_federated::grpc++ ALIAS grpc::mindspore_federated_grpc++)
 
 # link other grpc libs
-target_link_libraries(grpc::mindspore_federated_grpc++ INTERFACE grpc::mindspore_federated_grpc grpc::mindspore_federated_gpr
-  grpc::mindspore_federated_upb grpc::mindspore_federated_address_sorting)
+target_link_libraries(grpc::mindspore_federated_grpc++ INTERFACE
+        grpc::mindspore_federated_grpc grpc::mindspore_federated_gpr
+        grpc::mindspore_federated_upb grpc::mindspore_federated_address_sorting)
 
 # modify mindspore macro define
 add_compile_definitions(grpc=mindspore_federated_grpc)

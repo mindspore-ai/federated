@@ -21,8 +21,10 @@
 #include <memory>
 #include <unordered_map>
 #include <set>
+#include <vector>
+#include <utility>
 #include "common/protos/fl.pb.h"
-#include "cache_status.h"
+#include "distributed_cache/cache_status.h"
 #include "common/common.h"
 #include "distributed_cache/distributed_cache.h"
 

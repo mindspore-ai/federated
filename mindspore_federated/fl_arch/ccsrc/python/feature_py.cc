@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 #include "python/feature_py.h"
+#include <functional>
+#include <vector>
 
 namespace mindspore {
 namespace fl {

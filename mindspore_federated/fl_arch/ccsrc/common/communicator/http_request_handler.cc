@@ -15,6 +15,7 @@
  */
 
 #include "common/communicator/http_request_handler.h"
+#include <vector>
 
 namespace mindspore {
 namespace fl {

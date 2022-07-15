@@ -18,11 +18,9 @@
 #include <map>
 #include <string>
 #include <memory>
-#include "server/executor.h"
+#include <utility>
 #include "common/utils/python_adapter.h"
 #include "distributed_cache/instance_context.h"
-#include "server/server.h"
-#include "server/executor.h"
 
 namespace mindspore {
 namespace fl {
@@ -55,7 +53,7 @@ void ModelStore::InitModel(const std::vector<InputWeight> &feature_map) {
     }
     model_size += feature.size;
   }
-  if (model_size <= 0 || model_size >= INT32_MAX) {
+  if (model_size == 0 || model_size >= INT32_MAX) {
     MS_LOG(EXCEPTION) << "Model size " << model_size << " cannot <=0 or >=UINT32_MAX";
   }
   // Assign new memory for the model.

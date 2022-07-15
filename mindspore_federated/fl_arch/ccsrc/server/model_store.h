@@ -22,6 +22,7 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <utility>
 #include "common/common.h"
 #include "server/memory_register.h"
 #include "compression/encode_executor.h"

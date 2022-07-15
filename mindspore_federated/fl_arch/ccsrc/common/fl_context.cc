@@ -15,8 +15,8 @@
  */
 
 #include "common/fl_context.h"
+#include <unordered_map>
 #include "common/utils/log_adapter.h"
-#include "server/executor.h"
 
 namespace mindspore {
 namespace fl {
@@ -166,17 +166,24 @@ void FLContext::set_encrypt_config(const EncryptConfig &config) {
   if (encrypt_type == kNotEncryptType) {
     return;
   }
-  if (config.dp_eps <= 0) {
-    MS_LOG(EXCEPTION) << config.dp_eps << " is invalid, dp_eps must be larger than 0, 50 is used by default.";
+  CheckDPEncrypt(config);
+  CheckSignDsEncrypt(config);
+  CheckPWEncrypt(config);
+}
+void FLContext::CheckPWEncrypt(const EncryptConfig &config) const {
+  if (config.share_secrets_ratio <= 0 || config.share_secrets_ratio > 1) {
+    MS_LOG(EXCEPTION) << config.share_secrets_ratio << " is invalid, share_secrets_ratio must be in range of (0, 1].";
   }
-  if (config.dp_delta <= 0 || config.dp_delta >= 1) {
-    MS_LOG(EXCEPTION) << config.dp_delta
-                      << " is invalid, dp_delta must be in range of (0, 1), 0.01 is used by default.";
+
+  if (config.cipher_time_window < 0) {
+    MS_LOG(EXCEPTION) << "cipher_time_window " << config.share_secrets_ratio << " should not be less than 0.";
   }
-  if (config.dp_norm_clip <= 0) {
-    MS_LOG(EXCEPTION) << config.dp_norm_clip
-                      << " is invalid, dp_norm_clip must be larger than 0, 1 is used by default.";
+  if (config.reconstruct_secrets_threshold == 0) {
+    MS_LOG(EXCEPTION) << "reconstruct_secrets_threshold should be positive.";
   }
+}
+
+void FLContext::CheckSignDsEncrypt(const EncryptConfig &config) const {
   const float sign_k_upper = 0.25;
   if (config.sign_k <= 0 || config.sign_k > sign_k_upper) {
     MS_LOG(EXCEPTION) << config.sign_k << " is invalid, sign_k must be in range of (0, 0.25], 0.01 is used by default.";
@@ -200,17 +207,19 @@ void FLContext::set_encrypt_config(const EncryptConfig &config) {
     MS_LOG(EXCEPTION) << config.sign_dim_out
                       << " is invalid, sign_dim_out must be in range of [0, 50], 0 is used by default.";
   }
-  if (config.share_secrets_ratio <= 0 || config.share_secrets_ratio > 1) {
-    MS_LOG(EXCEPTION) << config.share_secrets_ratio << " is invalid, share_secrets_ratio must be in range of (0, 1].";
-  }
+}
 
-  if (config.cipher_time_window < 0) {
-    MS_LOG(EXCEPTION) << "cipher_time_window " << config.share_secrets_ratio << " should not be less than 0.";
-    return;
+void FLContext::CheckDPEncrypt(const EncryptConfig &config) const {
+  if (config.dp_eps <= 0) {
+    MS_LOG(EXCEPTION) << config.dp_eps << " is invalid, dp_eps must be larger than 0, 50 is used by default.";
   }
-  if (config.reconstruct_secrets_threshold == 0) {
-    MS_LOG(EXCEPTION) << "reconstruct_secrets_threshold should be positive.";
-    return;
+  if (config.dp_delta <= 0 || config.dp_delta >= 1) {
+    MS_LOG(EXCEPTION) << config.dp_delta
+                      << " is invalid, dp_delta must be in range of (0, 1), 0.01 is used by default.";
+  }
+  if (config.dp_norm_clip <= 0) {
+    MS_LOG(EXCEPTION) << config.dp_norm_clip
+                      << " is invalid, dp_norm_clip must be larger than 0, 1 is used by default.";
   }
 }
 

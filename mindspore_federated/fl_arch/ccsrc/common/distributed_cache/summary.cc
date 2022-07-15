@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 #include "distributed_cache/summary.h"
-#include "distributed_cache/instance_context.h"
+#include <unordered_map>
 #include "distributed_cache/distributed_cache.h"
 #include "distributed_cache/redis_keys.h"
 #include "distributed_cache/server.h"
@@ -136,7 +136,6 @@ void Summary::UnlockSummary() {
     MS_LOG_WARNING << "Get redis client failed";
     return;
   }
-  auto node_id = Server::Instance().node_id();
   auto key = RedisKeys::GetInstance().IterationSummaryLockString();
   constexpr int expire_time_in_seconds = 30;  // finish flag for 30 seconds
   auto status = client->SetEx(key, kSummaryFinishFlag, expire_time_in_seconds);

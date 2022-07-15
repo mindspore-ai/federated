@@ -54,6 +54,9 @@ class TcpMessageHandler {
   MessageHandleFun msg_callback_ = nullptr;
 
   bool ReceiveMessageInner(const ReadBufferFun &read_fun, bool *end_read);
+  bool ReadMessageHeader(const ReadBufferFun &read_fun, bool *end_read);
+  bool ReadMessageMeta(const ReadBufferFun &read_fun, bool *end_read);
+  bool ReadMessageDataAndCallback(const ReadBufferFun &read_fun, bool *end_read);
   void Reset();
 };
 }  // namespace fl

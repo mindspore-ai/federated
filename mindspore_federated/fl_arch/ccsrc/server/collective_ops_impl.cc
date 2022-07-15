@@ -15,8 +15,9 @@
  */
 
 #include "server/collective_ops_impl.h"
+#include <algorithm>
+#include <utility>
 #include "server/local_meta_store.h"
-#include "server/iteration.h"
 #include "distributed_cache/server.h"
 #include "distributed_cache/instance_context.h"
 

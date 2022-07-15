@@ -46,8 +46,9 @@ class UpdateModelKernelMod : public AbstractKernel {
     return instance;
   }
 
-  bool Launch(std::map<std::string, std::vector<float>> &weight_datas) {
+  bool Launch(std::map<std::string, std::vector<float>> *weight_datas) {
     MS_LOG(INFO) << "Launching client UpdateModelKernelMod";
+    MS_EXCEPTION_IF_NULL(weight_datas);
 
     if (!WeightingData(weight_datas)) {
       MS_LOG(EXCEPTION) << "Weighting data with data_size failed.";
@@ -58,7 +59,7 @@ class UpdateModelKernelMod : public AbstractKernel {
       EncryptData(weight_datas);
     }
     FBBuilder builder;
-    if (!BuildUpdateModelReq(&builder, weight_datas)) {
+    if (!BuildUpdateModelReq(&builder, *weight_datas)) {
       MS_LOG(EXCEPTION) << "Building request for FusedPushWeight failed.";
       return false;
     }
@@ -114,7 +115,7 @@ class UpdateModelKernelMod : public AbstractKernel {
   }
 
  private:
-  bool BuildUpdateModelReq(FBBuilder *fbb, std::map<std::string, std::vector<float>> &weight_datas) {
+  bool BuildUpdateModelReq(FBBuilder *fbb, const std::map<std::string, std::vector<float>> &weight_datas) {
     MS_EXCEPTION_IF_NULL(fbb);
     auto fbs_fl_name = fbb->CreateString(fl_name_);
     auto fbs_fl_id = fbb->CreateString(fl_id_);
@@ -144,8 +145,8 @@ class UpdateModelKernelMod : public AbstractKernel {
     return true;
   }
 
-  bool WeightingData(std::map<std::string, std::vector<float>> &weight_datas) {
-    for (auto &item : weight_datas) {
+  bool WeightingData(std::map<std::string, std::vector<float>> *weight_datas) {
+    for (auto &item : *weight_datas) {
       auto &data = item.second;
       for (size_t i = 0; i < data.size(); i++) {
         data[i] *= data_size_;
@@ -154,10 +155,10 @@ class UpdateModelKernelMod : public AbstractKernel {
     return true;
   }
 
-  void EncryptData(std::map<std::string, std::vector<float>> &weight_datas) {
+  void EncryptData(std::map<std::string, std::vector<float>> *weight_datas) {
     // calculate the sum of all layer's weight size
     size_t total_size = 0;
-    for (auto &weight_item : weight_datas) {
+    for (auto &weight_item : *weight_datas) {
       auto &weight_data = weight_item.second;
       total_size += weight_data.size();
     }
@@ -166,7 +167,7 @@ class UpdateModelKernelMod : public AbstractKernel {
 
     // encrypt original data
     size_t encrypt_num = 0;
-    for (auto &weight_item : weight_datas) {
+    for (auto &weight_item : *weight_datas) {
       const std::string &weight_name = weight_item.first;
       auto &original_data = weight_item.second;
       MS_LOG(INFO) << "Encrypt weights of layer: " << weight_name;

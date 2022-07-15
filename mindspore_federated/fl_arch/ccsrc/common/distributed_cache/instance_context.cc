@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 #include "distributed_cache/instance_context.h"
+#include <memory>
+#include <unordered_map>
+#include <vector>
 #include "distributed_cache/distributed_cache.h"
 #include "distributed_cache/redis_keys.h"
 #include "common/common.h"
@@ -23,7 +26,6 @@
 #include "distributed_cache/timer.h"
 #include "distributed_cache/counter.h"
 #include "distributed_cache/server.h"
-#include "distributed_cache/hyper_params.h"
 
 namespace mindspore {
 namespace fl {
@@ -337,6 +339,69 @@ CacheStatus InstanceContext::SyncInstanceName(const std::shared_ptr<RedisClientB
   return kCacheSuccess;
 }
 
+CacheStatus InstanceContext::SyncInstanceState(const std::shared_ptr<RedisClientBase> &client,
+                                               const std::unordered_map<std::string, std::string> &values) {
+  if (client == nullptr) {
+    return kCacheInnerErr;
+  }
+  CacheStatus ret;
+  auto key = RedisKeys::GetInstance().InstanceStatusHash();
+  auto iteration_state = static_cast<uint64_t>(instance_state_);
+  auto it = values.find(kFiledRunningState);
+  if (it == values.end()) {  // default running
+    iteration_state = static_cast<uint64_t>(InstanceState::kStateRunning);
+  } else {
+    const auto &filed_val = it->second;
+    if (!Str2Uint64(it->second, &iteration_state) || iteration_state >= InstanceState::kStateMaximum) {
+      MS_LOG_WARNING << "The filed value of " << key << " is invalid, filed: " << kFiledRunningState
+                     << ", value: " << filed_val;
+      ret = client->HSet(key, kFiledRunningState, std::to_string(instance_state_));
+      if (!ret.IsSuccess()) {
+        return ret;
+      }
+    }
+  }
+  if (iteration_state != static_cast<uint64_t>(instance_state_)) {
+    if (instance_state_ == InstanceState::kStateFinish) {
+      MS_LOG_INFO << "The instance has finished, update the finish state to the cache";
+      ret = client->HSet(key, kFiledRunningState, std::to_string(instance_state_));
+      if (!ret.IsSuccess()) {
+        return ret;
+      }
+    }
+    OnStateUpdate(static_cast<InstanceState>(iteration_state));
+  }
+  return kCacheSuccess;
+}
+
+CacheStatus InstanceContext::SyncIterationInfo(const std::shared_ptr<RedisClientBase> &client,
+                                               const std::unordered_map<std::string, std::string> &values) {
+  if (client == nullptr) {
+    return kCacheInnerErr;
+  }
+  CacheStatus ret;
+  auto key = RedisKeys::GetInstance().InstanceStatusHash();
+  uint64_t iteration_num_cache = 0;
+  auto ret_b = GetUintValue(values, kFiledIterationNum, &iteration_num_cache);
+  if (!ret_b || iteration_num_cache <= 0) {
+    MS_LOG_WARNING << "Get filed " << kFiledIterationNum << " from " << key << " failed";
+    return UpdateCacheWhenCacheEmpty(client);
+  }
+  // move to next iteration, including disable, sync local to cache
+  if (iteration_num_cache == iteration_num_ && new_iteration_num_ != iteration_num_cache) {
+    return UpdateCacheWhenNextIteration(client);
+  }
+  // sync from cache to local
+  if (iteration_num_cache != iteration_num_) {
+    uint64_t last_iteration_success = 0;
+    (void)GetUintValue(values, kFiledLastIterationSuccess, &last_iteration_success);
+    std::string last_iteration_result;
+    GetStrValue(values, kFiledLastIterationResult, &last_iteration_result);
+    MoveToNextIterationLocal(iteration_num_cache - 1, last_iteration_success != 0, last_iteration_result);
+  }
+  return kCacheSuccess;
+}
+
 CacheStatus InstanceContext::SyncInner(bool *is_cache_empty) {
   if (is_cache_empty != nullptr) {
     *is_cache_empty = false;
@@ -369,49 +434,14 @@ CacheStatus InstanceContext::SyncInner(bool *is_cache_empty) {
     return UpdateCacheWhenCacheEmpty(client);
   }
   // sync state
-  auto iteration_state = static_cast<uint64_t>(instance_state_);
-  auto it = values.find(kFiledRunningState);
-  if (it == values.end()) {  // default running
-    iteration_state = static_cast<uint64_t>(InstanceState::kStateRunning);
-  } else {
-    const auto &filed_val = it->second;
-    if (!Str2Uint64(it->second, &iteration_state) || iteration_state >= InstanceState::kStateMaximum) {
-      MS_LOG_WARNING << "The filed value of " << key << " is invalid, filed: " << kFiledRunningState
-                     << ", value: " << filed_val;
-      ret = client->HSet(key, kFiledRunningState, std::to_string(instance_state_));
-      if (!ret.IsSuccess()) {
-        return ret;
-      }
-    }
-  }
-  if (iteration_state != static_cast<uint64_t>(instance_state_)) {
-    if (instance_state_ == InstanceState::kStateFinish) {
-      MS_LOG_INFO << "The instance has finished, update the finish state to the cache";
-      ret = client->HSet(key, kFiledRunningState, std::to_string(instance_state_));
-      if (!ret.IsSuccess()) {
-        return ret;
-      }
-    }
-    OnStateUpdate(static_cast<InstanceState>(iteration_state));
+  ret = SyncInstanceState(client, values);
+  if (!ret.IsSuccess()) {
+    return ret;
   }
   // sync iteration info
-  uint64_t iteration_num_cache = 0;
-  auto ret_b = GetUintValue(values, kFiledIterationNum, &iteration_num_cache);
-  if (!ret_b || iteration_num_cache <= 0) {
-    MS_LOG_WARNING << "Get filed " << kFiledIterationNum << " from " << key << " failed";
-    return UpdateCacheWhenCacheEmpty(client);
-  }
-  // move to next iteration, including disable, sync local to cache
-  if (iteration_num_cache == iteration_num_ && new_iteration_num_ != iteration_num_cache) {
-    return UpdateCacheWhenNextIteration(client);
-  }
-  // sync from cache to local
-  if (iteration_num_cache != iteration_num_) {
-    uint64_t last_iteration_success = 0;
-    (void)GetUintValue(values, kFiledLastIterationSuccess, &last_iteration_success);
-    std::string last_iteration_result;
-    GetStrValue(values, kFiledLastIterationResult, &last_iteration_result);
-    MoveToNextIterationLocal(iteration_num_cache - 1, last_iteration_success != 0, last_iteration_result);
+  ret = SyncIterationInfo(client, values);
+  if (!ret.IsSuccess()) {
+    return ret;
   }
   return kCacheSuccess;
 }

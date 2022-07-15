@@ -15,6 +15,8 @@
  */
 
 #include "distributed_cache/redis/redis.h"
+#include <algorithm>
+#include <utility>
 #include "common/utils/log_adapter.h"
 #include "common/core/comm_util.h"
 #include "common/common.h"

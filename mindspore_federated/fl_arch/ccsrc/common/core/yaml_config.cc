@@ -15,6 +15,7 @@
  */
 #include "common/core/yaml_config.h"
 #include <functional>
+#include <vector>
 #include "common/common.h"
 #include "common/fl_context.h"
 
@@ -85,7 +86,7 @@ void YamlConfig::InitDistributedCacheConfig() {
     distributed_cache_config.configs[key] = val;
   }
   FLContext::instance()->set_distributed_cache_config(distributed_cache_config);
-};
+}
 
 void YamlConfig::InitSslConfig() {
   if (!enable_ssl_) {
@@ -109,7 +110,8 @@ void YamlConfig::InitRoundConfig() {
   Get("round.start_fl_job_threshold", SET_INT_CXT(set_start_fl_job_threshold), true, CheckInt(1, UINT32_MAX, INC_BOTH));
   Get("round.start_fl_job_time_window", SET_INT_CXT(set_start_fl_job_time_window), true,
       CheckInt(1, UINT32_MAX, INC_BOTH));
-  Get("round.update_model_ratio", SET_FLOAT_CXT(set_update_model_ratio), true, CheckFloat(0, 1, INC_RIGHT));  //(0, 1.0]
+  Get("round.update_model_ratio", SET_FLOAT_CXT(set_update_model_ratio), true,
+      CheckFloat(0, 1, INC_RIGHT));  // (0, 1.0]
   Get("round.update_model_time_window", SET_INT_CXT(set_update_model_time_window), true,
       CheckInt(1, UINT32_MAX, INC_BOTH));
   Get("round.global_iteration_time_window", SET_INT_CXT(set_global_iteration_time_window), true,
@@ -131,14 +133,14 @@ void YamlConfig::InitEncryptConfig() {
   auto &encrypt_type = encrypt_config.encrypt_type;
   if (encrypt_type == kPWEncryptType || encrypt_type == kStablePWEncryptType) {
     Get("encrypt.pw_encrypt.share_secrets_ratio", &encrypt_config.share_secrets_ratio, true,
-        CheckFloat(0, 1, INC_RIGHT));  //(0, 1.0]
+        CheckFloat(0, 1, INC_RIGHT));  // (0, 1.0]
     Get("encrypt.pw_encrypt.cipher_time_window", &encrypt_config.cipher_time_window, true,
         CheckInt(1, UINT32_MAX, INC_BOTH));
     Get("encrypt.pw_encrypt.reconstruct_secrets_threshold", &encrypt_config.reconstruct_secrets_threshold, true,
         CheckInt(1, UINT32_MAX, INC_BOTH));
   } else if (encrypt_type == kDPEncryptType) {
     Get("encrypt.dp_encrypt.dp_eps", &encrypt_config.dp_eps, false, CheckFloat(0, GT));                  // >0
-    Get("encrypt.dp_encrypt.dp_delta", &encrypt_config.dp_delta, false, CheckFloat(0, 1, INC_NEITHER));  //(0,1)
+    Get("encrypt.dp_encrypt.dp_delta", &encrypt_config.dp_delta, false, CheckFloat(0, 1, INC_NEITHER));  // (0,1)
     Get("encrypt.dp_encrypt.dp_norm_clip", &encrypt_config.dp_norm_clip, false, CheckFloat(0, GT));      // >0
   } else if (encrypt_type == kDSEncryptType) {
     Get("encrypt.signds.sign_k", &encrypt_config.sign_k, false, CheckFloat(0, 0.25, INC_RIGHT));     // (0, 0.25]
