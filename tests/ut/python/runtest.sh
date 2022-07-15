@@ -18,7 +18,6 @@ BASEPATH=$(
   cd "$(dirname "$0")"
   pwd
 )
-CURRUSER=$(whoami)
 ROOT_DIR=${BASEPATH}/../../..
 
 cp -r ${ROOT_DIR}/mindspore_federated/fl_arch/python/mindspore_federated/* ${ROOT_DIR}/build/package/mindspore_federated/
@@ -48,8 +47,12 @@ function clear_port()
 function start_redis_server() {
   echo "begin start redis server"
   redis-server --port ${REDIS_SERVER_PORT} --save "" &
-  pid=$(ps aux | grep 'redis-server' | grep :${REDIS_SERVER_PORT} | grep -v grep | awk '{print $2}')
-  if [ ! $pid ]
+  sleep 0.5s
+  echo "after start redis server"
+  ps aux | grep 'redis-server' | grep :${REDIS_SERVER_PORT} | grep -v grep
+
+  count=$(ps aux | grep 'redis-server' | grep :${REDIS_SERVER_PORT} | grep -v grep | wc -l)
+  if [[ $count == 0 ]]
   then
     echo "Failed to start redis server, server port: ${REDIS_SERVER_PORT}"
     exit 1

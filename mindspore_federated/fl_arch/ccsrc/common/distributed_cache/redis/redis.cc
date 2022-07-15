@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-#include "redis.h"
+#include "distributed_cache/redis/redis.h"
 #include "common/utils/log_adapter.h"
 #include "common/core/comm_util.h"
 #include "common/common.h"
 #include "common/exit_handler.h"
-#include "distributed_cache/redis_keys.h"
 
 namespace mindspore {
 namespace fl {
@@ -185,12 +184,12 @@ CacheStatus RedisClient::Connect(bool retry_connect) {
       return {kCacheNetErr, reason};
     }
   }
-  size_t retry_times = timeout_;
+  int64_t retry_times = timeout_;
   if (retry_times <= 0 || !retry_connect) {
     retry_times = 1;
   }
   const std::string refused_str = "Connection refused";
-  for (size_t i = 0; i < retry_times; i++) {
+  for (int64_t i = 0; i < retry_times; i++) {
     if (ExitHandler::Instance().HasStopped()) {
       auto reason =
         std::string("Connection canceled: ") + "receive signal " + std::to_string(ExitHandler::Instance().GetSignal());
@@ -618,12 +617,7 @@ bool RedisDistributedCache::Init(const DistributedCacheConfig &cache_config, int
     }
     redisInitOpenSSL();
     redisSSLContextError ssl_error;
-    auto c_str = [](const std::string &str) -> const char * {
-      if (str.empty()) {
-        return nullptr;
-      }
-      return str.c_str();
-    };
+    auto c_str = [](const std::string &str) -> const char * { return str.empty() ? nullptr : str.c_str(); };
     ssl_context_ = redisCreateSSLContext(c_str(ssl_config.cacert_filename), c_str(ssl_config.capath),
                                          c_str(ssl_config.cert_filename), c_str(ssl_config.private_key_filename),
                                          c_str(ssl_config.server_name), &ssl_error);
@@ -660,12 +654,8 @@ std::shared_ptr<RedisClientBase> RedisDistributedCache::GetOneClient() {
 }
 
 bool RedisDistributedCache::HasInvalid() const {
-  for (auto &item : client_pool_) {
-    if (!item->IsValid()) {
-      return true;
-    }
-  }
-  return false;
+  return std::any_of(client_pool_.begin(), client_pool_.end(),
+                     [](const std::shared_ptr<RedisClient> &item) { return !item->IsValid(); });
 }
 
 CacheStatus RedisDistributedCache::RetryConnect() {
