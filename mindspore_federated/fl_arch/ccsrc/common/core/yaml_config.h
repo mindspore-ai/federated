@@ -19,6 +19,7 @@
 #include <string>
 #include <unordered_map>
 #include <functional>
+#include <vector>
 #include "common/status.h"
 #include "common/constants.h"
 
@@ -87,7 +88,7 @@ struct CheckNum {
   CheckNum(T min, T max, RangeOp range_op) : min_(min), max_(max), range_op_(range_op) {}
   CheckNum(T val, CompareOp cmp_op) : val_(val), cmp_op_(cmp_op) {}
 
-  FlStatus Check(T num) {
+  FlStatus CheckRange(T num) {
     if (range_op_ == INC_NEITHER && !(num > min_ && num < max_)) {  // (min, max)
       return {kFlFailed, "expect value to be range of (" + std::to_string(min_) + "," + std::to_string(max_) +
                            "), but got " + std::to_string(num)};
@@ -100,7 +101,11 @@ struct CheckNum {
     } else if (range_op_ == INC_BOTH && !(num >= min_ && num <= max_)) {  // [min, max]
       return {kFlFailed, "value is expected to be range of [" + std::to_string(min_) + "," + std::to_string(max_) +
                            "], but got " + std::to_string(num)};
-    } else if (cmp_op_ == GE && !(num >= val_)) {  // >=
+    }
+    return kFlSuccess;
+  }
+  FlStatus CheckCmp(T num) {
+    if (cmp_op_ == GE && !(num >= val_)) {  // >=
       return {kFlFailed, "value is expected >=" + std::to_string(val_) + ", but got " + std::to_string(num)};
     } else if (cmp_op_ == GT && !(num > val_)) {  //
       return {kFlFailed, "value is expected >" + std::to_string(val_) + ", but got " + std::to_string(num)};
@@ -108,6 +113,17 @@ struct CheckNum {
       return {kFlFailed, "value is expected <=" + std::to_string(val_) + ", but got " + std::to_string(num)};
     } else if (cmp_op_ == LT && !(num < val_)) {  // <
       return {kFlFailed, "value is expected <" + std::to_string(val_) + ", but got " + std::to_string(num)};
+    }
+    return kFlSuccess;
+  }
+  FlStatus Check(T num) {
+    auto status = CheckRange(num);
+    if (!status.IsSuccess()) {
+      return status;
+    }
+    status = CheckCmp(num);
+    if (!status.IsSuccess()) {
+      return status;
     }
     return kFlSuccess;
   }

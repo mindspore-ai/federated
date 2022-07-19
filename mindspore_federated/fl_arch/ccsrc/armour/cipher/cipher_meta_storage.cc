@@ -15,6 +15,7 @@
  */
 
 #include "armour/cipher/cipher_meta_storage.h"
+#include <unordered_map>
 #include "distributed_cache/client_infos.h"
 #include "distributed_cache/instance_context.h"
 

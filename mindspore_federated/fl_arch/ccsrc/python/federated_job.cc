@@ -15,6 +15,7 @@
  */
 
 #include "python/federated_job.h"
+#include <vector>
 #include "common/utils/log_adapter.h"
 #include "common/common.h"
 #include "server/server.h"
@@ -65,7 +66,9 @@ void FederatedJob::StartFederatedServer(const std::vector<std::shared_ptr<Featur
                                         const py::object &on_iteration_end_callback) {
   FLContext::instance()->set_ms_role(kEnvRoleOfServer);
   std::vector<InputWeight> feature_list_inner;
+  feature_list_inner.reserve(feature_list.size());
   for (auto &item : feature_list) {
+    // cppcheck-suppress useStlAlgorithm
     feature_list_inner.push_back(item->GetWeight());
   }
   server::FlCallback callback;
@@ -91,7 +94,7 @@ bool FederatedJob::StartFLJob(size_t data_size) { return StartFLJobKernelMod::Ge
 
 py::dict FederatedJob::UpdateAndGetModel(std::map<std::string, std::vector<float>> weight_datas) {
   py::dict dict_data;
-  if (!UpdateModelKernelMod::GetInstance()->Launch(weight_datas)) {
+  if (!UpdateModelKernelMod::GetInstance()->Launch(&weight_datas)) {
     return dict_data;
   }
   return GetModelKernelMod::GetInstance()->Launch();

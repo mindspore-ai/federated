@@ -22,6 +22,7 @@
 #include <memory>
 #include <map>
 #include <utility>
+#include <algorithm>
 #include "armour/secure_protocol/secret_sharing.h"
 #include "common/utils/log_adapter.h"
 #include "armour/cipher/cipher_init.h"

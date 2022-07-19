@@ -15,6 +15,7 @@
  */
 
 #include "scheduler/scheduler_node.h"
+#include <map>
 #include "distributed_cache/scheduler.h"
 #include "distributed_cache/hyper_params.h"
 #include "distributed_cache/instance_context.h"

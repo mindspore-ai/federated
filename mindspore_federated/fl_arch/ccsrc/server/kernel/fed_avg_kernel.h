@@ -22,6 +22,7 @@
 #include <utility>
 #include <vector>
 #include <functional>
+#include <map>
 #include "common/common.h"
 #include "server/collective_ops_impl.h"
 #include "server/local_meta_store.h"

@@ -21,7 +21,6 @@
 #include <string>
 #include <vector>
 #include <utility>
-#include "distributed_cache/counter.h"
 #include "distributed_cache/server.h"
 #include "server/server.h"
 
@@ -263,7 +262,6 @@ ResultCode UpdateModelKernel::VerifyUpdateModel(const schema::RequestUpdateModel
     return ResultCode::kFail;
   }
   if (FLContext::instance()->encrypt_type() == kPWEncryptType) {
-    std::vector<std::string> get_secrets_clients;
     auto find_client = cache::ClientInfos::GetInstance().HasGetSecretsClient(update_model_fl_id);
     if (!find_client) {  // the client not in get_secrets_clients
       std::string reason = "fl_id: " + update_model_fl_id + " is not in get_secrets_clients. Please retry later.";

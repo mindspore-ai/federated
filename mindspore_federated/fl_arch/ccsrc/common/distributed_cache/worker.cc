@@ -38,13 +38,13 @@ void Worker::Stop() {
     return;
   }
   std::string instance_name;
-  auto cache_ret = Scheduler::Instance().GetInstanceName(fl_name_, &instance_name);
+  (void)Scheduler::Instance().GetInstanceName(fl_name_, &instance_name);
   if (instance_name.empty()) {
     return;
   }
   // store key
   auto worker_key = RedisKeys::GetInstance().WorkerHash(fl_name_, instance_name);
-  cache_ret = client->HDel(worker_key, fl_id_);
+  auto cache_ret = client->HDel(worker_key, fl_id_);
   if (!cache_ret.IsSuccess()) {
     MS_LOG_WARNING << "Failed to del info of worker " << fl_id_;
   } else {
@@ -76,7 +76,6 @@ CacheStatus Worker::SyncFromCache2Local() {
   if (!ret.IsSuccess()) {
     return ret;
   }
-  std::map<std::string, std::string> worker_alive;
   for (auto &item : worker_registered) {
     const auto &node_id = item.first;
     auto heartbeat_key = RedisKeys::GetInstance().WorkerHeartbeatString(fl_name_, instance_name, node_id);

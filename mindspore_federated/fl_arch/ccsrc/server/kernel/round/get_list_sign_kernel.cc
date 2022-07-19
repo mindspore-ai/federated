@@ -20,6 +20,7 @@
 #include <vector>
 #include <memory>
 #include <map>
+#include <unordered_map>
 #include "schema/cipher_generated.h"
 
 namespace mindspore {
@@ -97,7 +98,6 @@ bool GetListSignKernel::Launch(const uint8_t *req_data, size_t len, const std::s
     SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
     return true;
   }
-  std::string fl_id = get_list_sign_req->fl_id()->str();
   if (DistributedCountService::GetInstance().CountReachThreshold(name_)) {
     MS_LOG(WARNING) << "Current amount for GetListSignKernel is enough.";
   }

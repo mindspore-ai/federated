@@ -16,6 +16,7 @@
 
 #ifndef MINDSPORE_CCSRC_FL_SERVER_BUFFER_STATUS_H
 #define MINDSPORE_CCSRC_FL_SERVER_BUFFER_STATUS_H
+#include <string>
 
 namespace mindspore {
 namespace fl {
@@ -33,7 +34,8 @@ enum CacheStatusCode {
 class CacheStatus {
  public:
   CacheStatus() = default;
-  CacheStatus(CacheStatusCode code, const std::string &detail = "") : code_(code), detail_(detail) {}
+  CacheStatus(CacheStatusCode code, const std::string &detail = "")  // NOLINT(runtime/explicit)
+      : code_(code), detail_(detail) {}
   bool IsSuccess() const { return code_ == kCacheSuccess; }
   bool IsNil() const { return code_ == kCacheNil; }
   CacheStatusCode GetCode() const { return code_; }

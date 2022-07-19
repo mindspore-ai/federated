@@ -23,7 +23,9 @@
 #include <string>
 #include <sstream>
 #include <memory>
+#include <unordered_map>
 #include <map>
+#include <vector>
 #include <thread>
 #include <functional>
 #include "common/utils/visible.h"

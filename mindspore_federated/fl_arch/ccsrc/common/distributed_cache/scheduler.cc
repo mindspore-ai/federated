@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 #include "distributed_cache/scheduler.h"
+#include <unordered_map>
+#include <utility>
+#include <vector>
 #include "distributed_cache/distributed_cache.h"
 #include "common/common.h"
-#include "distributed_cache/common.h"
 #include "distributed_cache/timer.h"
 #include "distributed_cache/redis_keys.h"
 

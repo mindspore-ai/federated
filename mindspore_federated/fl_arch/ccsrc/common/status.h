@@ -34,7 +34,8 @@ enum FlStatusCode {
 class FlStatus {
  public:
   FlStatus() = default;
-  FlStatus(FlStatusCode code, const std::string &detail = "") : code_(code), detail_(detail) {}
+  FlStatus(FlStatusCode code, const std::string &detail = "")  // NOLINT(runtime/explicit)
+      : code_(code), detail_(detail) {}
   FlStatus(const FlStatus &other) {
     code_ = other.code_;
     detail_ = other.detail_;

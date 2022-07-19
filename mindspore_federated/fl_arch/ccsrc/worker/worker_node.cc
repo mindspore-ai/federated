@@ -15,7 +15,7 @@
  */
 
 #include "worker/worker_node.h"
-#include "common//core/comm_util.h"
+#include <map>
 #include "distributed_cache/distributed_cache.h"
 #include "distributed_cache/scheduler.h"
 

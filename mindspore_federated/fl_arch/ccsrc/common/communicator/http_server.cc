@@ -15,9 +15,6 @@
  */
 
 #include "common/communicator/http_server.h"
-#include "common/communicator/http_message_handler.h"
-#include "common/core/comm_util.h"
-
 #include <arpa/inet.h>
 #include <event.h>
 
@@ -25,6 +22,9 @@
 #include <cstring>
 #include <functional>
 #include <regex>
+
+#include "common/communicator/http_message_handler.h"
+#include "common/core/comm_util.h"
 
 namespace mindspore {
 namespace fl {

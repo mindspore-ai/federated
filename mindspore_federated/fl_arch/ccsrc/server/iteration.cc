@@ -56,6 +56,7 @@ void Iteration::InitIteration(const std::shared_ptr<ServerNode> &server_node,
   size_t iteration_time_window = 0;
   for (const RoundConfig &config : round_configs) {
     if (config.check_timeout) {
+      // cppcheck-suppress useStlAlgorithm
       iteration_time_window += config.time_window;
     }
   }
@@ -315,10 +316,11 @@ void Iteration::SaveModel() {
     // Sync model from other successful servers.
     if (!Executor::GetInstance().IsIterationModelFinished(store_iteration_num)) {
       auto status = Executor::GetInstance().SyncLatestModelFromOtherServers();
-      if (!status.IsSuccess()) {
-        MS_LOG_WARNING << "Iteration " << store_iteration_num << " is invalid. Reason: " << status.StatusMessage();
+      if (status.IsSuccess()) {
+        return;
       }
-      return;
+      MS_LOG_WARNING << "Iteration " << store_iteration_num << " is invalid. Reason: " << status.StatusMessage();
+      is_iteration_valid = false;  // used model weights of last iteration
     }
   }
   if (is_iteration_valid) {

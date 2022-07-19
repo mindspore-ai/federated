@@ -15,7 +15,7 @@
  */
 #include "distributed_cache/hyper_params.h"
 #include <string>
-#include <unordered_map>
+#include <memory>
 #include <nlohmann/json.hpp>
 #include "distributed_cache/redis_keys.h"
 #include "distributed_cache/distributed_cache.h"

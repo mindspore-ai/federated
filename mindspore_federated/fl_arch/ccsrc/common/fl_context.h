@@ -20,8 +20,8 @@
 #include <map>
 #include <string>
 #include <memory>
-#include <map>
 #include <vector>
+#include <unordered_map>
 #include "common/constants.h"
 #include "common/common.h"
 #include "common/core/cluster_config.h"
@@ -344,6 +344,9 @@ class MS_EXPORT FLContext {
   std::string metrics_file_ = "metrics.json";
   std::string failure_event_file_ = "event.txt";
   std::string data_rate_dir_ = "..";
+  void CheckDPEncrypt(const EncryptConfig &config) const;
+  void CheckSignDsEncrypt(const EncryptConfig &config) const;
+  void CheckPWEncrypt(const EncryptConfig &config) const;
 };
 }  // namespace fl
 }  // namespace mindspore

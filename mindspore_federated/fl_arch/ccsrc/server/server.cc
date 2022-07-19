@@ -18,6 +18,8 @@
 #include <memory>
 #include <string>
 #include <csignal>
+#include <algorithm>
+#include <map>
 #include "armour/secure_protocol/secret_sharing.h"
 #include "armour/cipher/cipher_init.h"
 #include "server/round.h"
@@ -337,13 +339,13 @@ void Server::Stop() {
 void Server::InitPkiCertificate() {
   auto &client_verify_config = FLContext::instance()->client_verify_config();
   if (client_verify_config.pki_verify) {
-    root_first_ca_path_ = client_verify_config.root_first_ca_path;
-    root_second_ca_path_ = client_verify_config.root_second_ca_path;
-    equip_crl_path_ = client_verify_config.equip_crl_path;
-    replay_attack_time_diff_ = client_verify_config.replay_attack_time_diff;
+    auto root_first_ca_path = client_verify_config.root_first_ca_path;
+    auto root_second_ca_path = client_verify_config.root_second_ca_path;
+    auto equip_crl_path = client_verify_config.equip_crl_path;
+    auto replay_attack_time_diff = client_verify_config.replay_attack_time_diff;
 
-    bool ret = CertVerify::initRootCertAndCRL(root_first_ca_path_, root_second_ca_path_, equip_crl_path_,
-                                              replay_attack_time_diff_);
+    bool ret =
+      CertVerify::initRootCertAndCRL(root_first_ca_path, root_second_ca_path, equip_crl_path, replay_attack_time_diff);
     if (!ret) {
       MS_LOG(EXCEPTION) << "init root cert and crl failed.";
     }

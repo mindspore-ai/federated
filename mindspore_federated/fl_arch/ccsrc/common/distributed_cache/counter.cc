@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 #include "distributed_cache/counter.h"
+#include <memory>
 #include "common/common.h"
 #include "distributed_cache/distributed_cache.h"
 #include "distributed_cache/redis_keys.h"
-#include "distributed_cache/common.h"
 #include "server/server.h"
 #include "distributed_cache/server.h"
 #include "distributed_cache/timer.h"
@@ -164,7 +164,6 @@ bool Counter::Count(const std::string &name, bool *trigger_first, bool *trigger_
     }
   } else {
     auto key = RedisKeys::GetInstance().CountHash();
-    std::string count_str;
     auto ret = client->HIncr(key, name, &new_count);
     if (!ret.IsSuccess()) {
       MS_LOG_WARNING << "Incr string count " << name << " failed";
@@ -308,16 +307,11 @@ bool Counter::GetCountInner(const std::shared_ptr<RedisClientBase> &client, cons
     info.has_server_exit = has_server_exit;
   } else {
     auto key = RedisKeys::GetInstance().CountHash();
-    std::string count_str;
     auto ret = client->HGet(key, name, 0, &cur_count);
     if (!ret.IsSuccess()) {
       MS_LOG_WARNING << "Get string count " << name << " failed";
       return false;
     }
-  }
-  if (cur_count < 0) {
-    MS_LOG_WARNING << "The value of count " << name << " cannot less than 0";
-    return false;
   }
   *count = cur_count;
   return true;

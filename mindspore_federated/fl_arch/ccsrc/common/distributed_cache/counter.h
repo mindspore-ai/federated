@@ -19,6 +19,7 @@
 #include <unordered_map>
 #include <functional>
 #include <queue>
+#include <memory>
 #include "common/protos/comm.pb.h"
 #include "distributed_cache/distributed_cache.h"
 

@@ -20,6 +20,7 @@
 #include <string>
 #include <memory>
 #include <map>
+#include <vector>
 #include "common/common.h"
 #include "python/feature_py.h"
 #include "common/utils/python_adapter.h"

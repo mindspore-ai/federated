@@ -17,6 +17,8 @@
 #include "server/round.h"
 #include <memory>
 #include <string>
+#include <map>
+#include <vector>
 #include "common/exit_handler.h"
 #include "server/server.h"
 #include "server/iteration.h"

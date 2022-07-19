@@ -18,6 +18,7 @@
 #define MINDSPORE_CCSRC_FL_LOAD_CONFIG_H
 
 #include <string>
+#include <memory>
 #include "distributed_cache/distributed_cache.h"
 
 namespace mindspore {

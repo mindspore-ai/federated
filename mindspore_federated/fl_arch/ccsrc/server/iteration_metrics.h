@@ -52,15 +52,7 @@ const std::map<cache::InstanceState, std::string> kInstanceStateName = {
 
 class IterationMetrics {
  public:
-  explicit IterationMetrics()
-      : fl_name_(""),
-        fl_iteration_num_(0),
-        cur_iteration_num_(0),
-        instance_state_(cache::InstanceState::kStateFinish),
-        loss_(0.0),
-        accuracy_(0.0),
-        iteration_time_cost_(0),
-        iteration_result_(true) {}
+  IterationMetrics() = default;
   ~IterationMetrics() = default;
 
   bool Initialize();
@@ -100,28 +92,28 @@ class IterationMetrics {
 
   // Federated learning iteration number. Set by fl_context.
   // If this number of iterations are completed, one instance is finished.
-  size_t fl_iteration_num_;
+  size_t fl_iteration_num_ = 0;
 
   // Current iteration number.
-  size_t cur_iteration_num_;
+  size_t cur_iteration_num_ = 0;
 
   // Current instance state.
-  cache::InstanceState instance_state_;
+  cache::InstanceState instance_state_ = cache::InstanceState::kStateFinish;
 
   // The training loss after this federated learning iteration, passed by worker.
-  float loss_;
+  float loss_ = 0.0f;
 
   // The evaluation result after this federated learning iteration, passed by worker.
-  float accuracy_;
+  float accuracy_ = 0.0f;
 
   // for example: "startFLJobTotalClientNum" -> startFLJob total client num
   std::map<std::string, size_t> round_client_num_map_;
 
   // The time cost in millisecond for this completed iteration.
-  uint64_t iteration_time_cost_;
+  uint64_t iteration_time_cost_ = 0;
 
   // Current iteration running result.
-  bool iteration_result_;
+  bool iteration_result_ = true;
 
   Time start_time_;
   Time end_time_;

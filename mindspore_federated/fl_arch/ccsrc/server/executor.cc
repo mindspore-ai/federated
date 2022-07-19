@@ -19,6 +19,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include <utility>
 #include "distributed_cache/instance_context.h"
 #include "distributed_cache/server.h"
 #include "distributed_cache/counter.h"
@@ -231,7 +233,6 @@ FlStatus Executor::HandlePullWeightRequest(const uint8_t *req_data, size_t len, 
     MS_LOG(WARNING) << reason;
     return FlStatus(kRequestError, reason);
   }
-  std::map<std::string, AddressPtr> feature_maps = {};
   size_t current_iter = cache::InstanceContext::Instance().iteration_num();
   size_t pull_weight_iter = IntToSize(pull_weight_req->iteration());
   // The iteration from worker should be the same as server's, otherwise return SucNotReady so that worker could retry.
