@@ -27,6 +27,7 @@ namespace fl {
 namespace server {
 void ModelStore::Initialize(const std::vector<InputWeight> &feature_map, uint32_t max_count) {
   auto latest_iteration_num = cache::InstanceContext::Instance().iteration_num() - 1;
+  MS_LOG(INFO) << "Latest iteration num is " << latest_iteration_num;
   max_model_count_ = max_count;
   InitModel(feature_map);
   MS_EXCEPTION_IF_NULL(initial_model_);
@@ -77,14 +78,10 @@ void ModelStore::InitModel(const std::vector<InputWeight> &feature_map) {
     weight_item.require_aggr = feature.require_aggr;
     cur_offset += feature.size;
 
-    Feature feature_set;
-    feature_set.weight_shape = weight_item.shape;
-    feature_set.weight_size = weight_item.size;
-    feature_set.weight_type = weight_item.type;
-    LocalMetaStore::GetInstance().put_aggregation_feature_map(weight_item.name, feature_set);
     MS_LOG(INFO) << "Aggregate Weight full name is " << weight_item.name << ", weight byte size is "
                  << weight_item.size;
   }
+  LocalMetaStore::GetInstance().put_aggregation_feature_map(initial_model_);
 }
 
 bool ModelStore::StoreModelByIterNum(size_t iteration, const void *proto_model_data, size_t len) {

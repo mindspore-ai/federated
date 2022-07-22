@@ -71,6 +71,7 @@ table RequestFLJob{
   download_compress_types:[CompressType];
   eval_data_size:int;
 }
+
 table ResponseFLJob {
   retcode:int;
   reason:string;

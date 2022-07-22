@@ -158,6 +158,8 @@ void Iteration::SubmitSummary() {
       end_last_iter_rsp.set_updatemodel_accept_client_num(round->kernel_accept_client_num());
       end_last_iter_rsp.set_updatemodel_reject_client_num(round->kernel_reject_client_num());
       end_last_iter_rsp.set_upload_loss(round->kernel_upload_loss());
+      end_last_iter_rsp.set_upload_accuracy(round->kernel_upload_accuracy());
+      end_last_iter_rsp.set_eval_data_size(round->kernel_eval_data_size());
       auto update_model_complete_info = round->GetUpdateModelCompleteInfo();
       if (update_model_complete_info.size() != kParticipationTimeLevelNum) {
         MS_LOG(EXCEPTION) << "update_model_complete_info size is not equal 3";
@@ -186,6 +188,8 @@ void Iteration::GetAllSummaries() {
   MS_LOG_INFO << "Server count for summary " << all_summary.size();
   round_client_num_map_.clear();
   float upload_loss = 0.0;
+  float upload_accuracy = 0.0;
+  size_t eval_data_size = 0;
   float metrics_loss = 0.0;
   float metrics_accuracy = 0.0;
   for (auto &item : all_summary) {
@@ -212,6 +216,8 @@ void Iteration::GetAllSummaries() {
     round_client_num_map_[kParticipationTimeLevel3] += summary.participation_time_level3_num();
 
     upload_loss += summary.upload_loss();
+    upload_accuracy += summary.upload_accuracy();
+    eval_data_size += summary.eval_data_size();
     if (summary.metrics_loss() != 0.0) {
       metrics_loss = summary.metrics_loss();
       metrics_accuracy = summary.metrics_accuracy();
@@ -219,10 +225,13 @@ void Iteration::GetAllSummaries() {
   }
   if (FLContext::instance()->server_mode() == kServerModeFL) {
     loss_ = upload_loss;
-    uint64_t update_model_threshold =
-      FLContext::instance()->start_fl_job_threshold() * FLContext::instance()->update_model_ratio();
-    if (update_model_threshold > 0) {
-      loss_ = loss_ / update_model_threshold;
+    accuracy_ = upload_accuracy;
+    size_t train_data_size = LocalMetaStore::GetInstance().value<size_t>(kCtxFedAvgTotalDataSize);
+    if (train_data_size > 0) {
+      loss_ = loss_ / train_data_size;
+    }
+    if (eval_data_size > 0) {
+      accuracy_ = accuracy_ / eval_data_size;
     }
   } else {
     loss_ = metrics_loss;
@@ -247,8 +256,7 @@ bool Iteration::SummarizeIteration() {
   metrics.set_loss(loss_);
   metrics.set_accuracy(accuracy_);
   metrics.set_round_client_num_map(round_client_num_map_);
-  auto iteration_valid = cache::InstanceContext::Instance().last_iteration_valid();
-  metrics.set_iteration_result(iteration_valid);
+  metrics.set_iteration_result(is_iteration_valid_);
 
   if (complete_time_.time_stamp < start_time_.time_stamp) {
     MS_LOG(ERROR) << "The complete_timestamp_: " << complete_time_.time_stamp
@@ -307,11 +315,11 @@ void Iteration::LogFailureEvent(const std::string &node_role, const std::string 
 // move next(success or fail), disable, sync with cache(new iteration number may != current iteration num + 1)
 void Iteration::SaveModel() {
   auto &instance_context = cache::InstanceContext::Instance();
-  auto is_iteration_valid = instance_context.last_iteration_valid();
+  is_iteration_valid_ = instance_context.last_iteration_valid();
   auto result = instance_context.last_iteration_result();
   // new_iteration_num is the iteration to be updated
   auto store_iteration_num = instance_context.new_iteration_num() - 1;
-  if (is_iteration_valid) {
+  if (is_iteration_valid_) {
     // This iteration of this server may have failed, or weight aggregation may not be performed.
     // Sync model from other successful servers.
     if (!Executor::GetInstance().IsIterationModelFinished(store_iteration_num)) {
@@ -320,16 +328,20 @@ void Iteration::SaveModel() {
         return;
       }
       MS_LOG_WARNING << "Iteration " << store_iteration_num << " is invalid. Reason: " << status.StatusMessage();
-      is_iteration_valid = false;  // used model weights of last iteration
+      is_iteration_valid_ = false;  // used model weights of last iteration
     }
   }
-  if (is_iteration_valid) {
+  if (is_iteration_valid_) {
     // Store the model which is successfully aggregated for this iteration.
     const auto &model = Executor::GetInstance().GetModel();
-    if (model == nullptr || model->weight_data.empty() || model->weight_items.empty()) {
-      MS_LOG(WARNING) << "Verify feature maps failed, iteration " << store_iteration_num << " will not be stored.";
+    if (model == nullptr || model->weight_data.empty() || model->weight_items.empty() || !LocalMetaStore::GetInstance().verifyAggregationFeatureMap(model, true)) {
+      MS_LOG(WARNING) << "Verify feature maps failed, iteration " << store_iteration_num << " will not be stored. Use the previous iteration model instead";
+      const auto &model_pair = ModelStore::GetInstance().GetLatestModel();
+      ModelStore::GetInstance().StoreModelByIterNum(store_iteration_num, model_pair.second);
+      is_iteration_valid_ = false;
       return;
     }
+
     ModelStore::GetInstance().StoreModelByIterNum(store_iteration_num, model);
     MS_LOG(INFO) << "Iteration " << store_iteration_num << " is successfully finished.";
   } else {
@@ -344,13 +356,17 @@ void Iteration::Reset() {
   for (auto &round : rounds_) {
     MS_ERROR_IF_NULL_WO_RET_VAL(round);
     round->Reset();
-    round->InitkernelClientVisitedNum();
-    round->InitkernelClientUploadLoss();
+    round->InitKernelClientVisitedNum();
+    round->InitKernelClientUploadLoss();
+    round->InitKernelClientUploadAccuracy();
+    round->InitKernelEvalDataSize();
     round->ResetParticipationTimeAndNum();
   }
   round_client_num_map_.clear();
   set_loss(0.0f);
   set_accuracy(0.0f);
+  size_t &total_data_size = LocalMetaStore::GetInstance().mutable_value<size_t>(kCtxFedAvgTotalDataSize);
+  total_data_size = 0;
 }
 
 void Iteration::SummaryOnIterationFinish(const std::function<void()> &iteration_end_callback) {
@@ -358,8 +374,7 @@ void Iteration::SummaryOnIterationFinish(const std::function<void()> &iteration_
     MS_ERROR_IF_NULL_WO_RET_VAL(round);
     round->KernelSummarize();
   }
-  auto iteration_valid = cache::InstanceContext::Instance().last_iteration_valid();
-  if (!iteration_valid) {
+  if (!is_iteration_valid_) {
     iteration_fail_num_++;
   } else {
     iteration_fail_num_ = 0;

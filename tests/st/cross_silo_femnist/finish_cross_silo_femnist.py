@@ -15,10 +15,23 @@
 
 import os
 import subprocess
+import argparse
 
+parser = argparse.ArgumentParser(description="Finish cross_silo_femnist case")
+parser.add_argument("--redis_port", type=int, default=8113)
+
+args, _ = parser.parse_known_args()
+redis_port = args.redis_port
 cur_dir = os.path.dirname(os.path.abspath(__file__))
 
 cmd = "pid=`ps -ef|grep \"yaml_config=" + str(cur_dir) + "\" "
+cmd += " | grep -v \"grep\" | grep -v \"finish\" |awk '{print $2}'` && "
+cmd += "for id in $pid; do kill -9 $id && echo \"killed $id\"; done"
+
+print("cmd: ", cmd)
+subprocess.call(['bash', '-c', cmd])
+
+cmd = "pid=`ps -ef|grep redis | grep " + str(redis_port)
 cmd += " | grep -v \"grep\" | grep -v \"finish\" |awk '{print $2}'` && "
 cmd += "for id in $pid; do kill -9 $id && echo \"killed $id\"; done"
 

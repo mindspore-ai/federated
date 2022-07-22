@@ -32,13 +32,6 @@ namespace server {
 // For example, the current iteration number, time windows for round kernels, etc.
 // LocalMetaStore is threadsafe.
 
-struct Feature {
-  std::vector<size_t> weight_shape;
-  std::string weight_type;
-  size_t weight_size;
-  std::vector<float> weight_data;
-};
-
 class LocalMetaStore {
  public:
   static LocalMetaStore &GetInstance() {
@@ -84,11 +77,11 @@ class LocalMetaStore {
 
   const cache::InstanceState curr_instance_state();
 
-  const void put_aggregation_feature_map(const std::string &name, const Feature &feature);
+  const void put_aggregation_feature_map(ModelItemPtr modelItemPtr);
 
-  std::unordered_map<std::string, Feature> &aggregation_feature_map();
+  ModelItemPtr &aggregation_feature_map();
 
-  bool verifyAggregationFeatureMap(const std::unordered_map<std::string, size_t> &model);
+  bool verifyAggregationFeatureMap(const ModelItemPtr &modelItemPtr, bool verify_score = false);
 
  private:
   LocalMetaStore() : key_to_meta_({}), curr_iter_num_(0) {}
@@ -103,7 +96,7 @@ class LocalMetaStore {
   size_t curr_iter_num_{0};
   cache::InstanceState instance_state_;
   // aggregation_feature_map_ stores model meta data with weight name and size which will be Aggregated.
-  std::unordered_map<std::string, Feature> aggregation_feature_map_;
+  ModelItemPtr aggregation_feature_map_;
 };
 }  // namespace server
 }  // namespace fl
