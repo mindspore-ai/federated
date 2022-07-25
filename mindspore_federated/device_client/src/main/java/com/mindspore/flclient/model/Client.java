@@ -256,6 +256,23 @@ public abstract class Client {
         return getInferResult(inferCallbacks);
     }
 
+    private boolean saveModelbyProxy(ModelProxy proxy, String outFile) {
+        if (outFile == null || outFile.isEmpty() ||
+                proxy == null || proxy.getModel() == null) {
+            logger.info("Path is empty or no model provided, no need to save model, out path:" + outFile);
+            return true;
+        }
+        Model trainModel = proxy.getModel();
+        File dstFile = new File(outFile);
+        String tmpFileName = dstFile.getParent() + "/tmp_" + dstFile.getName();
+        boolean exportRet = trainModel.export(tmpFileName, 0, false, null);
+        if (exportRet) {
+            File tmpFile = new File(tmpFileName);
+            exportRet = tmpFile.renameTo(dstFile);
+        }
+        return exportRet;
+    }
+
     /**
      * Save model.
      * @param flParameter
@@ -265,31 +282,13 @@ public abstract class Client {
     public Status saveModel(FLParameter flParameter, LocalFLParameter localFLParameter) {
         String trainModelPath = flParameter.getTrainModelPath();
         String inferModelPath = flParameter.getInferModelPath();
-        boolean exportRet = true;
-        if (trainModelPath == null || trainModelPath.isEmpty() ||
-                trainModelProxy == null || trainModelProxy.getModel() == null) {
-            logger.info("No train model provided, no need save train model");
-        } else {
-            Model trainModel = trainModelProxy.getModel();
-            exportRet = trainModel.export(trainModelPath, 0, false, null);
-        }
-
+        boolean exportRet = saveModelbyProxy(trainModelProxy, trainModelPath);
         if (!exportRet) {
             logger.severe("Save train model to file failed.");
             return Status.FAILED;
         }
 
-        if (!localFLParameter.getServerMod().equals(ServerMod.HYBRID_TRAINING.toString())) {
-            return Status.SUCCESS;
-        }
-
-        if (inferModelPath == null || inferModelPath.isEmpty() ||
-                inferModelProxy == null || inferModelProxy.getModel() == null) {
-            logger.info("No infer model provided, no need save infer model");
-        } else {
-            Model inferModel = inferModelProxy.getModel();
-            exportRet = inferModel.export(inferModelPath, 0, false, null);
-        }
+        exportRet = saveModelbyProxy(inferModelProxy, inferModelPath);
         if (!exportRet) {
             logger.severe("Save infer model to file failed.");
             return Status.FAILED;

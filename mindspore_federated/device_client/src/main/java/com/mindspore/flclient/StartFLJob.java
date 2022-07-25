@@ -96,13 +96,14 @@ public class StartFLJob {
     /**
      * get request start FLJob
      *
-     * @param dataSize  dataSize
+     * @param trainDataSize  trainDataSize
+     * @param evaDataSize  evaDataSize
      * @param iteration iteration
      * @param time      time
      * @param pkiBean   pki bean
      * @return byte[] data
      */
-    public byte[] getRequestStartFLJob(int dataSize, int iteration, long time, PkiBean pkiBean) {
+    public byte[] getRequestStartFLJob(int trainDataSize, int evaDataSize, int iteration, long time, PkiBean pkiBean) {
         RequestStartFLJobBuilder builder = new RequestStartFLJobBuilder();
 
         if (flParameter.isPkiVerify()) {
@@ -113,7 +114,8 @@ public class StartFLJob {
             return builder.flName(flParameter.getFlName())
                     .time(time)
                     .id(localFLParameter.getFlID())
-                    .dataSize(dataSize)
+                    .trainDataSize(trainDataSize)
+                    .evaDataSize(evaDataSize)
                     .iteration(iteration)
                     .signData(pkiBean.getSignData())
                     .certificateChain(pkiBean.getCertificates())
@@ -123,7 +125,8 @@ public class StartFLJob {
         return builder.flName(flParameter.getFlName())
                 .time(time)
                 .id(localFLParameter.getFlID())
-                .dataSize(dataSize)
+                .trainDataSize(trainDataSize)
+                .evaDataSize(evaDataSize)
                 .iteration(iteration)
                 .downloadCompressTypesBuilder(flParameter.getDownloadCompressTypes())
                 .build();
@@ -333,7 +336,8 @@ public class StartFLJob {
         private FlatBufferBuilder builder;
         private int nameOffset = 0;
         private int iteration = 0;
-        private int dataSize = 0;
+        private int trainDataSize = 0;
+        private int evaDataSize = 0;
         private int timestampOffset = 0;
         private int idOffset = 0;
         private int signDataOffset = 0;
@@ -389,15 +393,28 @@ public class StartFLJob {
         }
 
         /**
-         * set dataSize
+         * set trainDataSize
          *
-         * @param dataSize int
+         * @param trainDataSize int
          * @return RequestStartFLJobBuilder
          */
-        public RequestStartFLJobBuilder dataSize(int dataSize) {
+        public RequestStartFLJobBuilder trainDataSize(int trainDataSize) {
             // temp code need confirm
-            this.dataSize = dataSize;
-            LOGGER.info("[startFLJob] the train data size: " + dataSize);
+            this.trainDataSize = trainDataSize;
+            LOGGER.info("[startFLJob] the train data size: " + trainDataSize);
+            return this;
+        }
+
+        /**
+         * set evaDataSize
+         *
+         * @param evaDataSize int
+         * @return RequestStartFLJobBuilder
+         */
+        public RequestStartFLJobBuilder evaDataSize(int evaDataSize) {
+            // temp code need confirm
+            this.evaDataSize = evaDataSize;
+            LOGGER.info("[startFLJob] the evaluate data size: " + evaDataSize);
             return this;
         }
 
@@ -477,7 +494,7 @@ public class StartFLJob {
             RequestFLJob.addFlName(builder, nameOffset);
             RequestFLJob.addFlId(builder, idOffset);
             RequestFLJob.addIteration(builder, iteration);
-            RequestFLJob.addDataSize(builder, dataSize);
+            RequestFLJob.addDataSize(builder, trainDataSize);
             RequestFLJob.addTimestamp(builder, timestampOffset);
             RequestFLJob.addSignData(builder, signDataOffset);
             RequestFLJob.addRootCert(builder, rootCertOffset);
@@ -485,6 +502,7 @@ public class StartFLJob {
             RequestFLJob.addEquipCert(builder, equipCertOffset);
             RequestFLJob.addKeyAttestation(builder, keyAttestationOffset);
             RequestFLJob.addDownloadCompressTypes(builder, downloadCompressTypesOffset);
+            RequestFLJob.addEvalDataSize(builder, evaDataSize);
             int root = RequestFLJob.endRequestFLJob(builder);
             builder.finish(root);
             return builder.sizedByteArray();
