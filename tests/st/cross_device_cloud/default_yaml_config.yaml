@@ -9,11 +9,11 @@ distributed_cache:
   enable_ssl: False
 
 round:
-  start_fl_job_threshold: 1
-  start_fl_job_time_window: 3000
+  start_fl_job_threshold: 2
+  start_fl_job_time_window: 30000
   update_model_ratio: 1.0
-  update_model_time_window: 3000
-  global_iteration_time_window: 30000
+  update_model_time_window: 30000
+  global_iteration_time_window: 60000
 
 summary:
   metrics_file: "metrics.json"

@@ -29,6 +29,7 @@ message DeviceMeta {
   string fl_id = 2;
   uint64 data_size = 3;
   uint64 now_time = 4;
+  uint64 eval_data_size = 5;
 }
 
 message FLIdToDeviceMeta {
@@ -106,4 +107,6 @@ message IterationSummaryMsg {
 
   float metrics_loss = 15;
   float metrics_accuracy = 16;
+  float upload_accuracy = 17;
+  uint64 eval_data_size = 18;
 }

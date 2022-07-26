@@ -132,6 +132,8 @@ class Iteration {
 
   std::string data_rate_file_path_;
   std::string event_file_path_;
+  // Whether last iteration is successfully finished and the reason.
+  bool is_iteration_valid_;
 };
 }  // namespace server
 }  // namespace fl

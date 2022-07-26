@@ -42,6 +42,9 @@ const uint64_t kDefaultLevel2 = 15;
 void UpdateModelKernel::InitKernel(size_t threshold_count) {
   InitClientVisitedNum();
   InitClientUploadLoss();
+  InitClientUploadAccuracy();
+  InitEvalDataSize();
+
   LocalMetaStore::GetInstance().put_value(kCtxUpdateModelThld, threshold_count);
   LocalMetaStore::GetInstance().put_value(kCtxFedAvgTotalDataSize, kInitialDataSizeSum);
 
@@ -52,6 +55,7 @@ void UpdateModelKernel::InitKernel(size_t threshold_count) {
 bool UpdateModelKernel::VerifyUpdateModelRequest(const schema::RequestUpdateModel *update_model_req) {
   MS_ERROR_IF_NULL_W_RET_VAL(update_model_req, false);
   MS_ERROR_IF_NULL_W_RET_VAL(update_model_req->fl_id(), false);
+  std::string fl_id = update_model_req->fl_id()->str();
   schema::CompressType upload_compress_type = update_model_req->upload_compress_type();
 
   if (upload_compress_type == schema::CompressType_NO_COMPRESS) {
@@ -76,8 +80,13 @@ bool UpdateModelKernel::VerifyUpdateModelRequest(const schema::RequestUpdateMode
   }
   MS_ERROR_IF_NULL_W_RET_VAL(update_model_req->timestamp(), false);
   float upload_loss = update_model_req->upload_loss();
-  if (isNaN(upload_loss)) {
-    MS_LOG(WARNING) << "The upload loss is nan, client fl id is " << update_model_req->fl_id()->str();
+  if (std::isnan(upload_loss) || std::isinf(upload_loss)) {
+    MS_LOG(WARNING) << "The upload loss is nan or inf, client fl id is " << fl_id;
+    return false;
+  }
+  float upload_accuracy = update_model_req->upload_accuracy();
+  if (std::isnan(upload_accuracy) || std::isinf(upload_accuracy)) {
+    MS_LOG(WARNING) << "The upload accuracy is nan or inf, client fl id is " << fl_id;
     return false;
   }
   return true;
@@ -147,8 +156,6 @@ bool UpdateModelKernel::Launch(const uint8_t *req_data, size_t len, const std::s
 
 bool UpdateModelKernel::Reset() {
   MS_LOG(INFO) << "Update model kernel reset!";
-  size_t &total_data_size = LocalMetaStore::GetInstance().mutable_value<size_t>(kCtxFedAvgTotalDataSize);
-  total_data_size = 0;
   return true;
 }
 
@@ -212,7 +219,7 @@ ResultCode UpdateModelKernel::VerifyUpdateModel(const schema::RequestUpdateModel
     MS_LOG(DEBUG) << "verify signature passed!";
   }
 
-  std::unordered_map<std::string, size_t> feature_map;
+  ModelItemPtr modelItemPtr = std::make_shared<ModelItem>();
   if (FLContext::instance()->compression_config().upload_compress_type != kDiffSparseQuant) {
     auto upload_feature_map = update_model_req->feature_map();
     for (uint32_t i = 0; i < upload_feature_map->size(); i++) {
@@ -224,26 +231,28 @@ ResultCode UpdateModelKernel::VerifyUpdateModel(const schema::RequestUpdateModel
         MS_LOG(WARNING) << reason;
         return ResultCode::kFail;
       }
-
+      WeightItem weight;
       std::string weight_full_name = item->weight_fullname()->str();
-      size_t weight_size = item->data()->size() * sizeof(float);
-      feature_map[weight_full_name] = weight_size;
+      const auto &data = item->data();
+      size_t weight_size = data->size() * sizeof(float);
+
+      weight.name = weight_full_name;
+      weight.size = weight_size;
+      modelItemPtr->weight_items[weight_full_name] = weight;
     }
   }
 
-  bool verifyFeatureMapIsSuccess;
+  bool verifyFeatureMapIsSuccess = true;
   if (FLContext::instance()->encrypt_type() == kDSEncryptType && update_model_req->sign() != 0) {
     if (update_model_req->index_array() == nullptr) {
       verifyFeatureMapIsSuccess = false;
     } else {
-      verifyFeatureMapIsSuccess = VerifySignDSFeatureMap(feature_map, update_model_req);
+      verifyFeatureMapIsSuccess = VerifySignDSFeatureMap(update_model_req);
     }
   } else if (IsCompress(update_model_req)) {
     verifyFeatureMapIsSuccess = VerifyUploadCompressFeatureMap(update_model_req);
-  } else {
-    verifyFeatureMapIsSuccess = LocalMetaStore::GetInstance().verifyAggregationFeatureMap(feature_map);
   }
-  if (!verifyFeatureMapIsSuccess) {
+  if (!verifyFeatureMapIsSuccess || !LocalMetaStore::GetInstance().verifyAggregationFeatureMap(modelItemPtr)) {
     auto next_req_time = LocalMetaStore::GetInstance().value<uint64_t>(kCtxIterationNextRequestTimestamp);
     std::string reason = "Verify model feature map failed, retry later at time: " + std::to_string(next_req_time);
     BuildUpdateModelRsp(fbb, schema::ResponseCode_RequestError, reason, std::to_string(next_req_time));
@@ -283,29 +292,17 @@ bool UpdateModelKernel::IsCompress(const schema::RequestUpdateModel *update_mode
   return false;
 }
 
-bool UpdateModelKernel::VerifySignDSFeatureMap(const std::unordered_map<std::string, size_t> &model,
-                                               const schema::RequestUpdateModel *update_model_req) {
-  auto &aggregation_feature_map_ = LocalMetaStore::GetInstance().aggregation_feature_map();
-  if (model.size() > aggregation_feature_map_.size()) {
-    return false;
-  }
+bool UpdateModelKernel::VerifySignDSFeatureMap(const schema::RequestUpdateModel *update_model_req) {
   auto index_array = update_model_req->index_array();
   size_t index_array_size = index_array->size();
   size_t array_size_upper = 100;
   if (index_array_size == 0 || index_array_size > array_size_upper) {
     return false;
   }
-  for (const auto &weight : model) {
-    std::string weight_name = weight.first;
-    if (aggregation_feature_map_.count(weight_name) == 0) {
-      return false;
-    }
-  }
   return true;
 }
 
 bool UpdateModelKernel::VerifyUploadCompressFeatureMap(const schema::RequestUpdateModel *update_model_req) {
-  auto &aggregation_feature_map_ = LocalMetaStore::GetInstance().aggregation_feature_map();
   auto upload_sparse_rate = update_model_req->upload_sparse_rate();
   if (upload_sparse_rate != FLContext::instance()->compression_config().upload_sparse_rate) {
     MS_LOG(WARNING) << "The upload_sparse_rate must be equal to the setting in context.";
@@ -319,17 +316,6 @@ bool UpdateModelKernel::VerifyUploadCompressFeatureMap(const schema::RequestUpda
   if (fbs_name_vec->size() == 0) {
     MS_LOG(WARNING) << "The size of name_vec must be larger than 0.";
     return false;
-  }
-  if (fbs_name_vec->size() > aggregation_feature_map_.size()) {
-    MS_LOG(WARNING) << "The size of name_vec must be smaller than model in server.";
-    return false;
-  }
-  for (size_t i = 0; i < fbs_name_vec->size(); ++i) {
-    std::string name = fbs_name_vec->Get(i)->str();
-    if (aggregation_feature_map_.count(name) == 0) {
-      MS_LOG(WARNING) << "The upload name: " << name << " is not in model in server.";
-      return false;
-    }
   }
   auto fbs_compress_feature_map = update_model_req->compress_feature_map();
   if (fbs_compress_feature_map == nullptr) {
@@ -382,6 +368,8 @@ ResultCode UpdateModelKernel::UpdateModel(const schema::RequestUpdateModel *upda
                                           const std::map<std::string, Address> &feature_map) {
   std::string update_model_fl_id = update_model_req->fl_id()->str();
   size_t data_size = device_meta.data_size();
+  size_t eval_data_size = device_meta.eval_data_size();
+
   if (!cache::ClientInfos::GetInstance().AddUpdateModelClient(update_model_fl_id).IsSuccess()) {
     std::string reason = "Updating metadata of UpdateModelClientList failed for fl id " + update_model_fl_id;
     BuildUpdateModelRsp(
@@ -400,7 +388,8 @@ ResultCode UpdateModelKernel::UpdateModel(const schema::RequestUpdateModel *upda
     return ResultCode::kFail;
   }
   executor_->HandleModelUpdate(feature_map, data_size);
-  UpdateClientUploadLoss(update_model_req->upload_loss());
+  UpdateClientUploadLoss(update_model_req->upload_loss(), data_size);
+  UpdateClientUploadAccuracy(update_model_req->upload_accuracy(), eval_data_size);
   BuildUpdateModelRsp(fbb, schema::ResponseCode_SUCCEED, "success not ready",
                       std::to_string(LocalMetaStore::GetInstance().value<uint64_t>(kCtxIterationNextRequestTimestamp)));
   return ResultCode::kSuccess;

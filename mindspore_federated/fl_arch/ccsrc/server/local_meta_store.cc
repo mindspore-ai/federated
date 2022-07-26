@@ -45,30 +45,38 @@ void LocalMetaStore::set_curr_instance_state(cache::InstanceState instance_state
 
 const cache::InstanceState LocalMetaStore::curr_instance_state() { return instance_state_; }
 
-const void LocalMetaStore::put_aggregation_feature_map(const std::string &name, const Feature &feature) {
-  if (aggregation_feature_map_.count(name) > 0) {
-    MS_LOG(WARNING) << "Put feature " << name << " failed.";
-    return;
-  }
-  aggregation_feature_map_[name] = feature;
+const void LocalMetaStore::put_aggregation_feature_map(ModelItemPtr modelItemPtr) {
+  aggregation_feature_map_ = modelItemPtr;
 }
 
-std::unordered_map<std::string, Feature> &LocalMetaStore::aggregation_feature_map() { return aggregation_feature_map_; }
+ModelItemPtr &LocalMetaStore::aggregation_feature_map() { return aggregation_feature_map_; }
 
-bool LocalMetaStore::verifyAggregationFeatureMap(const std::unordered_map<std::string, size_t> &model) {
+bool LocalMetaStore::verifyAggregationFeatureMap(const ModelItemPtr &modelItemPtr,
+                                                 bool verify_scope) {
   // feature map size in Hybrid training is not equal with upload model size
-  if (model.size() > aggregation_feature_map_.size()) {
+  if (modelItemPtr->weight_items.size() > aggregation_feature_map_->weight_items.size()) {
     return false;
   }
 
-  for (const auto &weight : model) {
+  for (const auto &weight : modelItemPtr->weight_items) {
     std::string weight_name = weight.first;
-    size_t weight_size = weight.second;
-    if (aggregation_feature_map_.count(weight_name) == 0) {
+    size_t weight_size = weight.second.size;
+    if (aggregation_feature_map_->weight_items.count(weight_name) == 0) {
       return false;
     }
-    if (weight_size != aggregation_feature_map_[weight_name].weight_size) {
+    if (weight_size != aggregation_feature_map_->weight_items[weight_name].size) {
       return false;
+    }
+  }
+  if (verify_scope) {
+      float *data = reinterpret_cast<float *>(modelItemPtr->weight_data.data());
+      std::vector<float> weight_data(data, data + modelItemPtr->weight_data.size() / sizeof(float));
+
+    for (const auto &data : weight_data) {
+      if (std::isnan(data) || std::isinf(data)) {
+        MS_LOG(WARNING) << "The aggregation weight is nan or inf.";
+        return false;
+      }
     }
   }
   return true;

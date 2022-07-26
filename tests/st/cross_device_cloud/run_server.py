@@ -22,24 +22,27 @@ parser = argparse.ArgumentParser(description="Run run_cloud.py case")
 parser.add_argument("--yaml_config", type=str, default="default_yaml_config.yaml")
 parser.add_argument("--tcp_server_ip", type=str, default="127.0.0.1")
 parser.add_argument("--checkpoint_dir", type=str, default="./fl_ckpt/")
-parser.add_argument("--fl_server_port", type=int, default=6666)
 parser.add_argument("--local_server_num", type=int, default=2)
+parser.add_argument("--http_server_address", type=str, default="127.0.0.1:6666")
 
 args, _ = parser.parse_known_args()
 yaml_config = args.yaml_config
 tcp_server_ip = args.tcp_server_ip
 checkpoint_dir = args.checkpoint_dir
-fl_server_port = args.fl_server_port
 local_server_num = args.local_server_num
+http_server_address = args.http_server_address
 
 cur_dir = os.path.dirname(os.path.abspath(__file__))
 yaml_config = os.path.join(cur_dir, yaml_config)
 checkpoint_dir = os.path.join(cur_dir, checkpoint_dir)
 
+strs = http_server_address.split(":")
+http_server_ip = strs[0]
+port = strs[1]
 assert local_server_num > 0, "The local server number cannot <= 0."
 
 for i in range(local_server_num):
-    http_port = fl_server_port + i
+    http_port = int(port) + i
     cmd_server = "execute_path=$(pwd) && self_path=$(dirname \"${script_self}\") && "
     cmd_server += "rm -rf ${execute_path}/logs/server_" + str(http_port) + "/ &&"
     cmd_server += "mkdir -p ${execute_path}/logs/server_" + str(http_port) + "/ &&"
@@ -49,7 +52,7 @@ for i in range(local_server_num):
     cmd_server += " --yaml_config=" + yaml_config
     cmd_server += " --tcp_server_ip=" + tcp_server_ip
     cmd_server += " --checkpoint_dir=" + checkpoint_dir
-    cmd_server += " --http_server_address=127.0.0.1:" + str(http_port)
+    cmd_server += " --http_server_address=" + (str(http_server_ip) + ":" + str(http_port))
     cmd_server += " > server.log 2>&1 &"
 
     import time
