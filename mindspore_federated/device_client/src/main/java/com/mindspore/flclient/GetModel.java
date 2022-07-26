@@ -167,6 +167,11 @@ public class GetModel {
             return updateFeatureForHybrid(client, featureGenerator);
         }
         if (localFLParameter.getServerMod().equals(ServerMod.FEDERATED_LEARNING.toString())) {
+            String trainModelPath = flParameter.getTrainModelPath();
+            String inferModelPath = flParameter.getInferModelPath();
+            if (!inferModelPath.equals("null") && !inferModelPath.equals(trainModelPath)) {
+              return updateFeatureForHybrid(client, featureGenerator);
+            }
             return updateFeatureForFederated(client, featureGenerator);
         }
         LOGGER.severe("[parseResponseFeatures] Unsupported ServerMod:" + localFLParameter.getServerMod());
