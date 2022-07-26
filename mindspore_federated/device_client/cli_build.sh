@@ -73,7 +73,7 @@ load_ms_lite_pkg(){
 
   rm -f "$FL_THIRD_PKG_PATH"/${MS_LITE_PKG_NAME}.tar.gz
   rm -rf "$FL_THIRD_PKG_PATH"/${MS_LITE_PKG_NAME}
-  wget ${MS_PKG_URL}
+  wget --no-check-certificate ${MS_PKG_URL}
   if [ ! -e "${MS_LITE_PKG_NAME}.tar.gz" ] ; then
     echo "down load ${MS_LITE_PKG_NAME} failed, please download manually or check your net config ..."
     exit
@@ -91,7 +91,7 @@ load_flat_buffer_pkg(){
   FLAT_BUFFER_PKG_NAME="v2.0.0.tar.gz"
   rm -f "$FL_THIRD_PKG_PATH"/v2.0.0.tar.gz
   rm -rf "$FL_THIRD_PKG_PATH"/flatbuffers-2.0.0
-  wget https://github.com/google/flatbuffers/archive/v2.0.0.tar.gz
+  wget --no-check-certificate https://github.com/google/flatbuffers/archive/v2.0.0.tar.gz
   tar -zxf v2.0.0.tar.gz
   mkdir -p "$FL_THIRD_PKG_PATH"/flatbuffers-2.0.0/build
   cd "$FL_THIRD_PKG_PATH"/flatbuffers-2.0.0/build

@@ -96,11 +96,11 @@ public class StartFLJob {
     /**
      * get request start FLJob
      *
-     * @param trainDataSize  trainDataSize
-     * @param evaDataSize  evaDataSize
-     * @param iteration iteration
-     * @param time      time
-     * @param pkiBean   pki bean
+     * @param trainDataSize trainDataSize
+     * @param evaDataSize   evaDataSize
+     * @param iteration     iteration
+     * @param time          time
+     * @param pkiBean       pki bean
      * @return byte[] data
      */
     public byte[] getRequestStartFLJob(int trainDataSize, int evaDataSize, int iteration, long time, PkiBean pkiBean) {
@@ -265,10 +265,10 @@ public class StartFLJob {
             String trainModelPath = flParameter.getTrainModelPath();
             String inferModelPath = flParameter.getInferModelPath();
             if (!inferModelPath.equals("null") && !inferModelPath.equals(trainModelPath)) {
-              LOGGER.info("[startFLJob] parseResponseFeatures for train and infer model";
-              return updateFeatureForHybrid(client, featureGenerator);
+                LOGGER.info("[startFLJob] parseResponseFeatures for train and infer model");
+                return updateFeatureForHybrid(client, featureGenerator);
             }
-            LOGGER.info("[startFLJob] parseResponseFeatures for train model";
+            LOGGER.info("[startFLJob] parseResponseFeatures for train model");
             status = updateFeatureForFederated(client, featureGenerator);
         }
         return status;
