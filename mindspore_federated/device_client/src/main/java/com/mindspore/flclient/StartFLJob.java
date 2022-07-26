@@ -259,10 +259,16 @@ public class StartFLJob {
         Client client = ClientManager.getClient(flParameter.getFlName());
         FeatureGenerator featureGenerator = FeatureGeneratorCtr(flJob);
         if (localFLParameter.getServerMod().equals(ServerMod.HYBRID_TRAINING.toString())) {
-            LOGGER.info("[startFLJob] parseResponseFeatures by " + localFLParameter.getServerMod());
+            LOGGER.info("[startFLJob] parseResponseFeatures for train and infer models");
             status = updateFeatureForHybrid(client, featureGenerator);
         } else if (localFLParameter.getServerMod().equals(ServerMod.FEDERATED_LEARNING.toString())) {
-            LOGGER.info("[startFLJob] parseResponseFeatures by " + localFLParameter.getServerMod());
+            String trainModelPath = flParameter.getTrainModelPath();
+            String inferModelPath = flParameter.getInferModelPath();
+            if (!inferModelPath.equals("null") && !inferModelPath.equals(trainModelPath)) {
+              LOGGER.info("[startFLJob] parseResponseFeatures for train and infer model";
+              return updateFeatureForHybrid(client, featureGenerator);
+            }
+            LOGGER.info("[startFLJob] parseResponseFeatures for train model";
             status = updateFeatureForFederated(client, featureGenerator);
         }
         return status;
