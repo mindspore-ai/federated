@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+"""The script runs the process of server's disaster recovery. It will kill the server process and launch it again."""
 
-# The script runs the process of server's disaster recovery. It will kill the server process and launch it again.
-
-import os
-import ast
 import argparse
+import os
 import subprocess
+
 parser = argparse.ArgumentParser(description="Run run_cloud.py case")
 
 parser.add_argument("--yaml_config", type=str, default="default_yaml_config.yaml")

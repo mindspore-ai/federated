@@ -14,10 +14,10 @@
 # ============================================================================
 
 # The script runs the process of server's disaster recovery. It will kill the server process and launch it again.
+"""start running lenet recovery server of cross device cloud mode"""
 
-import os
-import ast
 import argparse
+import os
 import subprocess
 
 parser = argparse.ArgumentParser(description="Run run_cloud.py case")

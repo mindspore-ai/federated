@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+"""Cross device cloud finish."""
 
 import os
 import subprocess
@@ -29,7 +30,6 @@ cmd = "pid=`ps -ef|grep \"yaml_config=" + str(cur_dir) + "\" "
 cmd += " | grep -v \"grep\" | grep -v \"finish\" |awk '{print $2}'` && "
 cmd += "for id in $pid; do kill -9 $id && echo \"killed $id\"; done"
 
-print("cmd: ", cmd)
 subprocess.call(['bash', '-c', cmd])
 
 
@@ -37,5 +37,4 @@ cmd = "pid=`ps -ef|grep redis | grep " + str(redis_port)
 cmd += " | grep -v \"grep\" | grep -v \"finish\" |awk '{print $2}'` && "
 cmd += "for id in $pid; do kill -9 $id && echo \"killed $id\"; done"
 
-print("cmd: ", cmd)
 subprocess.call(['bash', '-c', cmd])

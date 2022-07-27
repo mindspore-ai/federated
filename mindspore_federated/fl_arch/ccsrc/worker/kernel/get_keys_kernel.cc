@@ -25,33 +25,9 @@ bool GetKeysKernelMod::Launch() {
   FBBuilder fbb;
   BuildGetKeysReq(&fbb);
 
-  std::shared_ptr<std::vector<unsigned char>> get_keys_rsp_msg = nullptr;
-  if (!fl::worker::Worker::GetInstance().SendToServer(fbb.GetBufferPointer(), fbb.GetSize(),
-                                                      fl::TcpUserCommand::kGetKeys, &get_keys_rsp_msg)) {
-    MS_LOG(EXCEPTION) << "Sending request for GetKeys to server failed.";
-    return false;
-  }
-  if (get_keys_rsp_msg == nullptr) {
-    MS_LOG(EXCEPTION) << "Received message pointer is nullptr.";
-    return false;
-  }
-  flatbuffers::Verifier verifier(get_keys_rsp_msg->data(), get_keys_rsp_msg->size());
-  if (!verifier.VerifyBuffer<schema::ReturnExchangeKeys>()) {
-    MS_LOG(EXCEPTION) << "The schema of ResponseGetKeys is invalid.";
-    return false;
-  }
-
-  const schema::ReturnExchangeKeys *get_keys_rsp =
-    flatbuffers::GetRoot<schema::ReturnExchangeKeys>(get_keys_rsp_msg->data());
-  MS_EXCEPTION_IF_NULL(get_keys_rsp);
-  auto response_code = get_keys_rsp->retcode();
-  if ((response_code != schema::ResponseCode_SUCCEED) && (response_code != schema::ResponseCode_OutOfTime)) {
-    MS_LOG(EXCEPTION) << "Launching get keys job for worker failed. response_code: " << response_code;
-  }
-
-  bool save_keys_succeed = SavePublicKeyList(get_keys_rsp->remote_publickeys());
-  if (!save_keys_succeed) {
-    MS_LOG(EXCEPTION) << "Save received remote keys failed.";
+  if (!fl::worker::CloudWorker::GetInstance().SendToServerSync(kernel_path_, HTTP_CONTENT_TYPE_URL_ENCODED,
+                                                               fbb.GetBufferPointer(), fbb.GetSize())) {
+    MS_LOG(WARNING) << "Sending request for getKeys to server failed.";
     return false;
   }
 
@@ -60,15 +36,44 @@ bool GetKeysKernelMod::Launch() {
 }
 
 void GetKeysKernelMod::Init() {
-  fl_id_ = fl::worker::Worker::GetInstance().fl_id();
+  fl_id_ = fl::worker::CloudWorker::GetInstance().fl_id();
 
-  MS_LOG(INFO) << "Initializing GetKeys kernel, fl_id: " << fl_id_;
+  kernel_path_ = "/getKeys";
+  MS_LOG(INFO) << "Initializing GetKeys kernel"
+               << ", fl_id: " << fl_id_;
+
+  fl::worker::CloudWorker::GetInstance().RegisterMessageCallback(
+    kernel_path_, [&](const std::shared_ptr<std::vector<unsigned char>> &response_msg) {
+      if (response_msg == nullptr) {
+        MS_LOG(EXCEPTION) << "Received message pointer is nullptr.";
+        return;
+      }
+      flatbuffers::Verifier verifier(response_msg->data(), response_msg->size());
+      if (!verifier.VerifyBuffer<schema::ReturnExchangeKeys>()) {
+        MS_LOG(WARNING) << "The schema of response message is invalid.";
+        return;
+      }
+      const schema::ReturnExchangeKeys *get_keys_rsp =
+        flatbuffers::GetRoot<schema::ReturnExchangeKeys>(response_msg->data());
+      MS_EXCEPTION_IF_NULL(get_keys_rsp);
+      auto response_code = get_keys_rsp->retcode();
+      if ((response_code != schema::ResponseCode_SUCCEED) && (response_code != schema::ResponseCode_OutOfTime)) {
+        MS_LOG(EXCEPTION) << "Launching get keys job for worker failed. response_code: " << response_code;
+      }
+
+      bool save_keys_succeed = SavePublicKeyList(get_keys_rsp->remote_publickeys());
+      if (!save_keys_succeed) {
+        MS_LOG(EXCEPTION) << "Save received remote keys failed.";
+      }
+      return;
+    });
+
   MS_LOG(INFO) << "Initialize GetKeys kernel successfully.";
 }
 
 void GetKeysKernelMod::BuildGetKeysReq(FBBuilder *fbb) {
   MS_EXCEPTION_IF_NULL(fbb);
-  int iter = fl::worker::Worker::GetInstance().fl_iteration_num();
+  int iter = fl::worker::CloudWorker::GetInstance().fl_iteration_num();
   auto fbs_fl_id = fbb->CreateString(fl_id_);
   schema::GetExchangeKeysBuilder get_keys_builder(*fbb);
   get_keys_builder.add_fl_id(fbs_fl_id);
@@ -115,7 +120,7 @@ bool GetKeysKernelMod::SavePublicKeyList(
       MS_LOG(INFO) << "Add public keys of client:" << fl_id << " successfully.";
     }
   }
-  fl::worker::Worker::GetInstance().set_public_keys_list(saved_remote_public_keys);
+  fl::worker::CloudWorker::GetInstance().set_public_keys_list(saved_remote_public_keys);
   return true;
 }
 }  // namespace kernel

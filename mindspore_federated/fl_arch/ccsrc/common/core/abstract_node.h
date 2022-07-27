@@ -52,6 +52,7 @@ class ResponseTrack {
   uint64_t request_id() const { return request_id_; }
   uint64_t expect_count() const { return expect_count_; }
 
+  bool OnRecvResponseData();
   bool OnRecvResponseData(const MessageMeta &meta, const Protos &protos, const VectorPtr &data);
   bool CheckMessageTrack() const;
 
@@ -88,8 +89,8 @@ class AbstractNode {
   bool TcpMessageHandle(const std::shared_ptr<TcpConnection> &conn, const MessageMeta &meta, const Protos &protos,
                         const VectorPtr &data);
 
-  // for tcp client
-  bool Wait(const std::shared_ptr<ResponseTrack> &request_track, const uint32_t &timeout);
+  // for tcp and http client
+  bool Wait(const std::shared_ptr<ResponseTrack> &request_track, const uint32_t &timeout = kCommTimeoutInSeconds);
   void ReleaseResponseTrack(uint64_t request_id);
 
   // when initializing the node, should initializing the node info.
@@ -104,6 +105,7 @@ class AbstractNode {
 
   // for tcp server
   void NotifyMessageArrival(const MessageMeta &meta, const Protos &protos, const VectorPtr &data);
+  void NotifyMessageArrival(const std::shared_ptr<ResponseTrack> &response_track);
   void ProcessRoundRequest(const std::shared_ptr<TcpConnection> &conn, const MessageMeta &meta, const Protos &,
                            const VectorPtr &data);
 
@@ -130,7 +132,7 @@ class AbstractNode {
   std::mutex collective_received_mutex_;
   std::condition_variable collective_received_cond_;
 
-  // track response of tcp client request
+  // track response of tcp and http client request
   std::unordered_map<uint64_t, std::weak_ptr<ResponseTrack>> message_tracker_;
   std::mutex message_tracker_mutex_;
   std::condition_variable message_tracker_cond_;

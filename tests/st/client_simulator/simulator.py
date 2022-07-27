@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+"""client simulator"""
 
 import argparse
 import time
@@ -19,12 +20,14 @@ import datetime
 import random
 import sys
 import requests
+from mindspore.fl.schema import (RequestFLJob, ResponseFLJob, ResponseCode,
+                                 RequestUpdateModel, ResponseUpdateModel,
+                                 FeatureMap, RequestGetModel, ResponseGetModel)
 import flatbuffers
 import numpy as np
+
 sys.path.append("../../../ut/python/tests")
-from mindspore.fl.schema import (RequestFLJob, ResponseFLJob, ResponseCode,
-                                RequestUpdateModel, ResponseUpdateModel,
-                                FeatureMap, RequestGetModel, ResponseGetModel)
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--pid", type=int, default=0)
@@ -49,12 +52,16 @@ upload_loss = args.upload_loss
 upload_accuracy = args.upload_accuracy
 
 alphabet = 'abcdefghijklmnopqrstuvwxyz'
-str_fl_id = random.choice(alphabet)
+random_fl_id = str(random.sample(alphabet, 8))
 
 server_not_available_rsp = ["The cluster is in safemode.",
                             "The server's training job is disabled or finished."]
 
+
 def generate_port():
+    """
+    generate port
+    """
     if not use_elb:
         return http_port
     port = random.randint(0, 100000) % server_num + http_port
@@ -62,10 +69,13 @@ def generate_port():
 
 
 def build_start_fl_job():
+    """
+    build start fl job
+    """
     start_fl_job_builder = flatbuffers.Builder(1024)
 
     fl_name = start_fl_job_builder.CreateString('fl_test_job')
-    fl_id = start_fl_job_builder.CreateString(str_fl_id)
+    fl_id = start_fl_job_builder.CreateString(random_fl_id)
     timestamp = start_fl_job_builder.CreateString('2020/11/16/19/18')
 
     RequestFLJob.RequestFLJobStart(start_fl_job_builder)
@@ -80,20 +90,20 @@ def build_start_fl_job():
     buf = start_fl_job_builder.Output()
     return buf
 
-def build_feature_map(builder, names, lengths, flag):
-    if len(names) != len(lengths):
+
+def build_feature_map(builder, feature_map_temp):
+    """
+    build feature map
+    """
+    if not feature_map_temp:
         return None
     feature_maps = []
     np_data = []
-    for j, _ in enumerate(names):
-        name = names[j]
-        length = lengths[j]
+    for name, data in feature_map_temp.items():
+        length = len(data)
         weight_full_name = builder.CreateString(name)
         FeatureMap.FeatureMapStartDataVector(builder, length)
-        if flag:
-            weight = (np.nan * np.ones(shape=length)).astype(np.float32)
-        else:
-            weight = np.random.rand(length) * 32
+        weight = np.random.rand(length) * 32
         np_data.append(weight)
         for idx in range(length - 1, -1, -1):
             builder.PrependFloat32(weight[idx])
@@ -105,23 +115,19 @@ def build_feature_map(builder, names, lengths, flag):
         feature_maps.append(feature_map)
     return feature_maps, np_data
 
-def build_update_model(iteration):
+
+def build_update_model(iteration, feature_map_temp):
+    """
+    build updating model
+    """
     builder_update_model = flatbuffers.Builder(1)
     fl_name = builder_update_model.CreateString('fl_test_job')
-    fl_id = builder_update_model.CreateString(str_fl_id)
+    fl_id = builder_update_model.CreateString(random_fl_id)
     timestamp = builder_update_model.CreateString('2020/11/16/19/18')
 
-    if iteration < 5:
-        flag = True
-    else:
-        flag = False
-    lengths = [450, 2400, 48000, 10080, 5208, 120, 84, 62]
-    feature_maps, np_data = build_feature_map(builder_update_model,
-                                              ["conv1.weight", "conv2.weight", "fc1.weight",
-                                               "fc2.weight", "fc3.weight", "fc1.bias", "fc2.bias", "fc3.bias"],
-                                              lengths, flag)
+    feature_maps, np_data = build_feature_map(builder_update_model, feature_map_temp)
 
-    RequestUpdateModel.RequestUpdateModelStartFeatureMapVector(builder_update_model, len(lengths))
+    RequestUpdateModel.RequestUpdateModelStartFeatureMapVector(builder_update_model, len(feature_map_temp))
     for single_feature_map in feature_maps:
         builder_update_model.PrependUOffsetTRelative(single_feature_map)
     feature_map = builder_update_model.EndVector()
@@ -139,7 +145,11 @@ def build_update_model(iteration):
     buf = builder_update_model.Output()
     return buf, np_data
 
+
 def build_get_model(iteration):
+    """
+    build getting model
+    """
     builder_get_model = flatbuffers.Builder(1)
     fl_name = builder_get_model.CreateString('fl_test_job')
     timestamp = builder_get_model.CreateString('2020/12/16/19/18')
@@ -153,30 +163,35 @@ def build_get_model(iteration):
     buf = builder_get_model.Output()
     return buf
 
+
 def datetime_to_timestamp(datetime_obj):
     local_timestamp = time.mktime(datetime_obj.timetuple()) * 1000.0 + datetime_obj.microsecond // 1000.0
     return local_timestamp
 
-weight_to_idx = {
-    "conv1.weight": 0,
-    "conv2.weight": 1,
-    "fc1.weight": 2,
-    "fc2.weight": 3,
-    "fc3.weight": 4,
-    "fc1.bias": 5,
-    "fc2.bias": 6,
-    "fc3.bias": 7
-}
+
+# weight_to_idx = {
+#     "conv1.weight": 0,
+#     "conv2.weight": 1,
+#     "fc1.weight": 2,
+#     "fc2.weight": 3,
+#     "fc3.weight": 4,
+#     "fc1.bias": 5,
+#     "fc2.bias": 6,
+#     "fc3.bias": 7
+# }
 
 session = requests.Session()
 current_iteration = 1
 np.random.seed(0)
 
+
 def start_fl_job():
+    """
+    start fl job
+    """
     start_fl_job_result = {}
     iteration = 0
     url = "http://" + http_ip + ":" + str(generate_port()) + '/startFLJob'
-    print("Start fl job url is ", url)
 
     x = session.post(url, data=build_start_fl_job())
     if x.text in server_not_available_rsp:
@@ -187,26 +202,31 @@ def start_fl_job():
 
     rsp_fl_job = ResponseFLJob.ResponseFLJob.GetRootAsResponseFLJob(x.content, 0)
     iteration = rsp_fl_job.Iteration()
+    rsp_feature_map = {}
     if rsp_fl_job.Retcode() != ResponseCode.ResponseCode.SUCCEED:
         if rsp_fl_job.Retcode() == ResponseCode.ResponseCode.OutOfTime:
             start_fl_job_result['reason'] = "Restart iteration."
             start_fl_job_result['next_ts'] = int(rsp_fl_job.NextReqTime().decode('utf-8'))
-            print("Start fl job out of time. Next request at ",
-                  start_fl_job_result['next_ts'], "reason:", rsp_fl_job.Reason())
         else:
             print("Start fl job failed, return code is ", rsp_fl_job.Retcode())
             sys.exit()
     else:
         start_fl_job_result['reason'] = "Success"
         start_fl_job_result['next_ts'] = 0
-    return start_fl_job_result, iteration
+        for i in range(0, rsp_fl_job.FeatureMapLength()):
+            rsp_feature_map[rsp_fl_job.FeatureMap(i).WeightFullname()] = rsp_fl_job.FeatureMap(i).DataAsNumpy()
+    return start_fl_job_result, iteration, rsp_feature_map
 
-def update_model(iteration):
+
+def update_model(iteration, feature_map_temp):
+    """
+    update model
+    """
     update_model_result = {}
 
     url = "http://" + http_ip + ":" + str(generate_port()) + '/updateModel'
     print("Update model url:", url, ", iteration:", iteration)
-    update_model_buf, update_model_np_data = build_update_model(iteration)
+    update_model_buf, update_model_np_data = build_update_model(iteration, feature_map_temp)
     x = session.post(url, data=update_model_buf)
     if x.text in server_not_available_rsp:
         update_model_result['reason'] = "Restart iteration."
@@ -229,7 +249,11 @@ def update_model(iteration):
         update_model_result['next_ts'] = 0
     return update_model_result, update_model_np_data
 
-def get_model(iteration, update_model_data):
+
+def get_model(iteration):
+    """
+    get model
+    """
     get_model_result = {}
 
     url = "http://" + http_ip + ":" + str(generate_port()) + '/getModel'
@@ -253,21 +277,17 @@ def get_model(iteration, update_model_data):
             print("Get model failed, return code is ", rsp_get_model.Retcode())
             sys.exit()
 
-    for i in range(0, 1):
+    for i in range(0, rsp_get_model.FeatureMapLength()):
         print(rsp_get_model.FeatureMap(i).WeightFullname())
-        origin = update_model_data[weight_to_idx[rsp_get_model.FeatureMap(i).WeightFullname().decode('utf-8')]]
-        after = rsp_get_model.FeatureMap(i).DataAsNumpy() * 32
-        print("Before update model", args.pid, origin[0:10])
-        print("After get model", args.pid, after[0:10])
         sys.stdout.flush()
-
+    print("")
     get_model_result['reason'] = "Success"
     get_model_result['next_ts'] = 0
     return get_model_result
 
 
 while True:
-    result, current_iteration = start_fl_job()
+    result, current_iteration, rsp_feature_maps = start_fl_job()
     sys.stdout.flush()
     if result['reason'] == "Restart iteration.":
         current_ts = datetime_to_timestamp(datetime.datetime.now())
@@ -276,7 +296,7 @@ while True:
             time.sleep(duration / 1000)
         continue
 
-    result, update_data = update_model(current_iteration)
+    result, update_data = update_model(current_iteration, rsp_feature_maps)
     sys.stdout.flush()
     if result['reason'] == "Restart iteration.":
         current_ts = datetime_to_timestamp(datetime.datetime.now())
@@ -285,7 +305,7 @@ while True:
             time.sleep(duration / 1000)
         continue
 
-    result = get_model(current_iteration, update_data)
+    result = get_model(current_iteration)
     sys.stdout.flush()
     if result['reason'] == "Restart iteration.":
         current_ts = datetime_to_timestamp(datetime.datetime.now())

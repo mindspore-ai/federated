@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+"""start running lenet worker of cross silo mode"""
 
 import os
 import argparse
@@ -24,9 +25,10 @@ parser.add_argument("--device_target", type=str, default="GPU")
 parser.add_argument("--fl_iteration_num", type=int, default=25)
 parser.add_argument("--client_batch_size", type=int, default=32)
 parser.add_argument("--client_learning_rate", type=float, default=0.01)
-parser.add_argument("--local_worker_num", type=int, default=1)
+parser.add_argument("--local_worker_num", type=int, default=4)
 parser.add_argument("--dataset_path", type=str, default="")
 parser.add_argument("--sync_type", type=str, default="fixed", choices=["fixed", "adaptive"])
+parser.add_argument("--http_server_address", type=str, default="127.0.0.1:5555")
 
 args, _ = parser.parse_known_args()
 yaml_config = args.yaml_config
@@ -37,6 +39,7 @@ client_learning_rate = args.client_learning_rate
 local_worker_num = args.local_worker_num
 dataset_path = args.dataset_path
 sync_type = args.sync_type
+http_server_address = args.http_server_address
 
 cur_dir = os.path.dirname(os.path.abspath(__file__))
 yaml_config = os.path.join(cur_dir, yaml_config)
@@ -58,6 +61,7 @@ for i in range(local_worker_num):
     cmd_worker += " --dataset_path=" + str(dataset_path)
     cmd_worker += " --user_id=" + str(i)
     cmd_worker += " --sync_type=" + sync_type
+    cmd_worker += " --http_server_address=" + http_server_address
     cmd_worker += " > worker.log 2>&1 &"
 
     subprocess.call(['bash', '-c', cmd_worker])

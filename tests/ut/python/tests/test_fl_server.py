@@ -16,17 +16,16 @@
 import time
 
 import numpy as np
+from mindspore_federated import FeatureMap
 
-from common import fl_name_with_idx, make_yaml_config, start_fl_server, g_redis_server_address, fl_test
-from common import stop_processes, restart_redis_server, get_default_ssl_config
-from common_client import post_start_fl_job, post_get_model, post_update_model
-from common_client import server_safemode_rsp, server_disabled_finished_rsp
-from common_client import ResponseCode, ResponseFLJob, ResponseGetModel, ResponseUpdateModel
-from common import start_fl_job_expect_success, update_model_expect_success, get_model_expect_success
 from common import check_feature_map, read_metrics
-
+from common import fl_name_with_idx, make_yaml_config, start_fl_server, fl_test
+from common import start_fl_job_expect_success, update_model_expect_success, get_model_expect_success
+from common import stop_processes
+from common_client import ResponseCode, ResponseFLJob, ResponseUpdateModel
+from common_client import post_start_fl_job, post_update_model
+from common_client import server_disabled_finished_rsp
 from mindspore_fl.schema import CompressType
-from mindspore_federated import FeatureMap, SSLConfig
 
 start_fl_job_reach_threshold_rsp = "Current amount for startFLJob has reached the threshold"
 update_model_reach_threshold_rsp = "Current amount for updateModel is enough."
@@ -85,7 +84,7 @@ def test_fl_server_one_server_one_client_multi_iterations_success():
                           "feature_bn2": update_feature_map["feature_bn2"] / data_size,
                           "feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
     # get model
-    client_feature_map, get_model_rsp = get_model_expect_success(http_server_address, fl_name, iteration)
+    client_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
     check_feature_map(expect_feature_map, client_feature_map)
 
     # reject updateModel with old iteration 1
@@ -113,7 +112,7 @@ def test_fl_server_one_server_one_client_multi_iterations_success():
                               "feature_bn2": update_feature_map["feature_bn2"] / data_size,
                               "feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
         # get model
-        client_feature_map, get_model_rsp = get_model_expect_success(http_server_address, fl_name, iteration)
+        client_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
         check_feature_map(expect_feature_map, client_feature_map)
     # startFLJob when instance is finished
     client_feature_map, fl_job_rsp = post_start_fl_job(http_server_address, fl_name, fl_id, data_size)
@@ -312,31 +311,33 @@ def test_fl_server_one_server_two_client_all_reduce_success():
 
     iteration = 1
     # start fl job for first fl_id
-    data_size = 16
+    data_size = 10
     fl_id = "fl_id_xxxx"
     start_fl_job_expect_success(http_server_address, fl_name, fl_id, data_size)
     # update model: success, first
     update_feature_map = create_default_feature_map()
-    loss0 = 1.1
+    loss0 = 1.0
     update_model_expect_success(http_server_address, fl_name, fl_id, iteration, update_feature_map, upload_loss=loss0)
     # start fl job for second fl_id2
-    data_size2 = 8
+    data_size2 = 40
     fl_id2 = "fl_id_xxxx2"
     start_fl_job_expect_success(http_server_address, fl_name, fl_id2, data_size2)
     # update model: success, second
     update_feature_map2 = create_default_feature_map()
-    loss1 = 7.9
+    loss1 = 9.0
     update_model_expect_success(http_server_address, fl_name, fl_id2, iteration, update_feature_map2, upload_loss=loss1)
 
-    client_feature_map, get_model_rsp = get_model_expect_success(http_server_address, fl_name, iteration)
+    client_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
     expect_feature_map = {"feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
     for key in ["feature_conv", "feature_bn", "feature_bn2"]:
         expect_feature_map[key] = (update_feature_map[key] + update_feature_map2[key]) / (data_size + data_size2)
     check_feature_map(expect_feature_map, client_feature_map)
     metrics = read_metrics()
-    assert len(metrics) > 0
+    assert metrics is not None
     last_metrics = metrics[-1]
-    assert "metricsLoss" in last_metrics and last_metrics["metricsLoss"] == (loss0 + loss1) / 2
+    print(f"metricsLoss :{last_metrics['metricsLoss']}")
+    assert "metricsLoss" in last_metrics and last_metrics["metricsLoss"] == \
+           (loss0 * data_size + loss1 * data_size2) / (data_size + data_size2)
 
 
 @fl_test
@@ -593,7 +594,7 @@ def test_fl_server_check_model_infos_success():
         start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file2,
                         http_server_address=http_server_address2)
         assert False
-    except Exception as e:
+    except RuntimeError as e:
         assert "The features are inconsistent with that declared in distributed cache: cannot find feature" in str(e)
 
     # init server3 with different missing feature map, but will be synced from server1
@@ -607,7 +608,7 @@ def test_fl_server_check_model_infos_success():
         start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file3,
                         http_server_address=http_server_address3)
         assert False
-    except Exception as e:
+    except RuntimeError as e:
         assert "The number 2 of local features != the number 4 declared in the the distributed cache" in str(e)
     assert stop_processes(server0)
 
@@ -615,7 +616,7 @@ def test_fl_server_check_model_infos_success():
         start_fl_server(feature_map=FeatureMap(), yaml_config=yaml_config_file3,
                         http_server_address=http_server_address3)
         assert False
-    except Exception as e:
+    except RuntimeError as e:
         assert "The number 0 of local features != the number 4 declared in the the distributed cache" in str(e)
 
     # require_aggr not match
@@ -628,7 +629,7 @@ def test_fl_server_check_model_infos_success():
         start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file3,
                         http_server_address=http_server_address3)
         assert False
-    except Exception as e:
+    except RuntimeError as e:
         assert "The feature require_aggr 0 of local != that 1 declared in the distributed cache" in str(e)
 
     # size not match
@@ -641,7 +642,7 @@ def test_fl_server_check_model_infos_success():
         start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file3,
                         http_server_address=http_server_address3)
         assert False
-    except Exception as e:
+    except RuntimeError as e:
         assert "The feature size 12 of local != that 24 declared in the distributed cache" in str(e)
 
 
@@ -718,7 +719,7 @@ def test_fl_server_checkpoint_save_load_success():
     # update model, when weight aggregation is done, checkpoint file will be saved in ./fl_ckpt/
     update_feature_map = create_default_feature_map()
     update_model_expect_success(http_server_address, fl_name, fl_id, iteration, update_feature_map)
-    client_feature_map, get_model_rsp = get_model_expect_success(http_server_address, fl_name, iteration)
+    client_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
     expect_feature_map = {"feature_conv": update_feature_map["feature_conv"] / data_size,
                           "feature_bn": update_feature_map["feature_bn"] / data_size,
                           "feature_bn2": update_feature_map["feature_bn2"] / data_size,
@@ -736,7 +737,7 @@ def test_fl_server_checkpoint_save_load_success():
     assert fl_job_rsp == server_disabled_finished_rsp
 
     # get model
-    client_feature_map, get_model_rsp = get_model_expect_success(http_server_address, fl_name, iteration)
+    client_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
     expect_feature_map = {"feature_conv": update_feature_map["feature_conv"] / data_size,
                           "feature_bn": update_feature_map["feature_bn"] / data_size,
                           "feature_bn2": update_feature_map["feature_bn2"] / data_size,
@@ -785,7 +786,7 @@ def test_fl_server_exit_move_next_iteration_success():
     # start, and iteration will move to next
     start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address)
     iteration = 2  # iteration move to next
-    for i in range(6):
+    for _ in range(6):
         client_feature_map, fl_job_rsp = post_start_fl_job(http_server_address, fl_name, fl_id, data_size)
         if client_feature_map is not None:
             break
@@ -794,7 +795,7 @@ def test_fl_server_exit_move_next_iteration_success():
     assert isinstance(fl_job_rsp, ResponseFLJob.ResponseFLJob)
     assert fl_job_rsp.Iteration() == iteration
     metrics = read_metrics()
-    assert len(metrics) > 0
+    assert metrics is not None
     last_metrics = metrics[-1]
     assert "iterationResult" in last_metrics and last_metrics["iterationResult"] == "fail"
 
@@ -841,7 +842,7 @@ def test_fl_server_exit_move_next_iteration_with_two_server_success():
     assert stop_processes(server_process)
 
     iteration = 2  # iteration move to next
-    for i in range(6):
+    for _ in range(6):
         client_feature_map, fl_job_rsp = post_start_fl_job(http_server_address2, fl_name, fl_id, data_size)
         if client_feature_map is not None:
             break
@@ -850,7 +851,7 @@ def test_fl_server_exit_move_next_iteration_with_two_server_success():
     assert isinstance(fl_job_rsp, ResponseFLJob.ResponseFLJob)
     assert fl_job_rsp.Iteration() == iteration
     metrics = read_metrics()
-    assert len(metrics) > 0
+    assert metrics is not None
     last_metrics = metrics[-1]
     assert "iterationResult" in last_metrics and last_metrics["iterationResult"] == "fail"
 
@@ -897,7 +898,7 @@ def test_fl_server_exit_no_move_next_iteration_with_two_server_success():
     # stop fist server, and expect terminate signal will stop server process
     assert stop_processes(server_process)
 
-    for i in range(4):
+    for _ in range(4):
         client_feature_map, fl_job_rsp = post_start_fl_job(http_server_address2, fl_name, fl_id, data_size)
         if client_feature_map is not None:
             break

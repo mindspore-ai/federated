@@ -12,22 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+"""lenet network"""
 
-
-import argparse
 import os
 import time
-import numpy as np
 
 import mindspore
-import mindspore.nn as nn
-from mindspore.common.initializer import TruncatedNormal
-from mindspore import Tensor
 import mindspore.dataset as ds
-import mindspore.dataset.vision.py_transforms as PV
-import mindspore.dataset.transforms.py_transforms as PT
 import mindspore.dataset.transforms.c_transforms as tC
+import mindspore.dataset.transforms.py_transforms as PT
+import mindspore.dataset.vision.py_transforms as PV
+import mindspore.nn as nn
+from mindspore import Tensor
+from mindspore.common.initializer import TruncatedNormal
 from mindspore.train.callback import Callback
+import numpy as np
 
 
 def conv(in_channels, out_channels, kernel_size, stride=1, padding=0):
@@ -58,6 +57,7 @@ def weight_variable():
 
 
 class LeNet5(nn.Cell):
+    """LeNet5"""
     def __init__(self, num_class=10, channel=3):
         super(LeNet5, self).__init__()
         self.num_class = num_class
@@ -71,6 +71,7 @@ class LeNet5(nn.Cell):
         self.flatten = nn.Flatten()
 
     def construct(self, x):
+        """construct"""
         x = self.conv1(x)
         x = self.relu(x)
         x = self.max_pool2d(x)
@@ -87,9 +88,11 @@ class LeNet5(nn.Cell):
 
 
 class LossGet(Callback):
-    # define loss callback for packaged model
+    """# define loss callback for packaged network"""
     def __init__(self, per_print_times, data_size):
         super(LossGet, self).__init__()
+        self._per_step_mseconds = None
+        self.epoch_time = None
         if not isinstance(per_print_times, int) or per_print_times < 0:
             raise ValueError("print_step must be int and >= 0.")
         self._per_print_times = per_print_times
@@ -98,6 +101,7 @@ class LossGet(Callback):
         self.loss_list = []
 
     def step_end(self, run_context):
+        """step end"""
         cb_params = run_context.original_args()
         loss = cb_params.net_outputs
 
@@ -117,26 +121,32 @@ class LossGet(Callback):
             self._loss = loss
             self.loss_list.append(loss)
 
-    def epoch_begin(self, run_context):
+    def epoch_begin(self, _):
+        """define epoch begin func"""
         self.epoch_time = time.time()
 
-    def epoch_end(self, run_context):
+    def epoch_end(self, _):
+        """define epoch end func"""
         epoch_mseconds = (time.time() - self.epoch_time) * 1000
         self._per_step_mseconds = epoch_mseconds / self.data_size
 
     def get_loss(self):
+        """get loss"""
         return self.loss_list  # todo return self._loss
 
     def get_per_step_time(self):
+        """get per step time"""
         return self._per_step_mseconds
 
 
 def mkdir(path):
+    """mkdir path"""
     if not os.path.exists(path):
         os.mkdir(path)
 
 
 def count_id(path):
+    """weight initial"""
     files = os.listdir(path)
     ids = {}
     for i in files:
@@ -144,15 +154,15 @@ def count_id(path):
     return ids
 
 
-def create_dataset_from_folder(data_path, img_size, batch_size=32, repeat_size=1, num_parallel_workers=1,
-                               shuffle=False):
+def create_dataset_from_folder(data_path, img_size, batch_size=32, repeat_size=1, shuffle=False):
     """ create dataset for train or test
-        Args:
-            data_path: Data path
-            batch_size: The number of data records in each group
-            repeat_size: The number of replicated data records
-            num_parallel_workers: The number of parallel workers
-        """
+    Args:
+        data_path: Data path
+        batch_size: The number of data records in each group
+        repeat_size: The number of replicated data records
+        num_parallel_workers: The number of parallel workers
+        :param shuffle:
+    """
     # define dataset
     ids = count_id(data_path)
     mnist_ds = ds.ImageFolderDataset(dataset_dir=data_path, decode=False, class_indexing=ids)

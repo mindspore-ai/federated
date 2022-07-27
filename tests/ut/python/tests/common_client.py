@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-
-import numpy as np
+"""common client"""
 import requests
-
-import flatbuffers
+import numpy as np
 from mindspore_fl.schema import (RequestFLJob, ResponseFLJob, ResponseCode, RequestUpdateModel, ResponseUpdateModel,
                                  FeatureMap, RequestGetModel, ResponseGetModel)
+import flatbuffers
+
 
 server_safemode_rsp = "The cluster is in safemode."
 server_disabled_finished_rsp = "The server's training job is disabled or finished."
@@ -27,6 +27,7 @@ server_not_available_rsp = [server_safemode_rsp, server_disabled_finished_rsp]
 
 
 def build_start_fl_job(fl_name, fl_id, data_size=32, timestamp="2020/11/16/19/18"):
+    """build start fl job"""
     builder = flatbuffers.Builder(1024)
     fb_fl_name = builder.CreateString(fl_name)
     fb_fl_id = builder.CreateString(fl_id)
@@ -42,6 +43,7 @@ def build_start_fl_job(fl_name, fl_id, data_size=32, timestamp="2020/11/16/19/18
 
 
 def build_get_model(fl_name, iteration, timestamp="2020/11/16/19/18"):
+    """build get model"""
     builder = flatbuffers.Builder(1024)
     fb_fl_name = builder.CreateString(fl_name)
     fb_timestamp = builder.CreateString(timestamp)
@@ -56,6 +58,7 @@ def build_get_model(fl_name, iteration, timestamp="2020/11/16/19/18"):
 
 
 def build_feature_map(builder, feature_map):
+    """build feature map"""
     if not isinstance(builder, flatbuffers.Builder):
         raise RuntimeError("Builder should be instance of flatbuffers.Builder")
     fb_feature_list = []
@@ -76,6 +79,7 @@ def build_feature_map(builder, feature_map):
 
 # feature_map: feature_name: np.ndarray
 def build_update_model(fl_name, fl_id, iteration, feature_map, timestamp="2020/11/16/19/18", upload_loss=0.0):
+    """build update model"""
     builder = flatbuffers.Builder(1024)
     fb_feature_list = []
     for feature_name, feature_tensor in feature_map.items():
@@ -114,26 +118,23 @@ def build_update_model(fl_name, fl_id, iteration, feature_map, timestamp="2020/1
 
 
 class ExceptionPost:
+    """ExceptionPost"""
     def __init__(self, text):
         self.text = text
 
 
 def post_msg(http_address, request_url, post_data, verify=None):
+    """post msg"""
     try:
         if verify:
-            return requests.post(f"https://{http_address}/{request_url}", data=post_data, verify=verify)
-        else:
-            return requests.post(f"http://{http_address}/{request_url}", data=post_data)
-    except Exception as e:
+            return requests.post(f"https://{http_address}/{request_url}", data=memoryview(post_data).tobytes(), verify=verify)
+        return requests.post(f"http://{http_address}/{request_url}", data=post_data)
+    except RuntimeError as e:
         return e
 
 
-class ServerNotAvailableException(Exception):
-    def __init__(self, info):
-        super(ServerNotAvailableException, self).__init__(info)
-
-
 def post_start_fl_job(http_address, fl_name, fl_id, data_size=32, verify=None):
+    """post start fl job"""
     buffer = build_start_fl_job(fl_name, fl_id, data_size)
     result = post_msg(http_address, "startFLJob", buffer, verify)
     if isinstance(result, Exception):
@@ -157,6 +158,7 @@ def post_start_fl_job(http_address, fl_name, fl_id, data_size=32, verify=None):
 
 
 def post_update_model(http_address, fl_name, fl_id, iteration, feature_map, upload_loss=0.0, verify=None):
+    """post update model"""
     buffer = build_update_model(fl_name, fl_id, iteration, feature_map, upload_loss=upload_loss)
     result = post_msg(http_address, "updateModel", buffer, verify)
     if isinstance(result, Exception):
@@ -172,6 +174,7 @@ def post_update_model(http_address, fl_name, fl_id, iteration, feature_map, uplo
 
 
 def post_get_model(http_address, fl_name, iteration, verify=None):
+    """post get model"""
     buffer = build_get_model(fl_name, iteration)
     result = post_msg(http_address, "getModel", buffer, verify)
     if isinstance(result, Exception):

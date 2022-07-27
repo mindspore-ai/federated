@@ -12,9 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+"""start running lenet cross device cloud mode"""
 
+import os
+import sys
 import argparse
 import numpy as np
+
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, parent_dir)
 
 parser = argparse.ArgumentParser(description="test_fl_cloud")
 
@@ -32,24 +38,38 @@ parser.add_argument("--scheduler_manage_address", type=str, default="127.0.0.1:1
 args, _ = parser.parse_known_args()
 
 
+def get_trainable_params(network):
+    """get trainable params"""
+    feature_map = {}
+    for param in network.trainable_params():
+        param_np = param.asnumpy()
+        if param_np.dtype != np.float32:
+            continue
+        feature_map[param.name] = param_np
+    return feature_map
+
+
 def start_one_server():
+    """start one server"""
+    from network.lenet import LeNet5
     from mindspore_federated import FLServerJob
 
-    args, _ = parser.parse_known_args()
     yaml_config = args.yaml_config
     tcp_server_ip = args.tcp_server_ip
     http_server_address = args.http_server_address
     checkpoint_dir = args.checkpoint_dir
 
+    network = LeNet5(62, 3)
     job = FLServerJob(yaml_config=yaml_config, http_server_address=http_server_address, tcp_server_ip=tcp_server_ip,
                       checkpoint_dir=checkpoint_dir, ssl_config=None)
-    job.run()
+    feature_map = get_trainable_params(network)
+    job.run(feature_map)
 
 
 def start_one_scheduler():
+    """start one scheduler"""
     from mindspore_federated import FlSchedulerJob
 
-    args, _ = parser.parse_known_args()
     yaml_config = args.yaml_config
     scheduler_manage_address = args.scheduler_manage_address
 

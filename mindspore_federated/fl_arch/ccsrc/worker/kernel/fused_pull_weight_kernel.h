@@ -26,14 +26,14 @@
 #include "schema/fl_job_generated.h"
 #include "worker/kernel/abstract_kernel.h"
 #include "common/fl_context.h"
-#include "worker/worker.h"
+#include "worker/hybrid_worker.h"
 
 namespace mindspore {
 namespace fl {
 namespace worker {
 namespace kernel {
 // The duration between two PullWeight requests when return code is ResponseCode_SucNotReady.
-constexpr int kRetryDurationOfPullWeights = 200;
+constexpr int kRetryDurationOfPullWeights = 500;
 class FusedPullWeightKernelMod : public AbstractKernel {
  public:
   FusedPullWeightKernelMod() : fl_iteration_(0) {}
@@ -64,8 +64,8 @@ class FusedPullWeightKernelMod : public AbstractKernel {
         MS_LOG(WARNING) << "Worker has finished.";
         return dict_data;
       }
-      if (!fl::worker::Worker::GetInstance().SendToServer(fbb.GetBufferPointer(), fbb.GetSize(),
-                                                          fl::TcpUserCommand::kPullWeight, &pull_weight_rsp_msg)) {
+      if (!fl::worker::HybridWorker::GetInstance().SendToServer(
+            fbb.GetBufferPointer(), fbb.GetSize(), fl::TcpUserCommand::kPullWeight, &pull_weight_rsp_msg)) {
         MS_LOG(WARNING) << "Sending request for FusedPullWeight to server 0 failed. Retry later.";
         retcode = schema::ResponseCode_SucNotReady;
         std::this_thread::sleep_for(std::chrono::milliseconds(kRetryDurationOfPullWeights));
@@ -93,7 +93,7 @@ class FusedPullWeightKernelMod : public AbstractKernel {
         std::this_thread::sleep_for(std::chrono::milliseconds(kRetryDurationOfPullWeights));
         fl_iteration_ = pull_weight_rsp->iteration();
         MS_LOG(DEBUG) << "Server is not ready for downloading yet. Reason: " << pull_weight_rsp->reason()->str()
-                      << ". Retry later.";
+                      << ", fl iteration is " << fl_iteration_ <<". Retry later.";
       } else if (retcode != schema::ResponseCode_SUCCEED) {
         MS_LOG(WARNING) << "FusedPullWeight failed. Server return code: " << pull_weight_rsp->retcode()
                         << ", reason: " << pull_weight_rsp->reason()->str();
@@ -116,7 +116,7 @@ class FusedPullWeightKernelMod : public AbstractKernel {
       dict_data[py::str(weight_fullname)] = weight_data_vec;
     }
     MS_LOG(INFO) << "Pull weights for iteration: " << fl_iteration_ << " success.";
-    fl::worker::Worker::GetInstance().SetIterationRunning();
+    fl::worker::HybridWorker::GetInstance().SetIterationRunning();
     return dict_data;
   }
 

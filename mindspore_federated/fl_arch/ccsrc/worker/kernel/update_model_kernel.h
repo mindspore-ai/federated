@@ -23,7 +23,7 @@
 #include <functional>
 #include <map>
 
-#include "worker/worker.h"
+#include "worker/cloud_worker.h"
 #include "armour/secure_protocol/masking.h"
 #include "common/core/comm_util.h"
 #include "common/exit_handler.h"
@@ -58,43 +58,24 @@ class UpdateModelKernelMod : public AbstractKernel {
     if (encrypt_type_.compare("STABLE_PW_ENCRYPT") == 0) {
       EncryptData(weight_datas);
     }
-    FBBuilder builder;
-    if (!BuildUpdateModelReq(&builder, *weight_datas)) {
+    FBBuilder fbb;
+    if (!BuildUpdateModelReq(&fbb, *weight_datas)) {
       MS_LOG(EXCEPTION) << "Building request for FusedPushWeight failed.";
       return false;
     }
-    std::shared_ptr<std::vector<unsigned char>> update_model_rsp_msg = nullptr;
-    if (!fl::worker::Worker::GetInstance().SendToServer(builder.GetBufferPointer(), builder.GetSize(),
-                                                        fl::TcpUserCommand::kUpdateModel, &update_model_rsp_msg)) {
-      MS_LOG(EXCEPTION) << "Sending request for UpdateModel to server failed.";
-      return false;
-    }
-    flatbuffers::Verifier verifier(update_model_rsp_msg->data(), update_model_rsp_msg->size());
-    if (!verifier.VerifyBuffer<schema::ResponseUpdateModel>()) {
-      MS_LOG(EXCEPTION) << "The schema of ResponseUpdateModel is invalid.";
-      return false;
-    }
-
-    const schema::ResponseFLJob *update_model_rsp =
-      flatbuffers::GetRoot<schema::ResponseFLJob>(update_model_rsp_msg->data());
-    MS_EXCEPTION_IF_NULL(update_model_rsp);
-    auto response_code = update_model_rsp->retcode();
-    switch (response_code) {
-      case schema::ResponseCode_SUCCEED:
-      case schema::ResponseCode_OutOfTime:
-        break;
-      default:
-        MS_LOG(EXCEPTION) << "Launching start fl job for worker failed. Reason: " << update_model_rsp->reason();
+    if (!fl::worker::CloudWorker::GetInstance().SendToServerSync(kernel_path_, HTTP_CONTENT_TYPE_URL_ENCODED,
+                                                                 fbb.GetBufferPointer(), fbb.GetSize())) {
+      MS_LOG(WARNING) << "Sending request for UpdateModel to server failed.";
     }
     return true;
   }
 
   void Init() override {
-    MS_LOG(INFO) << "Initializing UpdateModel kernel";
-    fl_name_ = fl::worker::Worker::GetInstance().fl_name();
-    fl_id_ = fl::worker::Worker::GetInstance().fl_id();
-    data_size_ = fl::worker::Worker::GetInstance().data_size();
-    encrypt_type_ = fl::worker::Worker::GetInstance().encrypt_type();
+    fl_name_ = fl::worker::CloudWorker::GetInstance().fl_name();
+    fl_id_ = fl::worker::CloudWorker::GetInstance().fl_id();
+    data_size_ = fl::worker::CloudWorker::GetInstance().data_size();
+    encrypt_type_ = FLContext::instance()->encrypt_type();
+    kernel_path_ = "/updateModel";
     if (encrypt_type_.compare("NOT_ENCRYPT") != 0 && encrypt_type_.compare("STABLE_PW_ENCRYPT") != 0) {
       MS_LOG(EXCEPTION)
         << "Value Error: the parameter 'encrypt_type' of updateModel kernel can only be 'NOT_ENCRYPT' or "
@@ -104,13 +85,34 @@ class UpdateModelKernelMod : public AbstractKernel {
 
     if (encrypt_type_.compare("STABLE_PW_ENCRYPT") == 0) {
       MS_LOG(INFO) << "STABLE_PW_ENCRYPT mode is open, model weights will be encrypted before send to server.";
-      client_keys = fl::worker::Worker::GetInstance().public_keys_list();
+      client_keys = fl::worker::CloudWorker::GetInstance().public_keys_list();
       if (client_keys.size() == 0) {
         MS_LOG(EXCEPTION) << "The size of local-stored client_keys_list is 0, please check whether P.ExchangeKeys() "
                              "and P.GetKeys() have been executed before updateModel.";
       }
     }
-    MS_LOG(INFO) << "Initializing StartFLJob kernel. fl_name: " << fl_name_ << ", fl_id: " << fl_id_
+
+    fl::worker::CloudWorker::GetInstance().RegisterMessageCallback(
+      kernel_path_, [this](const std::shared_ptr<std::vector<unsigned char>> &response_msg) {
+        flatbuffers::Verifier verifier(response_msg->data(), response_msg->size());
+        if (!verifier.VerifyBuffer<schema::ResponseUpdateModel>()) {
+          MS_LOG(WARNING) << "The schema of response message is invalid.";
+          return;
+        }
+        const schema::ResponseFLJob *update_model_rsp =
+          flatbuffers::GetRoot<schema::ResponseFLJob>(response_msg->data());
+        MS_ERROR_IF_NULL_WO_RET_VAL(update_model_rsp);
+        auto response_code = update_model_rsp->retcode();
+        switch (response_code) {
+          case schema::ResponseCode_SUCCEED:
+          case schema::ResponseCode_OutOfTime:
+            break;
+          default:
+            MS_LOG(ERROR) << "Launching update model for worker failed. Reason: " << update_model_rsp->reason();
+        }
+        MS_LOG(INFO) << "Launching update model for worker successful";
+      });
+    MS_LOG(INFO) << "Initializing UpdateModel kernel. fl_name: " << fl_name_ << ", fl_id: " << fl_id_
                  << ". Request will be sent to server, Encrypt type: " << encrypt_type_;
   }
 
@@ -137,7 +139,7 @@ class UpdateModelKernelMod : public AbstractKernel {
     req_update_model_builder.add_fl_name(fbs_fl_name);
     req_update_model_builder.add_fl_id(fbs_fl_id);
     req_update_model_builder.add_timestamp(fbs_timestamp);
-    iteration_ = fl::worker::Worker::GetInstance().fl_iteration_num();
+    iteration_ = fl::worker::CloudWorker::GetInstance().fl_iteration_num();
     req_update_model_builder.add_iteration(SizeToInt(iteration_));
     req_update_model_builder.add_feature_map(fbs_feature_maps_vector);
     auto req_update_model = req_update_model_builder.Finish();
@@ -192,7 +194,7 @@ class UpdateModelKernelMod : public AbstractKernel {
         continue;
       }
       // get local worker's private key
-      armour::PrivateKey *local_private_key = fl::worker::Worker::GetInstance().secret_pk();
+      armour::PrivateKey *local_private_key = fl::worker::CloudWorker::GetInstance().secret_pk();
       if (local_private_key == nullptr) {
         MS_LOG(EXCEPTION) << "Local secret private key is nullptr, get encryption noise failed!";
       }
@@ -201,8 +203,8 @@ class UpdateModelKernelMod : public AbstractKernel {
       std::vector<uint8_t> encrypt_pw_iv;
       std::vector<uint8_t> encrypt_pw_salt;
       if (fl_id_ < remote_fl_id) {
-        encrypt_pw_iv = fl::worker::Worker::GetInstance().pw_iv();
-        encrypt_pw_salt = fl::worker::Worker::GetInstance().pw_salt();
+        encrypt_pw_iv = fl::worker::CloudWorker::GetInstance().pw_iv();
+        encrypt_pw_salt = fl::worker::CloudWorker::GetInstance().pw_salt();
       } else {
         encrypt_pw_iv = public_key_set_i.pwIV;
         encrypt_pw_salt = public_key_set_i.pwSalt;
@@ -240,6 +242,7 @@ class UpdateModelKernelMod : public AbstractKernel {
   uint64_t iteration_;
   std::vector<EncryptPublicKeys> client_keys;
   std::string encrypt_type_;
+  std::string kernel_path_;
 };
 }  // namespace kernel
 }  // namespace worker

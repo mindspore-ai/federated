@@ -161,7 +161,6 @@ class EggInfo(egg_info):
     def run(self):
         super().run()
         egg_info_dir = os.path.join(pkg_dir, 'mindspore_federated.egg-info')
-        print("egg_info_dir--------------",egg_info_dir)
         update_permissions(egg_info_dir)
 
 
@@ -171,10 +170,8 @@ class BuildPy(build_py):
     def run(self):
         super().run()
         mindspore_dir = os.path.join(pkg_dir, 'build', 'lib', 'mindspore_federated')
-        print("mindspore_dir--------------",mindspore_dir)
         update_permissions(mindspore_dir)
         mindspore_dir = os.path.join(pkg_dir, 'build', 'lib', 'akg')
-        print("mindspore_dir--------------",mindspore_dir)
         update_permissions(mindspore_dir)
 
 

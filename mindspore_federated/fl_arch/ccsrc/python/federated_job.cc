@@ -19,7 +19,8 @@
 #include "common/utils/log_adapter.h"
 #include "common/common.h"
 #include "server/server.h"
-#include "worker/worker.h"
+#include "worker/hybrid_worker.h"
+#include "worker/cloud_worker.h"
 #include "scheduler/scheduler.h"
 #include "common/fl_context.h"
 #include "server/model_store.h"
@@ -28,7 +29,7 @@
 #include "worker/kernel/get_model_kernel.h"
 #include "worker/kernel/fused_pull_weight_kernel.h"
 #include "worker/kernel/fused_push_weight_kernel.h"
-#include "worker/kernel/push_metrics_kernel.h"
+#include "worker/kernel/fused_push_metrics_kernel.h"
 
 namespace mindspore {
 namespace fl {
@@ -37,7 +38,7 @@ using UpdateModelKernelMod = worker::kernel::UpdateModelKernelMod;
 using GetModelKernelMod = worker::kernel::GetModelKernelMod;
 using FusedPullWeightKernelMod = worker::kernel::FusedPullWeightKernelMod;
 using FusedPushWeightKernelMod = worker::kernel::FusedPushWeightKernelMod;
-using PushMetricsKernelMod = worker::kernel::PushMetricsKernelMod;
+using FusedPushMetricsKernelMod = worker::kernel::FusedPushMetricsKernelMod;
 
 void OnIterationEnd(const py::object &on_iteration_end_callback) {
   auto fl_name = cache::InstanceContext::Instance().fl_name();
@@ -85,10 +86,20 @@ void FederatedJob::StartFederatedScheduler() {
 
 void FederatedJob::InitFederatedWorker() {
   FLContext::instance()->set_ms_role(kEnvRoleOfWorker);
-  worker::Worker::GetInstance().Init();
+  auto server_mode = FLContext::instance()->server_mode();
+  if (server_mode == kServerModeFL) {
+    worker::CloudWorker::GetInstance().Init();
+  } else if (server_mode == kServerModeHybrid) {
+    worker::HybridWorker::GetInstance().Init();
+  } else {
+    MS_LOG(EXCEPTION) << server_mode << " is invalid, init federated worker failed.";
+  }
 }
 
-void FederatedJob::StopFederatedWorker() { worker::Worker::GetInstance().Stop(); }
+void FederatedJob::StopFederatedWorker() {
+  worker::HybridWorker::GetInstance().Stop();
+  worker::CloudWorker::GetInstance().Stop();
+}
 
 bool FederatedJob::StartFLJob(size_t data_size) { return StartFLJobKernelMod::GetInstance()->Launch(data_size); }
 
@@ -109,7 +120,7 @@ bool FederatedJob::PushWeight(const std::map<std::string, std::vector<float>> &w
 }
 
 bool FederatedJob::PushMetrics(float loss, float accuracy) {
-  return PushMetricsKernelMod::GetInstance()->Launch(loss, accuracy);
+  return FusedPushMetricsKernelMod::GetInstance()->Launch(loss, accuracy);
 }
 }  // namespace fl
 }  // namespace mindspore

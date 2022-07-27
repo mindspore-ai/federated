@@ -1,5 +1,5 @@
 fl_name: Lenet
-fl_iteration_num: 25
+fl_iteration_num: 5000
 server_mode: HYBRID_TRAINING
 
 distributed_cache:
@@ -9,11 +9,11 @@ distributed_cache:
   enable_ssl: False
 
 round:
-  start_fl_job_threshold: 1
-  start_fl_job_time_window: 3000
+  start_fl_job_threshold: 4
+  start_fl_job_time_window: 300000
   update_model_ratio: 1.0
-  update_model_time_window: 3000
-  global_iteration_time_window: 30000
+  update_model_time_window: 300000
+  global_iteration_time_window: 600000
 
 summary:
   metrics_file: "metrics.json"
