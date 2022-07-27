@@ -96,11 +96,11 @@ public class StartFLJob {
     /**
      * get request start FLJob
      *
-     * @param trainDataSize  trainDataSize
-     * @param evaDataSize  evaDataSize
-     * @param iteration iteration
-     * @param time      time
-     * @param pkiBean   pki bean
+     * @param trainDataSize trainDataSize
+     * @param evaDataSize   evaDataSize
+     * @param iteration     iteration
+     * @param time          time
+     * @param pkiBean       pki bean
      * @return byte[] data
      */
     public byte[] getRequestStartFLJob(int trainDataSize, int evaDataSize, int iteration, long time, PkiBean pkiBean) {
@@ -259,16 +259,16 @@ public class StartFLJob {
         Client client = ClientManager.getClient(flParameter.getFlName());
         FeatureGenerator featureGenerator = FeatureGeneratorCtr(flJob);
         if (localFLParameter.getServerMod().equals(ServerMod.HYBRID_TRAINING.toString())) {
-            LOGGER.info("[startFLJob] parseResponseFeatures for train and infer models");
+            LOGGER.info("[startFLJob] parseResponseFeatures by for train and infer models");
             status = updateFeatureForHybrid(client, featureGenerator);
         } else if (localFLParameter.getServerMod().equals(ServerMod.FEDERATED_LEARNING.toString())) {
             String trainModelPath = flParameter.getTrainModelPath();
             String inferModelPath = flParameter.getInferModelPath();
             if (!inferModelPath.equals("null") && !inferModelPath.equals(trainModelPath)) {
-              LOGGER.info("[startFLJob] parseResponseFeatures for train and infer model";
-              return updateFeatureForHybrid(client, featureGenerator);
+                LOGGER.info("[startFLJob] parseResponseFeatures for train and infer model");
+                return updateFeatureForHybrid(client, featureGenerator);
             }
-            LOGGER.info("[startFLJob] parseResponseFeatures for train model";
+            LOGGER.info("[startFLJob] parseResponseFeatures for train model");
             status = updateFeatureForFederated(client, featureGenerator);
         }
         return status;
