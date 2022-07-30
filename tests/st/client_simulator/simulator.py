@@ -31,10 +31,8 @@ sys.path.append("../../../ut/python/tests")
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--pid", type=int, default=0)
-parser.add_argument("--http_ip", type=str, default="10.113.216.106")
-parser.add_argument("--http_port", type=int, default=6666)
-parser.add_argument("--use_elb", type=bool, default=False)
-parser.add_argument("--server_num", type=int, default=1)
+parser.add_argument("--http_type", type=str, default="http")
+parser.add_argument("--http_server_address", type=str, default="127.0.0.1:6666")
 parser.add_argument("--data_size", type=int, default=32)
 parser.add_argument("--eval_data_size", type=int, default=32)
 parser.add_argument("--upload_loss", type=float, default=1)
@@ -42,10 +40,8 @@ parser.add_argument("--upload_accuracy", type=float, default=1)
 
 args, _ = parser.parse_known_args()
 pid = args.pid
-http_ip = args.http_ip
-http_port = args.http_port
-use_elb = args.use_elb
-server_num = args.server_num
+http_type = args.http_type
+http_server_address = args.http_server_address
 data_size = args.data_size
 eval_data_size = args.eval_data_size
 upload_loss = args.upload_loss
@@ -56,17 +52,6 @@ random_fl_id = str(random.sample(alphabet, 8))
 
 server_not_available_rsp = ["The cluster is in safemode.",
                             "The server's training job is disabled or finished."]
-
-
-def generate_port():
-    """
-    generate port
-    """
-    if not use_elb:
-        return http_port
-    port = random.randint(0, 100000) % server_num + http_port
-    return port
-
 
 def build_start_fl_job():
     """
@@ -191,9 +176,9 @@ def start_fl_job():
     """
     start_fl_job_result = {}
     iteration = 0
-    url = "http://" + http_ip + ":" + str(generate_port()) + '/startFLJob'
+    url = http_type + "://" + http_server_address + '/startFLJob'
 
-    x = session.post(url, data=build_start_fl_job())
+    x = session.post(url, data=memoryview(build_start_fl_job()).tobytes(), verify=False)
     if x.text in server_not_available_rsp:
         start_fl_job_result['reason'] = "Restart iteration."
         start_fl_job_result['next_ts'] = datetime_to_timestamp(datetime.datetime.now()) + 500
@@ -224,10 +209,10 @@ def update_model(iteration, feature_map_temp):
     """
     update_model_result = {}
 
-    url = "http://" + http_ip + ":" + str(generate_port()) + '/updateModel'
+    url = http_type + "://" + http_server_address + '/updateModel'
     print("Update model url:", url, ", iteration:", iteration)
     update_model_buf, update_model_np_data = build_update_model(iteration, feature_map_temp)
-    x = session.post(url, data=update_model_buf)
+    x = session.post(url, data=memoryview(update_model_buf).tobytes(), verify=False)
     if x.text in server_not_available_rsp:
         update_model_result['reason'] = "Restart iteration."
         update_model_result['next_ts'] = datetime_to_timestamp(datetime.datetime.now()) + 500
@@ -256,11 +241,11 @@ def get_model(iteration):
     """
     get_model_result = {}
 
-    url = "http://" + http_ip + ":" + str(generate_port()) + '/getModel'
+    url = http_type + "://" + http_server_address  + '/getModel'
     print("Get model url:", url, ", iteration:", iteration)
 
     while True:
-        x = session.post(url, data=build_get_model(iteration))
+        x = session.post(url, data=memoryview(build_get_model(iteration)).tobytes(), verify=False)
         if x.text in server_not_available_rsp:
             print("Get model when safemode.")
             time.sleep(0.5)

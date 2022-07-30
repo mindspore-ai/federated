@@ -18,6 +18,7 @@ import os
 import sys
 import argparse
 import numpy as np
+from mindspore_federated.startup.ssl_config import SSLConfig
 
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, parent_dir)
@@ -37,7 +38,7 @@ parser.add_argument("--scheduler_manage_address", type=str, default="127.0.0.1:1
 
 args, _ = parser.parse_known_args()
 
-
+ssl_config = SSLConfig(server_password="server_password_12345", client_password="client_password_12345")
 def get_trainable_params(network):
     """get trainable params"""
     feature_map = {}
@@ -62,6 +63,8 @@ def start_one_server():
     network = LeNet5(62, 3)
     job = FLServerJob(yaml_config=yaml_config, http_server_address=http_server_address, tcp_server_ip=tcp_server_ip,
                       checkpoint_dir=checkpoint_dir, ssl_config=None)
+    # job = FLServerJob(yaml_config=yaml_config, http_server_address=http_server_address, tcp_server_ip=tcp_server_ip,
+    #                   checkpoint_dir=checkpoint_dir, ssl_config=ssl_config)
     feature_map = get_trainable_params(network)
     job.run(feature_map)
 

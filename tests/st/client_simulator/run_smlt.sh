@@ -15,15 +15,12 @@
 # ============================================================================
 
 export PYTHONPATH=../../../../:$PYTHONPATH
-server_num=$1
-worker_num=$2
-ip=$3
-port=$4
+client_num=$1
+http_type=$2
+http_server_address=$3
 
-for((i=0;i<worker_num;i++));
+for((i=0;i<client_num;i++));
 do
-  ofs=`expr $i % $server_num`
-  real_port=`expr $port + $ofs`
-  echo $real_port
-  python simulator.py --pid=$i --http_ip=$ip --http_port=$port --use_elb=True --server_num=$1 > simulator_$i.log 2>&1 &
+  echo $http_server_address
+  python simulator.py --pid=$i --http_type=$http_type --http_server_address=$http_server_address> simulator_$i.log 2>&1 &
 done
