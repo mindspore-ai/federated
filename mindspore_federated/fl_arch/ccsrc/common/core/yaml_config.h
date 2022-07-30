@@ -50,10 +50,6 @@ struct RoundConfig {
   uint64_t global_iteration_time_window = 0;
 };
 
-struct WorkerConfig {
-  uint64_t step_num_per_iteration = 0;
-};
-
 struct SummaryConfig {
   std::string participation_time_level = "5,15";
   uint64_t continuous_failure_times = 10;

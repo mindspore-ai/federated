@@ -40,6 +40,11 @@ bool ResponseTrack::OnRecvResponseData(const MessageMeta &meta, const Protos &pr
   return curr_count_ >= expect_count_;
 }
 
+bool ResponseTrack::OnRecvResponseData() {
+  curr_count_ += 1;
+  return curr_count_ >= expect_count_;
+}
+
 bool ResponseTrack::CheckMessageTrack() const { return curr_count_ >= expect_count_; }
 
 std::shared_ptr<TcpClient> AbstractNode::GetOrCreateTcpClient(const std::string &server_address) {
@@ -425,6 +430,16 @@ void AbstractNode::NotifyMessageArrival(const MessageMeta &meta, const Protos &p
   if (count_enough) {
     message_tracker_cond_.notify_all();
   }
+  lock.unlock();  // release track first
+}
+
+void AbstractNode::NotifyMessageArrival(const std::shared_ptr<ResponseTrack> &response_track) {
+  std::unique_lock<std::mutex> lock(message_tracker_mutex_);
+  if (message_tracker_.count(response_track->request_id()) <= 0) {
+    return;
+  }
+  response_track->OnRecvResponseData();
+  message_tracker_cond_.notify_all();
   lock.unlock();  // release track first
 }
 }  // namespace fl

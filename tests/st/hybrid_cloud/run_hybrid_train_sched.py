@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+"""start running lenet scheduler of hybrid cloud mode"""
 
 import os
 import argparse

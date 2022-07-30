@@ -100,6 +100,7 @@ ResetterRound FLContext::resetter_round() const { return resetter_round_; }
 
 void FLContext::set_http_server_address(const std::string &http_server_address) {
   http_server_address_ = http_server_address;
+  MS_LOG(INFO) << "Http server address is:" << http_server_address_;
 }
 
 std::string FLContext::http_server_address() const { return http_server_address_; }

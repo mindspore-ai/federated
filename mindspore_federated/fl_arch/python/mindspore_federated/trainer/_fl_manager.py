@@ -17,19 +17,17 @@
 from copy import deepcopy
 import numpy as np
 from mindspore import context, nn
-from mindspore import load_checkpoint, load_param_into_net
-from mindspore.train.serialization import tensor_to_ms_type
+from mindspore import load_param_into_net
 from mindspore.common.tensor import Tensor
 from mindspore.common.parameter import Parameter
 from mindspore.train.callback import Callback
 from mindspore._checkparam import Validator, Rel
+from mindspore_federated._mindspore_federated import Federated_, FLContext
 from mindspore_federated import log as logger
 
 from ..startup.ssl_config import init_ssl_config
 from ..startup.yaml_config import load_yaml_config
 from ..common import _fl_context, check_type
-
-from mindspore_federated._mindspore_federated import Federated_, FLContext
 
 ONE_STEP_PER_ITERATION = 1
 TRAIN_BEGIN_STEP_NUM = 1
@@ -66,10 +64,6 @@ class _ExchangeKeys():
     """
     Exchange Keys for Stable PW Encrypt.
     """
-
-    def __init__(self):
-        super(_ExchangeKeys, self).__init__()
-
     def construct(self):
         return Federated_.exchange_keys()
 
@@ -78,9 +72,6 @@ class _GetKeys():
     """
     Get Keys for Stable PW Encrypt.
     """
-
-    def __init__(self):
-        super(_GetKeys, self).__init__()
 
     def construct(self):
         return Federated_.get_keys()
@@ -92,7 +83,6 @@ class _PullWeight():
     """
 
     def __init__(self, pull_weight_params):
-        super(_PullWeight, self).__init__()
         self.pull_weight_params = pull_weight_params
 
     def construct(self):
@@ -105,7 +95,6 @@ class _PushWeight():
     """
 
     def __init__(self, weights):
-        super(_PushWeight, self).__init__()
         self._weights = weights
 
     def construct(self):
@@ -116,9 +105,6 @@ class PushMetrics:
     """
     Push Metrics for Federated Learning Worker.
     """
-
-    def __init__(self):
-        super(PushMetrics, self).__init__()
 
     def construct(self, loss, accuracy):
         return Federated_.push_metrics(loss, accuracy)
@@ -143,16 +129,19 @@ class FederatedLearningManager(Callback):
         This is an experimental prototype that is subject to change.
     """
 
-    def __init__(self, yaml_config, model, sync_frequency, data_size=1, sync_type='fixed', ssl_config=None, **kwargs):
+    def __init__(self, yaml_config, model, sync_frequency, http_server_address="", data_size=1, sync_type='fixed',
+                 ssl_config=None, **kwargs):
         super(FederatedLearningManager, self).__init__()
         check_type.check_str("yaml_config", yaml_config)
         enable_ssl = init_ssl_config(ssl_config)
         load_yaml_config(yaml_config, _fl_context.RoleOfServer, enable_ssl)
-        Federated_.init_federated_worker()
 
         ctx = FLContext.get_instance()
         server_mode = ctx.server_mode()
         encrypt_type = ctx.encrypt_type()
+        ctx.set_http_server_address(http_server_address)
+
+        Federated_.init_federated_worker()
 
         Validator.check_isinstance('model', model, nn.Cell)
         Validator.check_positive_int(sync_frequency)
@@ -171,7 +160,9 @@ class FederatedLearningManager(Callback):
         if self._is_adaptive_sync():
             self._as_set_init_state(kwargs)
             self._as_wrap_cell()
-        logger.info("Step number needs to run per iteration: {}".format(self._next_sync_iter_id))
+        logger.info(f"Step number needs to run per iteration {self._next_sync_iter_id},"
+                    f"server mode {self._server_mode}, encrypt type {self._encrypt_type},"
+                    f"http server address {http_server_address},enable ssl {enable_ssl}")
 
     def __del__(self):
         Federated_.stop_federated_worker()
@@ -291,7 +282,7 @@ class FederatedLearningManager(Callback):
         """
         logger.info("Try to pull weights. Local step number: {}".format(self._global_step))
         # The worker has to train kWorkerTrainStepNum standalone iterations before it communicates with server.
-        if self._next_sync_iter_id != ONE_STEP_PER_ITERATION and self._global_step % self._next_sync_iter_id != TRAIN_BEGIN_STEP_NUM:
+        if self._global_step % self._sync_frequency != TRAIN_BEGIN_STEP_NUM:
             return
 
         pull_weight_params = []
@@ -321,7 +312,7 @@ class FederatedLearningManager(Callback):
         push weight to server in hybrid training mode
         """
         logger.info("Try to push weights. Local step number: {}".format(self._global_step))
-        if self._next_sync_iter_id != ONE_STEP_PER_ITERATION and self._global_step % self._next_sync_iter_id != TRAIN_END_STEP_NUM:
+        if self._global_step % self._sync_frequency != TRAIN_END_STEP_NUM:
             return
         weights = dict()
         for param in self._model.trainable_params():

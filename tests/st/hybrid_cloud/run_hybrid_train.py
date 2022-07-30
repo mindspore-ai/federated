@@ -12,10 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+"""start running lenet of hybrid cloud mode"""
 
 import os
+import sys
 import argparse
 import numpy as np
+
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, parent_dir)
 
 parser = argparse.ArgumentParser(description="Run run_hybrid_train.py case")
 
@@ -49,6 +54,7 @@ args, _ = parser.parse_known_args()
 
 
 def get_trainable_params(network):
+    """get trainable params"""
     feature_map = {}
     for param in network.trainable_params():
         param_np = param.asnumpy()
@@ -59,10 +65,10 @@ def get_trainable_params(network):
 
 
 def start_one_server():
-    from network import LeNet5
+    """start one server"""
+    from network.lenet import LeNet5
     from mindspore_federated import FLServerJob
 
-    args, _ = parser.parse_known_args()
     yaml_config = args.yaml_config
     tcp_server_ip = args.tcp_server_ip
     http_server_address = args.http_server_address
@@ -76,9 +82,9 @@ def start_one_server():
 
 
 def start_one_scheduler():
+    """start one scheduler"""
     from mindspore_federated import FlSchedulerJob
 
-    args, _ = parser.parse_known_args()
     yaml_config = args.yaml_config
     scheduler_manage_address = args.scheduler_manage_address
 
@@ -87,6 +93,7 @@ def start_one_scheduler():
 
 
 def start_one_worker():
+    """start one worker"""
     yaml_config = args.yaml_config
     dataset_path = args.dataset_path
     user_id = args.user_id
@@ -100,12 +107,12 @@ def start_one_worker():
 
     from mindspore import nn, Model, save_checkpoint, context
     from mindspore_federated import FederatedLearningManager, PushMetrics
-    from network import LeNet5, ds, create_dataset_from_folder, LossGet, evalute_process
+    from network.lenet import LeNet5, ds, create_dataset_from_folder, LossGet, evalute_process
     from mindspore.nn.metrics import Accuracy
 
     context.set_context(mode=context.GRAPH_MODE, device_target=device_target)
 
-    epoch = 20
+    epoch = 5
     network = LeNet5(62, 3)
 
     # construct dataset

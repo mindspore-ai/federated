@@ -25,7 +25,7 @@
 #include <map>
 #include "worker/kernel/abstract_kernel.h"
 #include "common/fl_context.h"
-#include "worker/worker.h"
+#include "worker/hybrid_worker.h"
 
 namespace mindspore {
 namespace fl {
@@ -65,8 +65,8 @@ class FusedPushWeightKernelMod : public AbstractKernel {
         MS_LOG(WARNING) << "Worker has finished.";
         return true;
       }
-      if (!fl::worker::Worker::GetInstance().SendToServer(fbb.GetBufferPointer(), fbb.GetSize(),
-                                                          fl::TcpUserCommand::kPushWeight, &push_weight_rsp_msg)) {
+      if (!fl::worker::HybridWorker::GetInstance().SendToServer(
+            fbb.GetBufferPointer(), fbb.GetSize(), fl::TcpUserCommand::kPushWeight, &push_weight_rsp_msg)) {
         MS_LOG(WARNING) << "Sending request for FusedPushWeight to server failed.";
         retcode = schema::ResponseCode_SucNotReady;
         std::this_thread::sleep_for(std::chrono::milliseconds(kRetryDurationOfPushWeights));

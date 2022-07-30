@@ -239,7 +239,7 @@ FlStatus Executor::HandlePullWeightRequest(const uint8_t *req_data, size_t len, 
   if (pull_weight_iter != current_iter) {
     reason = "PullWeight iteration " + std::to_string(pull_weight_iter) +
              " is invalid. Server current iteration: " + std::to_string(current_iter);
-    MS_LOG(WARNING) << reason;
+    MS_LOG(DEBUG) << reason;
     return FlStatus(kNotReadyError, reason);
   }
 

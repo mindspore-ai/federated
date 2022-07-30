@@ -96,11 +96,13 @@ cd tests/st/cross_device_cloud
 python run_server.py
 ```
 
-可通过额外，其中`${server_port}`为启始HTTP Server端口号，默认为6666，`${server_num}`为启动的Server个数:
+可通过指定`${http_server_address}`设置HTTP Server的IP+端口号，默认为6666，`${server_num}`为启动的Server个数:
 
 ```shell
-python run_server.py --fl_server_port=${server_port} --local_server_num=${server_num}
+python run_server.py --http_server_address=${http_server_address} --local_server_num=${server_num}
 ```
+
+注意可以通过输入checkpoint的路径(指定`checkpoint_dir`)与构造神经网络的方式传入`feature_map`,请参考cross_device_femnist目录下的run_cloud.py文件。
 
 4、启动Scheduler，管理面地址默认为`127.0.0.1:11202`
 
@@ -114,13 +116,105 @@ python run_sched.py
 python run_sched.py --scheduler_manage_address=${scheduler_manage_address}
 ```
 
-5、启动客户端Python模拟
+#### 混合联邦模式
+
+1、样例路径：
 
 ```shell
-bash run_smlt.sh 1 1 127.0.0.1 6666
+cd tests/st/hybrid_cloud
 ```
 
-### 
+2、据实际运行需要修改Yaml配置文件：`default_yaml_config.yaml`
+
+3、运行Server，默认启动1个Server，HTTP服务器地址为`127.0.0.1:6666`
+
+```shell
+python run_hybrid_train_server.py
+```
+
+可通过指定`${http_server_address}`设置HTTP Server的IP+端口号，默认为6666，`${server_num}`为启动的Server个数:
+
+```shell
+python run_hybrid_train_server.py --http_server_address=${http_server_address} --local_server_num=${server_num}
+```
+
+4、启动Scheduler，管理面地址默认为`127.0.0.1:11202`
+
+```shell
+python run_hybrid_train_sched.py
+```
+
+可通过额外指定`scheduler_manage_address`设定管理面地址，其中`${scheduler_manage_address}`为Scheduler管理吗HTTP服务器的地址。
+
+```shell
+python run_hybrid_train_sched.py --scheduler_manage_address=${scheduler_manage_address}
+```
+
+5、运行Worker，运行于云侧启动有监督训练，默认启动1个Worker，HTTP服务器地址为`127.0.0.1:6666`
+
+```shell
+python run_hybrid_train_worker.py
+```
+
+可通过额外，其中`${dataset_path}`为训练集数据的路径。
+
+```shell
+python run_hybrid_train_worker.py  --dataset_path=${dataset_path}
+```
+
+#### 云云联邦模式
+
+1、样例路径：
+
+```shell
+cd tests/st/cross_silo_femnist
+```
+
+2、据实际运行需要修改Yaml配置文件：`default_yaml_config.yaml`
+
+3、运行Server，默认启动1个Server，HTTP服务器地址为`127.0.0.1:6666`
+
+```shell
+python run_cross_silo_femnist_server.py
+```
+
+可通过指定`${http_server_address}`设置HTTP Server的IP+端口号，默认为6666，`${server_num}`为启动的Server个数:
+
+```shell
+python run_cross_silo_femnist_server.py --http_server_address=${http_server_address} --local_server_num=${server_num}
+```
+
+4、启动Scheduler，管理面地址默认为`127.0.0.1:11202`
+
+```shell
+python run_cross_silo_femnist_sched.py
+```
+
+可通过额外指定`scheduler_manage_address`设定管理面地址，其中`${scheduler_manage_address}`为Scheduler管理吗HTTP服务器的地址。
+
+```shell
+python run_cross_silo_femnist_sched.py --scheduler_manage_address=${scheduler_manage_address}
+```
+
+5、运行Worker，运行于端侧启动有监督训练，多个worker之间参与联合建模，HTTP服务器地址为`127.0.0.1:6666`
+
+```shell
+python run_cross_silo_femnist_worker.py
+```
+
+可通过额外，其中`${dataset_path}`为训练集数据的路径。
+
+```shell
+python run_cross_silo_femnist_worker.py  --dataset_path=${dataset_path}
+```
+
+最后：启动客户端Python模拟
+
+```shell
+bash run_smlt.sh 1 4 127.0.0.1 6666
+```
+
+###
 
 ## 快速入门
 
@@ -128,7 +222,7 @@ bash run_smlt.sh 1 1 127.0.0.1 6666
 
 ### 开发者教程
 
-有关安装指南、教程和API的更多详细信息，请参阅[用户文档](https://www.mindspore.cn/federated/docs/zh-CN/master/server.html)。
+有关安装指南、教程和API的更多详细信息，请参阅[用户文档](https://www.mindspore.cn/federated/docs/zh-CN/master/deploy_federated_server.html)。
 
 ## 社区
 

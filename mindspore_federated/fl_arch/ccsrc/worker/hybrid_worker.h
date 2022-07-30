@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef MINDSPORE_CCSRC_FL_WORKER_FL_WORKER_H_
-#define MINDSPORE_CCSRC_FL_WORKER_FL_WORKER_H_
+#ifndef MINDSPORE_CCSRC_FL_WORKER_HYBRID_WORKER_H_
+#define MINDSPORE_CCSRC_FL_WORKER_HYBRID_WORKER_H_
 
 #include <memory>
 #include <string>
@@ -28,13 +28,6 @@
 #include "worker/worker_node.h"
 #include "common/communicator/tcp_communicator.h"
 #include "common/common.h"
-
-struct EncryptPublicKeys {
-  std::string flID;
-  std::vector<uint8_t> publicKey;
-  std::vector<uint8_t> pwIV;
-  std::vector<uint8_t> pwSalt;
-};
 
 namespace mindspore {
 namespace fl {
@@ -59,9 +52,9 @@ enum class IterationState {
 namespace worker {
 // This class is used for hybrid training mode for now. In later version, parameter server mode will also use this class
 // as worker.
-class MS_EXPORT Worker {
+class MS_EXPORT HybridWorker {
  public:
-  static Worker &GetInstance();
+  static HybridWorker &GetInstance();
   void Init();
   void Stop();
   bool SendToServer(const void *data, size_t size, fl::TcpUserCommand command, VectorPtr *output = nullptr);
@@ -76,27 +69,14 @@ class MS_EXPORT Worker {
   void set_data_size(int data_size);
   int data_size() const;
 
-  void set_secret_pk(armour::PrivateKey *secret_pk);
-  armour::PrivateKey *secret_pk() const;
-
-  void set_pw_salt(const std::vector<uint8_t> &pw_salt);
-  std::vector<uint8_t> pw_salt() const;
-
-  void set_pw_iv(const std::vector<uint8_t> &pw_iv);
-  std::vector<uint8_t> pw_iv() const;
-
-  void set_public_keys_list(const std::vector<EncryptPublicKeys> &public_keys_list);
-  std::vector<EncryptPublicKeys> public_keys_list() const;
-
   std::string fl_name() const;
   std::string fl_id() const;
-  std::string encrypt_type() const;
 
  private:
-  Worker() = default;
-  ~Worker() = default;
-  Worker(const Worker &) = delete;
-  Worker &operator=(const Worker &) = delete;
+  HybridWorker() = default;
+  ~HybridWorker() = default;
+  HybridWorker(const HybridWorker &) = delete;
+  HybridWorker &operator=(const HybridWorker &) = delete;
   void InitAndLoadDistributedCache();
   void StartPeriodJob();
 
@@ -112,22 +92,8 @@ class MS_EXPORT Worker {
 
   // This variable represents the worker iteration state and should be changed by worker training process.
   std::atomic<IterationState> worker_iteration_state_;
-
-  // The private key used for computing the pairwise encryption's secret.
-  armour::PrivateKey *secret_pk_ = nullptr;
-
-  // The salt value used for generate pairwise noise.
-  std::vector<uint8_t> pw_salt_;
-
-  // The initialization vector value used for generate pairwise noise.
-  std::vector<uint8_t> pw_iv_;
-
-  // The public keys used for computing the pairwise encryption's secret.
-  std::vector<EncryptPublicKeys> public_keys_list_;
-
-  std::string encrypt_type_;
 };
 }  // namespace worker
 }  // namespace fl
 }  // namespace mindspore
-#endif  // MINDSPORE_CCSRC_FL_WORKER_FL_WORKER_H_
+#endif  // MINDSPORE_CCSRC_FL_WORKER_HYBRID_WORKER_H_

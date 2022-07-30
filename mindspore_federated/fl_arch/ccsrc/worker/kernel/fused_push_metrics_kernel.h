@@ -24,7 +24,7 @@
 #include <functional>
 #include <utility>
 #include "worker/kernel/abstract_kernel.h"
-#include "worker/worker.h"
+#include "worker/hybrid_worker.h"
 
 namespace mindspore {
 namespace fl {
@@ -34,23 +34,24 @@ namespace kernel {
 constexpr int kRetryDurationOfPushMetrics = 500;
 // Retry for 30 minutes.
 constexpr int kMaxRetryTime = 3600;
-class PushMetricsKernelMod : public AbstractKernel {
+class FusedPushMetricsKernelMod : public AbstractKernel {
  public:
-  PushMetricsKernelMod() : total_iteration_(0) {}
-  ~PushMetricsKernelMod() override = default;
+  FusedPushMetricsKernelMod() : total_iteration_(0) {}
+  ~FusedPushMetricsKernelMod() override = default;
 
   void Init() override {}
 
-  static std::shared_ptr<PushMetricsKernelMod> GetInstance() {
-    static std::shared_ptr<PushMetricsKernelMod> instance = nullptr;
+  static std::shared_ptr<FusedPushMetricsKernelMod> GetInstance() {
+    static std::shared_ptr<FusedPushMetricsKernelMod> instance = nullptr;
     if (instance == nullptr) {
-      instance.reset(new PushMetricsKernelMod());
+      instance.reset(new FusedPushMetricsKernelMod());
       instance->Init();
     }
     return instance;
   }
 
   bool Launch(float loss, float accuracy) {
+    MS_LOG(INFO) << "Launch FusedPushMetricsKernelMod.";
     FBBuilder fbb;
     BuildPushMetricsReq(&fbb, loss, accuracy);
     uint32_t retry_time = 0;
@@ -61,7 +62,7 @@ class PushMetricsKernelMod : public AbstractKernel {
         return true;
       }
       retry_time++;
-      if (!fl::worker::Worker::GetInstance().SendToServer(fbb.GetBufferPointer(), fbb.GetSize(),
+      if (!fl::worker::HybridWorker::GetInstance().SendToServer(fbb.GetBufferPointer(), fbb.GetSize(),
                                                           fl::TcpUserCommand::kPushMetrics, &push_metrics_rsp_msg)) {
         MS_LOG(WARNING) << "Sending request for PushMetrics to server 0 failed.";
         std::this_thread::sleep_for(std::chrono::milliseconds(kRetryDurationOfPushMetrics));
@@ -70,6 +71,7 @@ class PushMetricsKernelMod : public AbstractKernel {
         break;
       }
     } while (retry_time < kMaxRetryTime);
+    MS_LOG(INFO) << "88888888888888888888888888888888.";
 
     flatbuffers::Verifier verifier(push_metrics_rsp_msg->data(), push_metrics_rsp_msg->size());
     if (!verifier.VerifyBuffer<schema::ResponsePushMetrics>()) {
@@ -90,7 +92,7 @@ class PushMetricsKernelMod : public AbstractKernel {
     }
 
     MS_LOG(INFO) << "Push metrics for loss and accuracy success.";
-    fl::worker::Worker::GetInstance().SetIterationCompleted();
+    fl::worker::HybridWorker::GetInstance().SetIterationCompleted();
     return true;
   }
 

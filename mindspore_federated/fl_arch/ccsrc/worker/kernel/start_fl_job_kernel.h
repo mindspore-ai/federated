@@ -21,7 +21,7 @@
 #include <string>
 #include <memory>
 #include "worker/kernel/abstract_kernel.h"
-#include "worker/worker.h"
+#include "worker/cloud_worker.h"
 #include "common/fl_context.h"
 #include "common/core/comm_util.h"
 #include "common/utils/python_adapter.h"
@@ -53,39 +53,42 @@ class StartFLJobKernelMod : public AbstractKernel {
       return false;
     }
 
-    std::shared_ptr<std::vector<unsigned char>> start_fl_job_rsp_msg = nullptr;
-    if (!fl::worker::Worker::GetInstance().SendToServer(fbb.GetBufferPointer(), fbb.GetSize(),
-                                                        fl::TcpUserCommand::kStartFLJob, &start_fl_job_rsp_msg)) {
-      MS_LOG(EXCEPTION) << "Sending request for StartFLJob to server failed.";
-      return false;
+    if (!fl::worker::CloudWorker::GetInstance().SendToServerSync(kernel_path_, HTTP_CONTENT_TYPE_URL_ENCODED,
+                                                                 fbb.GetBufferPointer(), fbb.GetSize())) {
+      MS_LOG(WARNING) << "Sending request for StartFLJob to server failed.";
     }
-    flatbuffers::Verifier verifier(start_fl_job_rsp_msg->data(), start_fl_job_rsp_msg->size());
-    if (!verifier.VerifyBuffer<schema::ResponseFLJob>()) {
-      MS_LOG(EXCEPTION) << "The schema of ResponseFLJob is invalid.";
-      return false;
-    }
-
-    const schema::ResponseFLJob *start_fl_job_rsp =
-      flatbuffers::GetRoot<schema::ResponseFLJob>(start_fl_job_rsp_msg->data());
-    MS_EXCEPTION_IF_NULL(start_fl_job_rsp);
-    auto response_code = start_fl_job_rsp->retcode();
-    switch (response_code) {
-      case schema::ResponseCode_SUCCEED:
-      case schema::ResponseCode_OutOfTime:
-        break;
-      default:
-        MS_LOG(EXCEPTION) << "Launching start fl job for worker failed. Reason: " << start_fl_job_rsp->reason();
-    }
-    fl::worker::Worker::GetInstance().set_data_size(data_size);
-    uint64_t iteration = IntToSize(start_fl_job_rsp->iteration());
-    fl::worker::Worker::GetInstance().set_fl_iteration_num(iteration);
-    MS_LOG(INFO) << "Start fl job for iteration " << iteration;
+    fl::worker::CloudWorker::GetInstance().set_data_size(data_size);
     return true;
   }
 
   void Init() override {
-    fl_name_ = fl::worker::Worker::GetInstance().fl_name();
-    fl_id_ = fl::worker::Worker::GetInstance().fl_id();
+    fl_name_ = fl::worker::CloudWorker::GetInstance().fl_name();
+    fl_id_ = fl::worker::CloudWorker::GetInstance().fl_id();
+    kernel_path_ = "/startFLJob";
+    fl::worker::CloudWorker::GetInstance().RegisterMessageCallback(
+      kernel_path_, [&](const std::shared_ptr<std::vector<unsigned char>> &response_msg) {
+        flatbuffers::Verifier verifier(response_msg->data(), response_msg->size());
+        if (!verifier.VerifyBuffer<schema::ResponseFLJob>()) {
+          MS_LOG(WARNING) << "The schema of response message is invalid.";
+          return;
+        }
+        const schema::ResponseFLJob *start_fl_job_rsp =
+          flatbuffers::GetRoot<schema::ResponseFLJob>(response_msg->data());
+        MS_ERROR_IF_NULL_WO_RET_VAL(start_fl_job_rsp);
+        auto response_code = start_fl_job_rsp->retcode();
+        switch (response_code) {
+          case schema::ResponseCode_SUCCEED:
+          case schema::ResponseCode_OutOfTime:
+            break;
+          default:
+            MS_LOG(ERROR) << "Launching start fl job for worker failed. Reason: " << start_fl_job_rsp->reason();
+        }
+
+        uint64_t iteration = IntToSize(start_fl_job_rsp->iteration());
+        fl::worker::CloudWorker::GetInstance().set_fl_iteration_num(iteration);
+        MS_LOG(INFO) << "Start fl job for iteration " << iteration;
+      });
+
     MS_LOG(INFO) << "Initializing StartFLJob kernel. fl_name: " << fl_name_ << ", fl_id: " << fl_id_;
   }
 
@@ -108,6 +111,7 @@ class StartFLJobKernelMod : public AbstractKernel {
   }
   std::string fl_name_;
   std::string fl_id_;
+  std::string kernel_path_;
 };
 }  // namespace kernel
 }  // namespace worker

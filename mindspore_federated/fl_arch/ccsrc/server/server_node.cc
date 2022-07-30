@@ -395,7 +395,7 @@ void ServerNode::HandleBroadcastModelWeight(const std::shared_ptr<TcpConnection>
 }
 
 bool ServerNode::PullWeight(const uint8_t *req_data, size_t len, VectorPtr *output) {
-  MS_LOG_INFO << "Begin pull weight from other servers";
+  MS_LOG_DEBUG << "Begin pull weight from other servers";
   if (output == nullptr) {
     return false;
   }
@@ -448,13 +448,13 @@ bool ServerNode::PullWeight(const uint8_t *req_data, size_t len, VectorPtr *outp
     MS_LOG_INFO << "Success to pull weight from other servers" << (*output)->size();
     return true;
   }
-  MS_LOG_INFO << "End pull weight from other servers";
+  MS_LOG_DEBUG << "End pull weight from other servers";
   return false;
 }
 
 void ServerNode::HandleServerPullWeight(const std::shared_ptr<TcpConnection> &conn, const MessageMeta &meta,
                                         const Protos &protos, const VectorPtr &data) {
-  MS_LOG_INFO << "Begin handle pull weight request from " << meta.send_node();
+  MS_LOG_DEBUG << "Begin handle pull weight request from " << meta.send_node();
   FBBuilder fbb;
   auto ret = Executor::GetInstance().HandlePullWeightRequest(data->data(), data->size(), &fbb);
   if (!ret.IsSuccess()) {

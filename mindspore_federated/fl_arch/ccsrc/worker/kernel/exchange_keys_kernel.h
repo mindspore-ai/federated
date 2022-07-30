@@ -20,7 +20,7 @@
 #include <vector>
 #include <string>
 #include <memory>
-#include "worker/worker.h"
+#include "worker/cloud_worker.h"
 #include "armour/secure_protocol/key_agreement.h"
 #include "worker/kernel/abstract_kernel.h"
 
@@ -42,6 +42,7 @@ class ExchangeKeysKernelMod : public AbstractKernel {
 
   std::string fl_id_;
   armour::PrivateKey *secret_prikey_ = nullptr;
+  std::string kernel_path_;
 };
 }  // namespace kernel
 }  // namespace worker

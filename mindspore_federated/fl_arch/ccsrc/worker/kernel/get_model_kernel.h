@@ -24,13 +24,15 @@
 #include <utility>
 #include <functional>
 #include "worker/kernel/abstract_kernel.h"
-#include "worker/worker.h"
+#include "worker/cloud_worker.h"
 #include "common/fl_context.h"
 
 namespace mindspore {
 namespace fl {
 namespace worker {
 namespace kernel {
+constexpr size_t kRetryTimesOfGetModel = 512;
+constexpr size_t kSleepMillisecondsOfGetModel = 1000;
 class GetModelKernelMod : public AbstractKernel {
  public:
   GetModelKernelMod() = default;
@@ -51,62 +53,65 @@ class GetModelKernelMod : public AbstractKernel {
     FBBuilder fbb;
     if (!BuildGetModelReq(&fbb)) {
       MS_LOG(EXCEPTION) << "Building request for FusedPushWeight failed.";
-      return dict_data;
     }
+    bool get_model_success = false;
+    fl::worker::CloudWorker::GetInstance().RegisterMessageCallback(
+      kernel_path_, [&](const std::shared_ptr<std::vector<unsigned char>> &response_msg) {
+        flatbuffers::Verifier verifier(response_msg->data(), response_msg->size());
+        if (!verifier.VerifyBuffer<schema::ResponseGetModel>()) {
+          MS_LOG(DEBUG) << "The schema of response message is invalid.";
+          return;
+        }
+        const schema::ResponseGetModel *get_model_rsp =
+          flatbuffers::GetRoot<schema::ResponseGetModel>(response_msg->data());
+        MS_ERROR_IF_NULL_WO_RET_VAL(get_model_rsp);
+        auto response_code = get_model_rsp->retcode();
+        if (response_code == schema::ResponseCode_SUCCEED) {
+          get_model_success = true;
+        } else if (response_code == schema::ResponseCode_SucNotReady) {
+          MS_LOG(INFO) << "Get model response code from server is not ready.";
+          return;
+        } else {
+          MS_LOG(ERROR) << "Launching get model for worker failed. Reason: " << get_model_rsp->reason();
+        }
 
-    const schema::ResponseGetModel *get_model_rsp = nullptr;
-    std::shared_ptr<std::vector<unsigned char>> get_model_rsp_msg = nullptr;
-    int response_code = schema::ResponseCode_SucNotReady;
-    while (response_code == schema::ResponseCode_SucNotReady) {
-      if (ExitHandler::Instance().HasStopped()) {
-        MS_LOG(WARNING) << "Worker has finished.";
-        return dict_data;
-      }
-      if (!fl::worker::Worker::GetInstance().SendToServer(fbb.GetBufferPointer(), fbb.GetSize(),
-                                                          fl::TcpUserCommand::kGetModel, &get_model_rsp_msg)) {
-        MS_LOG(EXCEPTION) << "Sending request for GetModel to server failed.";
-        return dict_data;
-      }
-      flatbuffers::Verifier verifier(get_model_rsp_msg->data(), get_model_rsp_msg->size());
-      if (!verifier.VerifyBuffer<schema::ResponseGetModel>()) {
-        MS_LOG(EXCEPTION) << "The schema of ResponseGetModel is invalid.";
-        return dict_data;
-      }
+        auto feature_map = get_model_rsp->feature_map();
+        MS_EXCEPTION_IF_NULL(feature_map);
 
-      get_model_rsp = flatbuffers::GetRoot<schema::ResponseGetModel>(get_model_rsp_msg->data());
-      MS_EXCEPTION_IF_NULL(get_model_rsp);
-      response_code = get_model_rsp->retcode();
-      if (response_code == schema::ResponseCode_SUCCEED) {
+        if (feature_map->size() == 0) {
+          MS_LOG(EXCEPTION) << "Feature map after GetModel is empty.";
+        }
+        for (size_t i = 0; i < feature_map->size(); i++) {
+          const auto &feature_fbs = feature_map->Get(i);
+          const auto &feature_data_fbs = feature_fbs->data();
+
+          std::string weight_fullname = feature_fbs->weight_fullname()->str();
+          float *weight_data = const_cast<float *>(feature_data_fbs->data());
+          std::vector<float> weight_data_vec(weight_data, weight_data + feature_data_fbs->size());
+          dict_data[py::str(weight_fullname)] = weight_data_vec;
+        }
+        MS_LOG(INFO) << "Get model from server successful.";
+      });
+
+    size_t retryTimes = 0;
+    while (!get_model_success && retryTimes < kRetryTimesOfGetModel) {
+      if (!fl::worker::CloudWorker::GetInstance().SendToServerSync(kernel_path_, HTTP_CONTENT_TYPE_URL_ENCODED,
+                                                                   fbb.GetBufferPointer(), fbb.GetSize())) {
+        MS_LOG(WARNING) << "Sending request for GetModel to server failed.";
         break;
-      } else if (response_code == schema::ResponseCode_SucNotReady) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        continue;
-      } else {
-        MS_LOG(EXCEPTION) << "Launching get model for worker failed. Reason: " << get_model_rsp->reason();
       }
+      retryTimes += 1;
+      std::this_thread::sleep_for(std::chrono::milliseconds(kSleepMillisecondsOfGetModel));
     }
-    auto feature_map = get_model_rsp->feature_map();
-    MS_EXCEPTION_IF_NULL(feature_map);
-    if (feature_map->size() == 0) {
-      MS_LOG(EXCEPTION) << "Feature map after GetModel is empty.";
-      return dict_data;
-    }
-    for (size_t i = 0; i < feature_map->size(); i++) {
-      const auto &feature_fbs = feature_map->Get(i);
-      const auto &feature_data_fbs = feature_fbs->data();
-
-      std::string weight_fullname = feature_fbs->weight_fullname()->str();
-      float *weight_data = const_cast<float *>(feature_data_fbs->data());
-      std::vector<float> weight_data_vec(weight_data, weight_data + feature_data_fbs->size());
-      dict_data[py::str(weight_fullname)] = weight_data_vec;
+    if (!get_model_success) {
+      MS_LOG(WARNING) << "Get model from server failed.";
     }
     return dict_data;
   }
 
   void Init() override {
-    MS_LOG(INFO) << "Initializing GetModel kernel";
-
-    fl_name_ = fl::worker::Worker::GetInstance().fl_name();
+    fl_name_ = fl::worker::CloudWorker::GetInstance().fl_name();
+    kernel_path_ = "/getModel";
     MS_LOG(INFO) << "Initializing GetModel kernel. fl_name: " << fl_name_ << ". Request will be sent to server";
   }
 
@@ -115,13 +120,12 @@ class GetModelKernelMod : public AbstractKernel {
     MS_EXCEPTION_IF_NULL(fbb);
     auto fbs_fl_name = fbb->CreateString(fl_name_);
     auto time = fl::CommUtil::GetNowTime();
-    MS_LOG(INFO) << "now time: " << time.time_str_mill;
     auto fbs_timestamp = fbb->CreateString(std::to_string(time.time_stamp));
     schema::RequestGetModelBuilder req_get_model_builder(*fbb);
     req_get_model_builder.add_fl_name(fbs_fl_name);
     req_get_model_builder.add_timestamp(fbs_timestamp);
-    iteration_ = fl::worker::Worker::GetInstance().fl_iteration_num();
-    MS_LOG(INFO) << "Get model iteration: " << iteration_;
+    iteration_ = fl::worker::CloudWorker::GetInstance().fl_iteration_num();
+    MS_LOG(INFO) << "now time: " << time.time_str_mill << ", get model iteration: " << iteration_;
     req_get_model_builder.add_iteration(SizeToInt(iteration_));
     auto req_get_model = req_get_model_builder.Finish();
     fbb->Finish(req_get_model);
@@ -129,6 +133,7 @@ class GetModelKernelMod : public AbstractKernel {
   }
   std::string fl_name_;
   uint64_t iteration_;
+  std::string kernel_path_;
 };
 }  // namespace kernel
 }  // namespace worker

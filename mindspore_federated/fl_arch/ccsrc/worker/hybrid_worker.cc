@@ -19,7 +19,7 @@
 #include <vector>
 #include <utility>
 #include "common/exit_handler.h"
-#include "worker/worker.h"
+#include "worker/hybrid_worker.h"
 #include "armour/secure_protocol/key_agreement.h"
 #include "distributed_cache/distributed_cache.h"
 #include "distributed_cache/worker.h"
@@ -27,12 +27,12 @@
 namespace mindspore {
 namespace fl {
 namespace worker {
-Worker &Worker::GetInstance() {
-  static Worker instance;
+HybridWorker &HybridWorker::GetInstance() {
+  static HybridWorker instance;
   return instance;
 }
 
-void Worker::Init() {
+void HybridWorker::Init() {
   if (running_.load()) {
     MS_LOG_EXCEPTION << "Worker has been inited";
   }
@@ -49,7 +49,7 @@ void Worker::Init() {
   StartPeriodJob();
 }
 
-void Worker::StartPeriodJob() {
+void HybridWorker::StartPeriodJob() {
   cache::Worker::Instance().Init(fl_id(), FLContext::instance()->fl_name());
   auto status = cache::Worker::Instance().Register();
   if (!status.IsSuccess()) {
@@ -86,7 +86,7 @@ void Worker::StartPeriodJob() {
   period_thread_ = std::thread(period_fun);
 }
 
-void Worker::Stop() {
+void HybridWorker::Stop() {
   MS_LOG_INFO << "Start to stop worker";
   ExitHandler::Instance().SetStopFlag();
   if (period_thread_.joinable()) {
@@ -96,7 +96,7 @@ void Worker::Stop() {
   MS_LOG_INFO << "Stop worker successfully";
 }
 
-void Worker::InitAndLoadDistributedCache() {
+void HybridWorker::InitAndLoadDistributedCache() {
   auto config = FLContext::instance()->distributed_cache_config();
   if (config.address.empty()) {
     MS_LOG(EXCEPTION) << "Distributed cache address cannot be empty.";
@@ -107,7 +107,7 @@ void Worker::InitAndLoadDistributedCache() {
   }
 }
 
-bool Worker::SendToServer(const void *data, size_t size, TcpUserCommand command, VectorPtr *output) {
+bool HybridWorker::SendToServer(const void *data, size_t size, TcpUserCommand command, VectorPtr *output) {
   MS_EXCEPTION_IF_NULL(worker_node_);
   MS_EXCEPTION_IF_NULL(data);
   if (output != nullptr) {
@@ -138,50 +138,30 @@ bool Worker::SendToServer(const void *data, size_t size, TcpUserCommand command,
   return true;
 }
 
-void Worker::SetIterationRunning() {
+void HybridWorker::SetIterationRunning() {
   MS_LOG(INFO) << "Worker iteration starts.";
   worker_iteration_state_ = IterationState::kRunning;
 }
 
-void Worker::SetIterationCompleted() {
+void HybridWorker::SetIterationCompleted() {
   MS_LOG(INFO) << "Worker iteration completes.";
   worker_iteration_state_ = IterationState::kCompleted;
 }
 
-void Worker::set_fl_iteration_num(uint64_t iteration_num) { iteration_num_ = iteration_num; }
+void HybridWorker::set_fl_iteration_num(uint64_t iteration_num) { iteration_num_ = iteration_num; }
 
-uint64_t Worker::fl_iteration_num() const { return iteration_num_.load(); }
+uint64_t HybridWorker::fl_iteration_num() const { return iteration_num_.load(); }
 
-void Worker::set_data_size(int data_size) { data_size_ = data_size; }
+void HybridWorker::set_data_size(int data_size) { data_size_ = data_size; }
 
-void Worker::set_secret_pk(armour::PrivateKey *secret_pk) { secret_pk_ = secret_pk; }
+int HybridWorker::data_size() const { return data_size_; }
 
-void Worker::set_pw_salt(const std::vector<uint8_t> &pw_salt) { pw_salt_ = pw_salt; }
+std::string HybridWorker::fl_name() const { return kServerModeFL; }
 
-void Worker::set_pw_iv(const std::vector<uint8_t> &pw_iv) { pw_iv_ = pw_iv; }
-
-void Worker::set_public_keys_list(const std::vector<EncryptPublicKeys> &public_keys_list) {
-  public_keys_list_ = public_keys_list;
-}
-
-int Worker::data_size() const { return data_size_; }
-
-armour::PrivateKey *Worker::secret_pk() const { return secret_pk_; }
-
-std::vector<uint8_t> Worker::pw_salt() const { return pw_salt_; }
-
-std::vector<uint8_t> Worker::pw_iv() const { return pw_iv_; }
-
-std::vector<EncryptPublicKeys> Worker::public_keys_list() const { return public_keys_list_; }
-
-std::string Worker::fl_name() const { return kServerModeFL; }
-
-std::string Worker::fl_id() const {
+std::string HybridWorker::fl_id() const {
   MS_EXCEPTION_IF_NULL(worker_node_);
   return worker_node_->fl_id();
 }
-
-std::string Worker::encrypt_type() const { return encrypt_type_; }
 }  // namespace worker
 }  // namespace fl
 }  // namespace mindspore

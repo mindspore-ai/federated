@@ -15,16 +15,19 @@
 """Interface for start up single core servable"""
 import os.path
 import numpy as np
+from mindspore_federated._mindspore_federated import Federated_, FLContext, FeatureItem_
 from ..common import _fl_context
 from .feature_map import FeatureMap
 from .. import log as logger
 from .ssl_config import init_ssl_config, SSLConfig
 from ..common import check_type
 from .yaml_config import load_yaml_config
-from mindspore_federated._mindspore_federated import Federated_, FLContext, FeatureItem_
 
 
 def load_ms_checkpoint(checkpoint_file_path):
+    """
+    load ms checkpoint
+    """
     logger.info(f"load checkpoint file: {checkpoint_file_path}")
     from mindspore import load_checkpoint
     param_dict = load_checkpoint(checkpoint_file_path)
@@ -53,6 +56,9 @@ def save_ms_checkpoint(checkpoint_file_path, feature_map):
 
 
 def load_mindir(mindir_file_path):
+    """
+    load mindir
+    """
     logger.info(f"load MindIR file: {mindir_file_path}")
     from mindspore import load, nn
     graph = load(mindir_file_path)
@@ -83,6 +89,9 @@ class CallbackContext:
 
 
 class Callback:
+    """
+    define callback of fl server job
+    """
     def __init__(self):
         pass
 
@@ -90,13 +99,11 @@ class Callback:
         """
         Callback after the server is successfully started.
         """
-        pass
 
     def before_stopped(self):
         """
         Callback after the server is stopped.
         """
-        pass
 
     def on_iteration_end(self, context):
         """
@@ -105,10 +112,12 @@ class Callback:
         Args:
             context (CallbackContext): Context of the iteration.
         """
-        pass
 
 
 class FLServerJob:
+    """
+    define fl server job
+    """
     def __init__(self, yaml_config, http_server_address, tcp_server_ip="127.0.0.1",
                  checkpoint_dir="./fl_ckpt/", ssl_config=None):
         check_type.check_str("yaml_config", yaml_config)
@@ -132,6 +141,9 @@ class FLServerJob:
         self.callback = None
 
     def run(self, feature_map=None, callback=None):
+        """
+        run fl server job
+        """
         if callback is not None and not isinstance(callback, Callback):
             raise RuntimeError("Parameter 'callback' is expected to be instance of Callback when it's not None, but"
                                f" got {type(callback)}")
@@ -146,37 +158,52 @@ class FLServerJob:
                                           self.before_stopped_callback, self.on_iteration_end_callback)
 
     def after_started_callback(self):
+        """
+        define callback after fl job is started
+        """
         logger.info("after started callback")
         if self.callback is not None:
             try:
                 self.callback.after_started()
-            except Exception as e:
+            except RuntimeError as e:
                 logger.warning(f"Catch exception when invoke callback after started: {str(e)}")
 
     def before_stopped_callback(self):
+        """
+        define callback before fl job is stopped
+        """
         logger.info("before stopped callback")
         if self.callback is not None:
             try:
                 self.callback.before_stopped()
-            except Exception as e:
+            except RuntimeError as e:
                 logger.warning(f"Catch exception when invoke callback before stopped: {str(e)}")
 
     def on_iteration_end_callback(self, feature_list, fl_name, instance_name, iteration_num,
                                   iteration_valid, iteration_reason):
+        """
+        define callback of iteration ending
+        """
         logger.info("on iteration end callback")
+        feature_map = {}
+        checkpoint_file = ""
+        if os.path.exists(self.checkpoint_dir):
+            feature_map = FeatureMap()
+            for feature in feature_list:
+                feature_map.add_feature(feature.feature_name, feature.data, feature.require_aggr)
+            checkpoint_file = self._save_feature_map(feature_map, iteration_num)
         if self.callback is not None:
             try:
-                feature_map = FeatureMap()
-                for feature in feature_list:
-                    feature_map.add_feature(feature.feature_name, feature.data, feature.require_aggr)
-                checkpoint_file = self._save_feature_map(feature_map, iteration_num)
                 context = CallbackContext(feature_map, checkpoint_file, fl_name, instance_name,
                                           iteration_num, iteration_valid, iteration_reason)
                 self.callback.on_iteration_end(context)
-            except Exception as e:
+            except RuntimeError as e:
                 logger.warning(f"Catch exception when invoke callback on iteration end: {str(e)}")
 
     def _save_feature_map(self, feature_map, iteration_num):
+        """
+        save feature map
+        """
         recovery_ckpt_file = self._get_current_recovery_ckpt_file()
         import datetime
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -189,6 +216,9 @@ class FLServerJob:
         return new_ckpt_file_path
 
     def _load_feature_map(self, feature_map):
+        """
+        load feature map
+        """
         if isinstance(feature_map, dict):
             new_feature_map = FeatureMap()
             for feature_name, val in feature_map.items():
@@ -204,7 +234,7 @@ class FLServerJob:
                     feature_map_ckpt = load_ms_checkpoint(ckpt_file)
                     logger.info(f"Load recovery checkpoint file {ckpt_file} successfully")
                     break
-                except Exception as e:
+                except ValueError as e:
                     logger.warning(f"Failed to load recovery checkpoint file {ckpt_file}: {str(e)}")
                     continue
             if feature_map_ckpt is not None:
@@ -221,7 +251,7 @@ class FLServerJob:
         if isinstance(feature_map, str):
             if feature_map.endswith(".ckpt"):
                 return load_ms_checkpoint(feature_map)
-            elif feature_map.endswith(".mindir"):
+            if feature_map.endswith(".mindir"):
                 return load_mindir(feature_map)
             raise RuntimeError(f"The value of parameter 'feature_map' is expected to be checkpoint file path, "
                                f"ends with '.ckpt', or MindIR file path, ends with '.mindir', "
@@ -231,6 +261,9 @@ class FLServerJob:
             f"or a checkpoint or mindir file path, but got '{type(feature_map)}'")
 
     def _get_current_recovery_ckpt_file(self):
+        """
+        get current recovery ckpt file
+        """
         # get checkpoint files from the latest to the next new in self.checkpoint_dir: {checkpoint_dir}/
         # checkpoint file: {fl_name}_recovery_iteration_xxx_20220601_164030.ckpt
         if not os.path.exists(self.checkpoint_dir) or not os.path.isdir(self.checkpoint_dir):
@@ -251,10 +284,14 @@ class FLServerJob:
                 timestamp = strs[1] + strs[2]
                 recovery_ckpt_files.append((iteration_num, timestamp, file_path))
         recovery_ckpt_files.sort(key=lambda elem: elem[1], reverse=True)
+        logger.info(f"Recovery ckpt files is: {recovery_ckpt_files}.")
         return recovery_ckpt_files
 
 
 class FlSchedulerJob:
+    """
+    Define the fl scheduler job
+    """
     def __init__(self, yaml_config, manage_address):
         check_type.check_str("yaml_config", yaml_config)
         check_type.check_str("manage_address", manage_address)
