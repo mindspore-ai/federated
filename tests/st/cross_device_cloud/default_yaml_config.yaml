@@ -7,6 +7,12 @@ distributed_cache:
   address: 127.0.0.1:2345
   plugin_lib_path: ""
   enable_ssl: False
+  # ssl config when enable_ssl is true
+  cacert_filename: ""
+  capath: ""
+  cert_filename: ""
+  private_key_filename: ""
+  server_name: ""
 
 round:
   start_fl_job_threshold: 4
