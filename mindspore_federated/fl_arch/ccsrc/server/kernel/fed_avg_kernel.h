@@ -57,7 +57,7 @@ class FedAvgKernel {
     }
     auto data_size = info->data_size;
     if (data_size == 0) {
-      MS_LOG(ERROR) << "After AllReduce, the data size is 0.";
+      MS_LOG(WARNING) << "After AllReduce, the data size is 0.";
       return false;
     }
     LocalMetaStore::GetInstance().put_value(kCtxFedAvgTotalDataSize, data_size);

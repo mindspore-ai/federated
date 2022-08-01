@@ -28,6 +28,7 @@
 #include "common/common.h"
 #include "server/model_store.h"
 #include "server/server_node.h"
+#include "common/constants.h"
 
 namespace mindspore {
 namespace fl {

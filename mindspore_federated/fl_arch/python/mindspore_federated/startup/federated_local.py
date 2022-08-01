@@ -134,7 +134,7 @@ class FLServerJob:
         ctx.set_tcp_server_ip(tcp_server_ip)
         ctx.set_checkpoint_dir(checkpoint_dir)
         enable_ssl = init_ssl_config(ssl_config)
-        load_yaml_config(yaml_config, _fl_context.RoleOfServer, enable_ssl)
+        load_yaml_config(yaml_config, _fl_context.ROLE_OF_SERVER, enable_ssl)
 
         self.checkpoint_dir = checkpoint_dir
         self.fl_name = ctx.fl_name()
@@ -298,7 +298,7 @@ class FlSchedulerJob:
 
         ctx = FLContext.get_instance()
         ctx.set_scheduler_manage_address(manage_address)
-        load_yaml_config(yaml_config, _fl_context.RoleOfScheduler, enable_ssl=False)
+        load_yaml_config(yaml_config, _fl_context.ROLE_OF_SCHEDULER, enable_ssl=False)
 
     def run(self):
         Federated_.start_federated_scheduler()

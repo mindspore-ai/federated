@@ -182,11 +182,14 @@ void YamlConfig::InitClientConfig() {
 }
 
 void YamlConfig::CheckYamlConfig() {
-  auto upload_compress_type = FLContext::instance()->compression_config().upload_compress_type;
+  CompressionConfig compression_config = FLContext::instance()->compression_config();
+  auto upload_compress_type = compression_config.upload_compress_type;
   auto encrypt_type = FLContext::instance()->encrypt_config().encrypt_type;
   if (upload_compress_type != kNoCompressType && (encrypt_type == kDSEncryptType || encrypt_type == kPWEncryptType)) {
-    MS_LOG_EXCEPTION << "The '" << encrypt_type << "' and '{" << upload_compress_type << "}' are conflicted, and in '{"
-                     << encrypt_type << "}' mode the 'upload_compress_type' will be 'NO_COMPRESS'";
+    MS_LOG(WARNING) << "The '" << encrypt_type << "' and '{" << upload_compress_type << "}' are conflicted, and in '{"
+                    << encrypt_type << "}' mode the 'upload_compress_type' will be 'NO_COMPRESS'";
+    compression_config.upload_compress_type = kNoCompressType;
+    FLContext::instance()->set_compression_config(compression_config);
   }
 }
 

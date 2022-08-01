@@ -16,7 +16,7 @@
 
 from copy import deepcopy
 import numpy as np
-from mindspore import context, nn
+from mindspore import nn
 from mindspore import load_param_into_net
 from mindspore.common.tensor import Tensor
 from mindspore.common.parameter import Parameter
@@ -34,20 +34,19 @@ TRAIN_BEGIN_STEP_NUM = 1
 TRAIN_END_STEP_NUM = 0
 
 
-class _StartFLJob():
+class _StartFLJob:
     """
     StartFLJob for Federated Learning Worker.
     """
 
     def __init__(self, data_size):
-        super(_StartFLJob, self).__init__()
         self._data_size = data_size
 
     def construct(self):
         return Federated_.start_fl_job(self._data_size)
 
 
-class _UpdateAndGetModel():
+class _UpdateAndGetModel:
     """
     Update and Get Model for Federated Learning Worker.
     """
@@ -60,24 +59,25 @@ class _UpdateAndGetModel():
         return Federated_.update_and_get_model(self._weights)
 
 
-class _ExchangeKeys():
+class _ExchangeKeys:
     """
     Exchange Keys for Stable PW Encrypt.
     """
-    def construct(self):
+    @staticmethod
+    def construct():
         return Federated_.exchange_keys()
 
 
-class _GetKeys():
+class _GetKeys:
     """
     Get Keys for Stable PW Encrypt.
     """
-
-    def construct(self):
+    @staticmethod
+    def construct():
         return Federated_.get_keys()
 
 
-class _PullWeight():
+class _PullWeight:
     """
     Pull Weight for Federated Learning Worker.
     """
@@ -89,7 +89,7 @@ class _PullWeight():
         return Federated_.pull_weight(self.pull_weight_params)
 
 
-class _PushWeight():
+class _PushWeight:
     """
     Push Weight for Federated Learning Worker.
     """
@@ -106,8 +106,21 @@ class PushMetrics:
     Push Metrics for Federated Learning Worker.
     """
 
-    def construct(self, loss, accuracy):
+    @staticmethod
+    def construct(loss, accuracy):
         return Federated_.push_metrics(loss, accuracy)
+
+
+def _get_fl_param_names(network, fl_param_names, requires_aggr=False):
+    for sub_cell in network.cells():
+        fl_param_names = _get_fl_param_names(sub_cell, fl_param_names, requires_aggr)
+        if isinstance(sub_cell, nn.Optimizer):
+            for k in sub_cell.parameters:
+                if requires_aggr and not k.requires_aggr:
+                    continue
+                if k.name not in fl_param_names:
+                    fl_param_names.append(k.name)
+    return fl_param_names
 
 
 class FederatedLearningManager(Callback):
@@ -134,7 +147,7 @@ class FederatedLearningManager(Callback):
         super(FederatedLearningManager, self).__init__()
         check_type.check_str("yaml_config", yaml_config)
         enable_ssl = init_ssl_config(ssl_config)
-        load_yaml_config(yaml_config, _fl_context.RoleOfServer, enable_ssl)
+        load_yaml_config(yaml_config, _fl_context.ROLE_OF_SERVER, enable_ssl)
 
         ctx = FLContext.get_instance()
         server_mode = ctx.server_mode()
@@ -154,7 +167,9 @@ class FederatedLearningManager(Callback):
         self._sync_type = sync_type
         self._global_step = 0
         self._encrypt_type = encrypt_type
-        if self._encrypt_type != "NOT_ENCRYPT" and self._encrypt_type != "STABLE_PW_ENCRYPT":
+        if self._encrypt_type not in (
+                _fl_context.ENCRYPT_NONE,
+                _fl_context.ENCRYPT_STABLE_PW) and self._server_mode == _fl_context.SERVER_MODE_FL:
             raise ValueError(
                 "encrypt_mode must be 'NOT_ENCRYPT' or 'STABLE_PW_ENCRYPT', but got {}.".format(self._encrypt_type))
         if self._is_adaptive_sync():
@@ -233,7 +248,8 @@ class FederatedLearningManager(Callback):
         """
         Analysis of relevant statistics based on gradient for adaptive synchronization.
         """
-        worker_num = context.get_fl_context("worker_num")
+        ctx = FLContext.get_instance()
+        worker_num = int(ctx.start_fl_job_threshold() * ctx.update_model_ratio())
         ema_alpha = self._ema_alpha
         consistent_rate_sum = 0.0
         grads = dict()
@@ -285,14 +301,18 @@ class FederatedLearningManager(Callback):
         if self._global_step % self._sync_frequency != TRAIN_BEGIN_STEP_NUM:
             return
 
-        pull_weight_params = []
+        pull_weight_params = list()
+        pull_weight_params = _get_fl_param_names(self._model, pull_weight_params, True)
+        if not pull_weight_params:
+            pull_weight_params = [_.name for _ in self._model.trainable_params()]
         weight_infos = {}
         for param in self._model.trainable_params():
+            if param.name not in pull_weight_params:
+                continue
             param_np = param.asnumpy()
             if param_np.dtype != np.float32:
                 continue
             weight_infos[param.name] = (param_np.shape, param_np.dtype)
-            pull_weight_params.append(param.name)
 
         pull_weight = _PullWeight(pull_weight_params)
         weights = pull_weight.construct()
@@ -314,8 +334,15 @@ class FederatedLearningManager(Callback):
         logger.info("Try to push weights. Local step number: {}".format(self._global_step))
         if self._global_step % self._sync_frequency != TRAIN_END_STEP_NUM:
             return
+
+        push_weight_params = list()
+        push_weight_params = _get_fl_param_names(self._model, push_weight_params, True)
+        if not push_weight_params:
+            push_weight_params = [_.name for _ in self._model.trainable_params()]
         weights = dict()
         for param in self._model.trainable_params():
+            if param.name not in push_weight_params:
+                continue
             weight = param.asnumpy().reshape(-1).tolist()
             weights[param.name] = weight
         push_weight = _PushWeight(weights)
