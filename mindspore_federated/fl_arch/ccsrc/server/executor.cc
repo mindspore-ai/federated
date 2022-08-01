@@ -53,6 +53,9 @@ FlStatus Executor::CheckUpdatedModel(const std::map<std::string, Address> &featu
     }
     auto it = feature_map.find(param_name);
     if (it == feature_map.end()) {
+      if (FLContext::instance()->server_mode() == kServerModeHybrid) {
+        continue;
+      }
       auto reason = "The updated weight of parameter " + param_name + " is missing, fl id: " + update_model_fl_id;
       MS_LOG_WARNING << reason;
       return {kFlFailed, reason};
@@ -396,6 +399,9 @@ bool Executor::RunWeightAggregationInner(const std::map<std::string, std::string
       continue;
     }
     if (!kernel::FedAvgKernel<float, size_t>::AllReduce(server_map, &param_aggr)) {
+      if (FLContext::instance()->server_mode() == kServerModeHybrid) {
+        continue;
+      }
       MS_LOG(WARNING) << "Failed to run aggregation for " << param_aggr.name;
       return false;
     }

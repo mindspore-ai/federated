@@ -41,24 +41,24 @@ struct FeatureInfo {
 struct EncryptConfig {
   std::string encrypt_type = kNotEncryptType;
   // pw encrypt
-  float share_secrets_ratio = 1.0;
+  float share_secrets_ratio = 1.0f;
   uint64_t cipher_time_window = 1;
   uint64_t reconstruct_secrets_threshold = 1;
   // dp encrypt
-  float dp_eps = 50.0;
-  float dp_delta = 0.01;
-  float dp_norm_clip = 1.0;
+  float dp_eps = 50.0f;
+  float dp_delta = 0.01f;
+  float dp_norm_clip = 1.0f;
   // sign ds
-  float sign_k = 0.01;
-  float sign_eps = 100;
-  float sign_thr_ratio = 0.6;
-  float sign_global_lr = 0.1;
+  float sign_k = 0.01f;
+  float sign_eps = 100.0f;
+  float sign_thr_ratio = 0.6f;
+  float sign_global_lr = 0.1f;
   uint64_t sign_dim_out = 0;
 };
 
 struct CompressionConfig {
   std::string upload_compress_type = kNoCompressType;
-  float upload_sparse_rate = 0.4;
+  float upload_sparse_rate = 0.4f;
   std::string download_compress_type = kNoCompressType;
 };
 
