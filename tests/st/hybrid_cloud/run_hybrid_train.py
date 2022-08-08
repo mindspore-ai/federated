@@ -18,6 +18,7 @@ import os
 import sys
 import argparse
 import numpy as np
+from mindspore_federated.startup.ssl_config import SSLConfig
 
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, parent_dir)
@@ -52,6 +53,8 @@ parser.add_argument("--fl_iteration_num", type=int, default=25)
 
 args, _ = parser.parse_known_args()
 
+ssl_config = SSLConfig(server_password="server_password_12345", client_password="client_password_12345")
+
 
 def get_trainable_params(network):
     """get trainable params"""
@@ -76,7 +79,7 @@ def start_one_server():
 
     network = LeNet5(62, 3)
     job = FLServerJob(yaml_config=yaml_config, http_server_address=http_server_address, tcp_server_ip=tcp_server_ip,
-                      checkpoint_dir=checkpoint_dir, ssl_config=None)
+                      checkpoint_dir=checkpoint_dir, ssl_config=ssl_config)
     feature_map = get_trainable_params(network)
     job.run(feature_map)
 
@@ -88,7 +91,7 @@ def start_one_scheduler():
     yaml_config = args.yaml_config
     scheduler_manage_address = args.scheduler_manage_address
 
-    job = FlSchedulerJob(yaml_config=yaml_config, manage_address=scheduler_manage_address)
+    job = FlSchedulerJob(yaml_config=yaml_config, manage_address=scheduler_manage_address, ssl_config=ssl_config)
     job.run()
 
 
@@ -134,7 +137,8 @@ def start_one_worker():
         model=network,
         sync_frequency=epoch * num_batches,
         data_size=num_batches,
-        sync_type=sync_type
+        sync_type=sync_type,
+        ssl_config=ssl_config
     )
     # define the optimizer
     net_opt = nn.Momentum(network.trainable_params(), client_learning_rate, 0.9)

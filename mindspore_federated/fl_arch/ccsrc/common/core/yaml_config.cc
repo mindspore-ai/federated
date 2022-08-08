@@ -23,10 +23,9 @@ namespace mindspore {
 namespace fl {
 namespace yaml {
 void YamlConfig::Load(const std::unordered_map<std::string, YamlConfigItem> &items, const std::string &yaml_config_file,
-                      const std::string &role, bool enable_ssl) {
+                      const std::string &role) {
   items_ = items;
   yaml_config_file_ = yaml_config_file;
-  enable_ssl_ = enable_ssl;
   InitCommonConfig();
   if (role == kEnvRoleOfServer) {
     InitRoundConfig();
@@ -48,10 +47,12 @@ void YamlConfig::InitCommonConfig() {
   Get("fl_name", SET_STR_CXT(set_fl_name), true);
   Get("fl_iteration_num", SET_INT_CXT(set_fl_iteration_num), true, CheckInt(1, UINT32_MAX, INC_BOTH));
   Get("server_mode", SET_STR_CXT(set_server_mode), true);
+  Get("enable_ssl", SET_BOOL_CXT(set_enable_ssl), true);
   // distributed cache
   InitDistributedCacheConfig();
-  //
-  InitSslConfig();
+  if (FLContext::instance()->enable_ssl()) {
+    InitSslConfig();
+  }
 }
 
 void YamlConfig::InitDistributedCacheConfig() {
@@ -59,7 +60,6 @@ void YamlConfig::InitDistributedCacheConfig() {
   Get("distributed_cache.type", &distributed_cache_config.type, false);
   Get("distributed_cache.address", &distributed_cache_config.address, true);
   Get("distributed_cache.plugin_lib_path", &distributed_cache_config.plugin_lib_path, false);
-  Get("distributed_cache.enable_ssl", &distributed_cache_config.enable_ssl, false);
   std::string prefix = "distributed_cache.";
   for (const auto &item : items_) {
     if (item.first.length() <= prefix.length() || item.first.substr(0, prefix.length()) != prefix) {
@@ -89,9 +89,6 @@ void YamlConfig::InitDistributedCacheConfig() {
 }
 
 void YamlConfig::InitSslConfig() {
-  if (!enable_ssl_) {
-    return;
-  }
   SslConfig ssl_config;
   // for tcp/http server
   Get("ssl.server_cert_path", &ssl_config.server_cert_path, true);

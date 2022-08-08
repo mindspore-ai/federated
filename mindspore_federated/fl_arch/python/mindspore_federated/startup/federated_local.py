@@ -133,9 +133,8 @@ class FLServerJob:
         ctx.set_http_server_address(http_server_address)
         ctx.set_tcp_server_ip(tcp_server_ip)
         ctx.set_checkpoint_dir(checkpoint_dir)
-        enable_ssl = init_ssl_config(ssl_config)
-        load_yaml_config(yaml_config, _fl_context.ROLE_OF_SERVER, enable_ssl)
-
+        init_ssl_config(ssl_config)
+        load_yaml_config(yaml_config, _fl_context.ROLE_OF_SERVER)
         self.checkpoint_dir = checkpoint_dir
         self.fl_name = ctx.fl_name()
         self.callback = None
@@ -292,13 +291,18 @@ class FlSchedulerJob:
     """
     Define the fl scheduler job
     """
-    def __init__(self, yaml_config, manage_address):
+    def __init__(self, yaml_config, manage_address, ssl_config=None):
         check_type.check_str("yaml_config", yaml_config)
         check_type.check_str("manage_address", manage_address)
 
+        if ssl_config is not None and not isinstance(ssl_config, SSLConfig):
+            raise RuntimeError(
+                f"Parameter 'ssl_config' should be None or instance of SSLConfig, but got {type(ssl_config)}")
+
         ctx = FLContext.get_instance()
         ctx.set_scheduler_manage_address(manage_address)
-        load_yaml_config(yaml_config, _fl_context.ROLE_OF_SCHEDULER, enable_ssl=False)
+        init_ssl_config(ssl_config)
+        load_yaml_config(yaml_config, _fl_context.ROLE_OF_SCHEDULER)
 
     def run(self):
         Federated_.start_federated_scheduler()

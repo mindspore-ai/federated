@@ -123,20 +123,21 @@ class ExceptionPost:
         self.text = text
 
 
-def post_msg(http_address, request_url, post_data, verify=None):
+def post_msg(http_address, request_url, post_data, enable_ssl=None):
     """post msg"""
     try:
-        if verify:
-            return requests.post(f"https://{http_address}/{request_url}", data=memoryview(post_data).tobytes(), verify=verify)
+        if enable_ssl:
+            return requests.post(f"https://{http_address}/{request_url}", data=memoryview(post_data).tobytes(),
+                                 verify=False)
         return requests.post(f"http://{http_address}/{request_url}", data=post_data)
     except RuntimeError as e:
         return e
 
 
-def post_start_fl_job(http_address, fl_name, fl_id, data_size=32, verify=None):
+def post_start_fl_job(http_address, fl_name, fl_id, data_size=32, enable_ssl=None):
     """post start fl job"""
     buffer = build_start_fl_job(fl_name, fl_id, data_size)
-    result = post_msg(http_address, "startFLJob", buffer, verify)
+    result = post_msg(http_address, "startFLJob", buffer, enable_ssl)
     if isinstance(result, Exception):
         raise result
     if result.text in server_not_available_rsp:
@@ -157,10 +158,10 @@ def post_start_fl_job(http_address, fl_name, fl_id, data_size=32, verify=None):
     return feature_map, fl_job_rsp
 
 
-def post_update_model(http_address, fl_name, fl_id, iteration, feature_map, upload_loss=0.0, verify=None):
+def post_update_model(http_address, fl_name, fl_id, iteration, feature_map, upload_loss=0.0, enable_ssl=None):
     """post update model"""
     buffer = build_update_model(fl_name, fl_id, iteration, feature_map, upload_loss=upload_loss)
-    result = post_msg(http_address, "updateModel", buffer, verify)
+    result = post_msg(http_address, "updateModel", buffer, enable_ssl)
     if isinstance(result, Exception):
         raise result
     if result.text in server_not_available_rsp:
@@ -173,10 +174,10 @@ def post_update_model(http_address, fl_name, fl_id, iteration, feature_map, uplo
     return True, update_model_rsp
 
 
-def post_get_model(http_address, fl_name, iteration, verify=None):
+def post_get_model(http_address, fl_name, iteration, enable_ssl=None):
     """post get model"""
     buffer = build_get_model(fl_name, iteration)
-    result = post_msg(http_address, "getModel", buffer, verify)
+    result = post_msg(http_address, "getModel", buffer, enable_ssl)
     if isinstance(result, Exception):
         raise result
     if result.text in server_not_available_rsp:

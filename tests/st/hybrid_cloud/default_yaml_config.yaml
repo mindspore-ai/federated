@@ -1,12 +1,12 @@
 fl_name: Lenet
 fl_iteration_num: 5000
 server_mode: HYBRID_TRAINING
+enable_ssl: false
 
 distributed_cache:
   type: redis
   address: 127.0.0.1:2345
   plugin_lib_path: ""
-  enable_ssl: False
 
 round:
   start_fl_job_threshold: 4

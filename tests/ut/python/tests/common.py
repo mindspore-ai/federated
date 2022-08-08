@@ -1,3 +1,5 @@
+# pylint: disable=broad-except
+
 # Copyright 2022 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,29 +14,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+"""common python file"""
+import json
+import logging
 import os
 import signal
-import logging
-import time
-import yaml
 import socket
-import psutil
 import subprocess
-import json
-import numpy as np
+import time
 import traceback
-from multiprocessing import Process, Pipe
 from functools import wraps
-import requests
+from multiprocessing import Process, Pipe
 
+import requests
+import yaml
+import numpy as np
+import psutil
+
+from mindspore_federated import FLServerJob, FlSchedulerJob, Callback
 from mindspore_federated import log as logger
-from mindspore_federated import FLServerJob, FeatureMap, FlSchedulerJob, Callback
+
+from common_client import ResponseCode, ResponseFLJob, ResponseGetModel
 from common_client import post_start_fl_job, post_get_model, post_update_model
-from common_client import server_safemode_rsp, server_disabled_finished_rsp
-from common_client import ResponseCode, ResponseFLJob, ResponseGetModel, ResponseUpdateModel
+from common_client import server_safemode_rsp
 
 
 def fl_test(func):
+    """fl test"""
     def clean_temp_files():
         cwd_dir = os.getcwd()
         temp_dir = os.path.join(cwd_dir, "temp")
@@ -65,6 +71,7 @@ def fl_test(func):
             raise
         finally:
             logger.info("Fl test begin to clear")
+            # pylint: disable=used-before-assignment
             global g_server_processes
             stop_processes(g_server_processes)
             g_server_processes = []
@@ -82,7 +89,7 @@ g_fl_name_idx = 1
 fl_training_mode = "FEDERATED_LEARNING"
 fl_hybrid_mode = "HYBRID_TRAINING"
 
-
+# pylint: disable=unused-argument
 def fl_name_with_idx(fl_name):
     global g_fl_name_idx
     new_fl_name = f"fl_name_{g_fl_name_idx}"
@@ -112,11 +119,14 @@ def get_default_redis_ssl_config():
     return server_cert_path, server_key_path, client_cert_path, client_key_path, ca_cert_path
 
 
-def make_yaml_config(fl_name, update_configs, output_yaml_file,
+def make_yaml_config(fl_name, update_configs, output_yaml_file, enable_ssl=False,
                      server_mode=None, distributed_cache_address=None, fl_iteration_num=None,
                      start_fl_job_threshold=None, update_model_ratio=None,
                      start_fl_job_time_window=None, update_model_time_window=None, global_iteration_time_window=None,
-                     pki_verify=None, rmv_configs=[]):
+                     pki_verify=None, rmv_configs=None):
+    """make yaml config"""
+    if rmv_configs is None:
+        rmv_configs = []
     cur_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)))
     with open(os.path.join(cur_dir, "default_yaml_config.yaml")) as fp:
         yaml_file_content = fp.read()
@@ -141,6 +151,7 @@ def make_yaml_config(fl_name, update_configs, output_yaml_file,
 
     set_when_not_none(update_configs, "server_mode", server_mode)
     set_when_not_none(update_configs, "fl_iteration_num", fl_iteration_num)
+    set_when_not_none(update_configs, "enable_ssl", enable_ssl)
     set_when_not_none(update_configs, "round.start_fl_job_threshold", start_fl_job_threshold)
     set_when_not_none(update_configs, "round.update_model_ratio", update_model_ratio)
     set_when_not_none(update_configs, "round.start_fl_job_time_window", start_fl_job_time_window)
@@ -194,14 +205,12 @@ def make_yaml_config(fl_name, update_configs, output_yaml_file,
 
 def start_fl_server(feature_map, yaml_config, http_server_address, tcp_server_ip="127.0.0.1",
                     checkpoint_dir="./fl_ckpt/", ssl_config=None, max_time_sec_wait=10):
+    """start fl server"""
     print("new server process", flush=True)
     signal.signal(signal.SIGCHLD, signal.SIG_IGN)
     send_pipe, recv_pipe = Pipe()
 
     class FlCallback(Callback):
-        def __init__(self):
-            super(FlCallback, self).__init__()
-
         def after_started(self):
             send_pipe.send("Success")
 
@@ -240,6 +249,7 @@ def start_fl_server(feature_map, yaml_config, http_server_address, tcp_server_ip
 
 
 def start_fl_scheduler(yaml_config, scheduler_http_address):
+    """start fl scheduler"""
     print("new scheduler process", flush=True)
     signal.signal(signal.SIGCHLD, signal.SIG_IGN)
     send_pipe, recv_pipe = Pipe()
@@ -268,7 +278,7 @@ def start_fl_scheduler(yaml_config, scheduler_http_address):
         if len(address_split) == 2:
             http_ip = address_split[0]
             scheduler_http_port = int(address_split[1])
-    except:
+    except Exception:
         http_ip = None
         scheduler_http_port = None
 
@@ -296,6 +306,7 @@ def start_fl_scheduler(yaml_config, scheduler_http_address):
 
 
 def run_worker_client_task(task):
+    """run worker client task"""
     signal.signal(signal.SIGCHLD, signal.SIG_IGN)
     send_pipe, recv_pipe = Pipe()
 
@@ -316,6 +327,7 @@ def run_worker_client_task(task):
 
 
 def wait_worker_client_task_result(worker_task_process, recv_pipe, max_run_secs=3):
+    """wait worker client task result"""
     index = 0
     while index < max_run_secs * 2:
         index += 1
@@ -370,6 +382,7 @@ g_redis_with_ssl = False
 
 
 def stop_redis_server():
+    """stop redis server"""
     # SIGNAL 15
     cmd = f"pid=`ps aux | grep 'redis-server' | grep :{g_redis_server_port}"
     cmd += " | grep -v \"grep\" |awk '{print $2}'` && "
@@ -399,13 +412,15 @@ def start_redis_server():
 
 
 def restart_redis_server():
+    """restart redis server"""
     stop_redis_server()
     start_redis_server()
 
 
 def start_redis_with_ssl():
+    """start redis with ssl"""
     stop_redis_server()
-    server_crt, server_key,_,_,ca_crt = get_default_redis_ssl_config()
+    server_crt, server_key, _, _, ca_crt = get_default_redis_ssl_config()
     cmd = f"redis-server --port 0 --tls-port {g_redis_server_port} --tls-cert-file {server_crt} " \
           f"--tls-key-file {server_key} --tls-ca-cert-file {ca_crt} --save \"\" &"
     print(cmd)
@@ -419,16 +434,18 @@ def start_redis_with_ssl():
 
 
 def recover_redis_server():
+    """recover redis server"""
     if g_redis_server_running and not g_redis_with_ssl:
         return
     stop_redis_server()
     start_redis_server()
 
 
-def start_fl_job_expect_success(http_server_address, fl_name, fl_id, data_size, verify=None):
+def start_fl_job_expect_success(http_server_address, fl_name, fl_id, data_size, enable_ssl=None):
+    """start fl job expect success"""
     for i in range(10):  # 0.5*10=5s
         client_feature_map, fl_job_rsp = post_start_fl_job(http_server_address, fl_name, fl_id, data_size,
-                                                           verify=verify)
+                                                           enable_ssl=enable_ssl)
         if client_feature_map is None:
             if isinstance(fl_job_rsp, str) and fl_job_rsp != server_safemode_rsp:
                 raise RuntimeError(f"Failed to post startFLJob: {fl_job_rsp}")
@@ -445,9 +462,10 @@ def start_fl_job_expect_success(http_server_address, fl_name, fl_id, data_size, 
 
 
 def update_model_expect_success(http_server_address, fl_name, fl_id, iteration, update_feature_map, upload_loss=0.0,
-                                verify=None):
+                                enable_ssl=None):
+    """update model expect success"""
     result, update_model_rsp = post_update_model(http_server_address, fl_name, fl_id, iteration, update_feature_map,
-                                                 upload_loss=upload_loss, verify=verify)
+                                                 upload_loss=upload_loss, enable_ssl=enable_ssl)
     if result is None:
         if isinstance(update_model_rsp, str):
             raise RuntimeError(f"Failed to post updateModel: {update_model_rsp}")
@@ -456,10 +474,11 @@ def update_model_expect_success(http_server_address, fl_name, fl_id, iteration, 
     return result, update_model_rsp
 
 
-def get_model_expect_success(http_server_address, fl_name, iteration, verify=None):
-    # get model
+def get_model_expect_success(http_server_address, fl_name, iteration, enable_ssl=None):
+    """get model expect success"""
     for i in range(10):  # 0.5*10=5s
-        client_feature_map, get_model_rsp = post_get_model(http_server_address, fl_name, iteration, verify=verify)
+        client_feature_map, get_model_rsp = post_get_model(http_server_address, fl_name, iteration,
+                                                           enable_ssl=enable_ssl)
         if client_feature_map is None:
             if isinstance(get_model_rsp, str) and get_model_rsp != server_safemode_rsp:
                 raise RuntimeError(f"Failed to post getModel: {get_model_rsp}")

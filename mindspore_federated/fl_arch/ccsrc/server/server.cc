@@ -363,7 +363,7 @@ void Server::InitAndLoadDistributedCache() {
   }
   if (!cache::DistributedCacheLoader::Instance().InitCacheImpl(config)) {
     MS_LOG(EXCEPTION) << "Link to distributed cache failed, distributed cache address: " << config.address
-                      << ", enable ssl: " << config.enable_ssl;
+                      << ", enable ssl: " << FLContext::instance()->enable_ssl();
   }
   auto fl_name = FLContext::instance()->fl_name();
   auto cache_ret = cache::InstanceContext::Instance().InitAndSync(fl_name);

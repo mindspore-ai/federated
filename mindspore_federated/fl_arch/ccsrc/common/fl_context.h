@@ -107,7 +107,7 @@ class MS_EXPORT FLContext {
   static std::shared_ptr<FLContext> instance();
 
   void LoadYamlConfig(const std::unordered_map<std::string, yaml::YamlConfigItem> &yaml_configs,
-                      const std::string &yaml_config_file, const std::string &role, bool enable_ssl);
+                      const std::string &yaml_config_file, const std::string &role);
 
   void Reset();
   std::string ms_role() const;
