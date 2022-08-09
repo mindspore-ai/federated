@@ -247,12 +247,14 @@ ResultCode UpdateModelKernel::VerifyUpdateModel(const schema::RequestUpdateModel
     if (update_model_req->index_array() == nullptr) {
       verifyFeatureMapIsSuccess = false;
     } else {
-      verifyFeatureMapIsSuccess = VerifySignDSFeatureMap(update_model_req);
+      verifyFeatureMapIsSuccess = VerifySignDSFeatureMap(modelItemPtr, update_model_req);
     }
+  } else if (!LocalMetaStore::GetInstance().verifyAggregationFeatureMap(modelItemPtr)) {
+    verifyFeatureMapIsSuccess = false;
   } else if (IsCompress(update_model_req)) {
     verifyFeatureMapIsSuccess = VerifyUploadCompressFeatureMap(update_model_req);
   }
-  if (!verifyFeatureMapIsSuccess || !LocalMetaStore::GetInstance().verifyAggregationFeatureMap(modelItemPtr)) {
+  if (!verifyFeatureMapIsSuccess) {
     auto next_req_time = LocalMetaStore::GetInstance().value<uint64_t>(kCtxIterationNextRequestTimestamp);
     std::string reason = "Verify model feature map failed, retry later at time: " + std::to_string(next_req_time);
     BuildUpdateModelRsp(fbb, schema::ResponseCode_RequestError, reason, std::to_string(next_req_time));
@@ -292,12 +294,23 @@ bool UpdateModelKernel::IsCompress(const schema::RequestUpdateModel *update_mode
   return false;
 }
 
-bool UpdateModelKernel::VerifySignDSFeatureMap(const schema::RequestUpdateModel *update_model_req) {
+bool UpdateModelKernel::VerifySignDSFeatureMap(const ModelItemPtr &modelItemPtr,
+                                               const schema::RequestUpdateModel *update_model_req) {
+  auto &aggregation_feature_map_ = LocalMetaStore::GetInstance().aggregation_feature_map();
+  if (modelItemPtr->weight_items.size() > aggregation_feature_map_->weight_items.size()) {
+    return false;
+  }
   auto index_array = update_model_req->index_array();
   size_t index_array_size = index_array->size();
   size_t array_size_upper = 100;
   if (index_array_size == 0 || index_array_size > array_size_upper) {
     return false;
+  }
+  for (const auto &weight : modelItemPtr->weight_items) {
+    std::string weight_name = weight.first;
+    if (aggregation_feature_map_->weight_items.count(weight_name) == 0) {
+      return false;
+    }
   }
   return true;
 }
