@@ -49,7 +49,7 @@ void Scheduler::InitAndLoadDistributedCache() {
   }
   if (!cache::DistributedCacheLoader::Instance().InitCacheImpl(config)) {
     MS_LOG(EXCEPTION) << "Link to distributed cache failed, distributed cache address: " << config.address
-                      << ", enable ssl: " << config.enable_ssl;
+                      << ", enable ssl: " << FLContext::instance()->enable_ssl();
   }
 }
 }  // namespace fl

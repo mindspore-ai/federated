@@ -1,12 +1,12 @@
 fl_name: Lenet
 fl_iteration_num: 5000
 server_mode: FEDERATED_LEARNING
+enable_ssl: false
 
 distributed_cache:
   type: redis
   address: 127.0.0.1:2345
   plugin_lib_path: ""
-  enable_ssl: False
   # ssl config when enable_ssl is true
   cacert_filename: ""
   capath: ""

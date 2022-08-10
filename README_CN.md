@@ -216,7 +216,7 @@ bash run_smlt.sh 4 http 127.0.0.1:6666
 
 其中`4`为启动模拟客户端的数量，`http`为启动访问的方式，`127.0.0.1:6666`为服务器server集群的监听地址。
 
-#### 启动ssl加密访问模式
+#### 启动ssl通信加密访问模式
 
 1、样例路径：
 
@@ -226,7 +226,7 @@ cd tests/st/cross_device_cloud
 
 2、证书生成样例请运行/tests/ut/python/generate_certs.sh
 
-3、据实际运行需要修改Yaml配置文件：`default_yaml_config.yaml`，需要设置distributed_cache.enable_ssl为TRUE，设置cacert_filename(path/to/ca.crt), cert_filename(/path/to/client.crt), private_key_filename(/path/to/clientkey.pem)
+3、据实际运行需要修改Yaml配置文件：`default_yaml_config.yaml`，需要设置enable_ssl为true，设置cacert_filename(path/to/ca.crt), cert_filename(/path/to/client.crt), private_key_filename(/path/to/clientkey.pem)
 
 4、以ssl方式运行Redis服务器：
 
@@ -234,7 +234,7 @@ cd tests/st/cross_device_cloud
 redis-server --port 0 --tls-port 2345 --tls-cert-file /path/to/server.crt --tls-key-file /path/to/serverkey.pem --tls-ca-cert-file /path/to/ca.crt --save ""
 ```
 
-5、运行Server，默认启动1个Server，HTTP服务器地址为`127.0.0.1:6666`, 需要设置输入参数SSLConfig("server_password", "client_password"), 表示客户端证书秘钥与服务器证书秘钥的密码。
+5、运行Server，默认启动1个Server，HTTP服务器地址为`127.0.0.1:6666`, 需要在run_server.py设置秘钥参数对象SSLConfig("server_password", "client_password"), 表示客户端证书秘钥与服务器证书秘钥的密码。
 
 ```shell
 python run_server.py

@@ -610,7 +610,7 @@ bool RedisDistributedCache::Init(const DistributedCacheConfig &cache_config, int
     MS_LOG_ERROR << "Invalid input parameter, server_address: " << cache_config_.address;
     return false;
   }
-  if (cache_config.enable_ssl) {
+  if (FLContext::instance()->enable_ssl()) {
     RedisSSLConfig ssl_config;
     auto ret = ParseSSLConfig(cache_config_.configs, &ssl_config);
     if (!ret.IsSuccess()) {

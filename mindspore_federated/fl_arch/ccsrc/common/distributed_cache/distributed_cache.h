@@ -32,7 +32,6 @@ struct DistributedCacheConfig {
   std::string type;
   std::string address;
   std::string plugin_lib_path;
-  bool enable_ssl = false;
   std::unordered_map<std::string, std::string> configs;
 };
 

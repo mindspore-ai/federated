@@ -146,8 +146,8 @@ class FederatedLearningManager(Callback):
                  ssl_config=None, **kwargs):
         super(FederatedLearningManager, self).__init__()
         check_type.check_str("yaml_config", yaml_config)
-        enable_ssl = init_ssl_config(ssl_config)
-        load_yaml_config(yaml_config, _fl_context.ROLE_OF_SERVER, enable_ssl)
+        init_ssl_config(ssl_config)
+        load_yaml_config(yaml_config, _fl_context.ROLE_OF_SERVER)
 
         ctx = FLContext.get_instance()
         server_mode = ctx.server_mode()
@@ -177,7 +177,7 @@ class FederatedLearningManager(Callback):
             self._as_wrap_cell()
         logger.info(f"Step number needs to run per iteration {self._next_sync_iter_id},"
                     f"server mode {self._server_mode}, encrypt type {self._encrypt_type},"
-                    f"http server address {http_server_address},enable ssl {enable_ssl}")
+                    f"http server address {http_server_address}")
 
     def __del__(self):
         Federated_.stop_federated_worker()

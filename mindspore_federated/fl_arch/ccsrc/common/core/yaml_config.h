@@ -138,7 +138,7 @@ using CheckFloat = CheckNum<float>;
 class YamlConfig {
  public:
   void Load(const std::unordered_map<std::string, YamlConfigItem> &items, const std::string &yaml_config_file,
-            const std::string &role, bool enable_ssl);
+            const std::string &role);
 
  private:
   bool Get(const std::string &key, std::string *value, bool required,
@@ -166,7 +166,6 @@ class YamlConfig {
 
   std::unordered_map<std::string, YamlConfigItem> items_;
   std::string yaml_config_file_;
-  bool enable_ssl_ = false;
 };
 }  // namespace yaml
 }  // namespace fl

@@ -29,9 +29,9 @@ std::shared_ptr<FLContext> FLContext::instance() {
 }
 
 void FLContext::LoadYamlConfig(const std::unordered_map<std::string, yaml::YamlConfigItem> &yaml_configs,
-                               const std::string &yaml_config_file, const std::string &role, bool enable_ssl) {
+                               const std::string &yaml_config_file, const std::string &role) {
   yaml::YamlConfig config;
-  config.Load(yaml_configs, yaml_config_file, role, enable_ssl);
+  config.Load(yaml_configs, yaml_config_file, role);
 }
 
 void FLContext::Reset() {}

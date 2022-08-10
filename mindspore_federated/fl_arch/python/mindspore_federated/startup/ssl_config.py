@@ -27,12 +27,8 @@ class SSLConfig:
 
 def init_ssl_config(ssl_config):
     ctx = FLContext.get_instance()
-    enable_ssl = False
     if ssl_config is not None:
         if not isinstance(ssl_config, SSLConfig):
             raise RuntimeError(f"Parameter 'ssl_config' should be instance of SSLConfig, but got {type(ssl_config)}")
-        enable_ssl = True
-        ctx.set_enable_ssl(True)
         ctx.set_server_password(ssl_config.server_password)
         ctx.set_client_password(ssl_config.client_password)
-    return enable_ssl

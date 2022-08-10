@@ -151,7 +151,6 @@ CacheStatus HyperParams::SyncLocal2Cache(const std::shared_ptr<RedisClientBase> 
 
   obj[HYPER_VAR(enable_ssl)] = context->enable_ssl();
   obj[HYPER_VAR(pki_verify)] = context->pki_verify();
-
   auto val = obj.dump();
   auto key = RedisKeys::GetInstance().HyperParamsString();
   auto result = client->SetExNx(key, val, Timer::config_expire_time_in_seconds());
