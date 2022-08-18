@@ -62,8 +62,8 @@ class FusedPushMetricsKernelMod : public AbstractKernel {
         return true;
       }
       retry_time++;
-      if (!fl::worker::HybridWorker::GetInstance().SendToServer(fbb.GetBufferPointer(), fbb.GetSize(),
-                                                          fl::TcpUserCommand::kPushMetrics, &push_metrics_rsp_msg)) {
+      if (!fl::worker::HybridWorker::GetInstance().SendToServer(
+            fbb.GetBufferPointer(), fbb.GetSize(), fl::TcpUserCommand::kPushMetrics, &push_metrics_rsp_msg)) {
         MS_LOG(WARNING) << "Sending request for PushMetrics to server 0 failed.";
         std::this_thread::sleep_for(std::chrono::milliseconds(kRetryDurationOfPushMetrics));
         continue;
@@ -71,7 +71,6 @@ class FusedPushMetricsKernelMod : public AbstractKernel {
         break;
       }
     } while (retry_time < kMaxRetryTime);
-    MS_LOG(INFO) << "88888888888888888888888888888888.";
 
     flatbuffers::Verifier verifier(push_metrics_rsp_msg->data(), push_metrics_rsp_msg->size());
     if (!verifier.VerifyBuffer<schema::ResponsePushMetrics>()) {

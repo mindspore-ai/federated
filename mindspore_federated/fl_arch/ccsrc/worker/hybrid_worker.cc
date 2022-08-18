@@ -51,9 +51,20 @@ void HybridWorker::Init() {
 
 void HybridWorker::StartPeriodJob() {
   cache::Worker::Instance().Init(fl_id(), FLContext::instance()->fl_name());
-  auto status = cache::Worker::Instance().Register();
+  constexpr int retry_times = 15 * 60;
+  constexpr int kWorkerRegisterInterval = 1;
+  cache::CacheStatus status = cache::CacheStatusCode::kCacheNil;
+  for (int i = 0; i < retry_times; i++) {
+    status = cache::Worker::Instance().Register();
+    if (!status.IsSuccess()) {
+      MS_LOG_WARNING << "Retry register worker to distributed cache.";
+      std::this_thread::sleep_for(std::chrono::seconds(kWorkerRegisterInterval));
+    } else {
+      break;
+    }
+  }
   if (!status.IsSuccess()) {
-    MS_LOG_EXCEPTION << "Failed to register worker to distributed cache.";
+    MS_LOG(EXCEPTION) << "Register worker to distributed cache failed.";
   }
   MS_LOG_INFO << "Register worker to distributed cache successfully";
   auto period_fun = []() {

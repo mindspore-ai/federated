@@ -54,12 +54,12 @@ class FusedPullWeightKernelMod : public AbstractKernel {
     fl_iteration_++;
     MS_LOG(INFO) << "Launching pulling weight for federated learning iteration " << fl_iteration_;
 
-    FBBuilder fbb;
-    BuildPullWeightReq(&fbb, pull_weight_names);
     std::shared_ptr<std::vector<unsigned char>> pull_weight_rsp_msg = nullptr;
     const schema::ResponsePullWeight *pull_weight_rsp = nullptr;
     int retcode = schema::ResponseCode_SucNotReady;
     while (retcode == schema::ResponseCode_SucNotReady) {
+      FBBuilder fbb;
+      BuildPullWeightReq(&fbb, pull_weight_names);
       if (ExitHandler::Instance().HasStopped()) {
         MS_LOG(WARNING) << "Worker has finished.";
         return dict_data;
@@ -93,7 +93,7 @@ class FusedPullWeightKernelMod : public AbstractKernel {
         std::this_thread::sleep_for(std::chrono::milliseconds(kRetryDurationOfPullWeights));
         fl_iteration_ = pull_weight_rsp->iteration();
         MS_LOG(DEBUG) << "Server is not ready for downloading yet. Reason: " << pull_weight_rsp->reason()->str()
-                      << ", fl iteration is " << fl_iteration_ <<". Retry later.";
+                      << ", fl iteration is " << fl_iteration_ << ". Retry later.";
       } else if (retcode != schema::ResponseCode_SUCCEED) {
         MS_LOG(WARNING) << "FusedPullWeight failed. Server return code: " << pull_weight_rsp->retcode()
                         << ", reason: " << pull_weight_rsp->reason()->str();

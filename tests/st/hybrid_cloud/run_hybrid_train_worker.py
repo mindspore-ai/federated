@@ -22,7 +22,7 @@ parser = argparse.ArgumentParser(description="Run run_cloud.py case")
 parser.add_argument("--yaml_config", type=str, default="default_yaml_config.yaml")
 
 parser.add_argument("--device_target", type=str, default="CPU")
-parser.add_argument("--fl_iteration_num", type=int, default=25)
+parser.add_argument("--fl_iteration_num", type=int, default=5000)
 parser.add_argument("--client_batch_size", type=int, default=32)
 parser.add_argument("--client_learning_rate", type=float, default=0.01)
 parser.add_argument("--dataset_path", type=str, default="")

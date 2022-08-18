@@ -38,6 +38,7 @@ const uint64_t kSecondToMills = 1000;
 const uint64_t kDefaultLevel1 = 5;
 const uint64_t kDefaultLevel2 = 15;
 }  // namespace
+const char *kCountForAggregation = "count_for_aggregation";
 
 void UpdateModelKernel::InitKernel(size_t threshold_count) {
   InitClientVisitedNum();
@@ -48,6 +49,10 @@ void UpdateModelKernel::InitKernel(size_t threshold_count) {
   LocalMetaStore::GetInstance().put_value(kCtxUpdateModelThld, threshold_count);
   LocalMetaStore::GetInstance().put_value(kCtxFedAvgTotalDataSize, kInitialDataSizeSum);
 
+  auto first_count_handler = [this]() {};
+  auto last_count_handler = [this]() { Executor::GetInstance().RunWeightAggregation(); };
+  cache::Counter::Instance().RegisterPerServerCounter(kCountForAggregation, threshold_count, first_count_handler,
+                                                      last_count_handler);
   std::string participation_time_level_str = FLContext::instance()->participation_time_level();
   CheckAndTransPara(participation_time_level_str);
 }
@@ -151,6 +156,11 @@ bool UpdateModelKernel::Launch(const uint8_t *req_data, size_t len, const std::s
   IncreaseAcceptClientNum();
   RecordCompletePeriod(device_meta);
   SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
+
+  result_code = CountForAggregation();
+  if (result_code != ResultCode::kSuccess) {
+    return false;
+  }
   return true;
 }
 
@@ -159,7 +169,7 @@ bool UpdateModelKernel::Reset() {
   return true;
 }
 
-void UpdateModelKernel::OnLastCountEvent() { Executor::GetInstance().RunWeightAggregation(); }
+void UpdateModelKernel::OnLastCountEvent() {}
 
 const std::vector<std::pair<uint64_t, uint32_t>> &UpdateModelKernel::GetCompletePeriodRecord() {
   std::lock_guard<std::mutex> lock(participation_time_and_num_mtx_);
@@ -392,6 +402,14 @@ ResultCode UpdateModelKernel::UpdateModel(const schema::RequestUpdateModel *upda
   UpdateClientUploadAccuracy(update_model_req->upload_accuracy(), eval_data_size);
   BuildUpdateModelRsp(fbb, schema::ResponseCode_SUCCEED, "success not ready",
                       std::to_string(LocalMetaStore::GetInstance().value<uint64_t>(kCtxIterationNextRequestTimestamp)));
+  return ResultCode::kSuccess;
+}
+
+ResultCode UpdateModelKernel::CountForAggregation() {
+  if (!DistributedCountService::GetInstance().Count(kCountForAggregation)) {
+    MS_LOG(ERROR) << "Counting for aggregation failed.";
+    return ResultCode::kFail;
+  }
   return ResultCode::kSuccess;
 }
 
