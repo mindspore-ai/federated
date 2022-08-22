@@ -48,19 +48,19 @@ class FusedPushWeightKernelMod : public AbstractKernel {
 
   bool Launch(const std::map<std::string, std::vector<float>> &weight_datas) {
     MS_LOG(INFO) << "Launch FusedPushWeightKernelMod.";
-    FBBuilder fbb;
 
     fl_iteration_++;
     MS_LOG(INFO) << "Launching pushing weight for federated learning iteration " << fl_iteration_;
-    if (!BuildPushWeightReq(&fbb, weight_datas)) {
-      MS_LOG(EXCEPTION) << "Building request for FusedPushWeight failed.";
-    }
 
     // The server number may change after scaling in/out.
     std::shared_ptr<std::vector<unsigned char>> push_weight_rsp_msg = nullptr;
     const schema::ResponsePushWeight *push_weight_rsp = nullptr;
     int retcode = schema::ResponseCode_SucNotReady;
     while (retcode == schema::ResponseCode_SucNotReady) {
+      FBBuilder fbb;
+      if (!BuildPushWeightReq(&fbb, weight_datas)) {
+        MS_LOG(EXCEPTION) << "Building request for FusedPushWeight failed.";
+      }
       if (ExitHandler::Instance().HasStopped()) {
         MS_LOG(WARNING) << "Worker has finished.";
         return true;
@@ -82,9 +82,6 @@ class FusedPushWeightKernelMod : public AbstractKernel {
         fl_iteration_ = push_weight_rsp->iteration();
         MS_LOG(DEBUG) << "Server is not ready for pushing weight yet. Reason: " << push_weight_rsp->reason()->str()
                       << ". Retry later.";
-        if (!BuildPushWeightReq(&fbb, weight_datas)) {
-          MS_LOG(EXCEPTION) << "Building request for FusedPushWeight failed.";
-        }
         continue;
       } else if (retcode != schema::ResponseCode_SUCCEED) {
         MS_LOG(WARNING) << "FusedPushWeight failed. Server return code: " << push_weight_rsp->retcode()

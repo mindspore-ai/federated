@@ -43,7 +43,9 @@ void HttpCommunicator::RegisterRoundMsgCallback(const std::string &msg_type, con
   };
 
   std::string url = FLContext::instance()->http_url_prefix();
-  url += "/";
+  if (url.empty()) {
+    url += "/";
+  }
   url += msg_type;
   MS_EXCEPTION_IF_NULL(http_server_);
   bool is_succeed = http_server_->RegisterRoute(url, &http_msg_callbacks_[msg_type]);

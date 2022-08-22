@@ -373,7 +373,8 @@ void Executor::RunWeightAggregation() {
     return;
   }
   size_t total_data_size = LocalMetaStore::GetInstance().value<size_t>(kCtxFedAvgTotalDataSize);
-  MS_LOG(INFO) << "Total data size for iteration " << curr_iter_num << " is " << total_data_size;
+  MS_LOG(INFO) << "Run weight aggregation finished. Total data size for iteration " << curr_iter_num << " is "
+               << total_data_size;
   if (FLContext::instance()->resetter_round() == ResetterRound::kUpdateModel) {
     SetIterationModelFinished();
     BroadcastModelWeight(all_reduce_server_map_);

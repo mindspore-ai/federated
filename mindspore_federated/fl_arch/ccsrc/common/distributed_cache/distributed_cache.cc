@@ -29,7 +29,7 @@ bool DistributedCacheLoader::InitCacheImpl(const DistributedCacheConfig &cache_c
     return true;
   }
   auto cache_impl = std::make_shared<RedisDistributedCache>();
-  constexpr int64_t cache_timeout_in_secs = 5 * 60;  // 5 min
+  constexpr int64_t cache_timeout_in_secs = 15 * 60;  // 5 min
   if (!cache_impl->Init(cache_config, cache_timeout_in_secs)) {
     return false;
   }
