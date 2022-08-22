@@ -23,15 +23,68 @@
 #include "python/federated_job.h"
 #include "python/feature_py.h"
 #include "worker/kernel/start_fl_job_kernel.h"
+#include "vertical/vfl_context.h"
+#include "vertical/python/vfederated_job.h"
+#include "vertical/python/tensor_list_py.h"
+#include "vertical/python/tensor_py.h"
 
 namespace py = pybind11;
 using FLContext = mindspore::fl::FLContext;
+using VFLContext = mindspore::fl::VFLContext;
 using FederatedJob = mindspore::fl::FederatedJob;
+using VFederatedJob = mindspore::fl::VFederatedJob;
 using StartFLJobKernelMod = mindspore::fl::worker::kernel::StartFLJobKernelMod;
 
 namespace mindspore {
 namespace fl {
 // Interface with python
+void InitVFLContext(const py::module &m) {
+  (void)py::class_<VFLContext, std::shared_ptr<VFLContext>>(m, "VFLContext")
+    .def_static("get_instance", &VFLContext::instance, "Get fl context instance.")
+    .def("set_http_server_address", &VFLContext::set_http_server_address, "Set federated learning http server address.")
+    .def("http_server_address", &VFLContext::http_server_address, "Get federated learning http server address.")
+    .def("set_remote_server_address", &VFLContext::set_remote_server_address,
+         "Set federated learning remote server address.")
+    .def("remote_server_address", &VFLContext::remote_server_address, "Get federated learning remote server address.")
+    .def("http_server_address", &VFLContext::http_server_address, "Get federated learning http server address.")
+    .def("set_enable_ssl", &VFLContext::set_enable_ssl, "Set PS SSL mode enabled or disabled.")
+    .def("enable_ssl", &VFLContext::enable_ssl, "Get PS SSL mode enabled or disabled.")
+    .def("set_client_password", &VFLContext::set_client_password, "Set the client password to decode the p12 file.")
+    .def("client_password", &VFLContext::client_password, "Get the client password to decode the p12 file.")
+    .def("set_server_password", &VFLContext::set_server_password, "Set the server password to decode the p12 file.")
+    .def("server_password", &VFLContext::server_password, "Get the server password to decode the p12 file.")
+    .def("http_url_prefix", &VFLContext::http_url_prefix, "http url prefix for http communication.")
+    .def("load_yaml_config", &VFLContext::LoadYamlConfig, "Load yaml config");
+}
+
+void InitTensorItemPy(const py::module &m) {
+  (void)py::class_<TensorItemPy, std::shared_ptr<TensorItemPy>>(m, "TensorItem_")
+    .def(py::init<>())
+    .def("set_name", &TensorItemPy::set_name, "Set name.")
+    .def("set_ref_key", &TensorItemPy::set_ref_key, "Get tensors.")
+    .def("set_shape", &TensorItemPy::set_shape, "Set shape.")
+    .def("set_dtype", &TensorItemPy::set_dtype, "Set dtype.")
+    .def("set_data", &TensorItemPy::set_data, "Set data.")
+    .def("name", &TensorItemPy::name, "Get name.")
+    .def("ref_key", &TensorItemPy::ref_key, "Get ref_key.")
+    .def("shape", &TensorItemPy::shape, "Get shape.")
+    .def("dtype", &TensorItemPy::dtype, "Get dtype.")
+    .def("data", &TensorItemPy::data, "Get data.");
+}
+
+void InitTensorListItemPy(const py::module &m) {
+  (void)py::class_<TensorListItemPy, std::shared_ptr<TensorListItemPy>>(m, "TensorListItem_")
+    .def(py::init<>())
+    .def(py::init<const std::string &, const std::vector<TensorItemPy> &, const std::vector<TensorListItemPy> &>())
+    .def("name", &TensorListItemPy::name, "Get tensor list name.")
+    .def("tensors", &TensorListItemPy::tensors, "Get tensors.")
+    .def("tensorListItems", &TensorListItemPy::tensorListItems, "Get tensorListItems.")
+    .def("set_name", &TensorListItemPy::set_name, "Set name.")
+    .def("add_tensor", &TensorListItemPy::add_tensor, "Add tensor.")
+    .def("add_tensor_list_item", &TensorListItemPy::add_tensor_list_item, "Add tensor list item.");
+}
+
+// cppcheck-suppress syntaxError
 PYBIND11_MODULE(_mindspore_federated, m) {
   (void)py::class_<FederatedJob, std::shared_ptr<FederatedJob>>(m, "Federated_")
     .def_static("start_federated_server", &FederatedJob::StartFederatedServer)
@@ -122,6 +175,15 @@ PYBIND11_MODULE(_mindspore_federated, m) {
       item.type = yaml::kYamlStr;
       item.str_val = val;
     });
+
+  (void)py::class_<VFederatedJob, std::shared_ptr<VFederatedJob>>(m, "VFederated_")
+    .def_static("start_trainer_communicator", &VFederatedJob::StartTrainerCommunicator)
+    .def_static("send", &VFederatedJob::Send)
+    .def_static("receive", &VFederatedJob::Receive);
+
+  InitVFLContext(m);
+  InitTensorItemPy(m);
+  InitTensorListItemPy(m);
 }
 }  // namespace fl
 }  // namespace mindspore

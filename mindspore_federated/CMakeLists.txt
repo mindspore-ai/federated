@@ -37,7 +37,8 @@ file(GLOB_RECURSE FEDERATED_SRC RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
         "fl_arch/ccsrc/compression/*.cc"
         "fl_arch/ccsrc/scheduler/*.cc"
         "fl_arch/ccsrc/server/*.cc"
-        "fl_arch/ccsrc/worker/*.cc")
+        "fl_arch/ccsrc/worker/*.cc"
+        "fl_arch/ccsrc/vertical/*.cc")
 
 add_library(federated SHARED ${FEDERATED_SRC})
 

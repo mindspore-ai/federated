@@ -72,7 +72,7 @@ class HttpMessageHandler {
   std::string GetHeadParam(const std::string &key) const;
   std::string GetPathParam(const std::string &key) const;
   std::string GetPostParam(const std::string &key);
-  bool GetPostMsg(size_t *len, uint8_t **buffer);
+  bool GetPostMsg(size_t *len, void **buffer);
   std::string GetUriPath() const;
   std::string GetRequestPath();
   std::string GetUriQuery() const;

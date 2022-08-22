@@ -32,8 +32,8 @@
 
 namespace mindspore {
 namespace fl {
-HttpClient::HttpClient(const std::string &http_server_address)
-    : http_server_address_(std::move(http_server_address)),
+HttpClient::HttpClient(const std::string &remote_server_address)
+    : remote_server_address_(std::move(remote_server_address)),
       event_base_(nullptr),
       buffer_event_(nullptr),
       http_req_(nullptr),
@@ -62,8 +62,8 @@ void HttpClient::Init() {
     bufferevent_free(buffer_event_);
     buffer_event_ = nullptr;
   }
-  if (!CommUtil::CheckHttpUrl(http_server_address_)) {
-    MS_LOG(EXCEPTION) << "The http client address:" << http_server_address_ << " is illegal!";
+  if (!CommUtil::CheckHttpUrl(remote_server_address_)) {
+    MS_LOG(EXCEPTION) << "The http client address:" << remote_server_address_ << " is illegal!";
   }
 
   int result = evthread_use_pthreads();
@@ -89,7 +89,7 @@ void HttpClient::Init() {
     MS_LOG(EXCEPTION) << "Buffer event enable read and write failed!";
   }
 
-  uri = evhttp_uri_parse(http_server_address_.c_str());
+  uri = evhttp_uri_parse(remote_server_address_.c_str());
   int port = evhttp_uri_get_port(uri);
   if (port == -1) {
     MS_LOG(EXCEPTION) << "Http uri port is invalid.";
@@ -153,13 +153,13 @@ void HttpClient::ReadCallback(struct evhttp_request *http_req, void *const arg) 
 
   event_base *base = http_client->get_event_base();
   MS_ERROR_IF_NULL_WO_RET_VAL(base);
-  MS_LOG(DEBUG) << "http_req->response_code is " << http_req->response_code << ", kernel path is "
-                << http_client->kernel_path();
+  MS_LOG(INFO) << "http_req->response_code is " << http_req->response_code << ", msg type is "
+               << http_client->msg_type();
   switch (http_req->response_code) {
     case HTTP_OK: {
       struct evbuffer *evbuf = evhttp_request_get_input_buffer(http_req);
       size_t length = evbuffer_get_length(evbuf);
-      MS_LOG(DEBUG) << "data length is:" << length;
+      MS_LOG(INFO) << "response message data length is:" << length;
 
       auto response_msg = std::make_shared<std::vector<unsigned char>>(length);
       int ret = memcpy_s(response_msg->data(), length, evbuffer_pullup(evbuf, -1), length);
@@ -167,7 +167,8 @@ void HttpClient::ReadCallback(struct evhttp_request *http_req, void *const arg) 
         MS_LOG(ERROR) << "memcpy_s error, errorno(" << ret << ")";
         return;
       }
-      http_client->OnReadHandler(http_client->response_track(), http_client->kernel_path(), response_msg);
+      http_client->set_response_msg(response_msg);
+      http_client->OnReadHandler(http_client->response_track(), http_client->msg_type());
       event_base_loopbreak(base);
       break;
     }
@@ -180,10 +181,10 @@ void HttpClient::ReadCallback(struct evhttp_request *http_req, void *const arg) 
   }
 }
 
-void HttpClient::OnReadHandler(const std::shared_ptr<ResponseTrack> &response_track, const std::string kernel_path,
-                               const std::shared_ptr<std::vector<unsigned char>> &response_msg) {
-  MS_EXCEPTION_IF_NULL(response_msg->data());
-  message_callback_(response_track, kernel_path, response_msg);
+void HttpClient::OnReadHandler(const std::shared_ptr<ResponseTrack> &response_track, const std::string msg_type) {
+  if (message_callback_ != nullptr) {
+    message_callback_(response_track, msg_type);
+  }
 }
 
 void HttpClient::SetMessageCallback(const OnMessage &cb) { message_callback_ = cb; }
@@ -196,24 +197,32 @@ void HttpClient::set_response_track(const std::shared_ptr<ResponseTrack> &respon
 
 std::shared_ptr<ResponseTrack> HttpClient::response_track() const { return response_track_; }
 
-void HttpClient::set_kernel_path(const std::string kernel_path) { kernel_path_ = kernel_path; }
+void HttpClient::set_msg_type(const std::string msg_type) { msg_type_ = msg_type; }
 
-std::string HttpClient::kernel_path() const { return kernel_path_; }
+std::string HttpClient::msg_type() const { return msg_type_; }
 
-bool HttpClient::SendMessage(const std::string &kernel_path, const std::string &content_type, const void *data,
-                             size_t data_size, const std::shared_ptr<ResponseTrack> &response_track) {
+void HttpClient::set_response_msg(const std::shared_ptr<std::vector<unsigned char>> &response_msg) {
+  response_msg_ = response_msg;
+}
+
+const std::shared_ptr<std::vector<unsigned char>> HttpClient::response_msg() const { return response_msg_; }
+
+bool HttpClient::SendMessage(const void *data, size_t data_size, const std::shared_ptr<ResponseTrack> &response_track,
+                             const std::string &msg_type, const std::string &content_type) {
   std::lock_guard<std::mutex> lock(connection_mutex_);
-  MS_LOG(DEBUG) << "kernel_path is:" << kernel_path << ", data_size is:" << data_size
-                << ", request id:" << response_track->request_id();
+  MS_LOG(INFO) << "msg_type is:" << msg_type << ", data_size is:" << data_size
+               << ", request id:" << response_track->request_id() << ", remote_server_address_ is "
+               << remote_server_address_;
   set_response_track(response_track);
-  set_kernel_path(kernel_path);
+  set_msg_type(msg_type);
   http_req_ = evhttp_request_new(ReadCallback, this);
 
   /** Set the post data */
   evbuffer_add(http_req_->output_buffer, data, data_size);
   evhttp_add_header(http_req_->output_headers, "Content-Type", content_type.c_str());
   evhttp_add_header(http_req_->output_headers, "Host", evhttp_uri_get_host(uri));
-  evhttp_make_request(evhttp_conn_, http_req_, EVHTTP_REQ_POST, kernel_path.c_str());
+  evhttp_add_header(http_req_->output_headers, "Message-Type", msg_type.c_str());
+  evhttp_make_request(evhttp_conn_, http_req_, EVHTTP_REQ_POST, msg_type.c_str());
 
   int ret = event_base_dispatch(event_base_);
   if (ret != 0) {

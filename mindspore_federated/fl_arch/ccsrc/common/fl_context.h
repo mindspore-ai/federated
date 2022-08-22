@@ -332,8 +332,6 @@ class MS_EXPORT FLContext {
   // The times of iteration continuous failure
   uint32_t continuous_failure_times_ = 10;
 
-  std::unordered_map<std::string, FeatureInfo> feature_info_;
-
   DistributedCacheConfig distributed_cache_config_;
   SslConfig ssl_config_;
   // server config

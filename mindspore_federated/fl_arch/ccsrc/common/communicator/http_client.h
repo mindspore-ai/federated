@@ -51,8 +51,7 @@ class HttpClient {
   using OnDisconnected = std::function<void()>;
   using OnTimeout = std::function<void()>;
   using OnMessage =
-    std::function<void(const std::shared_ptr<ResponseTrack> &response_track, const std::string &kernel_path,
-                       const std::shared_ptr<std::vector<unsigned char>> &response_data)>;
+    std::function<void(const std::shared_ptr<ResponseTrack> &response_track, const std::string &msg_type)>;
   using OnTimer = std::function<void()>;
 
   explicit HttpClient(const std::string &http_server_address);
@@ -63,20 +62,21 @@ class HttpClient {
   void Init();
   bool Stop();
   void SetMessageCallback(const OnMessage &cb);
-  bool SendMessage(const std::string &kernel_path, const std::string &content_type, const void *data, size_t data_size,
-                   const std::shared_ptr<ResponseTrack> &response_track);
+  bool SendMessage(const void *data, size_t data_size, const std::shared_ptr<ResponseTrack> &response_track,
+                   const std::string &msg_type, const std::string &content_type);
   event_base *get_event_base() const;
   bool BreakLoopEvent();
   void set_response_track(const std::shared_ptr<ResponseTrack> &response_track);
   std::shared_ptr<ResponseTrack> response_track() const;
-  void set_kernel_path(const std::string kernel_path);
-  std::string kernel_path() const;
+  void set_msg_type(const std::string msg_type);
+  std::string msg_type() const;
+  void set_response_msg(const std::shared_ptr<std::vector<unsigned char>> &response_msg);
+  const std::shared_ptr<std::vector<unsigned char>> response_msg() const;
 
  protected:
   static void ReadCallback(struct evhttp_request *http_req, void *message_callback);
   bool EstablishSSL();
-  void OnReadHandler(const std::shared_ptr<ResponseTrack> &response_track, const std::string kernel_name,
-                     const std::shared_ptr<std::vector<unsigned char>> &response_msg);
+  void OnReadHandler(const std::shared_ptr<ResponseTrack> &response_track, const std::string kernel_name);
   std::string PeerRoleName() const;
 
  private:
@@ -87,8 +87,8 @@ class HttpClient {
   OnTimeout timeout_callback_;
   OnTimer on_timer_callback_;
 
-  std::string http_server_address_;
-  std::string kernel_path_;
+  std::string remote_server_address_;
+  std::string msg_type_;
   event_base *event_base_;
   bufferevent *buffer_event_;
 
@@ -100,6 +100,7 @@ class HttpClient {
   evhttp_connection *evhttp_conn_;
   evhttp_uri *uri;
   std::shared_ptr<ResponseTrack> response_track_;
+  std::shared_ptr<std::vector<unsigned char>> response_msg_;
 };
 }  // namespace fl
 }  // namespace mindspore

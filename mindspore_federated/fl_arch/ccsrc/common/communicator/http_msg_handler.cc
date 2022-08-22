@@ -19,7 +19,7 @@
 
 namespace mindspore {
 namespace fl {
-HttpMsgHandler::HttpMsgHandler(const std::shared_ptr<HttpMessageHandler> &http_msg, uint8_t *const data, size_t len)
+HttpMsgHandler::HttpMsgHandler(const std::shared_ptr<HttpMessageHandler> &http_msg, void* data, size_t len)
     : http_msg_(http_msg), data_(data), len_(len) {}
 
 const void *HttpMsgHandler::data() const {

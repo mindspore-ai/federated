@@ -49,7 +49,9 @@ class MS_EXPORT CloudWorker : public AbstractNode {
   void Init();
   bool Start(const uint32_t &timeout) override { return true; }
   bool Stop() override { return true; }
-  bool SendToServerSync(const std::string path, const std::string content_type, const void *data, size_t data_size);
+  std::shared_ptr<std::vector<unsigned char>> SendToServerSync(
+    const void *data, size_t data_size, const std::string &msg_type = "/trainer",
+    const std::string &content_type = HTTP_CONTENT_TYPE_URL_ENCODED);
 
   void set_fl_iteration_num(uint64_t iteration_num);
   uint64_t fl_iteration_num() const;
@@ -72,7 +74,7 @@ class MS_EXPORT CloudWorker : public AbstractNode {
   std::string fl_name() const;
   std::string fl_id() const;
 
-  void RegisterMessageCallback(const std::string kernel_path, const MessageReceive &cb);
+  void RegisterMessageCallback(const std::string msg_type, const MessageReceive &cb);
 
  private:
   CloudWorker()

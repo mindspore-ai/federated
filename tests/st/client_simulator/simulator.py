@@ -200,6 +200,8 @@ def start_fl_job():
         start_fl_job_result['next_ts'] = 0
         for i in range(0, rsp_fl_job.FeatureMapLength()):
             rsp_feature_map[rsp_fl_job.FeatureMap(i).WeightFullname()] = rsp_fl_job.FeatureMap(i).DataAsNumpy()
+            print("start fl job rsp weight name:{}".format(rsp_fl_job.FeatureMap(i).WeightFullname()))
+            print("start fl job rsp weight size:{}".format(len(rsp_fl_job.FeatureMap(i).DataAsNumpy())))
     return start_fl_job_result, iteration, rsp_feature_map
 
 

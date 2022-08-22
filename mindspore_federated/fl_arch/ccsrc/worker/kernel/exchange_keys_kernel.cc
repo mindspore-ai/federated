@@ -28,15 +28,26 @@ bool ExchangeKeysKernelMod::Launch() {
   FBBuilder fbb;
   if (!BuildExchangeKeysReq(&fbb)) {
     MS_LOG(EXCEPTION) << "Building request for ExchangeKeys failed.";
-    return false;
   }
 
-  if (!fl::worker::CloudWorker::GetInstance().SendToServerSync(kernel_path_, HTTP_CONTENT_TYPE_URL_ENCODED,
-                                                               fbb.GetBufferPointer(), fbb.GetSize())) {
-    MS_LOG(WARNING) << "Sending request for exchangeKeys to server failed.";
-    return false;
-  }
-
+  auto response_msg = fl::worker::CloudWorker::GetInstance().SendToServerSync(
+                                                               fbb.GetBufferPointer(), fbb.GetSize(), kernel_path_);
+    if (response_msg == nullptr) {
+      MS_LOG(WARNING) << "The response message is invalid.";
+      return false;
+    }
+      flatbuffers::Verifier verifier(response_msg->data(), response_msg->size());
+      if (!verifier.VerifyBuffer<schema::ResponseExchangeKeys>()) {
+        MS_LOG(WARNING) << "The schema of response message is invalid.";
+        return false;
+      }
+      const schema::ResponseExchangeKeys *exchange_keys_rsp =
+        flatbuffers::GetRoot<schema::ResponseExchangeKeys>(response_msg->data());
+      MS_EXCEPTION_IF_NULL(exchange_keys_rsp);
+      auto response_code = exchange_keys_rsp->retcode();
+      if ((response_code != schema::ResponseCode_SUCCEED) && (response_code != schema::ResponseCode_OutOfTime)) {
+        MS_LOG(EXCEPTION) << "Launching exchange keys job for worker failed. Reason: " << exchange_keys_rsp->reason();
+      }
   MS_LOG(INFO) << "Exchange keys successfully.";
   return true;
 }
@@ -47,27 +58,6 @@ void ExchangeKeysKernelMod::Init() {
   MS_LOG(INFO) << "Initializing ExchangeKeys kernel"
                << ", fl_id: " << fl_id_;
   kernel_path_ = "/exchangeKeys";
-  fl::worker::CloudWorker::GetInstance().RegisterMessageCallback(
-    kernel_path_, [&](const std::shared_ptr<std::vector<unsigned char>> &response_msg) {
-      if (response_msg == nullptr) {
-        MS_LOG(EXCEPTION) << "Received message pointer is nullptr.";
-        return;
-      }
-      flatbuffers::Verifier verifier(response_msg->data(), response_msg->size());
-      if (!verifier.VerifyBuffer<schema::ResponseExchangeKeys>()) {
-        MS_LOG(WARNING) << "The schema of response message is invalid.";
-        return;
-      }
-      const schema::ResponseExchangeKeys *exchange_keys_rsp =
-        flatbuffers::GetRoot<schema::ResponseExchangeKeys>(response_msg->data());
-      MS_EXCEPTION_IF_NULL(exchange_keys_rsp);
-      auto response_code = exchange_keys_rsp->retcode();
-      if ((response_code != schema::ResponseCode_SUCCEED) && (response_code != schema::ResponseCode_OutOfTime)) {
-        MS_LOG(EXCEPTION) << "Launching exchange keys job for worker failed. Reason: " << exchange_keys_rsp->reason();
-      }
-      return;
-    });
-
   MS_LOG(INFO) << "Initialize ExchangeKeys kernel successfully.";
 }
 
@@ -96,7 +86,6 @@ bool ExchangeKeysKernelMod::BuildExchangeKeysReq(FBBuilder *fbb) {
   std::vector<uint8_t> pubkey_bytes = GetPubicKeyBytes();
   if (pubkey_bytes.size() == 0) {
     MS_LOG(EXCEPTION) << "Get public key failed.";
-    return false;
   }
 
   // build data which will be send to server
