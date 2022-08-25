@@ -203,12 +203,12 @@ public class StartFLJob {
         }
     }
 
-    private FLClientStatus updateFeatureForFederated(Client client, FeatureGenerator featureGenerator) {
+    private FLClientStatus getUpdateFeatureForFederated(Client client, FeatureGenerator featureGenerator) {
         FLClientStatus result = FLClientStatus.SUCCESS;
         Status status = Status.SUCCESS;
         updateFeatureName.clear();
         featureSize = 0;
-        LOGGER.info("[startFLJob] set <batch size> for client: " + batchSize);
+        LOGGER.info("[getUpdateFeatureForFederated] set <batch size> for client: " + batchSize);
         client.setBatchSize(batchSize);
         while (!featureGenerator.isEnd()) {
             FeatureMap featureMap = featureGenerator.next();
@@ -216,20 +216,25 @@ public class StartFLJob {
             updateFeatureName.add(featureMap.weightFullname());
             status = client.updateFeature(featureMap, true);
             if (status != Status.SUCCESS) {
-                LOGGER.severe("[updateFeatureForFederated] Update feature failed.");
+                LOGGER.severe("[getUpdateFeatureForFederated] Update feature failed.");
                 break;
             }
         }
-
-        return status == Status.SUCCESS ? FLClientStatus.SUCCESS : FLClientStatus.FAILED;
+        if (status == Status.SUCCESS && featureSize > 0) {
+            return FLClientStatus.SUCCESS;
+        } else {
+            LOGGER.severe("[getUpdateFeatureForFederated] get update features for Federated failed, featureSize is: "
+                    + featureSize + " status:" + status);
+            return FLClientStatus.FAILED;
+        }
     }
 
-    private FLClientStatus updateFeatureForHybrid(Client client, FeatureGenerator featureGenerator) {
+    private FLClientStatus getUpdateFeatureForHybrid(Client client, FeatureGenerator featureGenerator) {
         FLClientStatus result = FLClientStatus.SUCCESS;
         Status status = Status.SUCCESS;
         updateFeatureName.clear();
         featureSize = 0;
-        LOGGER.info("[startFLJob] set <batch size> for client: " + batchSize);
+        LOGGER.info("[getUpdateFeatureForHybrid] set <batch size> for client: " + batchSize);
         client.setBatchSize(batchSize);
         while (!featureGenerator.isEnd()) {
             FeatureMap featureMap = featureGenerator.next();
@@ -239,18 +244,24 @@ public class StartFLJob {
                 status = client.updateFeature(featureMap, true);
             }
             if (status != Status.SUCCESS) {
-                LOGGER.severe("[updateFeatureForFederated] Update feature failed.");
+                LOGGER.severe("[getUpdateFeatureForHybrid] Update feature failed.");
                 break;
             }
             if (flParameter.getHybridWeightName(RunType.INFERMODE).contains(featureMap.weightFullname())) {
                 status = client.updateFeature(featureMap, false);
             }
             if (status != Status.SUCCESS) {
-                LOGGER.severe("[updateFeatureForFederated] Update feature failed.");
+                LOGGER.severe("[getUpdateFeatureForHybrid] Update feature failed.");
                 break;
             }
         }
-        return status == Status.SUCCESS ? FLClientStatus.SUCCESS : FLClientStatus.FAILED;
+        if (status == Status.SUCCESS && featureSize > 0) {
+            return FLClientStatus.SUCCESS;
+        } else {
+            LOGGER.severe("[getUpdateFeatureForHybrid] get update features for hybrid failed, featureSize is: "
+                    + featureSize + " status:" + status);
+            return FLClientStatus.FAILED;
+        }
     }
 
 
@@ -260,16 +271,16 @@ public class StartFLJob {
         FeatureGenerator featureGenerator = FeatureGeneratorCtr(flJob);
         if (localFLParameter.getServerMod().equals(ServerMod.HYBRID_TRAINING.toString())) {
             LOGGER.info("[startFLJob] parseResponseFeatures by for train and infer models");
-            status = updateFeatureForHybrid(client, featureGenerator);
+            status = getUpdateFeatureForHybrid(client, featureGenerator);
         } else if (localFLParameter.getServerMod().equals(ServerMod.FEDERATED_LEARNING.toString())) {
             String trainModelPath = flParameter.getTrainModelPath();
             String inferModelPath = flParameter.getInferModelPath();
             if (!inferModelPath.equals("null") && !inferModelPath.equals(trainModelPath)) {
                 LOGGER.info("[startFLJob] parseResponseFeatures for train and infer model");
-                return updateFeatureForHybrid(client, featureGenerator);
+                return getUpdateFeatureForHybrid(client, featureGenerator);
             }
             LOGGER.info("[startFLJob] parseResponseFeatures for train model");
-            status = updateFeatureForFederated(client, featureGenerator);
+            status = getUpdateFeatureForFederated(client, featureGenerator);
         }
         return status;
     }

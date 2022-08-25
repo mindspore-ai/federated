@@ -38,7 +38,7 @@ checkopts()
   # Process the options
   while getopts 'p:c:h' opt
   do
-    LOW_OPT_ARG=$(echo "${OPTARG}" | tr '[A-Z]' '[a-z]')
+    LOW_OPT_ARG=$(echo "${OPTARG}" | tr '[:upper:]' '[:lower:]')
 
     case "${opt}" in
       p)
@@ -52,6 +52,7 @@ checkopts()
       h)
         echo "user opt: -h"
         usage
+        exit 1
         ;;
       *)
         echo "Unknown option ${opt}!"
@@ -72,7 +73,7 @@ load_ms_lite_pkg(){
   fi
 
   rm -f "$FL_THIRD_PKG_PATH"/${MS_LITE_PKG_NAME}.tar.gz
-  rm -rf "$FL_THIRD_PKG_PATH"/${MS_LITE_PKG_NAME}
+  rm -rf "$FL_THIRD_PKG_PATH"/${MS_LITE_PKG_NAME:?}
   wget --no-check-certificate ${MS_PKG_URL}
   if [ ! -e "${MS_LITE_PKG_NAME}.tar.gz" ] ; then
     echo "down load ${MS_LITE_PKG_NAME} failed, please download manually or check your net config ..."
@@ -88,7 +89,6 @@ load_flat_buffer_pkg(){
     echo "Find cached flat pkg, don't load again"
     return
   fi
-  FLAT_BUFFER_PKG_NAME="v2.0.0.tar.gz"
   rm -f "$FL_THIRD_PKG_PATH"/v2.0.0.tar.gz
   rm -rf "$FL_THIRD_PKG_PATH"/flatbuffers-2.0.0
   wget --no-check-certificate https://github.com/google/flatbuffers/archive/v2.0.0.tar.gz
@@ -122,7 +122,7 @@ build_mindspore_federated_client()
   echo "start build mindspore_federated client project."
   mkdir -p "${PROJECT_PATH}"/libs/
   rm -rf "${PROJECT_PATH}"/libs/*
-  tar -zxf "${FL_THIRD_PKG_PATH}"/${MS_LITE_PKG_NAME}.tar.gz
+  tar -zxf "${FL_THIRD_PKG_PATH}"/${MS_LITE_PKG_NAME}.tar.gz -C "${FL_THIRD_PKG_PATH}"/
   cp "${FL_THIRD_PKG_PATH}"/${MS_LITE_PKG_NAME}/runtime/lib/mindspore-lite-java.jar "${PROJECT_PATH}"/libs
   cd "${PROJECT_PATH}"
 
