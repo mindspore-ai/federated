@@ -1,0 +1,109 @@
+syntax = "proto3";
+package vfl;
+
+enum Role {
+  VFL_LEADER = 0;
+  VFL_FOLLOWER = 1;
+}
+
+enum DataType {
+  UNDEFINED = 0;
+  // Basic types.
+  FLOAT = 1;   // float
+  UINT8 = 2;   // uint8_t
+  INT8 = 3;    // int8_t
+  UINT16 = 4;  // uint16_t
+  INT16 = 5;   // int16_t
+  INT32 = 6;   // int32_t
+  INT64 = 7;   // int64_t
+  STRING = 8;  // string
+  BOOL = 9;    // bool
+  FLOAT16 = 10;
+  DOUBLE = 11;
+  UINT32 = 12;
+  UINT64 = 13;
+  COMPLEX64 = 14;
+  COMPLEX128 = 15;
+  BFLOAT16 = 16;
+  FLOAT64 = 17;
+}
+
+message ExternalDataProto {
+  string location = 1;
+  int64 offset = 2;
+  int64 length = 3;
+  string checksum= 4;
+}
+
+message TensorProto {
+  string name = 1;
+  string ref_key = 2;
+  string doc_string = 3;
+
+  DataType data_type = 4;
+
+  repeated int64 dims = 5;
+  repeated int64 min_dims = 6;
+  repeated int64 max_dims = 7;
+  bytes raw_data = 8;
+  repeated bool bool_data = 9;
+  repeated bytes string_data = 10;
+  repeated int32 int32_data = 11;
+  repeated int64 int64_data = 12;
+  repeated uint32 uint32_data = 13; 
+  repeated uint64 uint64_data = 14;
+  repeated float float_data = 15;
+  repeated double double_data = 16;
+
+  ExternalDataProto external_data = 17;
+}
+
+//encapsulate embeddings and grad-scales
+message TensorListProto {
+  string name = 1;
+  repeated TensorProto tensors = 2;
+  repeated TensorListProto tensor_list = 3;
+  string send_addr = 4;
+  string recv_addr = 5;
+  int64 length = 6;
+}
+
+// encapsulate hyperparameters
+message OptimizerHyperParameterProto {
+  enum OptimizerType {
+    Adam = 0;
+    AdamWeightDecay = 1;
+    AdamOffload = 2;
+    AdaFactor = 3;
+    AdaSumByDeltaWeightWrapCell = 4;
+    AdaSumByGradWrapCell = 5;
+    AdaMax = 6;
+    Adadelta = 7;
+    ASGD = 8;
+    Adagrad = 9;
+    FTRL = 10;
+    Lamb = 11;
+    LARS = 12;
+    LazyAdam = 13;
+    Momentum = 14;
+    ProximalAdagrad = 15;
+    Rprop = 16;
+    RMSProp = 17;
+    SGD = 18;
+    thor = 19;
+  }
+  OptimizerType type = 1;
+  message HyperParameter {
+    string key = 1;
+    bytes raw_data = 2;
+    repeated bool bool_data = 3;
+    repeated bytes string_data = 4;
+    repeated int32 int32_data = 5;
+    repeated int64 int64_data = 6;
+    repeated uint32 uint32_data = 7; 
+    repeated uint64 uint64_data = 8;
+    repeated float float_data = 9;
+    repeated double double_data = 10;
+  }
+  repeated HyperParameter hyper_parameter_list = 2;
+}

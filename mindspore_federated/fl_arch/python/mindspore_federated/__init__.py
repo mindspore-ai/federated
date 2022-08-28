@@ -19,6 +19,9 @@ from .startup.federated_local import Callback, CallbackContext
 from .startup.feature_map import FeatureItem, FeatureMap
 from .startup.ssl_config import SSLConfig
 from .trainer._fl_manager import FederatedLearningManager, PushMetrics
+from .trainer.vfl_model import FLModel
+from .trainer.vfl_optim import PartyGradOperation, PartyOptimizer, PartyGradScaler
+from .common import vfl_utils
 from . import log
 
 __all__ = [
@@ -28,5 +31,10 @@ __all__ = [
     "FeatureMap",
     "SSLConfig",
     "FederatedLearningManager",
-    "PushMetrics"
+    "PushMetrics",
+    "FLModel",
+    "PartyGradOperation",
+    "PartyOptimizer",
+    "PartyGradScaler",
+    "vfl_utils"
 ]

@@ -29,6 +29,21 @@ install(FILES ${glog_LIBPATH}/libmindspore_federated_glog.so.0.4.0
 install(FILES ${hiredis_LIBPATH}/libhiredis.so.1.0.0 DESTINATION ${INSTALL_LIB_DIR} COMPONENT mindspore_federated)
 install(FILES ${hiredis_LIBPATH}/libhiredis_ssl.so.1.0.0 DESTINATION ${INSTALL_LIB_DIR} COMPONENT mindspore_federated)
 
+# process proto files
+set(protoc_abs_path ${protobuf_ROOT}/bin/protoc)
+message(find_protoc_path: ${protoc_abs_path})
+set(proto_out_path ${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/python/mindspore_federated/common)
+set(proto_src_path ${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/python/mindspore_federated/common/protos)
+file(GLOB proto_list ${proto_src_path}/*.proto)
+foreach(proto_path ${proto_list})
+        get_filename_component(proto_file_absolute ${proto_path} ABSOLUTE)
+        execute_process(
+                COMMAND ${protoc_abs_path}
+                ${proto_file_absolute}
+                --python_out ${proto_out_path}
+                -I ${proto_src_path})
+endforeach()
+
 # set python files
 file(GLOB MS_PY_LIST ${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/python/mindspore_federated/*.py)
 install(
