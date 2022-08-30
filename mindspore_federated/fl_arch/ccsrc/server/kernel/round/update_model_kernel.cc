@@ -221,7 +221,8 @@ ResultCode UpdateModelKernel::VerifyUpdateModel(const schema::RequestUpdateModel
     }
 
     if (verify_result == sigVerifyResult::TIMEOUT) {
-      std::string reason = "verify signature timestamp failed for fl id " + update_model_fl_id;
+      std::string reason =
+        "verify signature timestamp failed or cannot find its key attestation for fl id " + update_model_fl_id;
       BuildUpdateModelRsp(fbb, schema::ResponseCode_OutOfTime, reason, "");
       MS_LOG(WARNING) << reason;
       return ResultCode::kFail;

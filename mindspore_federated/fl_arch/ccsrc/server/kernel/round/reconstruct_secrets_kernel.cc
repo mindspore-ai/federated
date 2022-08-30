@@ -91,7 +91,7 @@ bool ReconstructSecretsKernel::Launch(const uint8_t *req_data, size_t len,
     }
 
     if (verify_result == sigVerifyResult::TIMEOUT) {
-      std::string reason = "verify signature timestamp failed.";
+      std::string reason = "verify signature timestamp failed or cannot find its key attestation.";
       cipher_reconstruct_.BuildReconstructSecretsRsp(fbb, schema::ResponseCode_OutOfTime, reason, SizeToInt(iter_num),
                                                      std::to_string(CURRENT_TIME_MILLI.count()));
       MS_LOG(ERROR) << reason;
@@ -126,6 +126,24 @@ bool ReconstructSecretsKernel::Launch(const uint8_t *req_data, size_t len,
   if (response) {
     (void)DistributedCountService::GetInstance().Count(name_);
   }
+
+  if (!checkReachThreshold(update_model_clients, cur_iterator, next_req_time, fbb, fl_id)) {
+    SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
+    return false;
+  }
+
+  SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
+
+  MS_LOG(INFO) << "reconstruct_secrets_kernel success.";
+  if (!response) {
+    MS_LOG(INFO) << "reconstruct_secrets_kernel response not ready.";
+  }
+  return true;
+}
+
+bool ReconstructSecretsKernel::checkReachThreshold(const std::vector<std::string> update_model_clients,
+                                                   const int cur_iterator, const std::string next_req_time,
+                                                   std::shared_ptr<FBBuilder> fbb, const std::string fl_id) {
   if (DistributedCountService::GetInstance().CountReachThreshold(name_)) {
     MS_LOG(INFO) << "Current amount for ReconstructSecretsKernel is enough.";
     clock_t start_time = clock();
@@ -141,6 +159,7 @@ bool ReconstructSecretsKernel::Launch(const uint8_t *req_data, size_t len,
         cipher_reconstruct_.BuildReconstructSecretsRsp(fbb, schema::ResponseCode_OutOfTime,
                                                        "the secret restructs failed.", cur_iterator, next_req_time);
         MS_LOG(ERROR) << "CipherReconStruct::ReconstructSecrets" << fl_id << " failed.";
+        return false;
       }
     } else if (ret.IsSuccess()) {
       cipher_reconstruct_.BuildReconstructSecretsRsp(fbb, schema::ResponseCode_SUCCEED, "Clients' number is full.",
@@ -158,13 +177,7 @@ bool ReconstructSecretsKernel::Launch(const uint8_t *req_data, size_t len,
   } else {
     cipher_reconstruct_.BuildReconstructSecretsRsp(fbb, schema::ResponseCode_SUCCEED,
                                                    "Success, but the server is not ready to reconstruct secret yet.",
-                                                   SizeToInt(iter_num), std::to_string(CURRENT_TIME_MILLI.count()));
-  }
-  SendResponseMsg(message, fbb->GetBufferPointer(), fbb->GetSize());
-
-  MS_LOG(INFO) << "reconstruct_secrets_kernel success.";
-  if (!response) {
-    MS_LOG(INFO) << "reconstruct_secrets_kernel response not ready.";
+                                                   cur_iterator, std::to_string(CURRENT_TIME_MILLI.count()));
   }
   return true;
 }

@@ -76,7 +76,7 @@ bool GetListSignKernel::Launch(const uint8_t *req_data, size_t len, const std::s
     }
 
     if (verify_result == sigVerifyResult::TIMEOUT) {
-      std::string reason = "verify signature timestamp failed.";
+      std::string reason = "verify signature timestamp failed or cannot find its key attestation.";
       BuildGetListSignKernelRsp(fbb, schema::ResponseCode_OutOfTime, reason, std::to_string(CURRENT_TIME_MILLI.count()),
                                 iter_num, list_signs);
       MS_LOG(ERROR) << reason;

@@ -43,6 +43,8 @@ class ReconstructSecretsKernel : public RoundKernel {
   std::string name_unmask_;
   armour::CipherReconStruct cipher_reconstruct_;
   sigVerifyResult VerifySignature(const schema::SendReconstructSecret *reconstruct_secret_req);
+  bool checkReachThreshold(const std::vector<std::string> update_model_clients, const int cur_iterator,
+                           const std::string next_req_time, std::shared_ptr<FBBuilder> fbb, const std::string fl_id);
 };
 }  // namespace kernel
 }  // namespace server
