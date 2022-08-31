@@ -91,7 +91,7 @@ bool GetKeysKernel::Launch(const uint8_t *req_data, size_t len, const std::share
     }
 
     if (verify_result == sigVerifyResult::TIMEOUT) {
-      std::string reason = "verify signature timestamp failed.";
+      std::string reason = "verify signature timestamp failed or cannot find its key attestation.";
       cipher_key_->BuildGetKeysRsp(fbb, schema::ResponseCode_OutOfTime, iter_num,
                                    std::to_string(CURRENT_TIME_MILLI.count()), false);
       MS_LOG(ERROR) << reason;
