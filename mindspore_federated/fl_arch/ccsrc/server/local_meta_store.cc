@@ -51,8 +51,7 @@ const void LocalMetaStore::put_aggregation_feature_map(ModelItemPtr modelItemPtr
 
 ModelItemPtr &LocalMetaStore::aggregation_feature_map() { return aggregation_feature_map_; }
 
-bool LocalMetaStore::verifyAggregationFeatureMap(const ModelItemPtr &modelItemPtr,
-                                                 bool verify_scope) {
+bool LocalMetaStore::verifyAggregationFeatureMap(const ModelItemPtr &modelItemPtr) {
   // feature map size in Hybrid training is not equal with upload model size
   if (modelItemPtr->weight_items.size() > aggregation_feature_map_->weight_items.size()) {
     return false;
@@ -61,6 +60,7 @@ bool LocalMetaStore::verifyAggregationFeatureMap(const ModelItemPtr &modelItemPt
   for (const auto &weight : modelItemPtr->weight_items) {
     std::string weight_name = weight.first;
     size_t weight_size = weight.second.size;
+
     if (aggregation_feature_map_->weight_items.count(weight_name) == 0) {
       return false;
     }
@@ -68,18 +68,36 @@ bool LocalMetaStore::verifyAggregationFeatureMap(const ModelItemPtr &modelItemPt
       return false;
     }
   }
-  if (verify_scope) {
-      float *data = reinterpret_cast<float *>(modelItemPtr->weight_data.data());
-      std::vector<float> weight_data(data, data + modelItemPtr->weight_data.size() / sizeof(float));
+  float *data_arr = reinterpret_cast<float *>(modelItemPtr->weight_data.data());
+  std::vector<float> weight_data(data_arr, data_arr + modelItemPtr->weight_data.size() / sizeof(float));
 
-    for (const auto &data : weight_data) {
-      if (std::isnan(data) || std::isinf(data)) {
-        MS_LOG(WARNING) << "The aggregation weight is nan or inf.";
-        return false;
-      }
+  for (const auto &data : weight_data) {
+    if (std::isnan(data) || std::isinf(data)) {
+      MS_LOG(WARNING) << "The aggregation weight is nan or inf.";
+      return false;
     }
   }
   return true;
+}
+
+bool LocalMetaStore::verifyAggregationFeatureMap(const std::map<std::string, Address> &model) {
+  ModelItemPtr modelItemPtr = std::make_shared<ModelItem>();
+  for (const auto &item : model) {
+    WeightItem weight;
+    std::string weight_full_name = item.first;
+    size_t weight_size = item.second.size;
+
+    weight.name = weight_full_name;
+    weight.size = weight_size;
+
+    uint8_t *upload_weight_data_arr = reinterpret_cast<uint8_t *>(const_cast<void *>(item.second.addr));
+    std::vector<uint8_t> upload_weight_data(upload_weight_data_arr,
+                                            upload_weight_data_arr + weight_size / sizeof(uint8_t));
+    modelItemPtr->weight_items[weight_full_name] = weight;
+    modelItemPtr->weight_data.insert(modelItemPtr->weight_data.end(), upload_weight_data.begin(),
+                                     upload_weight_data.end());
+  }
+  return verifyAggregationFeatureMap(modelItemPtr);
 }
 }  // namespace server
 }  // namespace fl

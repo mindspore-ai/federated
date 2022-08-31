@@ -328,22 +328,24 @@ void Iteration::SaveModel() {
         return;
       }
       MS_LOG_WARNING << "Iteration " << store_iteration_num << " is invalid. Reason: " << status.StatusMessage();
-      is_iteration_valid_ = false;  // used model weights of last iteration
-    }
-  }
-  if (is_iteration_valid_) {
-    // Store the model which is successfully aggregated for this iteration.
-    const auto &model = Executor::GetInstance().GetModel();
-    if (model == nullptr || model->weight_data.empty() || model->weight_items.empty() || !LocalMetaStore::GetInstance().verifyAggregationFeatureMap(model, true)) {
-      MS_LOG(WARNING) << "Verify feature maps failed, iteration " << store_iteration_num << " will not be stored. Use the previous iteration model instead";
       const auto &model_pair = ModelStore::GetInstance().GetLatestModel();
       ModelStore::GetInstance().StoreModelByIterNum(store_iteration_num, model_pair.second);
-      is_iteration_valid_ = false;
-      return;
-    }
+    } else {
+      // Store the model which is successfully aggregated for this iteration.
+      const auto &model = Executor::GetInstance().GetModel();
+      if (model == nullptr || model->weight_data.empty() || model->weight_items.empty() ||
+          !LocalMetaStore::GetInstance().verifyAggregationFeatureMap(model)) {
+        MS_LOG(WARNING) << "Verify feature maps failed, iteration " << store_iteration_num
+                        << " will not be stored. Use the previous iteration model instead";
+        const auto &model_pair = ModelStore::GetInstance().GetLatestModel();
+        ModelStore::GetInstance().StoreModelByIterNum(store_iteration_num, model_pair.second);
+        is_iteration_valid_ = false;
+        return;
+      }
 
-    ModelStore::GetInstance().StoreModelByIterNum(store_iteration_num, model);
-    MS_LOG(INFO) << "Iteration " << store_iteration_num << " is successfully finished.";
+      ModelStore::GetInstance().StoreModelByIterNum(store_iteration_num, model);
+      MS_LOG(INFO) << "Iteration " << store_iteration_num << " is successfully finished.";
+    }
   } else {
     // Store last iteration's model because this iteration is considered as invalid.
     const auto &model_pair = ModelStore::GetInstance().GetLatestModel();
@@ -360,6 +362,7 @@ void Iteration::Reset() {
     round->InitKernelClientUploadLoss();
     round->InitKernelClientUploadAccuracy();
     round->InitKernelEvalDataSize();
+    round->InitKernelTrainDataSize();
     round->ResetParticipationTimeAndNum();
   }
   round_client_num_map_.clear();

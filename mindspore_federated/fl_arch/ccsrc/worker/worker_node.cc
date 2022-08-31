@@ -77,6 +77,7 @@ bool WorkerNode::Send(const NodeRole &node_role, const void *message, size_t len
       MS_LOG_INFO << "Failed to send message to server " << recv_node;
       continue;
     }
+    MS_LOG_INFO << "Worker send message to server " << recv_node << " successful.";
     return Wait(request_track, timeout);
   }
   MS_LOG_WARNING << "Cannot find one server to send message";

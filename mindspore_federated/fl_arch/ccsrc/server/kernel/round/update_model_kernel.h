@@ -74,8 +74,9 @@ class UpdateModelKernel : public RoundKernel {
   std::map<std::string, Address> ParseUploadCompressFeatureMap(const schema::RequestUpdateModel *update_model_req,
                                                                size_t data_size,
                                                                std::map<std::string, std::vector<float>> *weight_map);
-  bool VerifySignDSFeatureMap(const ModelItemPtr &modelItemPtr, const schema::RequestUpdateModel *update_model_req);
-  bool VerifyUploadCompressFeatureMap(const schema::RequestUpdateModel *update_model_req);
+  bool VerifySignDSFeatureMap(const schema::RequestUpdateModel *update_model_req, DeviceMeta *device_meta);
+  bool VerifyUploadCompressFeatureMap(const schema::RequestUpdateModel *update_model_req, DeviceMeta *device_meta);
+  ModelItemPtr ParseModelItemPtr(const schema::RequestUpdateModel *update_model_req);
   sigVerifyResult VerifySignature(const schema::RequestUpdateModel *update_model_req);
   void BuildUpdateModelRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
                            const std::string &reason, const std::string &next_req_time);
