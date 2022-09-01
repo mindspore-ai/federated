@@ -1,0 +1,91 @@
+role: follower
+model: # define the net of vFL party
+  train_net:
+    name: follower_loss_net
+    inputs:
+      - name: id_hldr0
+        source: local
+      - name: wt_hldr0
+        source: local
+    outputs:
+      - name: wide_embedding
+        destination: remote
+      - name: deep_embedding
+        destination: remote
+      - name: l2_regu
+        destination: local
+  eval_net:
+    name: follower_net
+    inputs:
+      - name: id_hldr0
+        source: local
+      - name: wt_hldr0
+        source: local
+    outputs:
+      - name: wide_embedding
+        destination: remote
+      - name: deep_embedding
+        destination: remote
+opts: # define ms optimizer
+  - type: FTRL
+    grads: # define ms grad operation
+      - inputs:
+          - name: id_hldr0
+          - name: wt_hldr0
+        output:
+          name: wide_embedding
+          index: 0
+        sens: wide_scale
+        get_all: False
+        get_by_list: True
+        sens_param: True
+    params:
+      - name: wide
+    hyper_parameters:
+      learning_rate: 5.e-2
+      l1: 1.e-8
+      l2: 1.e-8
+      initial_accum: 1.0
+      loss_scale: 1024.0
+  - type: Adam
+    grads:
+      - inputs:
+          - name: id_hldr0
+          - name: wt_hldr0
+        output:
+          name: deep_embedding
+          index: 1
+        sens: deep_scale
+        get_all: False
+        get_by_list: True
+        sens_param: True
+      - inputs:
+          - name: id_hldr0
+          - name: wt_hldr0
+        output:
+          name: l2_regu
+          index: 2
+        sens: 1024.0
+        get_all: False
+        get_by_list: True
+        sens_param: True
+    params:
+      - name: deep
+      - name: dense
+    hyper_parameters:
+      learning_rate: 3.5e-4
+      eps: 1.e-8
+      loss_scale: 1024.0
+dataset:
+  name: criteo
+  features:
+    - id_hldr0
+    - wt_hldr0
+hyper_parameters:
+  epochs: 20
+  batch_size: 16000
+  workers: 1
+  is_eval: True
+network:
+  master_ip: 127.0.0.1:8081
+  peer_ip: 127.0.0.1:8082
