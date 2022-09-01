@@ -102,7 +102,7 @@ flatbuffers {
             println('the version of " + flatExePath " is not valid, try to find flac from server deps')
         }
     } else {
-        println('no env FLAT_EXE_PATH setted, try to find flac from server deps')
+        println('no env FLAT_EXE_PATH set, try to find flac from server deps')  
     }
 
     String serFlatPath = projectDir.path + "/../../build/mindspore_federated/_deps/flatbuffers-src/_build/flatc"
@@ -127,25 +127,47 @@ task createFlatBuffers(type: FlatBuffers) {
     extraArgs = "--gen-mutable"
 }
 
-task clearJar(type: Delete) {
-    delete 'build/libs/jarAAR/mindspore-lite-java-flclient.jar'
-    delete 'build/libs/jarX86/mindspore-lite-java-flclient.jar'
-    delete 'build/libs/mindspore-lite-java-flclient.jar'
+def getCommitID() {
+    def out = new ByteArrayOutputStream();
+    exec {
+        commandLine 'git', 'rev-parse', 'HEAD'
+        standardOutput = out
+    }
+    println("the used commit_id: " + out.toString())
+    return out.toString()
 }
 
+version = '1.9.0'
 archivesBaseName = 'mindspore-lite-java-flclient'
+def commitID = getCommitID()
+
+task clearJar(type: Delete) {
+    delete('build/libs/jarAAR/' + archivesBaseName + '-' + version + '.jar')
+    delete('build/libs/jarX86/' + archivesBaseName + '-' + version + '.jar')
+    delete('build/libs/' + archivesBaseName + '-' + version + '.jar')
+}
+
 
 task flReleaseJarAAR(type: Jar, dependsOn: ['compileJava']) {
     manifest {
-        attributes "Main-Class": "com.mindspore.flclient.SyncFLJob"
+        attributes(
+                "Main-Class": "com.mindspore.flclient.SyncFLJob",
+                "Plateform": "Andriod",
+                "CommitID": commitID
+        )
     }
     from('build/classes/java/main')
     destinationDirectory = file('build/libs/jarAAR')
 }
 
 task packFLJarX86(type: Jar, dependsOn: ['compileJava']) {
+    println("packFLJarX86 used commit_id: " + getCommitID())
     manifest {
-        attributes "Main-Class": "com.mindspore.flclient.SyncFLJob"
+        attributes(
+                "Main-Class": "com.mindspore.flclient.SyncFLJob",
+                "Plateform": "X86",
+                "CommitID": commitID
+        )
     }
     from('build/classes/java/main')
     from {
@@ -158,7 +180,11 @@ task packFLJarX86(type: Jar, dependsOn: ['compileJava']) {
 
 task packFLJarX86UT(type: Jar, dependsOn: ['compileTestJava']) {
     manifest {
-        attributes "Main-Class": "com.mindspore.flclient.SyncFLJobTest"
+        attributes(
+                "Main-Class": "com.mindspore.flclient.SyncFLJob",
+                "Plateform": "X86",
+                "CommitID": commitID
+        )
     }
     from('build/classes/java/main')
     from('build/classes/java/test')
@@ -180,7 +206,7 @@ task packFLJarX86UT(type: Jar, dependsOn: ['compileTestJava']) {
 task flUTJarX86(dependsOn: ['packFLJarX86UT']) {
     doLast {
         exec {
-            commandLine "zip", "-d", "./build/libs/jarX86UT/mindspore-lite-java-flclient.jar", 'META-INF/.SF', 'META-INF/.RSA', 'META-INF/*SF'
+            commandLine "zip", "-d", "./build/libs/jarX86UT/" + archivesBaseName + '-' + version + '.jar', 'META-INF/.SF', 'META-INF/.RSA', 'META-INF/*SF'
         }
         exec {
             // Need do -javaagent so we copy the jmockit jar to the release path
@@ -191,5 +217,5 @@ task flUTJarX86(dependsOn: ['packFLJarX86UT']) {
 }
 
 task flReleaseJarX86(type: Exec, dependsOn: ['packFLJarX86']) {
-    commandLine "zip", "-d", "./build/libs/jarX86/mindspore-lite-java-flclient.jar", 'META-INF/.SF', 'META-INF/.RSA', 'META-INF/*SF'
+    commandLine "zip", "-d", "./build/libs/jarX86/" + archivesBaseName + '-' + version + '.jar', 'META-INF/.SF', 'META-INF/.RSA', 'META-INF/*SF'
 }
