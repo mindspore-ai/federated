@@ -91,9 +91,11 @@ class FusedPullWeightKernelMod : public AbstractKernel {
       retcode = pull_weight_rsp->retcode();
       if (retcode == schema::ResponseCode_SucNotReady) {
         std::this_thread::sleep_for(std::chrono::milliseconds(kRetryDurationOfPullWeights));
-        fl_iteration_ = pull_weight_rsp->iteration();
-        MS_LOG(DEBUG) << "Server is not ready for downloading yet. Reason: " << pull_weight_rsp->reason()->str()
-                      << ", fl iteration is " << fl_iteration_ << ". Retry later.";
+        if (IntToUint(pull_weight_rsp->iteration()) > fl_iteration_) {
+          fl_iteration_ = pull_weight_rsp->iteration();
+        }
+        MS_LOG(INFO) << "Server is not ready for downloading yet. Reason: " << pull_weight_rsp->reason()->str()
+                     << ", fl iteration is " << fl_iteration_ << ". Retry later.";
       } else if (retcode != schema::ResponseCode_SUCCEED) {
         MS_LOG(WARNING) << "FusedPullWeight failed. Server return code: " << pull_weight_rsp->retcode()
                         << ", reason: " << pull_weight_rsp->reason()->str();
@@ -113,6 +115,12 @@ class FusedPullWeightKernelMod : public AbstractKernel {
       std::string weight_fullname = feature_fbs->weight_fullname()->str();
       float *weight_data = const_cast<float *>(feature_data_fbs->data());
       std::vector<float> weight_data_vec(weight_data, weight_data + feature_data_fbs->size());
+      for (const auto &data : weight_data_vec) {
+        if (std::isnan(data) || std::isinf(data)) {
+          MS_LOG(WARNING) << "The aggregation weight:" << weight_fullname << " is nan or inf.";
+          continue;
+        }
+      }
       dict_data[py::str(weight_fullname)] = weight_data_vec;
     }
     MS_LOG(INFO) << "Pull weights for iteration: " << fl_iteration_ << " success.";

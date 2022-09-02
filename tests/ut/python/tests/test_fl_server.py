@@ -90,7 +90,8 @@ def test_fl_server_one_server_one_client_multi_iterations_success():
     # reject updateModel with old iteration 1
     result, update_model_rsp = post_update_model(http_server_address, fl_name, fl_id, iteration, update_feature_map)
     assert result is None
-    assert "UpdateModel iteration number is invalid:1, current iteration:2" in update_model_rsp.Reason().decode()
+    reason = "devices_meta for " + fl_id + " is not set. Please retry later."
+    assert reason in update_model_rsp.Reason().decode()
 
     # --------------------------- for more iteration
     for i in range(2, fl_iteration_num + 1):

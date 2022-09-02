@@ -476,7 +476,7 @@ def update_model_expect_success(http_server_address, fl_name, fl_id, iteration, 
 
 def get_model_expect_success(http_server_address, fl_name, iteration, enable_ssl=None):
     """get model expect success"""
-    for i in range(10):  # 0.5*10=5s
+    for i in range(60):  # 0.5*60=30s
         client_feature_map, get_model_rsp = post_get_model(http_server_address, fl_name, iteration,
                                                            enable_ssl=enable_ssl)
         if client_feature_map is None:

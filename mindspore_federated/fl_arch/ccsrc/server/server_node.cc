@@ -445,7 +445,8 @@ bool ServerNode::PullWeight(const uint8_t *req_data, size_t len, VectorPtr *outp
     if (*output == nullptr) {
       continue;
     }
-    MS_LOG_INFO << "Success to pull weight from other servers" << (*output)->size();
+    MS_LOG_INFO << "Success to pull weight from other server " << recv_node << ", pull weight size is "
+                << (*output)->size();
     return true;
   }
   MS_LOG_DEBUG << "End pull weight from other servers";
@@ -462,7 +463,7 @@ void ServerNode::HandleServerPullWeight(const std::shared_ptr<TcpConnection> &co
     return;
   }
   conn->SendMessage(meta, Protos::FLATBUFFERS, fbb.GetBufferPointer(), fbb.GetSize());
-  MS_LOG_INFO << "End handle pull weight request";
+  MS_LOG_DEBUG << "End handle pull weight request";
 }
 }  // namespace server
 }  // namespace fl

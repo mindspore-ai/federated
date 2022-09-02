@@ -319,8 +319,9 @@ void Server::RunMainProcessInner() {
   }
   // Resume receiving client messages and events
   instance_context.SetSafeMode(false);
-  MS_LOG_INFO << "End handle instance event " << event_str << ", cur iteration: " << instance_context.iteration_num()
-              << ", cur instance name: " << instance_context.instance_name();
+  MS_LOG_INFO << "End handle instance event " << event_str
+              << ". Move to next iteration: " << instance_context.iteration_num()
+              << ", next instance name: " << instance_context.instance_name() << "\n";
 }
 
 void Server::Stop() {

@@ -45,12 +45,21 @@ void UpdateModelKernel::InitKernel(size_t threshold_count) {
   InitClientUploadLoss();
   InitClientUploadAccuracy();
   InitEvalDataSize();
+  InitTrainDataSize();
 
   LocalMetaStore::GetInstance().put_value(kCtxUpdateModelThld, threshold_count);
   LocalMetaStore::GetInstance().put_value(kCtxFedAvgTotalDataSize, kInitialDataSizeSum);
 
   auto first_count_handler = [this]() {};
-  auto last_count_handler = [this]() { Executor::GetInstance().RunWeightAggregation(); };
+  auto last_count_handler = [this]() {
+    if (!LocalMetaStore::GetInstance().verifyAggregationFeatureMap(Executor::GetInstance().GetModel())) {
+      MS_LOG(WARNING) << "Verify feature map failed before aggregation";
+    }
+    Executor::GetInstance().RunWeightAggregation();
+    if (!LocalMetaStore::GetInstance().verifyAggregationFeatureMap(Executor::GetInstance().GetModel())) {
+      MS_LOG(WARNING) << "Verify feature map failed after aggregation";
+    }
+  };
   cache::Counter::Instance().RegisterPerServerCounter(kCountForAggregation, threshold_count, first_count_handler,
                                                       last_count_handler);
   std::string participation_time_level_str = FLContext::instance()->participation_time_level();
@@ -190,7 +199,7 @@ ResultCode UpdateModelKernel::ReachThresholdForUpdateModel(const std::shared_ptr
     BuildUpdateModelRsp(
       fbb, schema::ResponseCode_OutOfTime, reason,
       std::to_string(LocalMetaStore::GetInstance().value<uint64_t>(kCtxIterationNextRequestTimestamp)));
-    MS_LOG(WARNING) << reason;
+    MS_LOG(DEBUG) << reason;
     return ResultCode::kFail;
   }
   return ResultCode::kSuccess;
@@ -199,6 +208,15 @@ ResultCode UpdateModelKernel::ReachThresholdForUpdateModel(const std::shared_ptr
 ResultCode UpdateModelKernel::VerifyUpdateModel(const schema::RequestUpdateModel *update_model_req,
                                                 const std::shared_ptr<FBBuilder> &fbb, DeviceMeta *device_meta) {
   std::string update_model_fl_id = update_model_req->fl_id()->str();
+  auto found = cache::ClientInfos::GetInstance().GetDeviceMeta(update_model_fl_id, device_meta);
+  if (!found.IsSuccess()) {
+    std::string reason = "devices_meta for " + update_model_fl_id + " is not set. Please retry later.";
+    BuildUpdateModelRsp(
+      fbb, schema::ResponseCode_OutOfTime, reason,
+      std::to_string(LocalMetaStore::GetInstance().value<uint64_t>(kCtxIterationNextRequestTimestamp)));
+    MS_LOG(WARNING) << reason;
+    return ResultCode::kFail;
+  }
   auto iteration = update_model_req->iteration();
   if (static_cast<uint64_t>(iteration) != cache::InstanceContext::Instance().iteration_num()) {
     auto next_req_time = LocalMetaStore::GetInstance().value<uint64_t>(kCtxIterationNextRequestTimestamp);
@@ -206,7 +224,7 @@ ResultCode UpdateModelKernel::VerifyUpdateModel(const schema::RequestUpdateModel
                          ", current iteration:" + std::to_string(cache::InstanceContext::Instance().iteration_num()) +
                          ", Retry later at time: " + std::to_string(next_req_time) + ", fl id is " + update_model_fl_id;
     BuildUpdateModelRsp(fbb, schema::ResponseCode_OutOfTime, reason, std::to_string(next_req_time));
-    MS_LOG(WARNING) << reason;
+    MS_LOG(DEBUG) << reason;
     return ResultCode::kFail;
   }
 
@@ -229,41 +247,19 @@ ResultCode UpdateModelKernel::VerifyUpdateModel(const schema::RequestUpdateModel
     }
     MS_LOG(DEBUG) << "verify signature passed!";
   }
-
-  ModelItemPtr modelItemPtr = std::make_shared<ModelItem>();
-  if (FLContext::instance()->compression_config().upload_compress_type != kDiffSparseQuant) {
-    auto upload_feature_map = update_model_req->feature_map();
-    for (uint32_t i = 0; i < upload_feature_map->size(); i++) {
-      const auto &item = upload_feature_map->Get(i);
-
-      if (item == nullptr || item->weight_fullname() == nullptr || item->data() == nullptr) {
-        std::string reason = "Verify upload feature map failed";
-        BuildUpdateModelRsp(fbb, schema::ResponseCode_RequestError, reason, "");
-        MS_LOG(WARNING) << reason;
-        return ResultCode::kFail;
-      }
-      WeightItem weight;
-      std::string weight_full_name = item->weight_fullname()->str();
-      const auto &data = item->data();
-      size_t weight_size = data->size() * sizeof(float);
-
-      weight.name = weight_full_name;
-      weight.size = weight_size;
-      modelItemPtr->weight_items[weight_full_name] = weight;
-    }
-  }
-
   bool verifyFeatureMapIsSuccess = true;
   if (FLContext::instance()->encrypt_type() == kDSEncryptType && update_model_req->sign() != 0) {
     if (update_model_req->index_array() == nullptr) {
       verifyFeatureMapIsSuccess = false;
     } else {
-      verifyFeatureMapIsSuccess = VerifySignDSFeatureMap(modelItemPtr, update_model_req);
+      verifyFeatureMapIsSuccess = VerifySignDSFeatureMap(update_model_req, device_meta);
     }
-  } else if (!LocalMetaStore::GetInstance().verifyAggregationFeatureMap(modelItemPtr)) {
-    verifyFeatureMapIsSuccess = false;
   } else if (IsCompress(update_model_req)) {
-    verifyFeatureMapIsSuccess = VerifyUploadCompressFeatureMap(update_model_req);
+    verifyFeatureMapIsSuccess = VerifyUploadCompressFeatureMap(update_model_req, device_meta);
+  } else {
+    ModelItemPtr modelItemPtr = ParseModelItemPtr(update_model_req);
+    MS_ERROR_IF_NULL_W_RET_VAL(modelItemPtr, ResultCode::kFail);
+    verifyFeatureMapIsSuccess = LocalMetaStore::GetInstance().verifyAggregationFeatureMap(modelItemPtr);
   }
   if (!verifyFeatureMapIsSuccess) {
     auto next_req_time = LocalMetaStore::GetInstance().value<uint64_t>(kCtxIterationNextRequestTimestamp);
@@ -273,16 +269,6 @@ ResultCode UpdateModelKernel::VerifyUpdateModel(const schema::RequestUpdateModel
     return ResultCode::kFail;
   }
 
-  MS_LOG(DEBUG) << "UpdateModel for fl id " << update_model_fl_id;
-  auto found = cache::ClientInfos::GetInstance().GetDeviceMeta(update_model_fl_id, device_meta);
-  if (!found.IsSuccess()) {
-    std::string reason = "devices_meta for " + update_model_fl_id + " is not set. Please retry later.";
-    BuildUpdateModelRsp(
-      fbb, schema::ResponseCode_OutOfTime, reason,
-      std::to_string(LocalMetaStore::GetInstance().value<uint64_t>(kCtxIterationNextRequestTimestamp)));
-    MS_LOG(WARNING) << reason;
-    return ResultCode::kFail;
-  }
   if (FLContext::instance()->encrypt_type() == kPWEncryptType) {
     auto find_client = cache::ClientInfos::GetInstance().HasGetSecretsClient(update_model_fl_id);
     if (!find_client) {  // the client not in get_secrets_clients
@@ -305,28 +291,22 @@ bool UpdateModelKernel::IsCompress(const schema::RequestUpdateModel *update_mode
   return false;
 }
 
-bool UpdateModelKernel::VerifySignDSFeatureMap(const ModelItemPtr &modelItemPtr,
-                                               const schema::RequestUpdateModel *update_model_req) {
-  auto &aggregation_feature_map_ = LocalMetaStore::GetInstance().aggregation_feature_map();
-  if (modelItemPtr->weight_items.size() > aggregation_feature_map_->weight_items.size()) {
-    return false;
-  }
+bool UpdateModelKernel::VerifySignDSFeatureMap(const schema::RequestUpdateModel *update_model_req,
+                                               DeviceMeta *device_meta) {
   auto index_array = update_model_req->index_array();
   size_t index_array_size = index_array->size();
   size_t array_size_upper = 100;
   if (index_array_size == 0 || index_array_size > array_size_upper) {
     return false;
   }
-  for (const auto &weight : modelItemPtr->weight_items) {
-    std::string weight_name = weight.first;
-    if (aggregation_feature_map_->weight_items.count(weight_name) == 0) {
-      return false;
-    }
-  }
-  return true;
+  std::map<std::string, std::vector<float>> weight_map;
+  std::map<std::string, Address> feature_map =
+    ParseSignDSFeatureMap(update_model_req, device_meta->data_size(), &weight_map);
+  return LocalMetaStore::GetInstance().verifyAggregationFeatureMap(feature_map);
 }
 
-bool UpdateModelKernel::VerifyUploadCompressFeatureMap(const schema::RequestUpdateModel *update_model_req) {
+bool UpdateModelKernel::VerifyUploadCompressFeatureMap(const schema::RequestUpdateModel *update_model_req,
+                                                       DeviceMeta *device_meta) {
   auto upload_sparse_rate = update_model_req->upload_sparse_rate();
   if (upload_sparse_rate != FLContext::instance()->compression_config().upload_sparse_rate) {
     MS_LOG(WARNING) << "The upload_sparse_rate must be equal to the setting in context.";
@@ -350,7 +330,38 @@ bool UpdateModelKernel::VerifyUploadCompressFeatureMap(const schema::RequestUpda
     MS_LOG(WARNING) << "The upload compress feature map is empty.";
     return false;
   }
-  return true;
+  for (size_t i = 0; i < fbs_compress_feature_map->size(); ++i) {
+    int compress_data_size = fbs_compress_feature_map->Get(i)->compress_data()->size();
+    if (compress_data_size == 0) {
+      continue;
+    }
+
+    if (compress_data_size < 0) {
+      MS_LOG(WARNING) << "Compress data size must be >= 0.";
+      return false;
+    }
+
+    float min_val = fbs_compress_feature_map->Get(i)->min_val();
+    float max_val = fbs_compress_feature_map->Get(i)->max_val();
+    if (min_val > max_val) {
+      MS_LOG(WARNING) << "Compress mode min val must be <= max val.";
+      return false;
+    }
+
+    if (std::isnan(min_val) || std::isinf(min_val)) {
+      MS_LOG(WARNING) << "The compress min val is nan or inf.";
+      return false;
+    }
+    if (std::isnan(max_val) || std::isinf(max_val)) {
+      MS_LOG(WARNING) << "The compress max val is nan or inf.";
+      return false;
+    }
+  }
+
+  std::map<std::string, std::vector<float>> weight_map;
+  std::map<std::string, Address> feature_map =
+    ParseUploadCompressFeatureMap(update_model_req, device_meta->data_size(), &weight_map);
+  return LocalMetaStore::GetInstance().verifyAggregationFeatureMap(feature_map);
 }
 
 ResultCode UpdateModelKernel::ParseAndVerifyFeatureMap(const schema::RequestUpdateModel *update_model_req,
@@ -391,6 +402,8 @@ ResultCode UpdateModelKernel::UpdateModel(const schema::RequestUpdateModel *upda
                                           const std::shared_ptr<FBBuilder> &fbb, const DeviceMeta &device_meta,
                                           const std::map<std::string, Address> &feature_map) {
   std::string update_model_fl_id = update_model_req->fl_id()->str();
+  MS_LOG(DEBUG) << "UpdateModel for fl id " << update_model_fl_id;
+
   size_t data_size = device_meta.data_size();
   size_t eval_data_size = device_meta.eval_data_size();
 
@@ -425,6 +438,33 @@ ResultCode UpdateModelKernel::CountForAggregation() {
     return ResultCode::kFail;
   }
   return ResultCode::kSuccess;
+}
+
+ModelItemPtr UpdateModelKernel::ParseModelItemPtr(const schema::RequestUpdateModel *update_model_req) {
+  ModelItemPtr modelItemPtr = std::make_shared<ModelItem>();
+  auto upload_feature_map = update_model_req->feature_map();
+  for (uint32_t i = 0; i < upload_feature_map->size(); i++) {
+    const auto &item = upload_feature_map->Get(i);
+
+    if (item == nullptr || item->weight_fullname() == nullptr || item->data() == nullptr) {
+      MS_LOG(WARNING) << "Verify upload feature map failed";
+      return nullptr;
+    }
+    WeightItem weight;
+    std::string weight_full_name = item->weight_fullname()->str();
+    const auto &data = item->data();
+    size_t weight_size = data->size() * sizeof(float);
+
+    weight.name = weight_full_name;
+    weight.size = weight_size;
+    uint8_t *upload_weight_data_arr = reinterpret_cast<uint8_t *>(const_cast<float *>(data->data()));
+    std::vector<uint8_t> upload_weight_data(upload_weight_data_arr,
+                                            upload_weight_data_arr + weight_size / sizeof(uint8_t));
+    modelItemPtr->weight_items[weight_full_name] = weight;
+    modelItemPtr->weight_data.insert(modelItemPtr->weight_data.end(), upload_weight_data.begin(),
+                                     upload_weight_data.end());
+  }
+  return modelItemPtr;
 }
 
 std::map<std::string, Address> UpdateModelKernel::ParseFeatureMap(const schema::RequestUpdateModel *update_model_req) {

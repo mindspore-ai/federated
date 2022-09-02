@@ -260,7 +260,7 @@ FlStatus Executor::HandlePullWeightRequest(const uint8_t *req_data, size_t len, 
   if (!status.IsSuccess()) {
     return status;
   }
-  MS_LOG(INFO) << "Pulling weight for iteration " << current_iter << " succeeds.";
+  MS_LOG(DEBUG) << "Pulling weight for iteration " << current_iter << " succeeds.";
   return kFlSuccess;
 }
 

@@ -22,6 +22,8 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <map>
+#include <memory>
 #include "common/common.h"
 #include "distributed_cache/instance_context.h"
 
@@ -81,7 +83,9 @@ class LocalMetaStore {
 
   ModelItemPtr &aggregation_feature_map();
 
-  bool verifyAggregationFeatureMap(const ModelItemPtr &modelItemPtr, bool verify_score = false);
+  bool verifyAggregationFeatureMap(const ModelItemPtr &modelItemPtr);
+
+  bool verifyAggregationFeatureMap(const std::map<std::string, Address> &model);
 
  private:
   LocalMetaStore() : key_to_meta_({}), curr_iter_num_(0) {}
