@@ -1,0 +1,105 @@
+# Copyright 2022 Huawei Technologies Co., Ltd
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ============================================================================
+"""Local splitnn of wide and deep on criteo dataset."""
+
+import os
+import logging
+
+from mindspore import context, Tensor
+from mindspore.train.summary import SummaryRecord
+
+from mindspore_federated import FLModel, vfl_utils
+
+from criteo_dataset import create_dataset, DataType
+from network_config import config
+from network.wide_and_deep import LeaderNet, LeaderLossNet, LeaderEvalNet, \
+    FollowerNet, FollowerLossNet, AUCMetric
+
+
+def construct_local_dataset():
+    """create dataset object according to config info."""
+    path = config.data_path
+    train_bs = config.batch_size
+    eval_bs = config.eval_batch_size
+    if config.dataset_type == "tfrecord":
+        ds_type = DataType.TFRECORD
+    elif config.dataset_type == "mindrecord":
+        ds_type = DataType.MINDRECORD
+    else:
+        ds_type = DataType.H5
+
+    if not os.path.exists(config.load_path):
+        os.mkdir(config.load_path)
+
+    train_dataset = create_dataset(path, batch_size=train_bs, data_type=ds_type)
+    eval_dataset = create_dataset(path, train_mode=False, batch_size=eval_bs, data_type=ds_type)
+    return train_dataset, eval_dataset
+
+
+if __name__ == '__main__':
+    logging.basicConfig(filename='log_local_gpu.txt', level=logging.INFO)
+    context.set_context(mode=context.GRAPH_MODE, device_target='GPU')
+    leader_yaml_data, leader_fp = vfl_utils.parse_yaml_file('leader.yaml')
+    follower_yaml_data, follower_fp = vfl_utils.parse_yaml_file('follower.yaml')
+    # local data iteration for experiment
+    ds_train, ds_eval = construct_local_dataset()
+    train_iter = ds_train.create_dict_iterator()
+    eval_iter = ds_eval.create_dict_iterator()
+    train_size = ds_train.get_dataset_size()
+    eval_size = ds_eval.get_dataset_size()
+    # Leader Part
+    leader_base_net = LeaderNet(config)
+    leader_train_net = LeaderLossNet(leader_base_net, config)
+    leader_eval_net = LeaderEvalNet(leader_base_net)
+    eval_metric = AUCMetric()
+    leader_fl_model = FLModel(role='leader',
+                              network=leader_base_net,
+                              train_network=leader_train_net,
+                              metrics=eval_metric,
+                              eval_network=leader_eval_net,
+                              yaml_data=leader_yaml_data)
+
+    # Follower Part
+    follower_eval_net = follower_base_net = FollowerNet(config)
+    follower_train_net = FollowerLossNet(follower_base_net, config)
+    follower_fl_model = FLModel(role='follower',
+                                network=follower_base_net,
+                                train_network=follower_train_net,
+                                eval_network=follower_eval_net,
+                                yaml_data=follower_yaml_data)
+    # forward/backward batch by batch
+    eval_metric = AUCMetric()
+    with SummaryRecord('./summary') as summary_record:
+        for epoch in range(config.epochs):
+            for step, item in enumerate(train_iter, start=1):
+                follower_out = follower_fl_model.forward_one_step(item)
+                leader_out = leader_fl_model.forward_one_step(item, follower_out)
+                scale = leader_fl_model.backward_one_step(item, follower_out)
+                follower_fl_model.backward_one_step(item, sens=scale)
+                if step % 100 == 0:
+                    summary_record.add_value('scalar', 'wide_loss', leader_out['wide_loss'])
+                    summary_record.add_value('scalar', 'deep_loss', leader_out['deep_loss'])
+                    summary_record.record(step)
+                    logging.info('epoch %d step %d/%d wide_loss: %f deep_loss: %f',
+                                 epoch, step, train_size, leader_out['wide_loss'], leader_out['deep_loss'])
+            for eval_item in eval_iter:
+                follower_out = follower_fl_model.forward_one_step(eval_item)
+                leader_eval_out = leader_fl_model.eval_one_step(eval_item, follower_out, eval_metric)
+            auc = eval_metric.eval()
+            eval_metric.clear()
+            summary_record.add_value('scalar', 'auc', Tensor(auc))
+            logging.info('----evaluation---- epoch %d auc %f', epoch, auc)
+    leader_fp.close()
+    follower_fp.close()
