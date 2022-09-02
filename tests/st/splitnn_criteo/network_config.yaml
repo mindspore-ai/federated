@@ -40,7 +40,7 @@ deep_table_slice_mode: "column_slice"
 weight_bias_init: ["normal", "normal"]
 emb_init: "normal"
 init_args: [-0.01, 0.01]
-l2_coef: 0.00008 # 8e-5
+l2_coef: 8.e-5
 manual_shape: None
 
 # ==============================================================================

@@ -17,7 +17,7 @@
 from sklearn.metrics import roc_auc_score
 
 from mindspore import nn, context, ops
-from mindspore import Parameter, Tensor
+from mindspore import Parameter
 import mindspore.common.dtype as mstype
 from mindspore.nn import Dropout
 from mindspore.nn.metrics import Metric
@@ -329,22 +329,18 @@ class LeaderLossNet(nn.Cell):
     def __init__(self, net: LeaderNet, config):
         super(LeaderLossNet, self).__init__(auto_prefix=False)
         self.net = net
-        self.l2_coef = Parameter(Tensor(config.l2_coef),
-                                 name="LeaderLossNet_l2_coef",
-                                 requires_grad=False)
-        self.config = config
+        self.l2_coef = config.l2_coef
         self.loss = ops.SigmoidCrossEntropyWithLogits()
         self.square = ops.Square()
         self.reduce_mean_false = ops.ReduceMean(keep_dims=False)
         self.reduce_sum_false = ops.ReduceSum(keep_dims=False)
-        self.scale_op = ops.GradOperation(get_all=True)
 
     def construct(self, id_hldr, wt_hldr, wide_embedding, deep_embedding, label):
         out = self.net(id_hldr, wt_hldr, wide_embedding, deep_embedding)
         log_loss = self.loss(out, label)
         wide_loss = self.reduce_mean_false(log_loss)
         l2_regu = self.reduce_sum_false(
-            self.square(self.net.bottom_net.deep_embeddinglookup.embedding_table)) / 2 * 8.e-5
+            self.square(self.net.bottom_net.deep_embeddinglookup.embedding_table)) / 2 * self.l2_coef
         deep_loss = self.reduce_mean_false(log_loss) + l2_regu
         return out, wide_loss, deep_loss
 
@@ -395,14 +391,12 @@ class FollowerLossNet(nn.Cell):
     def __init__(self, net: WideDeepModel, config):
         super(FollowerLossNet, self).__init__(auto_prefix=False)
         self.net = net
-        self.l2_coef = Parameter(Tensor(config.l2_coef),
-                                 name="FollowerLossNet_l2_coef",
-                                 requires_grad=False)
+        self.l2_coef = config.l2_coef
         self.square = ops.Square()
         self.reduce_mean_false = ops.ReduceMean(keep_dims=False)
 
     def construct(self, id_hldr0, wt_hldr0):
         wide_embedding, deep_embedding = self.net(id_hldr0, wt_hldr0)
         l2_regu = self.reduce_mean_false(
-            self.square(self.net.deep_embeddinglookup.embedding_table)) / 2 * 8.e-5
+            self.square(self.net.deep_embeddinglookup.embedding_table)) / 2 * self.l2_coef
         return wide_embedding, deep_embedding, l2_regu
