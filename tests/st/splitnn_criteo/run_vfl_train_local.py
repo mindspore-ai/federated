@@ -14,7 +14,6 @@
 # ============================================================================
 """Local splitnn of wide and deep on criteo dataset."""
 
-import os
 import logging
 
 from mindspore import context, Tensor
@@ -32,16 +31,13 @@ def construct_local_dataset():
     """create dataset object according to config info."""
     path = config.data_path
     train_bs = config.batch_size
-    eval_bs = config.eval_batch_size
+    eval_bs = config.batch_size
     if config.dataset_type == "tfrecord":
         ds_type = DataType.TFRECORD
     elif config.dataset_type == "mindrecord":
         ds_type = DataType.MINDRECORD
     else:
         ds_type = DataType.H5
-
-    if not os.path.exists(config.load_path):
-        os.mkdir(config.load_path)
 
     train_dataset = create_dataset(path, batch_size=train_bs, data_type=ds_type)
     eval_dataset = create_dataset(path, train_mode=False, batch_size=eval_bs, data_type=ds_type)
