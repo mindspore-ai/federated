@@ -102,7 +102,7 @@ flatbuffers {
             println('the version of " + flatExePath " is not valid, try to find flac from server deps')
         }
     } else {
-        println('no env FLAT_EXE_PATH set, try to find flac from server deps')  
+        println('no env FLAT_EXE_PATH set, try to find flac from server deps')
     }
 
     String serFlatPath = projectDir.path + "/../../build/mindspore_federated/_deps/flatbuffers-src/_build/flatc"
@@ -134,7 +134,7 @@ def getCommitID() {
         standardOutput = out
     }
     println("the used commit_id: " + out.toString())
-    return out.toString()
+    return out.toString().trim()
 }
 
 version = '1.9.0'
