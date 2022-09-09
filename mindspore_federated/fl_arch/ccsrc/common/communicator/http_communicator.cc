@@ -25,7 +25,7 @@ void HttpCommunicator::RegisterRoundMsgCallback(const std::string &msg_type, con
     MS_EXCEPTION_IF_NULL(http_msg);
     try {
       size_t len = 0;
-      uint8_t *data = nullptr;
+      void *data = nullptr;
       if (!http_msg->GetPostMsg(&len, &data)) {
         FlStatus result(kInvalidInputs, "Get post message failed");
         http_msg->ErrorResponse(HTTP_INTERNAL, result);

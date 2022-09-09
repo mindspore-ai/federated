@@ -197,7 +197,7 @@ std::string HttpMessageHandler::GetUriFragment() const {
   return std::string(fragment);
 }
 
-bool HttpMessageHandler::GetPostMsg(size_t *len, uint8_t **buffer) {
+bool HttpMessageHandler::GetPostMsg(size_t *len, void **buffer) {
   MS_EXCEPTION_IF_NULL(event_request_);
   if (len == nullptr || buffer == nullptr) {
     MS_LOG(ERROR) << "Input parameter len or buffer cannot be nullptr";

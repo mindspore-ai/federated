@@ -56,49 +56,40 @@ void CloudWorker::Init() {
   http_client_ = std::make_shared<HttpClient>(http_server_address_);
 
   http_client_->SetMessageCallback([&](const std::shared_ptr<ResponseTrack> &response_track,
-                                       const std::string &kernel_path,
-                                       const std::shared_ptr<std::vector<unsigned char>> &response_msg) {
-    if (handlers_.count(kernel_path) <= 0) {
-      MS_LOG(WARNING) << "The kernel path of response message is invalid.";
-      return;
-    }
-    MS_LOG(DEBUG) << "Received the response"
-                  << ", kernel_path is " << kernel_path << ", request_id is " << response_track->request_id()
-                  << ", response_msg size is " << response_msg->size();
-    const auto &callback = handlers_[kernel_path];
-    callback(response_msg);
-    NotifyMessageArrival(response_track);
-  });
+                                       const std::string &msg_type) { NotifyMessageArrival(response_track); });
 
   http_client_->Init();
 }
 
-bool CloudWorker::SendToServerSync(const std::string kernel_path, const std::string content_type, const void *data,
-                                   size_t data_size) {
-  MS_ERROR_IF_NULL_W_RET_VAL(data, false);
+std::shared_ptr<std::vector<unsigned char>> CloudWorker::SendToServerSync(const void *data, size_t data_size,
+                                                                          const std::string &msg_type,
+                                                                          const std::string &content_type) {
+  MS_ERROR_IF_NULL_W_RET_VAL(data, nullptr);
   if (data_size == 0) {
     MS_LOG(WARNING) << "Sending request for data size must be > 0";
-    return false;
+    return nullptr;
   }
   auto request_track = AddMessageTrack(1, nullptr);
-  if (!http_client_->SendMessage(kernel_path, content_type, data, data_size, request_track)) {
-    MS_LOG(WARNING) << "Sending request for " << kernel_path << " to server " << http_server_address_ << " failed.";
-    return false;
+  if (!http_client_->SendMessage(data, data_size, request_track, msg_type, content_type)) {
+    MS_LOG(WARNING) << "Sending request for msg type:" << msg_type << " to server " << http_server_address_
+                    << " failed.";
+    return nullptr;
   }
   if (!Wait(request_track)) {
+    MS_LOG(WARNING) << "Sending http message timeout.";
     http_client_->BreakLoopEvent();
-    return false;
+    return nullptr;
   }
-  return true;
+  return http_client_->response_msg();
 }
 
-void CloudWorker::RegisterMessageCallback(const std::string kernel_path, const MessageReceive &cb) {
-  if (handlers_.count(kernel_path) > 0) {
-    MS_LOG(DEBUG) << "Http handlers has already register kernel path:" << kernel_path;
+void CloudWorker::RegisterMessageCallback(const std::string msg_type, const MessageReceive &cb) {
+  if (handlers_.count(msg_type) > 0) {
+    MS_LOG(DEBUG) << "Http handlers has already register msg type:" << msg_type;
     return;
   }
-  handlers_[kernel_path] = cb;
-  MS_LOG(INFO) << "Http handlers register kernel path:" << kernel_path;
+  handlers_[msg_type] = cb;
+  MS_LOG(INFO) << "Http handlers register msg type:" << msg_type;
 }
 
 void CloudWorker::set_fl_iteration_num(uint64_t iteration_num) { iteration_num_ = iteration_num; }

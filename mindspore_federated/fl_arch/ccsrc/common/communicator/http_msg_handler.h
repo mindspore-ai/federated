@@ -26,7 +26,7 @@ namespace fl {
 constexpr int kHttpSuccess = 200;
 class HttpMsgHandler : public MessageHandler {
  public:
-  HttpMsgHandler(const std::shared_ptr<HttpMessageHandler> &http_msg, uint8_t *data, size_t len);
+  HttpMsgHandler(const std::shared_ptr<HttpMessageHandler> &http_msg, void* data, size_t len);
   ~HttpMsgHandler() override = default;
 
   const void *data() const override;
@@ -36,7 +36,7 @@ class HttpMsgHandler : public MessageHandler {
 
  private:
   std::shared_ptr<HttpMessageHandler> http_msg_;
-  uint8_t *data_;
+  void *data_;
   size_t len_;
 };
 }  // namespace fl

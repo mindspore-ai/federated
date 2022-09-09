@@ -61,12 +61,29 @@ class UpdateModelKernelMod : public AbstractKernel {
     FBBuilder fbb;
     if (!BuildUpdateModelReq(&fbb, *weight_datas)) {
       MS_LOG(EXCEPTION) << "Building request for FusedPushWeight failed.";
+    }
+    auto response_msg =
+      fl::worker::CloudWorker::GetInstance().SendToServerSync(fbb.GetBufferPointer(), fbb.GetSize(), kernel_path_);
+    if (response_msg == nullptr) {
+      MS_LOG(WARNING) << "The response message is invalid.";
       return false;
     }
-    if (!fl::worker::CloudWorker::GetInstance().SendToServerSync(kernel_path_, HTTP_CONTENT_TYPE_URL_ENCODED,
-                                                                 fbb.GetBufferPointer(), fbb.GetSize())) {
-      MS_LOG(WARNING) << "Sending request for UpdateModel to server failed.";
+    flatbuffers::Verifier verifier(response_msg->data(), response_msg->size());
+    if (!verifier.VerifyBuffer<schema::ResponseUpdateModel>()) {
+      MS_LOG(WARNING) << "The schema of response message is invalid.";
+      return false;
     }
+    const schema::ResponseFLJob *update_model_rsp = flatbuffers::GetRoot<schema::ResponseFLJob>(response_msg->data());
+    MS_ERROR_IF_NULL_W_RET_VAL(update_model_rsp, false);
+    auto response_code = update_model_rsp->retcode();
+    switch (response_code) {
+      case schema::ResponseCode_SUCCEED:
+      case schema::ResponseCode_OutOfTime:
+        break;
+      default:
+        MS_LOG(ERROR) << "Launching update model for worker failed. Reason: " << update_model_rsp->reason();
+    }
+    MS_LOG(INFO) << "Launching update model for worker successful";
     return true;
   }
 
@@ -91,27 +108,6 @@ class UpdateModelKernelMod : public AbstractKernel {
                              "and P.GetKeys() have been executed before updateModel.";
       }
     }
-
-    fl::worker::CloudWorker::GetInstance().RegisterMessageCallback(
-      kernel_path_, [this](const std::shared_ptr<std::vector<unsigned char>> &response_msg) {
-        flatbuffers::Verifier verifier(response_msg->data(), response_msg->size());
-        if (!verifier.VerifyBuffer<schema::ResponseUpdateModel>()) {
-          MS_LOG(WARNING) << "The schema of response message is invalid.";
-          return;
-        }
-        const schema::ResponseFLJob *update_model_rsp =
-          flatbuffers::GetRoot<schema::ResponseFLJob>(response_msg->data());
-        MS_ERROR_IF_NULL_WO_RET_VAL(update_model_rsp);
-        auto response_code = update_model_rsp->retcode();
-        switch (response_code) {
-          case schema::ResponseCode_SUCCEED:
-          case schema::ResponseCode_OutOfTime:
-            break;
-          default:
-            MS_LOG(ERROR) << "Launching update model for worker failed. Reason: " << update_model_rsp->reason();
-        }
-        MS_LOG(INFO) << "Launching update model for worker successful";
-      });
     MS_LOG(INFO) << "Initializing UpdateModel kernel. fl_name: " << fl_name_ << ", fl_id: " << fl_id_
                  << ". Request will be sent to server, Encrypt type: " << encrypt_type_;
   }

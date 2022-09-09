@@ -25,33 +25,15 @@ bool GetKeysKernelMod::Launch() {
   FBBuilder fbb;
   BuildGetKeysReq(&fbb);
 
-  if (!fl::worker::CloudWorker::GetInstance().SendToServerSync(kernel_path_, HTTP_CONTENT_TYPE_URL_ENCODED,
-                                                               fbb.GetBufferPointer(), fbb.GetSize())) {
-    MS_LOG(WARNING) << "Sending request for getKeys to server failed.";
-    return false;
-  }
-
-  MS_LOG(INFO) << "Get keys successfully.";
-  return true;
-}
-
-void GetKeysKernelMod::Init() {
-  fl_id_ = fl::worker::CloudWorker::GetInstance().fl_id();
-
-  kernel_path_ = "/getKeys";
-  MS_LOG(INFO) << "Initializing GetKeys kernel"
-               << ", fl_id: " << fl_id_;
-
-  fl::worker::CloudWorker::GetInstance().RegisterMessageCallback(
-    kernel_path_, [&](const std::shared_ptr<std::vector<unsigned char>> &response_msg) {
+  auto response_msg = fl::worker::CloudWorker::GetInstance().SendToServerSync(
+                                                               fbb.GetBufferPointer(), fbb.GetSize(), kernel_path_);
       if (response_msg == nullptr) {
         MS_LOG(EXCEPTION) << "Received message pointer is nullptr.";
-        return;
       }
       flatbuffers::Verifier verifier(response_msg->data(), response_msg->size());
       if (!verifier.VerifyBuffer<schema::ReturnExchangeKeys>()) {
         MS_LOG(WARNING) << "The schema of response message is invalid.";
-        return;
+        return false;
       }
       const schema::ReturnExchangeKeys *get_keys_rsp =
         flatbuffers::GetRoot<schema::ReturnExchangeKeys>(response_msg->data());
@@ -65,8 +47,16 @@ void GetKeysKernelMod::Init() {
       if (!save_keys_succeed) {
         MS_LOG(EXCEPTION) << "Save received remote keys failed.";
       }
-      return;
-    });
+  MS_LOG(INFO) << "Get keys successfully.";
+  return true;
+}
+
+void GetKeysKernelMod::Init() {
+  fl_id_ = fl::worker::CloudWorker::GetInstance().fl_id();
+
+  kernel_path_ = "/getKeys";
+  MS_LOG(INFO) << "Initializing GetKeys kernel"
+               << ", fl_id: " << fl_id_;
 
   MS_LOG(INFO) << "Initialize GetKeys kernel successfully.";
 }

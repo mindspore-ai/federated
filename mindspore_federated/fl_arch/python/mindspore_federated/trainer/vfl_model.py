@@ -13,7 +13,6 @@
 # limitations under the License.
 # ============================================================================
 """Classes and methods for modeling network of vfl parties in the scenario of splitnn."""
-
 from collections import OrderedDict
 
 from mindspore import nn, context

@@ -54,57 +54,51 @@ class GetModelKernelMod : public AbstractKernel {
     if (!BuildGetModelReq(&fbb)) {
       MS_LOG(EXCEPTION) << "Building request for FusedPushWeight failed.";
     }
-    bool get_model_success = false;
-    fl::worker::CloudWorker::GetInstance().RegisterMessageCallback(
-      kernel_path_, [&](const std::shared_ptr<std::vector<unsigned char>> &response_msg) {
-        flatbuffers::Verifier verifier(response_msg->data(), response_msg->size());
-        if (!verifier.VerifyBuffer<schema::ResponseGetModel>()) {
-          MS_LOG(DEBUG) << "The schema of response message is invalid.";
-          return;
-        }
-        const schema::ResponseGetModel *get_model_rsp =
-          flatbuffers::GetRoot<schema::ResponseGetModel>(response_msg->data());
-        MS_ERROR_IF_NULL_WO_RET_VAL(get_model_rsp);
-        auto response_code = get_model_rsp->retcode();
-        if (response_code == schema::ResponseCode_SUCCEED) {
-          get_model_success = true;
-        } else if (response_code == schema::ResponseCode_SucNotReady) {
-          MS_LOG(INFO) << "Get model response code from server is not ready.";
-          return;
-        } else {
-          MS_LOG(ERROR) << "Launching get model for worker failed. Reason: " << get_model_rsp->reason();
-        }
-
-        auto feature_map = get_model_rsp->feature_map();
-        MS_EXCEPTION_IF_NULL(feature_map);
-
-        if (feature_map->size() == 0) {
-          MS_LOG(EXCEPTION) << "Feature map after GetModel is empty.";
-        }
-        for (size_t i = 0; i < feature_map->size(); i++) {
-          const auto &feature_fbs = feature_map->Get(i);
-          const auto &feature_data_fbs = feature_fbs->data();
-
-          std::string weight_fullname = feature_fbs->weight_fullname()->str();
-          float *weight_data = const_cast<float *>(feature_data_fbs->data());
-          std::vector<float> weight_data_vec(weight_data, weight_data + feature_data_fbs->size());
-          dict_data[py::str(weight_fullname)] = weight_data_vec;
-        }
-        MS_LOG(INFO) << "Get model from server successful.";
-      });
-
     size_t retryTimes = 0;
-    while (!get_model_success && retryTimes < kRetryTimesOfGetModel) {
-      if (!fl::worker::CloudWorker::GetInstance().SendToServerSync(kernel_path_, HTTP_CONTENT_TYPE_URL_ENCODED,
-                                                                   fbb.GetBufferPointer(), fbb.GetSize())) {
-        MS_LOG(WARNING) << "Sending request for GetModel to server failed.";
-        break;
+    while (retryTimes < kRetryTimesOfGetModel) {
+      auto response_msg =
+        fl::worker::CloudWorker::GetInstance().SendToServerSync(fbb.GetBufferPointer(), fbb.GetSize(), kernel_path_);
+
+      if (response_msg == nullptr) {
+        MS_LOG(WARNING) << "The response message is invalid.";
+        continue;
       }
       retryTimes += 1;
       std::this_thread::sleep_for(std::chrono::milliseconds(kSleepMillisecondsOfGetModel));
-    }
-    if (!get_model_success) {
-      MS_LOG(WARNING) << "Get model from server failed.";
+      flatbuffers::Verifier verifier(response_msg->data(), response_msg->size());
+      if (!verifier.VerifyBuffer<schema::ResponseGetModel>()) {
+        MS_LOG(INFO) << "The schema of response message is invalid.";
+        continue;
+      }
+      const schema::ResponseGetModel *get_model_rsp =
+        flatbuffers::GetRoot<schema::ResponseGetModel>(response_msg->data());
+      MS_ERROR_IF_NULL_W_RET_VAL(get_model_rsp, dict_data);
+      auto response_code = get_model_rsp->retcode();
+      if (response_code == schema::ResponseCode_SUCCEED) {
+      } else if (response_code == schema::ResponseCode_SucNotReady) {
+        MS_LOG(INFO) << "Get model response code from server is not ready.";
+        continue;
+      } else {
+        MS_LOG(EXCEPTION) << "Launching get model for worker failed. Reason: " << get_model_rsp->reason();
+      }
+      auto feature_map = get_model_rsp->feature_map();
+      MS_EXCEPTION_IF_NULL(feature_map);
+
+      if (feature_map->size() == 0) {
+        MS_LOG(WARNING) << "Feature map after GetModel is empty.";
+        continue;
+      }
+      for (size_t i = 0; i < feature_map->size(); i++) {
+        const auto &feature_fbs = feature_map->Get(i);
+        const auto &feature_data_fbs = feature_fbs->data();
+
+        std::string weight_fullname = feature_fbs->weight_fullname()->str();
+        float *weight_data = const_cast<float *>(feature_data_fbs->data());
+        std::vector<float> weight_data_vec(weight_data, weight_data + feature_data_fbs->size());
+        dict_data[py::str(weight_fullname)] = weight_data_vec;
+      }
+      MS_LOG(INFO) << "Get model from server successful.";
+      break;
     }
     return dict_data;
   }
