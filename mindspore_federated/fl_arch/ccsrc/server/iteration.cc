@@ -88,7 +88,8 @@ void Iteration::InitIteration(const std::shared_ptr<ServerNode> &server_node,
   instance_name_ = FLContext::instance()->instance_name();
   if (instance_name_.empty()) {
     MS_LOG(WARNING) << "instance name is empty";
-    instance_name_ = "instance_" + fl::CommUtil::GetNowTime().time_str_second;
+    instance_name_ = "instance_" + fl::CommUtil::GetNowTime().time_str_mill;
+    FLContext::instance()->set_instance_name(instance_name_);
   }
   InitConfig();
   InitEventTxtFile();
@@ -474,8 +475,8 @@ void Iteration::InitGlobalIterTimer() {
 
 void Iteration::InitConfig() {
   data_rate_file_path_ = FLContext::instance()->data_rate_dir();
-  if (data_rate_file_path_.empty()) {
-    MS_LOG(EXCEPTION) << "Failed to get data rate file path from config file";
+  if (!data_rate_file_path_.empty() &&CommUtil::CreateDirectory(data_rate_file_path_)) {
+    MS_LOG(INFO) << "Create Directory :" << data_rate_file_path_ << " success.";
   }
   event_file_path_ = FLContext::instance()->failure_event_file();
   if (event_file_path_.empty()) {
@@ -487,21 +488,31 @@ void Iteration::StartThreadToRecordDataRate() {
   MS_LOG(INFO) << "Start to create a thread to record data rate";
   data_rate_thread_ = std::thread([&]() {
     std::fstream file_stream;
-    MS_LOG(DEBUG) << "The data rate file path is " << data_rate_file_path_;
+    MS_LOG(INFO) << "The data rate file path is " << data_rate_file_path_;
     auto tcp_address = server_node_->tcp_address();
-    while (is_date_rate_thread_running_) {
+    while (is_date_rate_thread_running_ && !data_rate_file_path_.empty()) {
       // record data every 60 seconds
       std::this_thread::sleep_for(std::chrono::seconds(60));
-      auto now_time = fl::CommUtil::GetNowTime();
-      std::string data_rate_file =
-        data_rate_file_path_ + "/" + now_time.time_str_day + "_flow_server_" + tcp_address + ".json";
+      auto time_now = std::chrono::system_clock::now();
+      std::time_t tt = std::chrono::system_clock::to_time_t(time_now);
+      struct tm ptm;
+      (void)localtime_r(&tt, &ptm);
+      std::ostringstream time_day_oss;
+      time_day_oss << std::put_time(&ptm, "%Y-%m-%d");
+      std::string time_day = time_day_oss.str();
+      std::string data_rate_file;
+      if (data_rate_file_path_ == ".") {
+        data_rate_file = time_day + "_flow_server" + tcp_address + ".json";
+      } else {
+        data_rate_file = data_rate_file_path_ + "/" + time_day + "_flow_server" + tcp_address + ".json";
+      }
       file_stream.open(data_rate_file, std::ios::out | std::ios::app);
       if (!file_stream.is_open()) {
-        MS_LOG(EXCEPTION) << data_rate_file << "is not open!";
+        MS_LOG(WARNING) << data_rate_file << "is not open! Please check config file!";
         return;
       }
-      std::multimap<uint64_t, size_t> send_datas;
-      std::multimap<uint64_t, size_t> receive_datas;
+      std::map<uint64_t, size_t> send_datas;
+      std::map<uint64_t, size_t> receive_datas;
       for (const auto &round : rounds_) {
         if (round == nullptr) {
           MS_LOG(WARNING) << "round is nullptr";
@@ -509,47 +520,57 @@ void Iteration::StartThreadToRecordDataRate() {
         }
         auto send_data = round->GetSendData();
         for (const auto &it : send_data) {
-          send_datas.emplace(it);
+          if (send_datas.find(it.first) != send_datas.end()) {
+            send_datas[it.first] = send_datas[it.first] + it.second;
+          } else {
+            send_datas.emplace(it);
+          }
         }
         auto receive_data = round->GetReceiveData();
         for (const auto &it : receive_data) {
-          receive_datas.emplace(it);
+          if (receive_datas.find(it.first) != receive_datas.end()) {
+            receive_datas[it.first] = receive_datas[it.first] + it.second;
+          } else {
+            receive_datas.emplace(it);
+          }
         }
         round->ClearData();
       }
-      // One minute need record 60 groups of send data
-      std::vector<size_t> send_data_rates(60, 0);
-      for (const auto &it : send_datas) {
-        uint64_t millisecond = it.first - send_datas.begin()->first;
-        uint64_t second = millisecond / 1000;
-        if (second > kLastSecond) {
-          send_data_rates[kLastSecond] = send_data_rates[kLastSecond] + it.second;
-        } else {
-          send_data_rates[second] = send_data_rates[second] + it.second;
-        }
-      }
 
-      // One minute need record 60 groups of receive data
-      std::vector<size_t> receive_data_rates(60, 0);
-      for (const auto &it : receive_datas) {
-        uint64_t millisecond = it.first - receive_datas.begin()->first;
-        uint64_t second = millisecond / 1000;
-        if (second > kLastSecond) {
-          receive_data_rates[kLastSecond] = receive_data_rates[kLastSecond] + it.second;
+      std::map<uint64_t, std::vector<size_t>> all_datas;
+      for (auto &it : send_datas) {
+        std::vector<size_t> send_and_receive_data;
+        send_and_receive_data.emplace_back(it.second);
+        send_and_receive_data.emplace_back(0);
+        all_datas.emplace(it.first, send_and_receive_data);
+      }
+      for (auto &it : receive_datas) {
+        if (all_datas.find(it.first) != all_datas.end()) {
+          std::vector<size_t> &temp = all_datas.at(it.first);
+          temp[1] = it.second;
         } else {
-          receive_data_rates[second] = receive_data_rates[second] + it.second;
+          std::vector<size_t> send_and_receive_data;
+          send_and_receive_data.emplace_back(0);
+          send_and_receive_data.emplace_back(it.second);
+          all_datas.emplace(it.first, send_and_receive_data);
         }
       }
-      nlohmann::json js;
-      auto minute_time = now_time.time_str_second;
-      js["time"] = minute_time;
-      js["send"] = send_data_rates;
-      js["receive"] = receive_data_rates;
-      file_stream << js << "\n";
-      (void)file_stream.flush();
-      file_stream.close();
+      for (auto &it : all_datas) {
+        nlohmann::json js;
+        auto data_time = static_cast<time_t>(it.first);
+        struct tm data_tm;
+        (void)localtime_r(&data_time, &data_tm);
+        std::ostringstream oss_second;
+        oss_second << std::put_time(&data_tm, "%Y-%m-%d %H:%M:%S");
+        js["time"] = oss_second.str();
+        js["send"] = it.second[0];
+        js["receive"] = it.second[1];
+        file_stream << js << "\n";
+      }
+      (void)file_stream.close();
     }
   });
+  return;
 }
 
 void Iteration::Stop() {

@@ -80,7 +80,8 @@ class FusedPushWeightKernelMod : public AbstractKernel {
       if (retcode == schema::ResponseCode_SucNotReady) {
         std::this_thread::sleep_for(std::chrono::milliseconds(kRetryDurationOfPushWeights));
         fl_iteration_ = push_weight_rsp->iteration();
-        MS_LOG(DEBUG) << "Server is not ready for pushing weight yet. Reason: " << push_weight_rsp->reason()->str()
+        MS_LOG(DEBUG) << "Server is not ready for pushing weight yet. Push weight rsp iteration is "
+                      << push_weight_rsp->iteration() << ". Reason: " << push_weight_rsp->reason()->str()
                       << ". Retry later.";
         continue;
       } else if (retcode != schema::ResponseCode_SUCCEED) {

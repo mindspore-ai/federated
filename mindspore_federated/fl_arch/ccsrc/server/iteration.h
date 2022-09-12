@@ -125,7 +125,7 @@ class Iteration {
   std::thread data_rate_thread_;
 
   // The state of data rate thread
-  std::atomic_bool is_date_rate_thread_running_ = false;
+  std::atomic_bool is_date_rate_thread_running_ = true;
 
   // The instance name, just used for metrics
   std::string instance_name_;

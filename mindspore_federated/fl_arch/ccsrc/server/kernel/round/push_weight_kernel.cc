@@ -29,12 +29,13 @@ bool PushWeightKernel::Launch(const uint8_t *req_data, size_t len, const std::sh
   auto current_iter = cache::InstanceContext::Instance().iteration_num();
   auto fl_status = OnReceiveModelWeight(req_data, len);
   if (!fl_status.IsSuccess()) {
-    BuildPushWeightRsp(&fbb, schema::ResponseCode_RequestError, fl_status.StatusMessage(), current_iter);
+    BuildPushWeightRsp(&fbb, schema::ResponseCode_SucNotReady, fl_status.StatusMessage(), current_iter);
     SendResponseMsg(message, fbb.GetBufferPointer(), fbb.GetSize());
     return true;
   }
   BuildPushWeightRsp(&fbb, schema::ResponseCode_SUCCEED, "PushWeight succeed.", current_iter);
   SendResponseMsg(message, fbb.GetBufferPointer(), fbb.GetSize());
+  MS_LOG(INFO) << "Launching PushWeightKernel successful.";
   return true;
 }
 
