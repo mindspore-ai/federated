@@ -27,7 +27,6 @@ from mindspore import dtype as mstype
 from .vfl_pb2 import DataType, TensorListProto, TensorProto
 
 
-
 def parse_yaml_file(file_path):
     yaml_path = os.path.abspath(file_path)
     if not os.path.exists(file_path):
@@ -48,12 +47,40 @@ class YamlDataParser:
         self.role = yaml_data['role']
         model_data = yaml_data['model']
         self.train_net = model_data['train_net']
+        self.train_net_ins = [input_config['name'] for input_config in self.train_net['inputs']]
+        self.train_net_outs = [output_config['name'] for output_config in self.train_net['outputs']]
         self.eval_net = model_data['eval_net']
         self.opt_list = yaml_data['opts']
         if 'grad_scales' in yaml_data:
             self.grad_scaler_list = yaml_data['grad_scales']
         self.dataset = yaml_data['dataset']
         self.train_hyper_parameters = yaml_data['train_hyper_parameters']
+        self._check_opts()
+        self._check_grad_scales()
+
+    def _check_opts(self):
+        """check whether the parameters defined in opts is logical"""
+        for opt_config in self.opt_list:
+            for grad_config in opt_config['grads']:
+                grad_inputs = {grad_in['name'] for grad_in in grad_config['inputs']}
+                if not grad_inputs.issubset(self.train_net_ins):
+                    raise ValueError('optimizer %s config error: containing undefined inputs' % opt_config['type'])
+                grad_out = grad_config['output']['name']
+                if grad_out not in self.train_net_outs:
+                    raise ValueError('optimizer %s config error: containing undefined output %s'
+                                     % (opt_config['type'], grad_out))
+                if not isinstance('sens', (str, int, float)):
+                    raise ValueError('optimizer %s config error: unsupported sens type of grads' % opt_config['type'])
+
+    def _check_grad_scales(self):
+        """check whether the parameters defined in grad_scales is logical"""
+        for grad_scale_config in self.grad_scaler_list:
+            grad_scale_ins = {grad_scale_in['name'] for grad_scale_in in grad_scale_config['inputs']}
+            if not grad_scale_ins.issubset(self.train_net_ins):
+                raise ValueError('grad_scales config error: containing undefined inputs')
+            grad_scale_out = grad_scale_config['output']['name']
+            if grad_scale_out not in self.train_net_outs:
+                raise ValueError('grad_scales config error: containing undefined output %s' % grad_scale_out)
 
 
 def get_params_list_by_name(net, name):

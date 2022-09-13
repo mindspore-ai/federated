@@ -34,11 +34,7 @@ opts: # define ms optimizer
           - name: wt_hldr0
         output:
           name: wide_embedding
-          index: 0
-        sens: wide_scale
-        get_all: False
-        get_by_list: True
-        sens_param: True
+        sens: wide_loss
     params:
       - name: wide
     hyper_parameters:
@@ -54,21 +50,13 @@ opts: # define ms optimizer
           - name: wt_hldr0
         output:
           name: deep_embedding
-          index: 1
-        sens: deep_scale
-        get_all: False
-        get_by_list: True
-        sens_param: True
+        sens: deep_loss
       - inputs:
           - name: id_hldr0
           - name: wt_hldr0
         output:
           name: l2_regu
-          index: 2
         sens: 1024.0
-        get_all: False
-        get_by_list: True
-        sens_param: True
     params:
       - name: deep
       - name: dense
