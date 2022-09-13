@@ -25,7 +25,6 @@ summary:
   metrics_file: "metrics.json"
   failure_event_file: "event.txt"
   continuous_failure_times: 10
-  data_rate_dir: ".."
   participation_time_level: "5,15"
 
 encrypt:

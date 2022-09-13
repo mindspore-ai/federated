@@ -137,8 +137,7 @@ void Round::LaunchRoundKernel(const std::shared_ptr<MessageHandler> &message) {
   }
   Iteration::GetInstance().OnRoundLaunchEnd();
 
-  auto time = fl::CommUtil::GetNowTime().time_stamp;
-  kernel_->RecordReceiveData(std::make_pair(time, message->len()));
+  kernel_->CalculateReceiveData(message->len());
 }
 
 void Round::Reset() {
@@ -270,9 +269,9 @@ void Round::ResetParticipationTimeAndNum() {
   return;
 }
 
-std::multimap<uint64_t, size_t> Round::GetSendData() const { return kernel_->GetSendData(); }
+std::map<uint64_t, size_t> Round::GetSendData() const { return kernel_->GetSendData(); }
 
-std::multimap<uint64_t, size_t> Round::GetReceiveData() const { return kernel_->GetReceiveData(); }
+std::map<uint64_t, size_t> Round::GetReceiveData() const { return kernel_->GetReceiveData(); }
 
 void Round::ClearData() { return kernel_->ClearData(); }
 }  // namespace server

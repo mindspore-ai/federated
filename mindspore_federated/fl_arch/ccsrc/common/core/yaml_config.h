@@ -55,7 +55,7 @@ struct SummaryConfig {
   uint64_t continuous_failure_times = 10;
   std::string metrics_file = "metrics.json";
   std::string failure_event_file = "event.txt";
-  std::string data_rate_dir = "..";
+  std::string data_rate_dir = "";
 };
 
 enum CompareOp {
