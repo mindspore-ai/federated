@@ -47,7 +47,30 @@ class TaskExecutor {
 
   // If the number of submitted tasks is greater than the size of the queue, it will block the submission of subsequent
   // tasks until timeout.
-  bool Submit(const std::function<void()> &task);
+  template <typename Fun, typename... Args>
+  bool Submit(Fun &&function, Args &&...args) {
+    constexpr int64_t kSubmitTaskIntervalInMs = 1;
+    auto callee = std::bind(function, args...);
+    std::function<void()> task = [callee]() -> void { callee(); };
+    for (size_t i = 0; i < submit_timeout_; i++) {
+      std::unique_lock<std::mutex> lock(mtx_);
+      if (has_stopped_) {
+        MS_LOG(INFO) << "Submit task failed, task executor has stopped";
+        return false;
+      }
+      if (task_queue_.size() < max_task_num_) {
+        task_queue_.push(task);
+        lock.unlock();
+        cv_.notify_all();
+        return true;
+      }
+      lock.unlock();
+      std::this_thread::sleep_for(std::chrono::milliseconds(kSubmitTaskIntervalInMs));
+    }
+    MS_LOG(WARNING) << "Submit task failed after " << submit_timeout_ << " ms.";
+    return false;
+  }
+
   void Stop();
 
  private:

@@ -37,9 +37,41 @@ enum NodeStatusCode {
   DO_NOT_USE_RESERVED_FOR_FUTURE_EXPANSION_USE_DEFAULT_IN_SWITCH_INSTEAD_ = 20;
 }
 
-
-
 message CountRequest {
   string name = 1;
   string id = 2;
+}
+
+message ClientPSIInitProto {
+  uint64 bin_id = 1;
+  string psi_type = 2;
+  uint64 self_size = 3;
+}
+
+message ServerPSIInitProto {
+  uint64 bin_id = 1;
+  uint64 self_size = 2;
+  string self_role = 3;
+}
+
+message BobPbProto {
+  uint64 bin_id = 1;
+  repeated bytes p_b_vct = 2;
+}
+
+message AlicePbaAndBFProto {
+  uint64 bin_id = 1;
+  repeated bytes p_b_a_vct = 2;
+  bytes bf_alice = 3;
+}
+
+message BobAlignResultProto {
+  uint64 bin_id = 1;
+  repeated bytes align_result = 2;
+}
+
+message AliceCheckProto {
+  uint64 bin_id = 1;
+  uint64 wrong_num = 2;
+  repeated bytes wrong_id = 3;
 }
