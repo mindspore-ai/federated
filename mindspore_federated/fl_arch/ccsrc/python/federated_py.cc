@@ -20,6 +20,7 @@
 #include <pybind11/stl.h>
 #include "common/utils/python_adapter.h"
 #include "common/fl_context.h"
+#include "armour/secure_protocol/psi.h"
 #include "python/federated_job.h"
 #include "python/feature_py.h"
 #include "worker/kernel/start_fl_job_kernel.h"
@@ -86,6 +87,9 @@ void InitTensorListItemPy(const py::module &m) {
 
 // cppcheck-suppress syntaxError
 PYBIND11_MODULE(_mindspore_federated, m) {
+  m.def("RunPsiDemo", &mindspore::fl::psi::RunPsiDemo, "run psi demo", py::arg("alice_list"), py::arg("bob_list"));
+  m.def("RunPsi", &mindspore::fl::psi::RunPSI, "run psi");
+
   (void)py::class_<FederatedJob, std::shared_ptr<FederatedJob>>(m, "Federated_")
     .def_static("start_federated_server", &FederatedJob::StartFederatedServer)
     .def_static("start_federated_scheduler", &FederatedJob::StartFederatedScheduler)
