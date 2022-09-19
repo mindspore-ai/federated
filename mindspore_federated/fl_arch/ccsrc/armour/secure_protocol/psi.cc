@@ -22,6 +22,7 @@
 #include "armour/base_crypto/hash.h"
 #include "armour/util/io_util.h"
 #include "armour/secure_protocol/psi.h"
+#include "vertical/vertical_server.h"
 
 namespace mindspore {
 namespace fl {
@@ -371,124 +372,179 @@ std::vector<std::string> RunPsiDemo(const std::vector<std::string> &alice_input,
 }
 
 std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx) {
-  if (psi_ctx.role == "alice") {
-    MS_LOG(INFO) << "[outline 600s] alice start computing p1^a...";
+  std::vector<std::string> align_results_vector;
+  auto &verticalServer = VerticalServer::GetInstance();
+  if (psi_ctx.role == "bob") {
+    // alice
+    MS_LOG(INFO) << "[outline] Alice start computing p1^a...";
     auto p_a_vct = psi_ctx.ecc->HashToCurveAndMul(psi_ctx.input_hash_vct, LENGTH_32, psi_ctx.compare_length);
     BloomFilter bf_alice(p_a_vct, psi_ctx.neg_log_fp_rate);
+    MS_LOG(INFO) << "Bloom filter bit array size is: " << bf_alice.bitArrayByteLen() << "Bytes.";
 
-    // 2. recv(BobPbProto)
-    auto recv_p_b_vct = ReadFileAndDeserialize("p2_b", psi_ctx.peer_num, psi_ctx.compress_length);  // recv
-    MS_LOG(INFO) << "[400s] alice start decompress and compute p2^b^a ";
-    auto p_b_a_vct = psi_ctx.ecc->DcpsAndMul(recv_p_b_vct, psi_ctx.compress_length, psi_ctx.compress_length);
-    // 3. send(AlicePbaAndBFProto)
-    AlicePbaAndBF alicePbaAndBf(psi_ctx.bin_id, p_b_a_vct, bf_alice.GetData());
-    Send(alicePbaAndBf);
+    MS_LOG(INFO) << "Alice start decompress and compute p2^b^a -------------------------- 2. alice recv bob_p_b "
+                    "-----------------------";
+    BobPb bob_p_b_recv;
+    verticalServer.Receive(&bob_p_b_recv);
+    auto p_b_a_vct = psi_ctx.ecc->DcpsAndMul(bob_p_b_recv.p_b_vct(), psi_ctx.compress_length, psi_ctx.compress_length);
 
-    // 6. recv(BobAlignResultProto)
-    if (!psi_ctx.need_check) {
-      return p_b_a_vct;
-    } else {
-      std::vector<std::string> wrong_vct;
-      std::vector<std::string> fix_vct;
-      auto recv_align_vct = ReadFile("bob_result_temp.csv");
-      fix_vct.reserve(recv_align_vct.size());
-      FindWrong(psi_ctx, recv_align_vct, &wrong_vct, &fix_vct);
+    MS_LOG(INFO) << " -------------------------- 3. alice send AlicePbaAndBFProto ------------------------";
+    AlicePbaAndBF alice_p_b_a_bf(psi_ctx.bin_id, p_b_a_vct, bf_alice.GetData());
+    verticalServer.Send(alice_p_b_a_bf);
 
-      // 7. send(AliceCheckProto)
-      AliceCheck aliceCheck(psi_ctx.bin_id, wrong_vct.size(), wrong_vct);
-      Send(aliceCheck);
-      return fix_vct;
-    }
+    MS_LOG(INFO) << "-------------------------- 6. alice recv align -----------------------";
+    std::vector<std::string> wrong_vct;
+    std::vector<std::string> fix_vct;
+    BobAlignResult bob_align_result_recv;
+    verticalServer.Receive(&bob_align_result_recv);
+    FindWrong(psi_ctx, bob_align_result_recv.align_result(), &wrong_vct, &fix_vct);
+    MS_LOG(INFO) << "-------------------------- 7. alice send wrong_id -----------------------";
+    AliceCheck alice_check(psi_ctx.bin_id, wrong_vct.size(), wrong_vct);
+    verticalServer.Send(alice_check);
   } else {
-    MS_LOG(INFO) << "[outline 600s] bob start computing p2^b...";
+    // bob
+    MS_LOG(INFO) << "[outline] Bob start computing p2^b...";
     auto p_b_vct =
       psi_ctx.ecc->HashToCurveAndMul(psi_ctx.input_hash_vct, psi_ctx.compress_length, psi_ctx.compress_length);
-    // 1. send(BobPbProto)
-    BobPb bobPb(psi_ctx.bin_id, p_b_vct);
-    Send(bobPb);
-    //-----------------------------------
+    MS_LOG(INFO) << "-------------------------- 1. bob send bobPb -----------------------";
+    BobPb bob_p_b(psi_ctx.bin_id, p_b_vct);
+    verticalServer.Send(bob_p_b);
+
     // bob
-    MS_LOG(INFO) << "[400s] bob start decompress and compute p2^b^a^(b^-1) ";
-    // 4. recv(AlicePbaAndBFProto)
-    auto recv_p_b_a_vct = ReadFileAndDeserialize("p2_b_a", psi_ctx.self_num, psi_ctx.compress_length);
-    auto p_b_a_bI_vct = psi_ctx.ecc->DcpsAndInverseMul(recv_p_b_a_vct, LENGTH_32, psi_ctx.compare_length);
+    MS_LOG(INFO) << "Bob start decompress and compute p2^b^a^(b^-1) -------------------------- 4. bob recv "
+                    "alice_p_b_a_bf -----------------------";
+    AlicePbaAndBF alice_p_b_a_bf_recv;
+    verticalServer.Receive(&alice_p_b_a_bf_recv);
+    auto p_b_a_bI_vct =
+      psi_ctx.ecc->DcpsAndInverseMul(alice_p_b_a_bf_recv.p_b_a_vct(), LENGTH_32, psi_ctx.compare_length);
 
-    // bob do align
-    auto recv_bf_alice = ReadFileAndBuildFilter("bf_alice", psi_ctx.peer_num, psi_ctx.neg_log_fp_rate);
-    auto align_results_vector = Align(p_b_a_bI_vct, recv_bf_alice, psi_ctx);
+    BloomFilter bf_alice_recv(alice_p_b_a_bf_recv.bf_alice(), psi_ctx.peer_num, psi_ctx.neg_log_fp_rate);
+    align_results_vector = Align(p_b_a_bI_vct, bf_alice_recv, psi_ctx);
+    MS_LOG(INFO) << "Number of false positive cases: "
+                 << static_cast<int>(align_results_vector.size() - psi_ctx.input_vct.size() / 2);
 
-    // 5. send(BobAlignResultProto)
-    BobAlignResult bobAlignResult(psi_ctx.bin_id, align_results_vector);
-    Send(bobAlignResult);
-    if (!psi_ctx.need_check) {
-      return align_results_vector;
-    } else {
-      // 8. recv(AliceCheckProto)
-      auto recv_wrong_vct = ReadFile("wrong_id.csv");
-      DelWrong(&align_results_vector, recv_wrong_vct);
-      return align_results_vector;
-    }
+    time_t time_start;
+    time_t time_end;
+    time(&time_start);
+    std::sort(align_results_vector.begin(), align_results_vector.end());
+    time(&time_end);
+    MS_LOG(INFO) << "Bob sort align result, time cost: " << difftime(time_end, time_start) << " s.";
+    MS_LOG(INFO) << "-------------------------- 5. bob send align -----------------------";
+    BobAlignResult bob_align_result(psi_ctx.bin_id, align_results_vector);
+    verticalServer.Send(bob_align_result);
+    MS_LOG(INFO) << "-------------------------- 8. bob recv wrong_id -----------------------";
+    AliceCheck alice_check_recv;
+    verticalServer.Receive(&alice_check_recv);
+    DelWrong(&align_results_vector, alice_check_recv.wrong_id());
   }
+  return align_results_vector;
 }
 
-std::vector<std::string> RunPSI(const std::vector<std::string> &input_vct, const size_t bin_id,
-                                const std::string &COM_role, const std::string &ip, const std::string &psi_type,
-                                size_t thread_num, bool need_check) {
+std::vector<std::string> RunPSICommunicateTest(const std::vector<std::string> &input_vct, const std::string &COM_role,
+                                               const std::string &http_server_address,
+                                               const std::string &remote_server_address) {
   std::vector<std::string> ret;
-  // init param
-  PsiCtx psi_ctx;
-  psi_ctx.bin_id = bin_id;
-  psi_ctx.thread_num = thread_num;
-  psi_ctx.ecc = std::make_unique<ECC>(psi_ctx.curve_name, psi_ctx.thread_num, psi_ctx.chunk_size);
-  psi_ctx.psi_type = psi_type;
-  psi_ctx.input_vct = input_vct;
-  psi_ctx.self_num = psi_ctx.input_vct.size();
+  MS_LOG(INFO) << "Start RunEcdhPsi, init config...";
+  VFLContext::instance()->set_http_server_address(http_server_address);
+  VFLContext::instance()->set_remote_server_address(remote_server_address);
+  MS_LOG(INFO) << "COM_role is: " << COM_role;
+  auto &verticalServer = VerticalServer::GetInstance();
+  verticalServer.StartVerticalCommunicator();
+  if (COM_role == "alice") {
+    PsiCtx psi_ctx;
+    psi_ctx.role = "alice";
+    psi_ctx.peer_role = "bob";
+    psi_ctx.compress_length = LENGTH_32;  // if use filter-ecdh, compress length must be 32byte.
+    psi_ctx.compare_length = 12;          // should be no more than 32byte.
+    psi_ctx.thread_num = 0;
+    psi_ctx.curve_name = "p256";
+    psi_ctx.chunk_size = 1;
+    psi_ctx.ecc =
+      std::make_unique<ECC>(psi_ctx.curve_name, psi_ctx.thread_num, psi_ctx.chunk_size);
+    psi_ctx.psi_type = "filter_ecdh";
+    psi_ctx.neg_log_fp_rate = 40;
+    psi_ctx.input_vct = input_vct;
+    psi_ctx.self_num = psi_ctx.input_vct.size();
+    psi_ctx.need_check = true;
+    if (psi_ctx.psi_type == "filter_ecdh") {
+      psi_ctx.compare_length = LENGTH_32;
+    }
 
-  if (COM_role == "server") {
-    // 2.wait recv(ClientPSIInitProto)
+    MS_LOG(INFO) << "Alice start hash input...";
+    psi_ctx.input_hash_vct =
+      HashInputs(psi_ctx.input_vct, psi_ctx.thread_num, psi_ctx.chunk_size);
 
-    // 3.send(ServerPSIInitProto)
-    ServerPSIInit serverPsiInit(psi_ctx.bin_id, psi_ctx.self_num, psi_ctx.role);
-    Send(serverPsiInit);
-  } else if (COM_role == "client") {
-    // 1.send(ClientPSIInitProto)
-    ClientPSIInit clientPsiInit(psi_ctx.bin_id, psi_ctx.psi_type, psi_ctx.self_num);
-    Send(clientPsiInit);
+    if (!psi_ctx.CheckPsiCtxOK()) {
+      MS_LOG(ERROR) << "Set PSI CTX ERROR!";
+      return ret;
+    }
 
-    // 4.recv(ServerPSIInitProto)
+    //  -------------------------- 1. client send clientPsiInit -----------------------
+    ClientPSIInit client_psi_init(psi_ctx.bin_id, psi_ctx.psi_type, psi_ctx.self_num);
+    verticalServer.Send(client_psi_init);
 
-  } else {
-    MS_LOG(ERROR) << "Unknown communication role, input role is " << COM_role;
-    return ret;
-  }
+    //  -------------------------- 4. client recv serverPsiInit -----------------------
+    ServerPSIInit server_psi_init_recv;
+    Recv(&server_psi_init_recv);
+    psi_ctx.SetRole(server_psi_init_recv.self_role());
+    MS_LOG(INFO) << "Alice start hash input...";
+    if (psi_ctx.peer_role != server_psi_init_recv.self_role() &&
+        psi_ctx.self_num != server_psi_init_recv.self_size()) {
+      MS_LOG(WARNING) << "Context role set ERROR, please check!";
+    }
 
-  //  psi_ctx.role = psi_role;
-  //  psi_ctx.peer_num = peer_num;
-  psi_ctx.need_check = need_check;
-  if (psi_ctx.psi_type == "filter_ecdh") {
-    psi_ctx.compare_length = LENGTH_32;
-  }
+    MS_LOG(INFO) << "SET PSI_CTX over";
+    if (psi_ctx.psi_type == "filter_ecdh") {
+      ret = RunInverseFilterEcdhPsi(psi_ctx);
+    } else {
+      MS_LOG(INFO) << "The psi protocol is not supported currently.";
+    }
+  } else if (COM_role == "bob") {
+    //  -------------------------- 2. server recv clientPsiInit -----------------------
+    ClientPSIInit client_psi_init_recv;
+    verticalServer.Receive(&client_psi_init_recv);
+    PsiCtx psi_ctx;
+    psi_ctx.role = "bob";
+    psi_ctx.peer_role = "alice";
+    psi_ctx.compress_length = LENGTH_32;  // if use filter-ecdh, compress length must be 32byte.
+    psi_ctx.compare_length = 12;          // should be no more than 32byte.
+    psi_ctx.thread_num = 0;
+    psi_ctx.curve_name = "p256";
+    psi_ctx.chunk_size = 1;
+    psi_ctx.ecc = std::make_unique<ECC>(psi_ctx.curve_name, psi_ctx.thread_num, psi_ctx.chunk_size);
+    psi_ctx.psi_type = "filter_ecdh";
+    if (psi_ctx.psi_type != client_psi_init_recv.psi_type()) {
+      MS_LOG(WARNING) << "Context psi_type is not same! use " << client_psi_init_recv.psi_type();
+      psi_ctx.psi_type = client_psi_init_recv.psi_type();
+    }
+    psi_ctx.neg_log_fp_rate = 40;
+    psi_ctx.input_vct = input_vct;
+    psi_ctx.self_num = psi_ctx.input_vct.size();
+    psi_ctx.need_check = true;
+    if (psi_ctx.psi_type == "filter_ecdh") {
+      psi_ctx.compare_length = LENGTH_32;
+    }
+    psi_ctx.SetRole(client_psi_init_recv.self_size());
+    MS_LOG(INFO) << "Bob start hash input...";
+    psi_ctx.input_hash_vct = HashInputs(psi_ctx.input_vct, psi_ctx.thread_num, psi_ctx.chunk_size);
 
-  MS_LOG(INFO) << "Start hash input data...";
-  psi_ctx.input_hash_vct = HashInputs(psi_ctx.input_vct, psi_ctx.thread_num, psi_ctx.chunk_size);
+    if (!psi_ctx.CheckPsiCtxOK()) {
+      MS_LOG(ERROR) << "Set PSI CTX ERROR!";
+      return ret;
+    }
 
-  if (!psi_ctx.CheckPsiCtxOK()) {
-    MS_LOG(ERROR) << "Set PSI CTX ERROR!";
-    return ret;
-  }
+    //  -------------------------- 3. server send serverPsiInit -----------------------
+    ServerPSIInit server_psi_init(psi_ctx.bin_id, psi_ctx.self_num, psi_ctx.role);
+    verticalServer.Send(server_psi_init);
 
-  if (psi_ctx.psi_type == "ecdh") {
-    MS_LOG(WARNING) << "The psi protocol is not supported currently.";
-  } else if (psi_ctx.psi_type == "inverse_ecdh") {
-    MS_LOG(WARNING) << "The psi protocol is not supported currently.";
-  } else if (psi_ctx.psi_type == "filter_ecdh") {
-    ret = RunInverseFilterEcdhPsi(psi_ctx);
-  } else {
-    MS_LOG(WARNING) << "The psi protocol is not supported currently.";
+    MS_LOG(INFO) << "SET PSI_CTX over";
+    if (psi_ctx.psi_type == "filter_ecdh") {
+      ret = RunInverseFilterEcdhPsi(psi_ctx);
+    } else {
+      MS_LOG(INFO) << "The psi protocol is not supported currently.";
+    }
   }
   return ret;
 }
-
 }  // namespace psi
 }  // namespace fl
 }  // namespace mindspore

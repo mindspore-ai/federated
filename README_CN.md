@@ -110,7 +110,7 @@ python run_server.py --http_server_address=${http_server_address} --local_server
 python run_sched.py
 ```
 
-可通过额外指定`scheduler_manage_address`设定管理面地址，其中`${scheduler_manage_address}`为Scheduler管理吗HTTP服务器的地址。
+可通过额外指定`scheduler_manage_address`设定管理面地址，其中`${scheduler_manage_address}`为Scheduler管理面HTTP服务器的地址。
 
 ```shell
 python run_sched.py --scheduler_manage_address=${scheduler_manage_address}
@@ -144,7 +144,7 @@ python run_hybrid_train_server.py --http_server_address=${http_server_address} -
 python run_hybrid_train_sched.py
 ```
 
-可通过额外指定`scheduler_manage_address`设定管理面地址，其中`${scheduler_manage_address}`为Scheduler管理吗HTTP服务器的地址。
+可通过额外指定`scheduler_manage_address`设定管理面地址，其中`${scheduler_manage_address}`为Scheduler管理面HTTP服务器的地址。
 
 ```shell
 python run_hybrid_train_sched.py --scheduler_manage_address=${scheduler_manage_address}
@@ -190,7 +190,7 @@ python run_cross_silo_femnist_server.py --http_server_address=${http_server_addr
 python run_cross_silo_femnist_sched.py
 ```
 
-可通过额外指定`scheduler_manage_address`设定管理面地址，其中`${scheduler_manage_address}`为Scheduler管理吗HTTP服务器的地址。
+可通过额外指定`scheduler_manage_address`设定管理面地址，其中`${scheduler_manage_address}`为Scheduler管理面HTTP服务器的地址。
 
 ```shell
 python run_cross_silo_femnist_sched.py --scheduler_manage_address=${scheduler_manage_address}
@@ -254,7 +254,7 @@ python run_server.py --http_server_address=${http_server_address} --local_server
 python run_sched.py
 ```
 
-7、可通过额外指定`scheduler_manage_address`设定管理面地址，其中`${scheduler_manage_address}`为Scheduler管理吗HTTP服务器的地址。
+7、可通过额外指定`scheduler_manage_address`设定管理面地址，其中`${scheduler_manage_address}`为Scheduler管理面HTTP服务器的地址。
 
 ```shell
 python run_sched.py --scheduler_manage_address=${scheduler_manage_address}

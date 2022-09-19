@@ -14,19 +14,21 @@
  * limitations under the License.
  */
 
-#include "vertical/python/vfederated_job.h"
-
-#include <vector>
-#include "vertical/communicator/trainer_communicator.h"
+#ifndef MINDSPORE_FL_ARCH_CCSRC_VERTICAL_PYTHON_FEDERATED_JOB_H_
+#define MINDSPORE_FL_ARCH_CCSRC_VERTICAL_PYTHON_FEDERATED_JOB_H_
+#include "vertical/python/tensor_list_py.h"
+#include "common/utils/visible.h"
 
 namespace mindspore {
 namespace fl {
-void VFederatedJob::StartTrainerCommunicator() { TrainerCommunicator::GetInstance().Start(); }
-
-void VFederatedJob::Send(const TensorListItemPy &tensorListItemPy) {
-  TrainerCommunicator::GetInstance().Send(tensorListItemPy);
-}
-
-TensorListItemPy VFederatedJob::Receive() { return TrainerCommunicator::GetInstance().Receive(); }
+class MS_EXPORT VerticalFederatedJob {
+ public:
+  VerticalFederatedJob() = default;
+  ~VerticalFederatedJob() = default;
+  static void StartVerticalCommunicator();
+  static void Send(const TensorListItemPy &tensorListItemPy);
+  static TensorListItemPy Receive();
+};
 }  // namespace fl
 }  // namespace mindspore
+#endif  // MINDSPORE_FL_ARCH_CCSRC_VERTICAL_PYTHON_FEDERATED_JOB_H_

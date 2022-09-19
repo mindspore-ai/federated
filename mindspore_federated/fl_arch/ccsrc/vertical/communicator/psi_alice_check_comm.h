@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef MINDSPORE_FL_ARCH_CCSRC_VERTICAL_TRAINER_COMMUNICATOR_H_
-#define MINDSPORE_FL_ARCH_CCSRC_VERTICAL_TRAINER_COMMUNICATOR_H_
+#ifndef MINDSPORE_FL_ARCH_CCSRC_VERTICAL_PSI_ALICECHECK_COMMUNICATOR_H_
+#define MINDSPORE_FL_ARCH_CCSRC_VERTICAL_PSI_ALICECHECK_COMMUNICATOR_H_
 
 #include <utility>
 #include <string>
@@ -24,38 +24,32 @@
 
 #include "vertical/communicator/abstract_communicator.h"
 #include "vertical/common.h"
-#include "common/communicator/http_client.h"
-#include "common/protos/vfl.pb.h"
-#include "vertical/python/tensor_list_py.h"
-#include "vertical/python/tensor_py.h"
+#include "common/protos/data_join.pb.h"
 #include "vertical/communicator/message_queue.h"
+#include "vertical/utils/psi_utils.h"
 
 namespace mindspore {
 namespace fl {
-class TrainerCommunicator : public AbstractCommunicator {
+class AliceCheckCommunicator : public AbstractCommunicator {
  public:
-  TrainerCommunicator() = default;
-  ~TrainerCommunicator() = default;
+  AliceCheckCommunicator() = default;
+  ~AliceCheckCommunicator() = default;
+
+  bool Send(const psi::AliceCheck &aliceCheck);
 
   bool LaunchMsgHandler(const std::shared_ptr<MessageHandler> &message) override;
 
   void InitCommunicator(const std::shared_ptr<HttpCommunicator> &http_communicator) override;
 
-  bool Send(const TensorListItemPy &tensorListItemPy);
-
-  TensorListItemPy Receive(const uint32_t &timeout = 100000);
+  psi::AliceCheck Receive();
 
  private:
-  bool TensorMsgReceiveHandler(const TensorListItemPy &tensorListItemPy);
-
-  bool VerifyTensorListItem(const TensorListItemPy &tensorListItemPy);
-
-  std::vector<VerticalConfig> vertical_config_ = {};
+  bool VerifyProtoMessage(const psi::AliceCheck &AliceCheck);
 
   std::mutex message_received_mutex_;
 
-  std::shared_ptr<MessageQueue<TensorListItemPy>> message_queue_ = nullptr;
+  std::shared_ptr<MessageQueue<psi::AliceCheck>> message_queue_ = nullptr;
 };
 }  // namespace fl
 }  // namespace mindspore
-#endif  // MINDSPORE_FL_ARCH_CCSRC_VERTICAL_TRAINER_COMMUNICATOR_H_
+#endif  // MINDSPORE_FL_ARCH_CCSRC_VERTICAL_PSI_ALICECHECK_COMMUNICATOR_H_
