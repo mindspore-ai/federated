@@ -35,6 +35,7 @@ class HttpCommunicator : public CommunicatorBase {
   bool Start() override { return true; }
   bool Stop() override { return true; }
   void RegisterRoundMsgCallback(const std::string &msg_type, const MessageCallback &cb) override;
+  std::shared_ptr<HttpServer> &http_server();
 
  private:
   std::shared_ptr<HttpServer> http_server_;

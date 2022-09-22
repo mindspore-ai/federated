@@ -13,7 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """Interface for start up single core servable"""
-from mindspore_federated._mindspore_federated import VFederated_, VFLContext, TensorListItem_
+from mindspore_federated._mindspore_federated import VerticalFederated_, VFLContext, TensorListItem_
 from .ssl_config import init_ssl_config, SSLConfig
 from ..common import check_type
 
@@ -36,10 +36,10 @@ class VFLTrainer:
         init_ssl_config(ssl_config)
 
     def start_communicator(self):
-        VFederated_.start_trainer_communicator()
+        VerticalFederated_.start_vertical_communicator()
 
     def send(self, tensor_list_item: TensorListItem_):
-        return VFederated_.send(tensor_list_item)
+        return VerticalFederated_.send(tensor_list_item)
 
     def receive(self):
-        return VFederated_.receive()
+        return VerticalFederated_.receive()

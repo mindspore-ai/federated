@@ -119,10 +119,10 @@ std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx_alice, co
 
 std::vector<std::string> CreateRangeItems(size_t begin, size_t size);
 
-MS_EXPORT std::vector<std::string> RunPSI(const std::vector<std::string> &input_vct, const size_t bin_id,
-                                          const std::string &COM_role, const std::string &ip,
-                                          const std::string &psi_type, size_t thread_num, bool need_check);
-
+MS_EXPORT std::vector<std::string> RunPSICommunicateTest(const std::vector<std::string> &input_vct,
+                                                         const std::string &COM_role,
+                                                         const std::string &http_server_address,
+                                                         const std::string &remote_server_address);
 }  // namespace psi
 }  // namespace fl
 }  // namespace mindspore

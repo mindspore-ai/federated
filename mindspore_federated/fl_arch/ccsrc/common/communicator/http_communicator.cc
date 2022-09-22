@@ -53,5 +53,7 @@ void HttpCommunicator::RegisterRoundMsgCallback(const std::string &msg_type, con
     MS_LOG(EXCEPTION) << "Http server register handler for url " << url << " failed.";
   }
 }
+
+std::shared_ptr<HttpServer> &HttpCommunicator::http_server() { return http_server_; }
 }  // namespace fl
 }  // namespace mindspore

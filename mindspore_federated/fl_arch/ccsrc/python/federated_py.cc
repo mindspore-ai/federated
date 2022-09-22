@@ -25,7 +25,7 @@
 #include "python/feature_py.h"
 #include "worker/kernel/start_fl_job_kernel.h"
 #include "vertical/vfl_context.h"
-#include "vertical/python/vfederated_job.h"
+#include "vertical/python/vertical_federated_job.h"
 #include "vertical/python/tensor_list_py.h"
 #include "vertical/python/tensor_py.h"
 
@@ -33,7 +33,7 @@ namespace py = pybind11;
 using FLContext = mindspore::fl::FLContext;
 using VFLContext = mindspore::fl::VFLContext;
 using FederatedJob = mindspore::fl::FederatedJob;
-using VFederatedJob = mindspore::fl::VFederatedJob;
+using VerticalFederatedJob = mindspore::fl::VerticalFederatedJob;
 using StartFLJobKernelMod = mindspore::fl::worker::kernel::StartFLJobKernelMod;
 
 namespace mindspore {
@@ -88,7 +88,7 @@ void InitTensorListItemPy(const py::module &m) {
 // cppcheck-suppress syntaxError
 PYBIND11_MODULE(_mindspore_federated, m) {
   m.def("RunPsiDemo", &mindspore::fl::psi::RunPsiDemo, "run psi demo", py::arg("alice_list"), py::arg("bob_list"));
-  m.def("RunPsi", &mindspore::fl::psi::RunPSI, "run psi");
+  m.def("RunPSICommunicateTest", &mindspore::fl::psi::RunPSICommunicateTest, "run psi communicate test");
 
   (void)py::class_<FederatedJob, std::shared_ptr<FederatedJob>>(m, "Federated_")
     .def_static("start_federated_server", &FederatedJob::StartFederatedServer)
@@ -180,10 +180,10 @@ PYBIND11_MODULE(_mindspore_federated, m) {
       item.str_val = val;
     });
 
-  (void)py::class_<VFederatedJob, std::shared_ptr<VFederatedJob>>(m, "VFederated_")
-    .def_static("start_trainer_communicator", &VFederatedJob::StartTrainerCommunicator)
-    .def_static("send", &VFederatedJob::Send)
-    .def_static("receive", &VFederatedJob::Receive);
+  (void)py::class_<VerticalFederatedJob, std::shared_ptr<VerticalFederatedJob>>(m, "VerticalFederated_")
+    .def_static("start_vertical_communicator", &VerticalFederatedJob::StartVerticalCommunicator)
+    .def_static("send", &VerticalFederatedJob::Send)
+    .def_static("receive", &VerticalFederatedJob::Receive);
 
   InitVFLContext(m);
   InitTensorItemPy(m);

@@ -77,6 +77,7 @@ class AbstractNode {
   void StartTcpServer(const std::string &ip, uint16_t port);
   std::shared_ptr<CommunicatorBase> GetOrCreateTcpComm();
   std::shared_ptr<CommunicatorBase> GetOrCreateHttpComm(const std::string &ip, uint16_t port);
+  void StartHttpServer();
 
   // for collective data send(by tcp client) and recv(by tcp server)
   std::shared_ptr<ResponseTrack> CollectiveSendAsync(const std::string &recv_address,
@@ -119,8 +120,6 @@ class AbstractNode {
     return false;
   }
   void StartTcpCommunicator();
-  // http server depend on round kernel registered
-  void StartHttpServer();
   void StopTcpServer();
   void StopHttpServer();
 

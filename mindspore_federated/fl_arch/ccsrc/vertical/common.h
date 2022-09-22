@@ -29,12 +29,28 @@
 
 namespace mindspore {
 namespace fl {
-struct TrainerConfig {
+struct VerticalConfig {
   // The name of the vertical server. Please refer to vertical directory files.
   std::string name;
 };
 
 enum ResponseElem { SUCCESS, FAILED };
+
+constexpr auto KTrainer = "trainer";
+constexpr auto KBobPb = "bobPb";
+constexpr auto KClientPSIInit = "clientPSIInit";
+constexpr auto KServerPSIInit = "serverPsiInit";
+constexpr auto KAlicePbaAndBF = "alicePbaAndBF";
+constexpr auto KBobAlignResult = "bobAlignResult";
+constexpr auto KAliceCheck = "aliceCheck";
+
+constexpr auto KTrainerMsgType = "/trainer";
+constexpr auto KBobPbMsgType = "/bobPb";
+constexpr auto KClientPSIInitMsgType = "/clientPSIInit";
+constexpr auto KServerPSIInitMsgType = "/serverPsiInit";
+constexpr auto KAlicePbaAndBFMsgType = "/alicePbaAndBF";
+constexpr auto KBobAlignResultMsgType = "/bobAlignResult";
+constexpr auto KAliceCheckMsgType = "/aliceCheck";
 }  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_FL_ARCH_CCSRC_VERTICAL_COMMON_H_
