@@ -40,7 +40,7 @@ class LeaderThread(threading.Thread):
         self.socket.bind(('0.0.0.0', 6001))
         self.socket.listen(5)
 
-        leader_yaml_data, leader_fp = vfl_utils.parse_yaml_file('leader.yaml')
+        leader_yaml_data, leader_fp = vfl_utils.parse_yaml_file(config.leader_yaml_path)
         leader_fp.close()
         leader_base_net = LeaderNet(config)
         leader_train_net = LeaderLossNet(leader_base_net, config)

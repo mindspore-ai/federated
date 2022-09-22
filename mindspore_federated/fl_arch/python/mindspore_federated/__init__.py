@@ -23,6 +23,7 @@ from .trainer.vfl_model import FLModel
 from .trainer.vfl_optim import PartyGradOperation, PartyOptimizer, PartyGradScaler
 from .common import vfl_utils, tensor_utils
 from . import log
+from . import privacy
 
 __all__ = [
     "FLServerJob",
@@ -37,5 +38,6 @@ __all__ = [
     "PartyOptimizer",
     "PartyGradScaler",
     "vfl_utils",
-    "tensor_utils"
+    "tensor_utils",
+    "privacy"
 ]

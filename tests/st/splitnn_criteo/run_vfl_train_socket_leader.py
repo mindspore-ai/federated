@@ -42,7 +42,7 @@ class LeaderTrainer:
                                       remote_http_address='10.113.216.44:6666')
         self.vfl_trainer.start_communicator()
 
-        leader_yaml_data, leader_fp = vfl_utils.parse_yaml_file('leader.yaml')
+        leader_yaml_data, leader_fp = vfl_utils.parse_yaml_file(config.leader_yaml_path)
         leader_fp.close()
         leader_base_net = LeaderNet(config)
         leader_train_net = LeaderLossNet(leader_base_net, config)

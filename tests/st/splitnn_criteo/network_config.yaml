@@ -1,5 +1,7 @@
 data_path: "./mindrecord/"
 device_target: GPU
+leader_yaml_path: "./yaml_files/leader.yaml"
+follower_yaml_path: "./yaml_files/follower.yaml"
 
 # ==============================================================================
 # argparse_init 'WideDeep'

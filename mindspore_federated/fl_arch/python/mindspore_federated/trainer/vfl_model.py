@@ -19,6 +19,7 @@ from mindspore import nn, context
 from mindspore.ops import PrimitiveWithInfer, prim_attr_register
 from mindspore.context import ParallelMode
 from mindspore.nn.metrics import Metric
+from mindspore_federated.privacy import LabelDP
 
 from ..common import vfl_utils
 from .vfl_optim import PartyGradOperation, PartyOptimizer, PartyGradScaler
@@ -106,11 +107,19 @@ class FLModel:
         self._metrics = metrics
         self._eval_network = eval_network
         self._eval_indexes = eval_indexes
+        self._label_dp = None
 
         self._yaml_data = yaml_data
         self._train_net_yaml_data = self._yaml_data['model']['train_net']
         self._eval_net_yaml_data = self._yaml_data['model']['eval_net']
 
+        if 'privacy' in self._yaml_data:
+            if 'label_dp' in self._yaml_data['privacy']:
+                label_dp_eps = self._yaml_data['privacy']['label_dp']['eps']
+                self._label_dp = LabelDP(eps=label_dp_eps)
+
+        if self._label_dp is not None and self._role != 'leader':
+            raise AttributeError('FLModel: only a leader party can employ the label dp strategy')
         if train_network is not None and self._loss_fn is not None:
             raise AttributeError('FLModel: the attribute train_network and loss_fn shall be selected only one')
         if train_network is None and self._loss_fn is not None:
@@ -246,6 +255,11 @@ class FLModel:
         """
         backward the network using a data batch.
         """
+        if self._role == 'leader' and self._label_dp is not None:
+            label = local_data_batch[self._yaml_data['model']['eval_net']['gt']]
+            dp_label = self._label_dp(label)
+            local_data_batch[self._yaml_data['model']['eval_net']['gt']] = dp_label
+
         scales = dict()
         if self._role == 'leader' and self._grad_scalers:
             for grad_scaler in self._grad_scalers:
@@ -254,4 +268,7 @@ class FLModel:
         if self._optimizers:
             for optimizer in self._optimizers:
                 optimizer(local_data_batch, remote_data_batch, sens)
+
+        if self._role == 'leader' and self._label_dp is not None:
+            local_data_batch[self._yaml_data['model']['eval_net']['gt']] = label
         return scales
