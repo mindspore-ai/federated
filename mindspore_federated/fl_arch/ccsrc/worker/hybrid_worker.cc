@@ -54,10 +54,10 @@ void HybridWorker::StartPeriodJob() {
   constexpr int retry_times = 15 * 60;
   constexpr int kWorkerRegisterInterval = 1;
   cache::CacheStatus status = cache::CacheStatusCode::kCacheNil;
+  MS_LOG(INFO) << "Hybrid worker try to register to distributed cache.";
   for (int i = 0; i < retry_times; i++) {
     status = cache::Worker::Instance().Register();
     if (!status.IsSuccess()) {
-      MS_LOG_WARNING << "Retry register worker to distributed cache.";
       std::this_thread::sleep_for(std::chrono::seconds(kWorkerRegisterInterval));
     } else {
       break;

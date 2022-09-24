@@ -91,11 +91,14 @@ class FusedPullWeightKernelMod : public AbstractKernel {
       retcode = pull_weight_rsp->retcode();
       if (retcode == schema::ResponseCode_SucNotReady) {
         std::this_thread::sleep_for(std::chrono::milliseconds(kRetryDurationOfPullWeights));
-        if (IntToUint(pull_weight_rsp->iteration()) > fl_iteration_) {
-          fl_iteration_ = pull_weight_rsp->iteration();
+        uint64_t pull_weight_iteration = IntToUint(pull_weight_rsp->iteration());
+        if (pull_weight_iteration > fl_iteration_ || pull_weight_iteration == 1) {
+          fl_iteration_ = pull_weight_iteration;
+          MS_LOG(INFO) << "Worker update the real iteration from server, current iteration is "
+                       << pull_weight_iteration;
         }
-        MS_LOG(INFO) << "Server is not ready for downloading yet. Reason: " << pull_weight_rsp->reason()->str()
-                     << ", fl iteration is " << fl_iteration_ << ". Retry later.";
+        MS_LOG(DEBUG) << "Server is not ready for downloading yet. Reason: " << pull_weight_rsp->reason()->str()
+                      << ", fl iteration is " << fl_iteration_ << ". Retry later.";
       } else if (retcode != schema::ResponseCode_SUCCEED) {
         MS_LOG(WARNING) << "FusedPullWeight failed. Server return code: " << pull_weight_rsp->retcode()
                         << ", reason: " << pull_weight_rsp->reason()->str();
