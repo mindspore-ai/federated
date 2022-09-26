@@ -24,6 +24,8 @@ cp -r ${ROOT_DIR}/mindspore_federated/fl_arch/python/mindspore_federated/* ${ROO
 
 export PYTHONPATH=${ROOT_DIR}/build/package:${ROOT_DIR}/tests/ut/python/tests:$PYTHONPATH
 
+export LD_LIBRARY_PATH=${ROOT_DIR}/build/package/mindspore_federated:${ROOT_DIR}/build/package/mindspore_federated/lib:${LD_LIBRARY_PATH}
+
 echo "PYTHONPATH=$PYTHONPATH"
 export GLOG_v=1
 export REDIS_SERVER_PORT=12345

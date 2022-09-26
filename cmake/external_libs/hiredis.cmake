@@ -1,3 +1,5 @@
+set(hiredis_CXXFLAGS "-Wl,-z,now -s")
+set(hiredis_CFLAGS "-Wl,-z,now -s")
 if(ENABLE_GITEE)
     set(REQ_URL "https://gitee.com/mirrors/hiredis/repository/archive/release/v1.0.2.tar.gz")
     set(MD5 "20acecf5cb87868723f97a9bbb5cf045")

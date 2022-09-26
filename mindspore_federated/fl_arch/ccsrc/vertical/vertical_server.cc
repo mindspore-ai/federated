@@ -36,6 +36,10 @@ void VerticalServer::InitVerticalConfigs() {
 
 bool VerticalServer::StartVerticalCommunicator() {
   try {
+    if (running_.load()) {
+      return true;
+    }
+    running_ = true;
     InitVerticalConfigs();
     const auto &http_comm = AbstractCommunicator::CreateHttpCommunicator();
     InitVerticalCommunicator(http_comm);

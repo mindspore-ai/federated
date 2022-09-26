@@ -80,6 +80,8 @@ class VerticalServer {
   void Receive(psi::AliceCheck *aliceCheck);
 
  private:
+  std::atomic_bool running_ = false;
+
   std::vector<VerticalConfig> vertical_config_ = {};
 
   std::map<std::string, std::shared_ptr<AbstractCommunicator>> communicators_;

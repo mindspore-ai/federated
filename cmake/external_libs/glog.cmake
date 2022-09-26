@@ -1,5 +1,5 @@
-set(glog_CXXFLAGS "-D_FORTIFY_SOURCE=2 -O2 ${SECURE_CXX_FLAGS} -Dgoogle=mindspore_federated_private")
-set(glog_CFLAGS "-D_FORTIFY_SOURCE=2 -O2")
+set(glog_CXXFLAGS "-D_FORTIFY_SOURCE=2 -O2 ${SECURE_CXX_FLAGS} -Dgoogle=mindspore_federated_private -s")
+set(glog_CFLAGS "-D_FORTIFY_SOURCE=2 -O2 -s")
 set(glog_patch ${CMAKE_SOURCE_DIR}/third_party/patch/glog/glog.patch001)
 set(glog_lib mindspore_federated_glog)
 

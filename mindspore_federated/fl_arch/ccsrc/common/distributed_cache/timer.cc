@@ -154,10 +154,7 @@ void Timer::ResetOnNewIteration() {
 void Timer::Sync() {
   // if timer is not registered in RedisKeys::GetInstance().TimerHash(), it's stopped or not started
   auto client = DistributedCacheLoader::Instance().GetOneClient();
-  if (client == nullptr) {
-    MS_LOG_WARNING << "Get redis client failed";
-    return;
-  }
+  MS_EXCEPTION_IF_NULL(client);
   std::lock_guard<std::mutex> lock(lock_);
   std::unordered_map<std::string, uint64_t> timer_map;
   auto time_key = RedisKeys::GetInstance().TimerHash();
@@ -166,20 +163,34 @@ void Timer::Sync() {
     MS_LOG_WARNING << "Get timer from cache failed";
     return;
   }
+  std::unordered_map<std::string, uint64_t> timer_reset_map;
+  CacheStateHandler(&timer_reset_map, &timer_map);
+  if (!timer_reset_map.empty()) {
+    ret = client->HMSet(time_key, timer_reset_map);
+    if (!ret.IsSuccess()) {
+      MS_LOG_WARNING << "Failed to sync local event to cache";
+      return;
+    }
+    (void)client->Expire(time_key, iteration_expire_time_in_seconds());
+  }
+}
+
+void Timer::CacheStateHandler(std::unordered_map<std::string, uint64_t> *timer_reset_map,
+                              std::unordered_map<std::string, uint64_t> *timer_map) {
   uint64_t cur_time_in_ms = CURRENT_TIME_MILLI.count();
   auto cur_iteration_num = InstanceContext::Instance().iteration_num();
-  std::unordered_map<std::string, uint64_t> timer_reset_map;
   for (auto &item : timer_map_) {
     auto &name = item.first;
     auto &info = item.second;
     if (info.state == kTimerStarted && cur_time_in_ms >= info.timeout_stamp) {
-      MS_LOG_INFO << "Timer " << name << " timeout, current time in milliseconds: " << cur_time_in_ms;
+      MS_LOG_WARNING << "Timer " << name << " timeout, current time in milliseconds: " << cur_time_in_ms
+                     << ", timer timeout stamp is " << info.timeout_stamp;
       HandleTimeoutInner(&info, cur_iteration_num);  // info.state = kTimerOut
     }
     TimerState cache_state = kTimerNotStarted;
     uint64_t cache_timeout_stamp = 0;
-    auto it = timer_map.find(name);
-    if (it != timer_map.end()) {
+    auto it = timer_map->find(name);
+    if (it != timer_map->end()) {
       cache_timeout_stamp = it->second;
       if (cache_timeout_stamp == 0) {
         cache_state = kTimerStopped;
@@ -193,12 +204,12 @@ void Timer::Sync() {
     switch (cache_state) {
       case kTimerNotStarted:
         if (info.state != kTimerNotStarted) {          // sync start/stop/timeout event to cache
-          timer_reset_map[name] = info.timeout_stamp;  // 0: stopped, other value: started, timeout
+          (*timer_reset_map)[name] = info.timeout_stamp;  // 0: stopped, other value: started, timeout
         }
         break;
       case kTimerStarted:
         if (info.state == kTimerStopped) {  // sync stop event to cache
-          timer_reset_map[name] = info.timeout_stamp;
+          (*timer_reset_map)[name] = info.timeout_stamp;
         } else if (info.state == kTimerNotStarted) {  // sync start event to local
           info.state = cache_state;
           info.timeout_stamp = cache_timeout_stamp;
@@ -211,21 +222,8 @@ void Timer::Sync() {
         }
         break;
       case kTimerTimeOut:
-        if (info.state == kTimerNotStarted || info.state == kTimerStarted) {
-          MS_LOG_INFO << "Timer " << name << " timeout, current time in milliseconds: " << cur_time_in_ms;
-          info.timeout_stamp = cache_timeout_stamp;
-          HandleTimeoutInner(&info, cur_iteration_num);
-        }
         break;
     }
-  }
-  if (!timer_reset_map.empty()) {
-    ret = client->HMSet(time_key, timer_reset_map);
-    if (!ret.IsSuccess()) {
-      MS_LOG_WARNING << "Failed to sync local event to cache";
-      return;
-    }
-    (void)client->Expire(time_key, iteration_expire_time_in_seconds());
   }
 }
 
