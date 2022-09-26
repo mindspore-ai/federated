@@ -47,7 +47,7 @@ std::string ReadBinFile(const std::string &csv_path);
 
 void FilterWriteFile(const std::string &out_path, const std::string &ret);
 
-std::vector<std::string> CreateRangeItems(size_t begin, size_t size);
+std::vector<std::string> CreateFakeDataset(size_t begin, size_t size);
 
 void GenDataSet();
 

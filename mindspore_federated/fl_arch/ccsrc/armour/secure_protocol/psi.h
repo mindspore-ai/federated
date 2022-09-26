@@ -47,6 +47,7 @@ struct PsiCtx {
       role = "alice";
       peer_role = "bob";
     }
+    MS_LOG(INFO) << "Server's role is " << role;
     return true;
   }
 
@@ -61,6 +62,7 @@ struct PsiCtx {
       MS_LOG(ERROR) << "PSI_Ctx is not set.";
       return false;
     }
+    MS_LOG(INFO) << "client's role is " << role;
     return true;
   }
 
@@ -68,17 +70,21 @@ struct PsiCtx {
     bool ret = true;
     if (compress_length != LENGTH_32 && compress_length != LENGTH_33) {
       ret = false;
-      MS_LOG(INFO) << "Compress_length can only be set to " << LENGTH_32 << " or " << LENGTH_33;
+      MS_LOG(INFO) << "Compress_length can only be set to " << LENGTH_32 << " or " << LENGTH_33 << ".";
     }
 
     if (compare_length < LENGTH_12 || compare_length > LENGTH_32) {
       ret = false;
-      MS_LOG(INFO) << "Compare_length should be in [12, 32], but get " << compare_length;
+      MS_LOG(INFO) << "Compare_length should be in [12, 32], but get " << compare_length << ".";
     }
 
     if (psi_type == "Filter_ecdh" && compare_length != LENGTH_32) {
       ret = false;
-      MS_LOG(INFO) << "If use filter ecdh, compare length must be 32, but get " << compare_length;
+      MS_LOG(INFO) << "If use filter ecdh, compare length must be 32, but get " << compare_length << ".";
+    }
+    if (role == peer_role) {
+      ret = false;
+      MS_LOG(INFO) << "Server and Client hava the same role: " << role << ".";
     }
     return ret;
   }
@@ -92,11 +98,10 @@ struct PsiCtx {
   std::string psi_type = "filter_ecdh";  // default
   std::string role = "alice";
   std::string peer_role = "bob";
-  int neg_log_fp_rate = 40;  // default
-  size_t chunk_size = 1;     // default
-  bool need_check = false;
+  int neg_log_fp_rate = STAT_SEC_PARA;  // default
+  size_t chunk_size = 1;                // default
+  bool need_check = true;
 
-  std::string file_path = "";
   std::vector<std::string> input_vct;
   std::vector<std::string> input_hash_vct;
   size_t self_num = 0;
@@ -108,7 +113,7 @@ void FindWrong(const PsiCtx &psi_ctx, const std::vector<std::string> &align_resu
 
 void DelWrong(std::vector<std::string> *align_results_vector, const std::vector<std::string> &recv_wrong_vct);
 
-MS_EXPORT std::vector<std::string> RunPsiDemo(const std::vector<std::string> &alice_input,
+MS_EXPORT std::vector<std::string> RunPSIDemo(const std::vector<std::string> &alice_input,
                                               const std::vector<std::string> &bob_input);
 
 void RunEcdhPsi(const PsiCtx &psi_ctx_alice, const PsiCtx &psi_ctx_bob);
@@ -117,12 +122,9 @@ void RunInverseEcdhPsi(const PsiCtx &psi_ctx_alice, const PsiCtx &psi_ctx_bob);
 
 std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx_alice, const PsiCtx &psi_ctx_bob);
 
-std::vector<std::string> CreateRangeItems(size_t begin, size_t size);
-
-MS_EXPORT std::vector<std::string> RunPSICommunicateTest(const std::vector<std::string> &input_vct,
-                                                         const std::string &COM_role,
-                                                         const std::string &http_server_address,
-                                                         const std::string &remote_server_address);
+MS_EXPORT std::vector<std::string> RunPSI(const std::vector<std::string> &input_vct, const std::string &COM_role,
+                                          const std::string &http_server_address,
+                                          const std::string &remote_server_address, size_t thread_num, size_t bin_id);
 }  // namespace psi
 }  // namespace fl
 }  // namespace mindspore

@@ -118,14 +118,14 @@ void FilterWriteFile(const std::string &out_path, const std::string &ret) {
   MS_LOG(INFO) << "Start write filter over, file length is " << ret.length();
 }
 
-std::vector<std::string> CreateRangeItems(size_t begin, size_t size) {
-  std::vector<std::string> ret;
+std::vector<std::string> CreateFakeDataset(size_t begin, size_t size) {
+  std::vector<std::string> fake_dataset;
   for (size_t i = 0; i < size; i++) {
-    ret.push_back(std::to_string(begin + i));
+    fake_dataset.push_back(std::to_string(begin + i));
   }
   srand((unsigned int)time(0));
-  shuffle(ret.begin(), ret.end(), std::mt19937(std::random_device()()));
-  return ret;
+  shuffle(fake_dataset.begin(), fake_dataset.end(), std::mt19937(std::random_device()()));
+  return fake_dataset;
 }
 
 void GenDataSet() {
@@ -136,8 +136,8 @@ void GenDataSet() {
 
     int alice_begin = 2 * num;
     int bob_begin = 2.5 * num;
-    auto alice_input = CreateRangeItems(alice_begin, num);
-    auto bob_input = CreateRangeItems(bob_begin, num);
+    auto alice_input = CreateFakeDataset(alice_begin, num);
+    auto bob_input = CreateFakeDataset(bob_begin, num);
     WriteFile(alice_csv_path, alice_input);
     WriteFile(bob_csv_path, bob_input);
     MS_LOG(INFO) << num << " is done.";
@@ -241,7 +241,7 @@ void Recv(AlicePbaAndBF *alice_p_b_a_bf) {
   alice_p_b_a_bf->set_bf_alice(alice_p_b_a_bf_proto.bf_alice());
   MS_LOG(INFO) << "alice_pba_bf, bin_id is " << alice_p_b_a_bf->bin_id();
   MS_LOG(INFO) << "alice_p_b_a size is " << alice_p_b_a_bf->p_b_a_vct().size();
-  MS_LOG(INFO) << "bf_alice size is " << alice_p_b_a_bf->bf_alice().size();
+  MS_LOG(INFO) << "bf_alice byte length is " << alice_p_b_a_bf->bf_alice().size();
 }
 
 bool Send(const BobAlignResult &bob_align_result) {
