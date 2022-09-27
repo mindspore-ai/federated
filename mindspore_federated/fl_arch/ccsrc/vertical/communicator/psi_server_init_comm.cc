@@ -47,7 +47,7 @@ bool ServerPSIInitCommunicator::LaunchMsgHandler(const std::shared_ptr<MessageHa
 
     psi::ServerPSIInit serverPSIInit = ParseServerPSIInitProto(serverPSIInitProto);
     if (!VerifyProtoMessage(serverPSIInit)) {
-      std::string reason = "Verify bob data failed for vertical psi.";
+      std::string reason = "Verify serverPSIInitProto failed for vertical psi.";
       MS_LOG(WARNING) << reason;
       SendResponseMsg(message, reason.c_str(), reason.size());
       return false;
@@ -70,7 +70,7 @@ bool ServerPSIInitCommunicator::Send(const psi::ServerPSIInit &serverPSIInit) {
   CreateServerPSIInitProto(client_psi_init_proto_ptr.get(), serverPSIInit);
   std::string data = client_psi_init_proto_ptr->SerializeAsString();
   size_t data_size = data.size();
-  MS_LOG(INFO) << "Send bob_pb data size is " << data_size;
+  MS_LOG(INFO) << "Send serverPSIInitProto size is " << data_size;
   return SendMessage(data.c_str(), data_size, KServerPSIInitMsgType);
 }
 

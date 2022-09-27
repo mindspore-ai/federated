@@ -34,6 +34,7 @@ namespace psi {
 constexpr size_t LENGTH_12 = 12;
 constexpr size_t LENGTH_32 = 32;
 constexpr size_t LENGTH_33 = 33;
+constexpr size_t STAT_SEC_PARA = 40;
 
 struct BNCtxFree {
  public:

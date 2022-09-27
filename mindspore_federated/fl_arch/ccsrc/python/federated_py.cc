@@ -87,8 +87,8 @@ void InitTensorListItemPy(const py::module &m) {
 
 // cppcheck-suppress syntaxError
 PYBIND11_MODULE(_mindspore_federated, m) {
-  m.def("RunPsiDemo", &mindspore::fl::psi::RunPsiDemo, "run psi demo", py::arg("alice_list"), py::arg("bob_list"));
-  m.def("RunPSICommunicateTest", &mindspore::fl::psi::RunPSICommunicateTest, "run psi communicate test");
+  m.def("RunPSIDemo", &mindspore::fl::psi::RunPSIDemo, "run psi demo", py::arg("alice_list"), py::arg("bob_list"));
+  m.def("RunPSI", &mindspore::fl::psi::RunPSI, "run psi with communicate");
 
   (void)py::class_<FederatedJob, std::shared_ptr<FederatedJob>>(m, "Federated_")
     .def_static("start_federated_server", &FederatedJob::StartFederatedServer)

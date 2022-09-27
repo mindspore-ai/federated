@@ -33,16 +33,15 @@ std::vector<std::string> HashInputs(const std::vector<std::string> &items, size_
   std::vector<std::string> ret(items.size());
 
   ParallelSync parallel_sync(thread_num);
-  MS_LOG(INFO) << "Thread num is " << parallel_sync.get_thread_num();
   parallel_sync.parallel_for(0, ret.size(), chunk_size, [&](size_t beg, size_t end) {
     for (size_t i = beg; i < end; i++) {
       ret[i] = HashInput(items[i]);
     }
   });
-  MS_LOG(INFO) << "Task num is " << parallel_sync.get_task_num();
 
   time(&time_end);
-  MS_LOG(INFO) << "HashInputs time cost: " << difftime(time_end, time_start) << " s.";
+  MS_LOG(INFO) << "Thread num is " << parallel_sync.get_thread_num() << ", Task num is " << parallel_sync.get_task_num()
+               << ", HashInputs time cost: " << difftime(time_end, time_start) << " s.";
   return ret;
 }
 
