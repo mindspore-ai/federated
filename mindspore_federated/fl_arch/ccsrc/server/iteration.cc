@@ -371,6 +371,9 @@ void Iteration::Reset() {
   set_accuracy(0.0f);
   size_t &total_data_size = LocalMetaStore::GetInstance().mutable_value<size_t>(kCtxFedAvgTotalDataSize);
   total_data_size = 0;
+  auto iteration_num = cache::InstanceContext::Instance().iteration_num();
+  MS_LOG(INFO) << "Iteration " << iteration_num << " stop global timer.";
+  cache::Timer::Instance().StopTimer(kGlobalTimer);
 }
 
 void Iteration::SummaryOnIterationFinish(const std::function<void()> &iteration_end_callback) {
@@ -475,7 +478,7 @@ void Iteration::InitGlobalIterTimer() {
 
 void Iteration::InitConfig() {
   data_rate_file_path_ = FLContext::instance()->data_rate_dir();
-  if (!data_rate_file_path_.empty() &&CommUtil::CreateDirectory(data_rate_file_path_)) {
+  if (!data_rate_file_path_.empty() && CommUtil::CreateDirectory(data_rate_file_path_)) {
     MS_LOG(INFO) << "Create Directory :" << data_rate_file_path_ << " success.";
   }
   event_file_path_ = FLContext::instance()->failure_event_file();

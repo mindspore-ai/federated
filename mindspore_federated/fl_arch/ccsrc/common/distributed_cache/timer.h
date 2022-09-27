@@ -32,6 +32,8 @@ class Timer {
     return instance;
   }
   void Sync();
+  void CacheStateHandler(std::unordered_map<std::string, uint64_t> *timer_reset_map,
+                         std::unordered_map<std::string, uint64_t> *timer_map);
   // invoked by round handle or other servers notification
   CacheStatus StartTimer(const std::string &name);
   CacheStatus StopTimer(const std::string &name);
