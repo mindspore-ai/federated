@@ -92,10 +92,18 @@ class FusedPullWeightKernelMod : public AbstractKernel {
       if (retcode == schema::ResponseCode_SucNotReady) {
         std::this_thread::sleep_for(std::chrono::milliseconds(kRetryDurationOfPullWeights));
         uint64_t pull_weight_iteration = IntToUint(pull_weight_rsp->iteration());
-        if (pull_weight_iteration > fl_iteration_ || pull_weight_iteration == 1) {
+        if (pull_weight_iteration > fl_iteration_) {
           fl_iteration_ = pull_weight_iteration;
           MS_LOG(INFO) << "Worker update the real iteration from server, current iteration is "
                        << pull_weight_iteration;
+        } else {
+          std::string instance_name = fl::worker::HybridWorker::GetInstance().instance_name();
+          if (instance_name != instance_name_) {
+            fl_iteration_ = 1;
+            instance_name_ = instance_name;
+            MS_LOG(INFO) << "Worker update the real iteration because of server cluster new instance " << instance_name_
+                         << ", fl iteration is " << fl_iteration_;
+          }
         }
         MS_LOG(DEBUG) << "Server is not ready for downloading yet. Reason: " << pull_weight_rsp->reason()->str()
                       << ", fl iteration is " << fl_iteration_ << ". Retry later.";
@@ -131,7 +139,7 @@ class FusedPullWeightKernelMod : public AbstractKernel {
     return dict_data;
   }
 
-  void Init() override {}
+  void Init() override { instance_name_ = fl::worker::HybridWorker::GetInstance().instance_name(); }
 
  private:
   void BuildPullWeightReq(fl::FBBuilder *fbb, const std::vector<std::string> &pull_weight_names) {
@@ -150,6 +158,7 @@ class FusedPullWeightKernelMod : public AbstractKernel {
   }
 
   uint64_t fl_iteration_;
+  std::string instance_name_;
 };
 }  // namespace kernel
 }  // namespace worker

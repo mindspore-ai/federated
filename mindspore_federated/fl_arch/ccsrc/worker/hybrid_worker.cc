@@ -23,6 +23,7 @@
 #include "armour/secure_protocol/key_agreement.h"
 #include "distributed_cache/distributed_cache.h"
 #include "distributed_cache/worker.h"
+#include "distributed_cache/scheduler.h"
 
 namespace mindspore {
 namespace fl {
@@ -42,7 +43,8 @@ void HybridWorker::Init() {
   InitAndLoadDistributedCache();
   worker_node_ = std::make_shared<fl::WorkerNode>();
   MS_EXCEPTION_IF_NULL(worker_node_);
-
+  fl_name_ = FLContext::instance()->fl_name();
+  MS_LOG(INFO) << "Fl name is " << fl_name_;
   if (!worker_node_->Start()) {
     MS_LOG(EXCEPTION) << "Starting worker node failed.";
   }
@@ -66,8 +68,17 @@ void HybridWorker::StartPeriodJob() {
   if (!status.IsSuccess()) {
     MS_LOG(EXCEPTION) << "Register worker to distributed cache failed.";
   }
-  MS_LOG_INFO << "Register worker to distributed cache successfully";
-  auto period_fun = []() {
+
+  auto client = cache::DistributedCacheLoader::Instance().GetOneClient();
+  if (client == nullptr) {
+    MS_LOG(EXCEPTION) << "Get redis client failed";
+  }
+  auto ret = cache::Scheduler::Instance().GetInstanceName(fl_name_, &instance_name_);
+  if (!ret.IsSuccess() || instance_name_.empty()) {
+    MS_LOG(EXCEPTION) << "Get instance name failed.";
+  }
+  MS_LOG_INFO << "Register worker to distributed cache successfully, instance name is " << instance_name_;
+  auto period_fun = [&]() {
     auto cache_link_valid = true;
     while (!ExitHandler::Instance().HasStopped()) {
       constexpr int default_sync_duration_ms = 1000;  // 1000ms
@@ -90,6 +101,12 @@ void HybridWorker::StartPeriodJob() {
         if (!cache_link_valid) {
           cache_link_valid = true;
           MS_LOG_INFO << "Success to reconnect to distributed cache";
+        }
+        std::string instance_name;
+        auto ret = cache::Scheduler::Instance().GetInstanceName(fl_name_, &instance_name);
+        if (ret.IsSuccess() && !instance_name.empty() && instance_name != instance_name_) {
+          instance_name_ = instance_name;
+          MS_LOG_INFO << "Server cluster is processing new instance, new instance name is " << instance_name_;
         }
       }
     }
@@ -173,6 +190,8 @@ std::string HybridWorker::fl_id() const {
   MS_EXCEPTION_IF_NULL(worker_node_);
   return worker_node_->fl_id();
 }
+
+std::string HybridWorker::instance_name() const { return instance_name_; }
 }  // namespace worker
 }  // namespace fl
 }  // namespace mindspore
