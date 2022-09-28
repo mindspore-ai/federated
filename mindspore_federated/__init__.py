@@ -19,7 +19,9 @@ Components for MindSpore Federated Learning Framework.
 import time
 from mindspore_federated.version import __version__
 from .fl_arch.python.mindspore_federated import *
-
+from .fl_arch.python.mindspore_federated.trainer._fl_manager import FederatedLearningManager
+from .fl_arch.python.mindspore_federated.startup.federated_local import FlSchedulerJob
+from .fl_arch.python.mindspore_federated.startup.federated_local import FLServerJob
 
 def _mindspore_version_check():
     """
@@ -61,3 +63,9 @@ def _mindspore_version_check():
 
 
 _mindspore_version_check()
+
+__all__ = [
+    'FederatedLearningManager',
+    'FlSchedulerJob',
+    'FLServerJob'
+]

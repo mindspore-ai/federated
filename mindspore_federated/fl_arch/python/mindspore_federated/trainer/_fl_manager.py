@@ -63,6 +63,7 @@ class _ExchangeKeys:
     """
     Exchange Keys for Stable PW Encrypt.
     """
+
     @staticmethod
     def construct():
         return Federated_.exchange_keys()
@@ -72,6 +73,7 @@ class _GetKeys:
     """
     Get Keys for Stable PW Encrypt.
     """
+
     @staticmethod
     def construct():
         return Federated_.get_keys()
@@ -128,18 +130,46 @@ class FederatedLearningManager(Callback):
     Manage Federated Learning during training.
 
     Args:
+        yaml_config (str): The yaml file path. more detail see `federated_server_yaml <https://gitee.com/mindspore/federated/blob/master/docs/federated_server_yaml.md>`_.
         model (nn.Cell): A training model.
         sync_frequency (int): Synchronization frequency of parameters in Federated Learning.
                               Note that in dataset sink mode, the unit of the frequency is the number of epochs.
                               Otherwise, the unit of the frequency is the number of steps.
+        http_server_address (str): The http server address used for communicating. Default: ""
+        data_size (int): The size of data volume server need report to worker. Default: 1.
         sync_type (str): Parameter synchronization type in Federated Learning.
                          Supports ["fixed", "adaptive"]. Default: "fixed".
 
                          - fixed: The frequency of parameter synchronization is fixed.
+
                          - adaptive: The frequency of parameter synchronization changes adaptively.
+
+        ssl_config (Union(None, SSLConfig)): Config of ssl. Default: None.
+        min_consistent_rate (float): Minimum consistency ratio threshold. The greater the value, the more
+                                     difficult it is to improve the synchronization frequency.
+                                     Value range: greater than or equal to 0.0. Default: 1.1.
+        min_consistent_rate_at_round (int): The number of rounds of the minimum consistency ratio threshold.
+                                            The greater the value, the more difficult it is to improve the
+                                            synchronization frequency.
+                                            Value range: greater than or equal to 0. Default: 0.
+        ema_alpha (float): Gradient consistency smoothing coefficient. The smaller the value, the more the
+                           frequency will be judged according to the gradient bifurcation of the current round
+                           more. Otherwise it will be judged according to the historical gradient bifurcation
+                           more.
+                           Value range: (0.0, 1.0). Default: 0.5.
+        observation_window_size (int): The number of rounds in the observation time window. The greater the
+                                       value, the more difficult it is to reduce the synchronization frequency.
+                                       Value range: greater than 0. Default: 5.
+        frequency_increase_ratio (int): Frequency increase amplitude. The greater the value, the greater the
+                                        frequency increase amplitude.
+                                        Value range: greater than 0. Default: 2.
+        unchanged_round (int): The number of rounds whose frequency does not change. The frequency is unchanged
+                               before unchanged_round rounds.
+                               Value range: greater than or equal to 0. Default: 0.
 
     Note:
         This is an experimental prototype that is subject to change.
+
     """
 
     def __init__(self, yaml_config, model, sync_frequency, http_server_address="", data_size=1, sync_type='fixed',
@@ -294,7 +324,7 @@ class FederatedLearningManager(Callback):
 
     def start_pull_weight(self):
         """
-        pull weight from server in hybrid training mode
+        pull weight from server in hybrid training mode.
         """
         logger.info("Try to pull weights. Local step number: {}".format(self._global_step))
         # The worker has to train kWorkerTrainStepNum standalone iterations before it communicates with server.
@@ -329,7 +359,7 @@ class FederatedLearningManager(Callback):
 
     def start_push_weight(self):
         """
-        push weight to server in hybrid training mode
+        push weight to server in hybrid training mode.
         """
         logger.info("Try to push weights. Local step number: {}".format(self._global_step))
         if self._global_step % self._sync_frequency != TRAIN_END_STEP_NUM:
