@@ -1,0 +1,17 @@
+main_table_files: ["vfl/datasets/test_data_0.csv", "vfl/datasets/test_data_1.csv"]
+output_file_name: "vfl/output/leader_mindrecord"
+primary_key: "oaid"
+bin_num: 1
+store_type: "csv"
+
+# export config
+shard_num: 1
+overwrite: True
+
+# psi config
+join_type: "psi"
+thread_num: 0
+
+# communicator config
+http_server_address: "10.113.216.40:9027"
+remote_server_address: "10.113.216.40:9028"
