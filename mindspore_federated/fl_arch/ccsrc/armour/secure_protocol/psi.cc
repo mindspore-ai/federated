@@ -78,9 +78,8 @@ std::vector<std::string> Align(const std::vector<std::string> &p_b_a_bI_vct, con
   align_results_vector.resize(idx);
 
   time(&time_end);
-  MS_LOG(INFO) << "Do filter_align, align_results_vector time cost: " << difftime(time_end, time_start) << " s.";
-  MS_LOG(INFO) << "[Demo] Number of false positive cases: "
-               << static_cast<int>((align_results_vector.size() - psi_ctx.input_vct.size() / 2));
+  MS_LOG(INFO) << "Do filter_align, align_results_vector time cost: " << difftime(time_end, time_start)
+               << " s. align_results_vector size is: " << align_results_vector.size();
   return align_results_vector;
 }
 
@@ -208,36 +207,35 @@ void RunInverseEcdhPsi(const PsiCtx &psi_ctx_alice, const PsiCtx &psi_ctx_bob) {
 
 std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx_alice, const PsiCtx &psi_ctx_bob) {
   // bob
-  MS_LOG(INFO) << "[outline] Bob start computing p2^b...";
+  MS_LOG(INFO) << "  -------------------------- 0.[outline] Bob start computing p2^b...----------------------";
   auto p_b_vct = psi_ctx_bob.ecc->HashToCurveAndMul(psi_ctx_bob.input_hash_vct, psi_ctx_bob.compress_length,
                                                     psi_ctx_bob.compress_length);
-  //  -------------------------- 1. bob send bobPb -----------------------
+  MS_LOG(INFO) << "  -------------------------- 1. bob send bobPb -----------------------";
   BobPb bob_p_b(psi_ctx_bob.bin_id, p_b_vct);
   Send(bob_p_b);
 
   // alice
-  MS_LOG(INFO) << "[outline] Alice start computing p1^a...";
+  MS_LOG(INFO) << "  -------------------------- 0.[outline] Alice start computing p1^a...----------------------";
   auto p_a_vct =
     psi_ctx_alice.ecc->HashToCurveAndMul(psi_ctx_alice.input_hash_vct, LENGTH_32, psi_ctx_alice.compare_length);
-  BloomFilter bf_alice(p_a_vct, psi_ctx_alice.neg_log_fp_rate);
-  MS_LOG(INFO) << "Bloom filter bit array size is: " << bf_alice.bitArrayByteLen() << "Bytes.";
+  BloomFilter bf_alice(p_a_vct, psi_ctx_alice.thread_num, psi_ctx_alice.neg_log_fp_rate);
 
-  MS_LOG(INFO) << "Alice start decompress and compute p2^b^a ";
-  //  -------------------------- 2. alice recv bob_p_b -----------------------
+  MS_LOG(INFO) << "  -------------------------- 2. alice recv bob_p_b -----------------------";
   BobPb bob_p_b_recv;
   Recv(&bob_p_b_recv);
+  MS_LOG(INFO) << "Alice start decompress and compute p2^b^a ";
   auto p_b_a_vct =
     psi_ctx_alice.ecc->DcpsAndMul(bob_p_b_recv.p_b_vct(), psi_ctx_alice.compress_length, psi_ctx_alice.compress_length);
 
-  //  -------------------------- 3. alice send AlicePbaAndBFProto -----------------------
+  MS_LOG(INFO) << "  -------------------------- 3. alice send AlicePbaAndBFProto -----------------------";
   AlicePbaAndBF alice_p_b_a_bf(psi_ctx_alice.bin_id, p_b_a_vct, bf_alice.GetData());
   Send(alice_p_b_a_bf);
 
   // bob
-  MS_LOG(INFO) << "Bob start decompress and compute p2^b^a^(b^-1) ";
-  //  -------------------------- 4. bob recv alice_p_b_a_bf -----------------------
+  MS_LOG(INFO) << "  -------------------------- 4. bob recv alice_p_b_a_bf -----------------------";
   AlicePbaAndBF alice_p_b_a_bf_recv;
   Recv(&alice_p_b_a_bf_recv);
+  MS_LOG(INFO) << "Bob start decompress and compute p2^b^a^(b^-1) ";
   auto p_b_a_bI_vct =
     psi_ctx_bob.ecc->DcpsAndInverseMul(alice_p_b_a_bf_recv.p_b_a_vct(), LENGTH_32, psi_ctx_bob.compare_length);
 
@@ -247,11 +245,11 @@ std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx_alice, co
                << static_cast<int>(align_results_vector.size() - psi_ctx_bob.input_vct.size() / 2);
 
   if (!psi_ctx_bob.need_check) {
-    //  -------------------------- 5. bob send align result -----------------------
+    MS_LOG(INFO) << "  -------------------------- 5. bob send align result -----------------------";
     BobAlignResult bob_align_result(psi_ctx_bob.bin_id, align_results_vector);
     Send(bob_align_result);
 
-    //  -------------------------- 6. alice recv align -----------------------
+    MS_LOG(INFO) << "  -------------------------- 6. alice recv align -----------------------";
     BobAlignResult bob_align_result_recv;
     Recv(&bob_align_result_recv);
     return bob_align_result_recv.align_result();
@@ -262,22 +260,22 @@ std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx_alice, co
     std::sort(align_results_vector.begin(), align_results_vector.end());
     time(&time_end);
     MS_LOG(INFO) << "Bob sort align result, time cost: " << difftime(time_end, time_start) << " s.";
-    //  -------------------------- 5. bob send align -----------------------
+    MS_LOG(INFO) << "  -------------------------- 5. bob send align -----------------------";
     BobAlignResult bob_align_result(psi_ctx_bob.bin_id, align_results_vector);
     Send(bob_align_result);
 
-    //  -------------------------- 6. alice recv align -----------------------
+    MS_LOG(INFO) << "  -------------------------- 6. alice recv align -----------------------";
     std::vector<std::string> wrong_vct;
     std::vector<std::string> fix_vct;
     BobAlignResult bob_align_result_recv;
     Recv(&bob_align_result_recv);
     FindWrong(psi_ctx_alice, bob_align_result_recv.align_result(), &wrong_vct, &fix_vct);
 
-    //  -------------------------- 7. alice send wrong_id -----------------------
+    MS_LOG(INFO) << "  -------------------------- 7. alice send wrong_id -----------------------";
     AliceCheck alice_check(psi_ctx_alice.bin_id, wrong_vct.size(), wrong_vct);
     Send(alice_check);
 
-    //  -------------------------- 8. bob recv wrong_id -----------------------
+    MS_LOG(INFO) << "  -------------------------- 8. bob recv wrong_id -----------------------";
     AliceCheck alice_check_recv;
     Recv(&alice_check_recv);
     DelWrong(&align_results_vector, alice_check_recv.wrong_id());
@@ -286,13 +284,13 @@ std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx_alice, co
 }
 
 std::vector<std::string> RunPSIDemo(const std::vector<std::string> &alice_input,
-                                    const std::vector<std::string> &bob_input) {
+                                    const std::vector<std::string> &bob_input, size_t thread_num) {
   std::vector<std::string> ret;
   MS_LOG(INFO) << "Start RunEcdhPsi, init config...";
   PsiCtx psi_ctx_alice;
+  psi_ctx_alice.thread_num = thread_num;
   psi_ctx_alice.compress_length = LENGTH_32;  // if use filter-ecdh, compress length must be 32byte.
   psi_ctx_alice.compare_length = 12;          // should be no more than 32byte.
-  psi_ctx_alice.thread_num = 0;
   psi_ctx_alice.curve_name = "p256";
   psi_ctx_alice.chunk_size = 1;
   psi_ctx_alice.ecc =
@@ -323,9 +321,9 @@ std::vector<std::string> RunPSIDemo(const std::vector<std::string> &alice_input,
   Recv(&client_psi_init_recv);
 
   PsiCtx psi_ctx_bob;
+  psi_ctx_bob.thread_num = thread_num;
   psi_ctx_bob.compress_length = LENGTH_32;  // if use filter-ecdh, compress length must be 32byte.
   psi_ctx_bob.compare_length = 12;          // should be no more than 32byte.
-  psi_ctx_bob.thread_num = 0;
   psi_ctx_bob.curve_name = "p256";
   psi_ctx_bob.chunk_size = 1;
   psi_ctx_bob.ecc = std::make_unique<ECC>(psi_ctx_bob.curve_name, psi_ctx_bob.thread_num, psi_ctx_bob.chunk_size);
@@ -357,7 +355,7 @@ std::vector<std::string> RunPSIDemo(const std::vector<std::string> &alice_input,
   //  -------------------------- 4. client recv serverPsiInit -----------------------
   ServerPSIInit server_psi_init_recv;
   Recv(&server_psi_init_recv);
-  psi_ctx_alice.SetRole(server_psi_init_recv.self_role());
+  psi_ctx_alice.SetRole(server_psi_init_recv.self_role(), server_psi_init_recv.self_size());
   if (psi_ctx_alice.peer_role != server_psi_init_recv.self_role() &&
       psi_ctx_alice.self_num != server_psi_init_recv.self_size()) {
     MS_LOG(WARNING) << "Context role set ERROR, please check!";
@@ -377,7 +375,7 @@ std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx) {
   if (psi_ctx.role == "alice") {
     MS_LOG(INFO) << "[outline] Alice start computing p1^a...";
     auto p_a_vct = psi_ctx.ecc->HashToCurveAndMul(psi_ctx.input_hash_vct, psi_ctx.compress_length, LENGTH_32);
-    BloomFilter bf_alice(p_a_vct, psi_ctx.neg_log_fp_rate);
+    BloomFilter bf_alice(p_a_vct, psi_ctx.thread_num, psi_ctx.neg_log_fp_rate);
 
     MS_LOG(INFO) << "----------------------- 2. alice recv bob_p_b -----------------------";
     BobPb bob_p_b_recv;
@@ -436,7 +434,7 @@ std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx) {
   }
 }
 
-std::vector<std::string> RunPSI(const std::vector<std::string> &input_vct, const std::string &COM_role,
+std::vector<std::string> RunPSI(const std::vector<std::string> &input_vct, const std::string &comm_role,
                                 const std::string &http_server_address, const std::string &remote_server_address,
                                 size_t thread_num, size_t bin_id) {
   std::vector<std::string> ret;
@@ -455,15 +453,15 @@ std::vector<std::string> RunPSI(const std::vector<std::string> &input_vct, const
   MS_LOG(INFO) << "Start hash input...";
   psi_ctx.input_hash_vct = HashInputs(psi_ctx.input_vct, psi_ctx.thread_num, psi_ctx.chunk_size);
 
-  if (COM_role == "client") {
+  if (comm_role == "client") {
     MS_LOG(INFO) << "-------------------------- 1. client send clientPsiInit -----------------------";
     ClientPSIInit client_psi_init(psi_ctx.bin_id, psi_ctx.psi_type, psi_ctx.self_num);
     verticalServer.Send(client_psi_init);
     MS_LOG(INFO) << "-------------------------- 4. client recv serverPsiInit -----------------------";
     ServerPSIInit server_psi_init_recv;
     verticalServer.Receive(&server_psi_init_recv);
-    psi_ctx.SetRole(server_psi_init_recv.self_role());
-  } else if (COM_role == "server") {
+    psi_ctx.SetRole(server_psi_init_recv.self_role(), server_psi_init_recv.self_size());
+  } else if (comm_role == "server") {
     MS_LOG(INFO) << "-------------------------- 2. server recv clientPsiInit -----------------------";
     ClientPSIInit client_psi_init_recv;
     verticalServer.Receive(&client_psi_init_recv);
@@ -476,7 +474,7 @@ std::vector<std::string> RunPSI(const std::vector<std::string> &input_vct, const
     ServerPSIInit server_psi_init(psi_ctx.bin_id, psi_ctx.self_num, psi_ctx.role);
     verticalServer.Send(server_psi_init);
   } else {
-    MS_LOG(ERROR) << "Unknown communication role, wrong input role is " << COM_role;
+    MS_LOG(ERROR) << "Unknown communication role, wrong input role is " << comm_role;
     return ret;
   }
 

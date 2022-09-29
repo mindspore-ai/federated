@@ -28,22 +28,22 @@
 namespace mindspore {
 namespace fl {
 namespace psi {
-const unsigned char numToBin[8] = {
+constexpr size_t LENGTH_8 = 8;
+
+const unsigned char TO_BINARY[LENGTH_8] = {
   0b10000000, 0b01000000, 0b00100000, 0b00010000, 0b00001000, 0b00000100, 0b00000010, 0b00000001,
 };
 
-constexpr size_t BYTE_LENGTH = 8;
-
 struct BloomFilter {
   // negLogfpRate = -log(fpRate), default fpRate is 2^-40
-  explicit BloomFilter(const std::vector<std::string> &intup_vct, int neg_log_fp_ate = 40)
+  explicit BloomFilter(const std::vector<std::string> &intup_vct, size_t thread_num, int neg_log_fp_ate)
       : BloomFilter("", intup_vct.size(), neg_log_fp_ate) {
     time_t time_start;
     time_t time_end;
     time(&time_start);
 
-    std::vector<unsigned char> long_array(array_bit_length_ + BYTE_LENGTH - 1, 0);
-    ParallelSync parallel_sync(0);
+    std::vector<unsigned char> long_array(array_bit_length_ + LENGTH_8 - 1, 0);
+    ParallelSync parallel_sync(thread_num);
     parallel_sync.parallel_for(0, input_num_, 1, [&](size_t beg, size_t end) {
       for (size_t i = beg; i < end; i++) {
         for (size_t j = 0; j < hash_num_; j++) {
@@ -57,23 +57,23 @@ struct BloomFilter {
 
     time(&time_start);
     // compress
-    parallel_sync.parallel_for(0, long_array.size() / BYTE_LENGTH, 1, [&](size_t beg, size_t end) {
+    parallel_sync.parallel_for(0, long_array.size() / LENGTH_8, 1, [&](size_t beg, size_t end) {
       for (size_t i = beg; i < end; i++) {
         unsigned char tmp = 0;
-        for (size_t j = 0; j < BYTE_LENGTH; j++) {
+        for (size_t j = 0; j < LENGTH_8; j++) {
           tmp <<= 1;
-          tmp += long_array[i * BYTE_LENGTH + j];
+          tmp += long_array[i * LENGTH_8 + j];
         }
         bit_array_[i] = tmp;
       }
     });
 
     time(&time_end);
-    MS_LOG(INFO) << "Generate filter time cost: " << difftime(time_end, time_start) << " s.";
-    MS_LOG(INFO) << "Bloom filter bit array size is: " << bitArrayByteLen() << "bytes.";
+    MS_LOG(INFO) << "Generate filter time cost: " << difftime(time_end, time_start)
+                 << " s. Bloom filter bit array size is: " << bitArrayByteLen() << "bytes.";
   }
 
-  BloomFilter(const std::string &bit_array, size_t input_num, int neg_log_fp_rate = 40) {
+  BloomFilter(const std::string &bit_array, size_t input_num, int neg_log_fp_rate) {
     input_num_ = input_num;
     hash_num_ = neg_log_fp_rate;
     bits_of_per_item_ = (size_t)(neg_log_fp_rate / M_LN2) + 1;
@@ -84,19 +84,20 @@ struct BloomFilter {
       bit_array_ = reinterpret_cast<uint8_t *>(memcpy(bit_array_, bit_array.c_str(), bit_array.size()));
   }
 
+  ~BloomFilter() { delete[] bit_array_; }
+
   size_t ezHash(const std::string &inputStr, size_t startPos) const {
     size_t ret = 0;
-
     size_t i = 0;
-    while (BYTE_LENGTH * (i + 1) <= hash_out_of_bits_) {
-      ret <<= BYTE_LENGTH;
+    while (LENGTH_8 * (i + 1) <= hash_out_of_bits_) {
+      ret <<= LENGTH_8;
       ret += (unsigned char)inputStr[(startPos + i) % inputStr.size()];
       i++;
     }
     size_t tmp = (unsigned char)inputStr[(startPos + i) % inputStr.size()];
-    size_t mov = hash_out_of_bits_ - BYTE_LENGTH * i + startPos / inputStr.size();
+    size_t mov = hash_out_of_bits_ - LENGTH_8 * i + startPos / inputStr.size();
     ret <<= mov;
-    ret += (tmp >> (BYTE_LENGTH - mov));
+    ret += (tmp >> (LENGTH_8 - mov));
     ret %= array_bit_length_;
     return ret;
   }
@@ -105,13 +106,13 @@ struct BloomFilter {
     bool ret = true;
     for (size_t i = 0; i < hash_num_; i++) {
       size_t hashResult = ezHash(lookupStr, i);
-      size_t index = hashResult / BYTE_LENGTH;
-      ret &= static_cast<bool>(bit_array_[index] & numToBin[hashResult % BYTE_LENGTH]);
+      size_t index = hashResult / LENGTH_8;
+      ret &= static_cast<bool>(bit_array_[index] & TO_BINARY[hashResult % LENGTH_8]);
     }
     return ret;
   }
 
-  size_t bitArrayByteLen() const { return (array_bit_length_ + BYTE_LENGTH - 1) / BYTE_LENGTH; }
+  size_t bitArrayByteLen() const { return (array_bit_length_ + LENGTH_8 - 1) / LENGTH_8; }
 
   std::string GetData() const {
     std::string ret;
@@ -126,7 +127,7 @@ struct BloomFilter {
   uint8_t *bit_array_;
   size_t array_bit_length_;
   size_t bits_of_per_item_;
-  size_t hash_num_ = 40;
+  size_t hash_num_;
   size_t hash_out_of_bits_;
 };
 
