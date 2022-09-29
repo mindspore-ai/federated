@@ -391,11 +391,13 @@ void TcpServer::EventCallbackInner(struct bufferevent *bev, std::int16_t events,
     MS_LOG(WARNING) << "BEV_EVENT_ERROR event is trigger!";
     if (FLContext::instance()->enable_ssl()) {
       uint64_t err = bufferevent_get_openssl_error(bev);
-      MS_LOG(WARNING) << "The error number is:" << err;
+      MS_LOG(DEBUG) << "The error number is:" << err;
 
-      MS_LOG(WARNING) << "Error message:" << ERR_reason_error_string(err)
-                      << ", the error lib:" << ERR_lib_error_string(err)
-                      << ", the error func:" << ERR_func_error_string(err);
+      MS_LOG(DEBUG) << "Error message:" << ERR_reason_error_string(err)
+                    << ", the error lib:" << ERR_lib_error_string(err)
+                    << ", the error func:" << ERR_func_error_string(err);
+
+      MS_LOG(WARNING) << "Tcp server filed!";
     }
     // Free connection structures
     srv->RemoveConnection(conn->GetFd());
@@ -405,7 +407,8 @@ void TcpServer::EventCallbackInner(struct bufferevent *bev, std::int16_t events,
       srv->client_disconnection_(*srv, *conn);
     }
   } else {
-    MS_LOG(WARNING) << "Unhandled event:" << events;
+    MS_LOG(WARNING) << "Unhandled event:" << events
+                    << " more detail see https://github.com/libevent/libevent/blob/master/include/event2/bufferevent.h";
   }
 }
 
