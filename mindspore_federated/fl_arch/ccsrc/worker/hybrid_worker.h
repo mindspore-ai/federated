@@ -71,6 +71,7 @@ class MS_EXPORT HybridWorker {
 
   std::string fl_name() const;
   std::string fl_id() const;
+  std::string instance_name() const;
 
  private:
   HybridWorker() = default;
@@ -92,6 +93,8 @@ class MS_EXPORT HybridWorker {
 
   // This variable represents the worker iteration state and should be changed by worker training process.
   std::atomic<IterationState> worker_iteration_state_;
+  std::string fl_name_;
+  std::string instance_name_;
 };
 }  // namespace worker
 }  // namespace fl
