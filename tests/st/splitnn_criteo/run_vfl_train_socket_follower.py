@@ -38,7 +38,7 @@ class FollowerTrainer():
                                       remote_http_address='10.113.216.44:6667')
         self.vfl_trainer.start_communicator()
         logging.info('start vfl trainer success')
-        follower_yaml_data, follower_fp = vfl_utils.parse_yaml_file('follower.yaml')
+        follower_yaml_data, follower_fp = vfl_utils.parse_yaml_file(config.follower_yaml_path)
         follower_fp.close()
         follower_eval_net = follower_base_net = FollowerNet(config)
         follower_train_net = FollowerLossNet(follower_base_net, config)

@@ -45,10 +45,10 @@ def construct_local_dataset():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(filename='log_local_gpu.txt', level=logging.INFO)
-    context.set_context(mode=context.GRAPH_MODE, device_target='GPU')
-    leader_yaml_data, leader_fp = vfl_utils.parse_yaml_file('leader.yaml')
-    follower_yaml_data, follower_fp = vfl_utils.parse_yaml_file('follower.yaml')
+    logging.basicConfig(filename='log_local_{}.txt'.format(config.device_target), level=logging.INFO)
+    context.set_context(mode=context.GRAPH_MODE, device_target=config.device_target)
+    leader_yaml_data, leader_fp = vfl_utils.parse_yaml_file(config.leader_yaml_path)
+    follower_yaml_data, follower_fp = vfl_utils.parse_yaml_file(config.follower_yaml_path)
     # local data iteration for experiment
     ds_train, ds_eval = construct_local_dataset()
     train_iter = ds_train.create_dict_iterator()

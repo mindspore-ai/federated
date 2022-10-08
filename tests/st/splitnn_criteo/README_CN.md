@@ -43,6 +43,8 @@ python src/preprocess_data.py  --data_path=./data/ --dense_dim=13 --slot_dim=26 
 
 2. run_vfl_train_socket.sh：多线程示例程序，Leader参与方和Follower参与方分别运行一个训练线程，其分别将embedding向量和梯度向量封装为protobuf消息后，通过socket通信接口传输至另一参与方。
 
+3. run_vfl_train_label_dp.sh: label dp示例程序，基于单线程示例实现，训练时Leader参与方的标签会进行label dp处理。
+
 以run_vfl_train_local.sh为例，运行示例程序的步骤如下：
 
 1. 参考[MindSpore官网指引](https://www.mindspore.cn/install)，安装MindSpore 1.8.1。
