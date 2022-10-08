@@ -71,6 +71,7 @@ install(
         ${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/python/mindspore_federated/dataset
         ${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/python/mindspore_federated/trainer
         ${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/python/mindspore_federated/startup
+        ${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/python/mindspore_federated/privacy
         DESTINATION ${INSTALL_PY_DIR}
         COMPONENT mindspore_federated
 )

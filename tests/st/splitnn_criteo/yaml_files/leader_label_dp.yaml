@@ -48,11 +48,7 @@ opts: # define ms optimizer
           - name: label
         output:
           name: wide_loss
-          index: 1
         sens: 1024.0
-        get_all: False
-        get_by_list: True
-        sens_param: True
     params:
       - name: wide
     hyper_parameters:
@@ -71,11 +67,7 @@ opts: # define ms optimizer
           - name: label
         output:
           name: deep_loss
-          index: 2
         sens: 1024.0
-        get_all: False
-        get_by_list: True
-        sens_param: True
     params:
       - name: deep
       - name: dense
@@ -83,29 +75,19 @@ opts: # define ms optimizer
       learning_rate: 3.5e-4
       eps: 1.e-8
       loss_scale: 1024.0
-grad_scales: # define the grad scale calculator
+grad_scalers: # define the grad scale calculator
   - inputs:
-      - name: id_hldr
-      - name: wt_hldr
       - name: wide_embedding
       - name: deep_embedding
-      - name: label
     output:
       name: wide_loss
-      output_index: 1
     sens: 1024.0
-    return: wide_scale
   - inputs:
-      - name: id_hldr
-      - name: wt_hldr
       - name: wide_embedding
       - name: deep_embedding
-      - name: label
     output:
       name: deep_loss
-      output_index: 2
     sens: 1024.0
-    return: deep_scale
 dataset:
   name: criteo
   features:

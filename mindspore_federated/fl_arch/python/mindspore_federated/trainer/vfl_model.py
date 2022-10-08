@@ -13,6 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """Classes and methods for modeling network of vfl parties in the scenario of splitnn."""
+
 from collections import OrderedDict
 
 from mindspore import nn, context
@@ -21,8 +22,7 @@ from mindspore.context import ParallelMode
 from mindspore.nn.metrics import Metric
 from mindspore_federated.privacy import LabelDP
 
-from ..common import vfl_utils
-from .vfl_optim import PartyGradOperation, PartyOptimizer, PartyGradScaler
+from .vfl_optim import PartyOptimizer, PartyGradScaler, _reorganize_input_data
 
 
 class _VirtualDataset(PrimitiveWithInfer):
@@ -110,8 +110,8 @@ class FLModel:
         self._label_dp = None
 
         self._yaml_data = yaml_data
-        self._train_net_yaml_data = self._yaml_data['model']['train_net']
-        self._eval_net_yaml_data = self._yaml_data['model']['eval_net']
+        self._train_net_yaml = self._yaml_data['model']['train_net']
+        self._eval_net_yaml = self._yaml_data['model']['eval_net']
 
         if 'privacy' in self._yaml_data:
             if 'label_dp' in self._yaml_data['privacy']:
@@ -141,11 +141,15 @@ class FLModel:
         if optimizers is None:
             self._optimizers = []
             self._build_optimizer()
-        else:
+        elif isinstance(optimizers, list):
             self._optimizers = optimizers
+        else:
+            self._optimizers = [optimizers]
 
-        if self._role == 'leader':
+        if 'grad_scalers' in self._yaml_data:
             self._grad_scalers = self._build_grad_scaler()
+        else:
+            self._grad_scalers = None
 
     def _build_train_network(self):
         """
@@ -170,16 +174,9 @@ class FLModel:
         """
         if self._yaml_data is None:
             raise AttributeError("yaml_data is required to build GrapOperation and Optimizer")
-        for opt_data in self._yaml_data['opts']:
-            grad_list = []
-            weight_name_list = [param['name'] for param in opt_data['params']]
-            params = vfl_utils.get_params_by_name(self._train_network, weight_name_list)
-            for grad_data in opt_data['grads']:
-                grad_op = PartyGradOperation(self._train_network, grad_data, params)
-                grad_list.append(grad_op)
-            opt_op = PartyOptimizer(opt_data['type'], self._train_network, params, opt_data['hyper_parameters'],
-                                    grad_list)
-            self._optimizers.append(opt_op)
+        for optim_data in self._yaml_data['opts']:
+            optim_inst = PartyOptimizer(optim_data, self._train_network, self._train_net_yaml)
+            self._optimizers.append(optim_inst)
 
     def _build_grad_scaler(self):
         """
@@ -187,11 +184,11 @@ class FLModel:
         """
         if self._role == 'follower':
             raise AttributeError('follower party cannot call _build_grad_scaler')
-        if 'grad_scales' not in self._yaml_data:
+        if 'grad_scalers' not in self._yaml_data:
             raise ValueError('info of grad_scaler is not defined in the yaml')
         grad_scalers = []
-        for grad_scaler_data in self._yaml_data['grad_scales']:
-            grad_scalers.append(PartyGradScaler(self._train_network, grad_scaler_data))
+        for grad_scaler_yaml in self._yaml_data['grad_scalers']:
+            grad_scalers.append(PartyGradScaler(grad_scaler_yaml, self._train_network, self._train_net_yaml))
         return grad_scalers
 
     def eval_one_step(self, local_data_batch: dict = None, remote_data_batch: dict = None, eval_metric: Metric = None):
@@ -205,22 +202,22 @@ class FLModel:
             item_list.extend(remote_data_batch.items())
         data_batch = dict(item_list)
         input_data_batch = OrderedDict()
-        for input_data in self._eval_net_yaml_data['inputs']:
+        for input_data in self._eval_net_yaml['inputs']:
             if input_data['name'] in data_batch:
                 input_data_batch[input_data['name']] = data_batch[input_data['name']]
             else:
                 raise ValueError('missing input data \'%s\'' % input_data['name'])
         out_tuple = self._eval_network(**input_data_batch)
-        if len(self._eval_net_yaml_data['outputs']) != len(out_tuple):
+        if len(self._eval_net_yaml['outputs']) != len(out_tuple):
             raise ValueError('output of %s do not match the description of yaml' % self._eval_network.__name__)
-        if self._eval_net_yaml_data['gt'] not in data_batch:
-            raise ValueError('the label \'%s\'descripped in the yaml do not exist' % self._eval_net_yaml_data['gt'])
+        if self._eval_net_yaml['gt'] not in data_batch:
+            raise ValueError('the label \'%s\'descripped in the yaml do not exist' % self._eval_net_yaml['gt'])
         if eval_metric is None:
             raise ValueError('not specify eval_metric')
-        eval_metric.update(*out_tuple, data_batch[self._eval_net_yaml_data['gt']])
+        eval_metric.update(*out_tuple, data_batch[self._eval_net_yaml['gt']])
         out = OrderedDict()
         idx = 0
-        for output_data in self._eval_net_yaml_data['outputs']:
+        for output_data in self._eval_net_yaml['outputs']:
             out[output_data['name']] = out_tuple[idx]
             idx += 1
         return out
@@ -236,18 +233,18 @@ class FLModel:
             item_list.extend(remote_data_batch.items())
         data_batch = dict(item_list)
         input_data_batch = OrderedDict()
-        for input_data in self._train_net_yaml_data['inputs']:
+        for input_data in self._train_net_yaml['inputs']:
             if input_data['name'] in data_batch:
                 input_data_batch[input_data['name']] = data_batch[input_data['name']]
             else:
                 raise ValueError("missing input data \'%s\'" % input_data['name'])
         input_data_batch = tuple(input_data_batch.values())
         out_tuple = self._train_network(*input_data_batch)
-        if len(self._train_net_yaml_data['outputs']) != len(out_tuple):
+        if len(self._train_net_yaml['outputs']) != len(out_tuple):
             raise ValueError(f'output of {self._train_network.__name__} do not match the description of yaml')
 
         out = OrderedDict()
-        for idx, output_data in enumerate(self._train_net_yaml_data['outputs']):
+        for idx, output_data in enumerate(self._train_net_yaml['outputs']):
             out[output_data['name']] = out_tuple[idx]
         return out
 
@@ -261,14 +258,23 @@ class FLModel:
             local_data_batch[self._yaml_data['model']['eval_net']['gt']] = dp_label
 
         scales = dict()
-        if self._role == 'leader' and self._grad_scalers:
+        if self._grad_scalers:
             for grad_scaler in self._grad_scalers:
-                scale = grad_scaler(local_data_batch, remote_data_batch)
+                scale = grad_scaler(local_data_batch, remote_data_batch, sens)
                 scales[grad_scaler.grad_scale_name()] = scale
+
         if self._optimizers:
             for optimizer in self._optimizers:
-                optimizer(local_data_batch, remote_data_batch, sens)
+                if isinstance(optimizer, PartyOptimizer):  # standard optimizer
+                    optimizer(local_data_batch, remote_data_batch, sens)
+                else:  # customized optimizer
+                    input_names = [input_name['name'] for input_name in self._train_net_yaml['inputs']]
+                    input_data_batch = _reorganize_input_data([local_data_batch, remote_data_batch],
+                                                              input_names, type(optimizer).__name__)
+                    input_data_batch = list(input_data_batch.values())
+                    optimizer(*input_data_batch, sens=sens)
 
         if self._role == 'leader' and self._label_dp is not None:
             local_data_batch[self._yaml_data['model']['eval_net']['gt']] = label
+
         return scales

@@ -17,7 +17,7 @@
 import importlib
 from collections import OrderedDict
 
-from mindspore import context, nn, ops, ParameterTuple
+from mindspore import context, nn, ops
 from mindspore.ops import PrimitiveWithInfer, prim_attr_register
 from mindspore.context import ParallelMode
 from mindspore.nn.wrap.grad_reducer import DistributedGradReducer
@@ -94,20 +94,31 @@ class PartyOptimizer:
     Optimizer for network of vfl parties.
 
     Args:
-        name (str): type of the optimizer.
+        optim_yaml (tuple): data describing on the optimizer, parsed from the yaml file.
         net (nn.Cell): the network to be optimized, provided by the mindspore framework.
-        params (tuple): parameters of the network to be optimized.
-        hyperparams (dict): hyperparams of the optimizer.
-        grad_list: the grad list calculating using PartyGradOperation.
+        net_yaml (tuple): data describing on the network, parsed from the yaml file.
+
+    Inputs:
+        local_data_batch (dict): data batch from local data sources.
+        remote_data_batch (dict): data batch from remote data sources.
+        sens_dict (dict): sens params for optimizer.
     """
-    def __init__(self, name: str, net: nn.Cell, params: tuple, hyperparams: dict, grad_list: list):
-        optim_module = importlib.import_module('mindspore.nn.optim')
-        self.hyperparams = hyperparams
+    def __init__(self, optim_yaml: dict, net: nn.Cell, net_yaml: dict):
+        self.type = optim_yaml['type']
+        self.hyperparams = optim_yaml['hyper_parameters']
         self.net = net
-        self.hyperparams['params'] = self._params = params
-        self.optim = getattr(optim_module, name)(**self.hyperparams)
-        self.type = name
-        self.grad_list = grad_list
+        if 'params' in optim_yaml:  # if only optimize specified params
+            param_name_list = [param['name'] for param in optim_yaml['params']]
+            optim_params = vfl_utils.get_params_by_name(net, param_name_list)
+        else:
+            optim_params = net.trainable_params()
+        self.hyperparams['params'] = self._params = optim_params
+        optim_module = importlib.import_module('mindspore.nn.optim')
+        self.optim = getattr(optim_module, self.type)(**self.hyperparams)
+        self.grad_list = []
+        for grad_yaml in optim_yaml['grads']:
+            grad_inst = PartyGradOperation(grad_yaml, net, net_yaml, optim_params)
+            self.grad_list.append(grad_inst)
 
     def __call__(self, local_data_batch: dict = None, remote_data_batch: dict = None, sens_dict: dict = None):
         grad_value = tuple()
@@ -126,26 +137,35 @@ class PartyGradOperation:
     GradOperation for network of vfl parties.
 
     Args:
-        loss_net (nn.Cell): loss net of the party, which input features and output loss values.
-        gra_data (dict): data describing on the grad calculating, parsed from the yaml file.
-        params (dict): parameters of the network need to calculate grad values.
+        grad_yaml (dict): data describing on the grad calculating, parsed from the yaml file.
+        net (nn.Cell): net to calculate grads, which input features and output loss values.
+        net_yaml (dict): data describing on the training network, parsed from the yaml file.
+        optim_params (dict): parameters of the network need to be optimized. If no params specified inside
+                             the grad, PartyGradOperation will try to calculate grads of the input params.
     """
-    def __init__(self, loss_net: nn.Cell, grad_data: dict, params: tuple):
-        self._name = 'PartyGradOperation'
-        self._loss_net = loss_net
-        self._input_names = [input_name['name'] for input_name in grad_data['inputs']]
-        self._output_name = grad_data['output']['name']
-        self._output_index = grad_data['output']['index']
-        self._params = params
-        self._sens = grad_data['sens'] if 'sens' in grad_data else None
-        self._get_all = grad_data['get_all']
-        self._get_by_list = grad_data['get_by_list']
-        self._sens_param = grad_data['sens_param']
-        self._loss = vfl_utils.IthOutputCellInTuple(self._loss_net, self._output_index)
+    def __init__(self, grad_yaml: dict, net: nn.Cell, net_yaml: dict, optim_params: tuple):
+        self._name = 'PartyGradOperation_'.join(net_yaml['name'])
+        self._net = net
+        self._input_names = [input_name['name'] for input_name in grad_yaml['inputs']]
+        self._output_name = grad_yaml['output']['name']
+        if 'params' in grad_yaml:
+            param_name_list = [param['name'] for param in grad_yaml['params']]
+            self._params = vfl_utils.get_params_by_name(net, param_name_list)
+        else:
+            self._params = optim_params
+        self._sens = grad_yaml['sens'] if 'sens' in grad_yaml else None
+        self._sens_param = 'sens' in grad_yaml
+        if len(net_yaml['outputs']) > 1:
+            for idx, output in enumerate(net_yaml['outputs']):
+                if output['name'] == self._output_name:
+                    self._output_index = idx
+                    break
+            self._loss = vfl_utils.IthOutputCellInTuple(self._net, self._output_index)
+        else:
+            self._loss = self._net
         self._loss.set_grad()
-        self._grad_op = ops.GradOperation(self._get_all, self._get_by_list, self._sens_param)
-        self._grad_op = self._grad_op(self._loss) if (self._get_all and not self._get_by_list) \
-            else self._grad_op(self._loss, self._params)
+        self._grad_op = ops.GradOperation(get_all=False, get_by_list=True, sens_param=self._sens_param)
+        self._grad_op = self._grad_op(self._loss, self._params)
         parallel_mode = context.get_auto_parallel_context("parallel_mode")
         self.reducer_flag = parallel_mode == ParallelMode.DATA_PARALLEL
         self.grad_reducer = None
@@ -153,24 +173,30 @@ class PartyGradOperation:
             mean = context.get_auto_parallel_context("gradients_mean")
             degree = context.get_auto_parallel_context("device_num")
             self.grad_reducer = DistributedGradReducer(self._params, mean, degree)
+        self._loss_dtype = None
+        self._loss_shape = None
+        self._dtype_op = ops.DType()
+        self._shape_op = ops.Shape()
+        self._fill_op = ops.Fill()
 
     def __call__(self, local_data_batch: dict = None, remote_data_batch: dict = None, sens: dict = None):
         input_data_batch = _reorganize_input_data([local_data_batch, remote_data_batch], self._input_names, self._name)
+        input_data_batch = list(input_data_batch.values())
         if self._sens_param:
-            input_data_batch = list(input_data_batch.values())
-            if isinstance(self._sens, float):
-                loss_value = self._loss(*input_data_batch)
-                sens_value = ops.Fill()(ops.DType()(loss_value), ops.Shape()(loss_value), self._sens)
+            if isinstance(self._sens, (float, int)):
+                if not self._loss_dtype and not self._loss_shape:
+                    loss_value = self._loss(*input_data_batch)
+                    self._loss_dtype = self._dtype_op(loss_value)
+                    self._loss_shape = self._shape_op(loss_value)
+                sens_value = self._fill_op(self._loss_dtype, self._loss_shape, self._sens)
             elif sens is not None and isinstance(self._sens, str):
                 sens_value = sens[self._sens]
                 sens_value = sens_value[self._output_name]
             else:
                 raise ValueError('Not input meaningful sens value')
             grad_value = self._grad_op(*input_data_batch, sens_value)
-            if self.reducer_flag:
-                grad_value = self.grad_reducer(grad_value)
-            return grad_value
-        grad_value = self._grad_op(input_data_batch)
+        else:
+            grad_value = self._grad_op(*input_data_batch)
         if self.reducer_flag:
             grad_value = self.grad_reducer(grad_value)
         return grad_value
@@ -182,50 +208,79 @@ class PartyGradScaler:
     the grad scale value will be input as the sens of PartyGradOperation.
 
     Args:
-        loss_net (nn.Cell): loss net of the party, which input features and output loss values.
-        grad_scale_data (dict): data describing on the grad scale calculating, parsed from the yaml file
-        get_all (bool): whether calculating grad scale of all parameters.
-        get_by_list (bool): whether calculating grad scale of specific parameters.
-        sens_param (bool): whether specifying sens of grad.
+        grad_scale_yaml (dict): data describing on the grad scale calculating, parsed from the yaml file.
+        net (nn.Cell): loss net of the party, which input features and output loss values.
+        net_yaml (dict): data describing on the training network, parsed from the yaml file.
     """
-    def __init__(self, loss_net: nn.Cell, grad_scale_data: dict, get_all: bool = True, get_by_list: bool = False,
-                 sens_param: bool = False):
-        self._name = grad_scale_data['return']
-        self._loss_net = loss_net
-        self._input_names = [input_name['name'] for input_name in grad_scale_data['inputs']]
-        self._output_name = grad_scale_data['output']['name']
-        self._output_idx = grad_scale_data['output']['output_index']
-        self._sens = grad_scale_data['sens']
-        self._get_all = get_all
-        self._get_by_list = get_by_list
-        self._params = ParameterTuple(loss_net.trainable_params())
-        self._sens_param = True if isinstance(self._sens, float) else sens_param
-        self._grad_op = ops.GradOperation(self._get_all, self._get_by_list, self._sens_param)
-        self._loss = vfl_utils.IthOutputCellInTuple(self._loss_net, self._output_idx)
+    def __init__(self, grad_scale_yaml: dict, net: nn.Cell, net_yaml: dict):
+        self._name = 'PartyGradScaler_'.join(net_yaml['name'])
+        self._input_names = [input_name['name'] for input_name in grad_scale_yaml['inputs']]
+        self._output_name = grad_scale_yaml['output']['name']
+        if len(net_yaml['outputs']) > 1:
+            for idx, output in enumerate(net_yaml['outputs']):
+                if output['name'] == self._output_name:
+                    self._output_index = idx
+                    break
+            self._loss_net = vfl_utils.IthOutputCellInTuple(net, self._output_index)
+        else:
+            self._loss_net = net
+        self._net_yaml = net_yaml
+        self._net_input_names = [input_name['name'] for input_name in net_yaml['inputs']]
+        self._sens = grad_scale_yaml['sens'] if 'sens' in grad_scale_yaml else None  # indicator to sens
+        self._sens_param = 'sens' in grad_scale_yaml  # whether use sens
+        self._grad_op = ops.GradOperation(get_all=True, get_by_list=False, sens_param=self._sens_param)
         parallel_mode = context.get_auto_parallel_context("parallel_mode")
         if parallel_mode in (ParallelMode.SEMI_AUTO_PARALLEL, ParallelMode.AUTO_PARALLEL):
-            self._loss = _VirtualDatasetCell(self._loss)
-            self._loss.set_auto_parallel()
-        self._loss.set_grad()
+            self._loss_net = _VirtualDatasetCell(self._loss_net)
+            self._loss_net.set_auto_parallel()
+        self._loss_net.set_grad()
+        self._sens_value = None
+        self._dtype_op = ops.DType()
+        self._shape_op = ops.Shape()
+        self._fill_op = ops.Fill()
 
-    def __call__(self, local_data_batch: dict = None, remote_data_batch: dict = None):
-        input_data_batch = _reorganize_input_data([local_data_batch, remote_data_batch], self._input_names, self._name)
-        if self._sens_param:
-            input_data_batch = tuple(input_data_batch.values())
-            loss_value = self._loss(*input_data_batch)
-            sens_value = ops.Fill()(ops.DType()(loss_value), ops.Shape()(loss_value), self._sens)
-            grad_scale_value = self._grad_op(self._loss)(*input_data_batch, sens_value)
-        else:
-            grad_scale_value = self._grad_op(self._loss)(*input_data_batch)
+    def __call__(self, local_data_batch: dict = None, remote_data_batch: dict = None, sens: dict = None):
+        input_data_batch = _reorganize_input_data([local_data_batch, remote_data_batch],
+                                                  self._net_input_names, self._name)
+        input_data_batch = tuple(input_data_batch.values())
+        if not self._sens_param:
+            grad_scale_value = self._grad_op(self._loss_net)(*input_data_batch)
+        elif isinstance(self._sens, (float, int)):
+            if not self._sens_value:
+                loss_value = self._loss_net(*input_data_batch)
+                self._fill_sens(loss_value)
+            grad_scale_value = self._grad_op(self._loss_net)(*input_data_batch, self._sens_value)
+        elif isinstance(self._sens, str):
+            if self._sens not in sens:
+                raise ValueError('Input sens of PartyGradScaler not containing ', self._sens)
+            sens_value = sens[self._sens]
+            grad_scale_value = self._grad_op(self._loss_net)(*input_data_batch, sens_value)
         remote_data_names = remote_data_batch.keys()
         remote_grad_scale_keys = []
         remote_grad_scale_values = []
         for remote_data_name in remote_data_names:
-            if remote_data_name in self._input_names:
-                idx = self._input_names.index(remote_data_name)
+            if remote_data_name in self._net_input_names:
+                idx = self._net_input_names.index(remote_data_name)
                 remote_grad_scale_keys.append(remote_data_name)
                 remote_grad_scale_values.append(grad_scale_value[idx])
         return OrderedDict(zip(remote_grad_scale_keys, remote_grad_scale_values))
 
+    def _fill_sens(self, loss):
+        """
+        generate sens matrix according to the shape of network output
+        """
+        if isinstance(loss, tuple):
+            sens_list = []
+            for loss_item in loss:
+                loss_dtype = self._dtype_op(loss_item)
+                loss_shape = self._shape_op(loss_item)
+                sens_item = self._fill_op(loss_dtype, loss_shape, self._sens)
+                sens_list.append(sens_item)
+            self._sens_value = tuple(sens_list)
+        else:
+            loss_dtype = self._dtype_op(loss)
+            loss_shape = self._shape_op(loss)
+            self._sens_value = self._fill_op(loss_dtype, loss_shape, self._sens)
+
     def grad_scale_name(self):
-        return self._name
+        return self._output_name
