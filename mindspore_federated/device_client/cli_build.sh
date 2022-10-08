@@ -4,20 +4,22 @@ PROJECT_PATH=$(cd "$(dirname "$0")"; pwd)
 # Init default values of build options
 FL_THIRD_PKG_PATH="${PROJECT_PATH}/third/"
 USE_CACHED_PKG="on"
+ENABLE_GITEE="on"
 MS_LITE_PKG_VER="1.8.0"
 MS_LITE_PKG_NAME="mindspore-lite-${MS_LITE_PKG_VER}-linux-x64"
 MS_PKG_URL="https://ms-release.obs.cn-north-4.myhuaweicloud.com/${MS_LITE_PKG_VER}/MindSpore/lite/release/linux/x86_64/${MS_LITE_PKG_NAME}.tar.gz"
-export FLAT_EXE_PATH="$FL_THIRD_PKG_PATH/flatbuffers-2.0.0/build/flatc"
+export FLAT_EXE_PATH="$FL_THIRD_PKG_PATH/flatbuffers-v2.0.0/build/flatc"
 
 # print usage message
 usage()
 {
   echo "Usage:"
-  echo "    bash cli_build.sh [-p path] [-c on|off] [-h] "
+  echo "    bash cli_build.sh [-p path] [-c on|off] [-S on|off] [-h] "
   echo ""
   echo "Options:"
   echo "    -p set the path of mindspore lite package"
   echo "    -c using the cached mindspore lite package or not, while 'on' check package exist or not before auto download"
+  echo "    -S download third party package from gitee"
   echo "    -h print usage info"
 }
 
@@ -36,7 +38,7 @@ check_on_off()
 checkopts()
 {
   # Process the options
-  while getopts 'p:c:h' opt
+  while getopts 'p:c:h:S' opt
   do
     LOW_OPT_ARG=$(echo "${OPTARG}" | tr '[:upper:]' '[:lower:]')
 
@@ -48,6 +50,10 @@ checkopts()
       c)
         echo "user opt: -c ""${OPTARG}"
         USE_CACHED_PKG=${LOW_OPT_ARG}
+        ;;
+      S)
+        echo "user opt: -c ""${OPTARG}"
+        ENABLE_GITEE=${LOW_OPT_ARG}
         ;;
       h)
         echo "user opt: -h"
@@ -85,16 +91,22 @@ load_ms_lite_pkg(){
 load_flat_buffer_pkg(){
   # load flat buffer
   cd "$FL_THIRD_PKG_PATH"
-  if [ "X$USE_CACHED_PKG" == "Xon" ] && [ -e "flatbuffers-2.0.0/build/flatc" ]; then
+  if [ "X$USE_CACHED_PKG" == "Xon" ] && [ -e "flatbuffers-v2.0.0/build/flatc" ]; then
     echo "Find cached flat pkg, don't load again"
     return
   fi
   rm -f "$FL_THIRD_PKG_PATH"/v2.0.0.tar.gz
-  rm -rf "$FL_THIRD_PKG_PATH"/flatbuffers-2.0.0
-  wget --no-check-certificate https://github.com/google/flatbuffers/archive/v2.0.0.tar.gz
-  tar -zxf v2.0.0.tar.gz
-  mkdir -p "$FL_THIRD_PKG_PATH"/flatbuffers-2.0.0/build
-  cd "$FL_THIRD_PKG_PATH"/flatbuffers-2.0.0/build
+  rm -rf "$FL_THIRD_PKG_PATH"/flatbuffers-v2.0.0
+  if [ "X$ENABLE_GITEE" == "Xon" ]; then
+     wget --no-check-certificate https://gitee.com/mirrors/flatbuffers/repository/archive/v2.0.0.tar.gz
+     tar -zxf v2.0.0.tar.gz
+  else
+     wget --no-check-certificate https://github.com/google/flatbuffers/archive/v2.0.0.tar.gz
+     tar -zxf v2.0.0.tar.gz
+     mv "$FL_THIRD_PKG_PATH"/flatbuffers-2.0.0 "$FL_THIRD_PKG_PATH"/flatbuffers-v2.0.0
+  fi
+  mkdir -p "$FL_THIRD_PKG_PATH"/flatbuffers-v2.0.0/build
+  cd "$FL_THIRD_PKG_PATH"/flatbuffers-v2.0.0/build
   cmake ..
   make -j4
   if [ ! -e "flatc" ]; then
