@@ -27,7 +27,8 @@ TaskExecutor::TaskExecutor(size_t thread_num, size_t max_task_num, size_t submit
         return;
       }
       while (task_queue_.empty()) {
-        cv_.wait(lock, [this]() { return has_stopped_.load() || !task_queue_.empty(); });
+        cv_.wait_for(lock, std::chrono::milliseconds(500),
+                     [this] { return has_stopped_.load() || !task_queue_.empty(); });
         if (has_stopped_) {
           return;
         }

@@ -23,6 +23,7 @@
 #include <utility>
 #include "distributed_cache/server.h"
 #include "server/server.h"
+#include "distributed_cache/timer.h"
 
 namespace mindspore {
 namespace fl {
@@ -175,6 +176,7 @@ bool UpdateModelKernel::Launch(const uint8_t *req_data, size_t len, const std::s
 
 bool UpdateModelKernel::Reset() {
   MS_LOG(INFO) << "Update model kernel reset!";
+  cache::Timer::Instance().StopTimer(name_);
   return true;
 }
 

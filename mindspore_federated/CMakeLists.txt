@@ -3,7 +3,8 @@
 
 # Find Protobuf installation
 # Looks for protobuf-config.cmake file installed by Protobuf's cmake installation.
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,--no-as-needed -Wl,-z,now -fstack-protector-all -s")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wl,-rpath,$ORIGIN:$ORIGIN/lib -Wl,--no-as-needed -Wl,-z,now \
+    -fstack-protector-all -s")
 
 if(ENABLE_COVERAGE)
     add_compile_options(-coverage)

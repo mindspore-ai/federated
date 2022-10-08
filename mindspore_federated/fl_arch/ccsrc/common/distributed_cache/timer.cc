@@ -46,8 +46,26 @@ uint64_t Timer::global_time_window_in_seconds() {
   return FLContext::instance()->global_iteration_time_window() / ms_sec_to_sec;
 }
 
-// invoked by round handle or other servers notification
 CacheStatus Timer::StartTimer(const std::string &name) {
+  std::lock_guard<std::mutex> lock(lock_);
+  auto it = timer_map_.find(name);
+  if (it == timer_map_.end()) {
+    MS_LOG_WARNING << "Timer " << name << " is not registered";
+    return kCacheInnerErr;
+  }
+  auto &info = it->second;
+  constexpr int sec_to_msec = 1000;
+  uint64_t expire_time_in_ms = CURRENT_TIME_MILLI.count() + info.time_in_seconds * sec_to_msec;
+  info.state = kTimerStarted;
+  info.timeout_stamp = expire_time_in_ms;
+
+  MS_LOG_INFO << "Start timer " << name << ", timer length in seconds: " << info.time_in_seconds
+              << ", expire timestamp in milliseconds: " << info.timeout_stamp;
+  return kCacheSuccess;
+}
+
+// invoked by round handle or other servers notification
+CacheStatus Timer::StartTimerWithCache(const std::string &name) {
   std::lock_guard<std::mutex> lock(lock_);
   auto it = timer_map_.find(name);
   if (it == timer_map_.end()) {
@@ -80,6 +98,20 @@ CacheStatus Timer::StartTimer(const std::string &name) {
 }
 
 CacheStatus Timer::StopTimer(const std::string &name) {
+  std::lock_guard<std::mutex> lock(lock_);
+  auto it = timer_map_.find(name);
+  if (it == timer_map_.end()) {
+    MS_LOG_WARNING << "Timer " << name << " is not registered";
+    return kCacheInnerErr;
+  }
+  auto &info = it->second;
+  info.state = kTimerStopped;
+  info.timeout_stamp = 0;
+  MS_LOG_INFO << "Stop timer " << name;
+  return kCacheSuccess;
+}
+
+CacheStatus Timer::StopTimerWithCache(const std::string &name) {
   std::lock_guard<std::mutex> lock(lock_);
   auto it = timer_map_.find(name);
   if (it == timer_map_.end()) {
@@ -152,6 +184,21 @@ void Timer::ResetOnNewIteration() {
 }
 
 void Timer::Sync() {
+  std::lock_guard<std::mutex> lock(lock_);
+  uint64_t cur_time_in_ms = CURRENT_TIME_MILLI.count();
+  auto cur_iteration_num = InstanceContext::Instance().iteration_num();
+  for (auto &item : timer_map_) {
+    auto &name = item.first;
+    auto &info = item.second;
+    if (info.state == kTimerStarted && cur_time_in_ms >= info.timeout_stamp) {
+      MS_LOG_WARNING << "Timer " << name << " timeout, current time in milliseconds: " << cur_time_in_ms
+                     << ", timer timeout stamp is " << info.timeout_stamp;
+      HandleTimeoutInner(&info, cur_iteration_num);  // info.state = kTimerOut
+    }
+  }
+}
+
+void Timer::SyncWithCache() {
   // if timer is not registered in RedisKeys::GetInstance().TimerHash(), it's stopped or not started
   auto client = DistributedCacheLoader::Instance().GetOneClient();
   MS_EXCEPTION_IF_NULL(client);
@@ -203,7 +250,7 @@ void Timer::CacheStateHandler(std::unordered_map<std::string, uint64_t> *timer_r
     // The start or stop timer event may be missed, and events need to be synced between cache and local.
     switch (cache_state) {
       case kTimerNotStarted:
-        if (info.state != kTimerNotStarted) {          // sync start/stop/timeout event to cache
+        if (info.state != kTimerNotStarted) {             // sync start/stop/timeout event to cache
           (*timer_reset_map)[name] = info.timeout_stamp;  // 0: stopped, other value: started, timeout
         }
         break;
