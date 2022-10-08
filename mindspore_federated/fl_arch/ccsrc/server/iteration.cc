@@ -103,7 +103,7 @@ void Iteration::SetIterationRunning() {
   auto iteration_num = cache::InstanceContext::Instance().iteration_num();
   MS_LOG(INFO) << "Iteration " << iteration_num << " start running.";
   start_time_ = fl::CommUtil::GetNowTime();
-  MS_LOG(INFO) << "Iteration " << iteration_num << " start global timer.";
+  MS_LOG(DEBUG) << "Iteration " << iteration_num << " start global timer.";
   cache::Timer::Instance().StartTimer(kGlobalTimer);
 }
 
@@ -372,7 +372,7 @@ void Iteration::Reset() {
   size_t &total_data_size = LocalMetaStore::GetInstance().mutable_value<size_t>(kCtxFedAvgTotalDataSize);
   total_data_size = 0;
   auto iteration_num = cache::InstanceContext::Instance().iteration_num();
-  MS_LOG(INFO) << "Iteration " << iteration_num << " stop global timer.";
+  MS_LOG(DEBUG) << "Iteration " << iteration_num << " stop global timer.";
   cache::Timer::Instance().StopTimer(kGlobalTimer);
 }
 

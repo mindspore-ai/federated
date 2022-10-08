@@ -85,7 +85,7 @@ class StartFLJobKernelMod : public AbstractKernel {
   void Init() override {
     fl_name_ = fl::worker::CloudWorker::GetInstance().fl_name();
     fl_id_ = fl::worker::CloudWorker::GetInstance().fl_id();
-    kernel_path_ = "/trainer";
+    kernel_path_ = "/startFLJob";
     MS_LOG(INFO) << "Initializing StartFLJob kernel. fl_name: " << fl_name_ << ", fl_id: " << fl_id_
                  << ", kernel_path: " << kernel_path_;
   }

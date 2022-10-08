@@ -22,6 +22,7 @@
 #include "armour/cipher/cipher_init.h"
 #include "server/model_store.h"
 #include "server/iteration.h"
+#include "distributed_cache/timer.h"
 
 namespace mindspore {
 namespace fl {
@@ -212,6 +213,7 @@ bool StartFLJobKernel::StoreKeyAttestation(const std::shared_ptr<FBBuilder> &fbb
 
 bool StartFLJobKernel::Reset() {
   MS_LOG(INFO) << "Starting fl job kernel reset!";
+  cache::Timer::Instance().StopTimer(name_);
   return true;
 }
 
