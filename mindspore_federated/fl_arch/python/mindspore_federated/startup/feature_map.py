@@ -1,4 +1,4 @@
-# Copyright 2021 Huawei Technologies Co., Ltd
+# Copyright 2022 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +17,9 @@ import numpy as np
 
 
 class FeatureItem:
+    """
+    Feature Item
+    """
     def __init__(self, feature_name, data, require_aggr=True):
         if not isinstance(data, np.ndarray):
             raise RuntimeError(f"The type of parameter 'data' is expected to be instance of numpy.ndarray")
@@ -52,6 +55,9 @@ class FeatureItem:
 
 
 class FeatureMap:
+    """
+    Feature Map
+    """
     def __init__(self):
         self.feature_map_ = {}
 
