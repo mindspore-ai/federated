@@ -1,11 +1,60 @@
-from mindspore_federated._mindspore_federated import RunPSI
+# Copyright 2022 Huawei Technologies Co., Ltd
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ============================================================================
+"""Communicator client in data join."""
+
+
+class _SimplifiedWorkerConfig:
+    def __init__(self, worker_config_dict):
+        self.join_type = worker_config_dict["join_type"]
+        self.bin_num = worker_config_dict["bin_num"]
+        self.primary_key = worker_config_dict["primary_key"]
+        self.shard_num = worker_config_dict["shard_num"]
+
+
+def request_params(http_server_address, remote_server_address):
+    """
+    fake communication
+    """
+    print("http_server_address:", http_server_address)
+    print("remote_server_address:", remote_server_address)
+    import yaml
+    import os
+    while True:
+        if os.path.exists("server_psi_yaml.yaml"):
+            break
+    with open("server_psi_yaml.yaml", "r") as f:
+        worker_config_dict = yaml.safe_load(stream=f)
+    worker_config = _SimplifiedWorkerConfig(worker_config_dict)
+    os.remove("server_psi_yaml.yaml")
+    return worker_config
+
+
+def wait_util_server_psi_is_ready(bin_id):
+    import os
+    while True:
+        if os.path.exists("server_psi_{}.txt".format(bin_id)):
+            os.remove("server_psi_{}.txt".format(bin_id))
+            break
 
 
 class _DataJoinClient:
+    """
+    Data join client.
+    """
     def __init__(self, worker_config):
         """
-        Data join client.
-
         Args:
             worker_config (_WorkerConfig): The config of worker.
         """
@@ -31,13 +80,13 @@ class _DataJoinClient:
             - worker_config (_WorkerConfig): The config of worker.
         """
         # TODO: send the above hyper parameters to client
-        # http_server_address = self._worker_config.http_server_address
-        # remote_server_address = self._worker_config.remote_server_address
-        # worker_config = request_params(http_server_address, remote_server_address)
-        # self._worker_config.primary_key = worker_config.primary_key
-        # self._worker_config.bin_num = worker_config.bin_num
-        # self._worker_config.shard_num = worker_config.shard_num
-        # self._worker_config.join_type = worker_config.join_type
+        http_server_address = self._worker_config.http_server_address
+        remote_server_address = self._worker_config.remote_server_address
+        worker_config = request_params(http_server_address, remote_server_address)
+        self._worker_config.primary_key = worker_config.primary_key
+        self._worker_config.bin_num = worker_config.bin_num
+        self._worker_config.shard_num = worker_config.shard_num
+        self._worker_config.join_type = worker_config.join_type
         return self._worker_config
 
     def join_func(self, input_vct, bin_id):
@@ -54,6 +103,7 @@ class _DataJoinClient:
         Raises:
             ValueError: If the join type is not supported.
         """
+        wait_util_server_psi_is_ready(bin_id)
         if self._worker_config.join_type == "psi":
             # TODO: real psi
             # thread_num = self._worker_config.thread_num
