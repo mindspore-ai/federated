@@ -12,12 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+"""Export and load data in vfl."""
 
 from mindspore.mindrecord import FileWriter
 from mindspore import dataset as ds
 
 
-def export_mindrecord(file_name, raw_data, keys, shard_num=1, overwrite=False):
+def export_mindrecord(file_name, raw_data, keys, shard_num=1, overwrite=True):
+    """
+    Export mindrecord.
+    """
     writer = FileWriter(file_name=file_name,
                         shard_num=shard_num,
                         overwrite=overwrite)

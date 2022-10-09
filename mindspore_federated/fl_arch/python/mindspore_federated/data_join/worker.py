@@ -1,6 +1,21 @@
-import mmh3
+# Copyright 2022 Huawei Technologies Co., Ltd
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ============================================================================
+"""Worker in data join."""
 import yaml
-import logging
+import mmh3
+from mindspore._checkparam import Validator, Rel
 from .io import export_mindrecord
 from .communicator import _DataJoinServer, _DataJoinClient
 
@@ -29,7 +44,6 @@ class _WorkerConfig:
         remote_server_address (str): The address of remote address. Default: "127.0.0.1:18080".
         thread_num (int): The thread number of psi. The prefix of output file name. Default: 0.
         shard_num (int): The output number of each bin when export. Default: 1.
-        overwrite (bool): If overwrite files when export. Default: False.
     """
 
     def __init__(self, worker_config_path):
@@ -51,7 +65,14 @@ class _WorkerConfig:
         self.remote_server_address = worker_config_dict.get("remote_server_address", "127.0.0.1:18080")
         self.thread_num = worker_config_dict.get("thread_num", 0)
         self.shard_num = worker_config_dict.get("shard_num", 1)
-        self.overwrite = worker_config_dict.get("overwrite", False)
+
+
+def _check_str(arg_value, arg_name=None, prim_name=None):
+    if not isinstance(arg_value, str):
+        prim_name = f"For '{prim_name}', the" if prim_name else 'The'
+        arg_name = f"'{arg_name}'" if arg_name else 'input value'
+        raise TypeError(f"{prim_name} {arg_name} must be a str, but got {type(arg_value).__name__}.")
+    return arg_value
 
 
 class _DivideKeyTobin:
@@ -83,6 +104,9 @@ class _DivideKeyTobin:
 
 
 class FLDataWorker:
+    """
+    Data join worker.
+    """
     def __init__(self,
                  role,
                  worker_config_path,
@@ -118,62 +142,40 @@ class FLDataWorker:
         main_table_files = self._worker_config.main_table_files
         if not isinstance(main_table_files, list) and not isinstance(main_table_files, str):
             raise TypeError("main_table_files must be list or str, but get {}".format(type(main_table_files)))
-        if not isinstance(self._worker_config.file_name, str):
-            raise TypeError("file_name must be str, but get {}".format(type(self._worker_config.file_name)))
-        if isinstance(self._worker_config.join_type, str):
-            if self._worker_config.join_type not in SUPPORT_JOIN_TYPES:
-                raise ValueError("join_type must be in {}".format(str(SUPPORT_JOIN_TYPES)))
-        else:
-            raise TypeError("join_type must be str, but get {}".format(type(self._worker_config.join_type)))
-        if isinstance(self._worker_config.bin_num, int):
-            if self._worker_config.bin_num < 0:
-                raise ValueError("bin_num must be bigger than 0, but get {}".format(self._worker_config.bin_num))
-        else:
-            raise TypeError("bin_num must be int, but get {}".format(type(self._worker_config.bin_num)))
-        if isinstance(self._worker_config.store_type, str):
-            if self._worker_config.store_type not in SUPPORT_STORE_TYPES:
-                raise ValueError("store_type must be in {}".format(str(SUPPORT_STORE_TYPES)))
-        else:
-            raise TypeError("store_type must be str, but get {}".format(type(self._worker_config.store_type)))
-        if not isinstance(self._worker_config.primary_key, str):
-            raise TypeError("primary_key must be str, but get {}".format(type(self._worker_config.primary_key)))
-        if not isinstance(self._worker_config.http_server_address, str):
-            raise TypeError(
-                "http_server_address must be str, but get {}".format(type(self._worker_config.http_server_address)))
-        if not isinstance(self._worker_config.remote_server_address, str):
-            raise TypeError(
-                "remote_server_address must be str, but get {}".format(type(self._worker_config.remote_server_address)))
-        if not isinstance(self._worker_config.thread_num, int):
-            raise TypeError("thread_num must be int, but get {}".format(type(self._worker_config.thread_num)))
-        elif self._worker_config.thread_num < 0:
-            raise ValueError(
-                "thread_num must be bigger than 0, but get {}".format(self._worker_config.thread_num))
-        if not isinstance(self._worker_config.shard_num, int):
-            raise TypeError("shard_num must be int, but get {}".format(type(self._worker_config.shard_num)))
-        elif self._worker_config.shard_num < 1 or self._worker_config.shard_num > 1000:
-            raise ValueError("shard_num should be between [1, 1000], but get {}".format(self._worker_config.shard_num))
-        if not isinstance(self._worker_config.overwrite, bool):
-            raise TypeError("overwrite must be bool, but get {}".format(type(self._worker_config.overwrite)))
+        _check_str(self._worker_config.file_name, arg_name="file_name")
+        Validator.check_string(self._worker_config.join_type, SUPPORT_JOIN_TYPES, arg_name="join_type")
+        Validator.check_int_range(self._worker_config.bin_num, 1, 1000000, Rel.INC_BOTH, arg_name="bin_num")
+        Validator.check_string(self._worker_config.store_type, SUPPORT_STORE_TYPES, arg_name="store_type")
+
+        _check_str(self._worker_config.primary_key, arg_name="primary_key")
+        _check_str(self._worker_config.http_server_address, arg_name="http_server_address")
+        _check_str(self._worker_config.remote_server_address, arg_name="remote_server_address")
+        Validator.check_non_negative_int(self._worker_config.thread_num, arg_name="thread_num")
+        Validator.check_int_range(self._worker_config.shard_num, 1, 1000, Rel.INC_BOTH, arg_name="shard_num")
+        self._verify_schema()
+
+    def _verify_schema(self):
+        """
+        Verify schema.
+        """
         if isinstance(self._schema, dict):
             for key in self._schema:
-                if not isinstance(key, str):
-                    raise TypeError("field name: {} must be str, but get {}".format(key, type(key)))
+                _check_str(key, arg_name="column name")
 
                 shape = self._schema[key].get("shape")
                 data_type = self._schema[key].get("type")
 
                 if shape is not None:
                     if isinstance(shape, list):
-                        raise TypeError("shape: must be list, but get {}".format(shape, type(shape)))
+                        raise TypeError("shape must be list, but get {}".format(type(shape)))
                 else:
                     shape = (1,)
 
-                if len(shape) == 1:
-                    if data_type is not None and data_type not in SUPPORT_TYPES:
-                        raise ValueError("type must be in {}, but get {}".format(str(SUPPORT_TYPES), data_type))
-                else:
-                    if data_type is not None and data_type not in SUPPORT_ARRAY_TYPES:
-                        raise ValueError("type must be in {}, but get {}".format(str(SUPPORT_ARRAY_TYPES), data_type))
+                if data_type is not None:
+                    if len(shape) == 1:
+                        Validator.check_string(data_type, SUPPORT_TYPES, arg_name="data type")
+                    else:
+                        Validator.check_string(data_type, SUPPORT_ARRAY_TYPES, arg_name="array data type")
         else:
             raise TypeError("schema must be dict, but get {}".format(type(self._schema)))
 
@@ -191,9 +193,11 @@ class FLDataWorker:
                 raw_data = PandasData(None, primary_key=self._worker_config.primary_key, schema=self._schema)
                 for main_table_file in self._worker_config.main_table_files:
                     df = pd.read_csv(main_table_file)
+                    df[self._worker_config.primary_key] = df[self._worker_config.primary_key].astype("str")
                     raw_data.merge(df)
             elif isinstance(self._worker_config.main_table_files, str):
                 df = pd.read_csv(self._worker_config.main_table_files)
+                df[self._worker_config.primary_key] = df[self._worker_config.primary_key].astype("str")
                 raw_data = PandasData(df, primary_key=self._worker_config.primary_key, schema=self._schema)
             else:
                 raise TypeError("main_table_files must be list or str, but get {}".format(
@@ -224,16 +228,14 @@ class FLDataWorker:
         divide_key_to_bin = _DivideKeyTobin(bin_num=self._worker_config.bin_num, keys=keys)
         bins = divide_key_to_bin.get_bins()
         shard_num = self._worker_config.shard_num
-        overwrite = self._worker_config.overwrite
         export_count = 0
         for bin_id, input_vct in enumerate(bins):
             intersection_keys = self._join_func(input_vct, bin_id)
-            if len(intersection_keys) == 0:
-                logging.debug("The intersection_keys of bin {} is empty".format(bin_id))
+            if not intersection_keys:
                 continue
             output_file_name = "{}_{}_".format(self._worker_config.file_name, bin_id) if shard_num > 1 else \
                 "{}_{}".format(self._worker_config.file_name, bin_id)
-            export_mindrecord(output_file_name, raw_data, intersection_keys, shard_num=shard_num, overwrite=overwrite)
+            export_mindrecord(output_file_name, raw_data, intersection_keys, shard_num=shard_num)
             export_count += 1
         if export_count == 0:
             raise ValueError("The intersection_keys of all bins is empty")
