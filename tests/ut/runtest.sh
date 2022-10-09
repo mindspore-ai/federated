@@ -27,7 +27,7 @@ if [ $# -gt 0 ]; then
     bash ${CURRPATH}/python/runtest.sh $2
   elif [ $1 == "cpp" ]; then
     echo "run cpp ut"
-    # bash ${CURRPATH}/cpp/runtest.sh
+    bash ${CURRPATH}/cpp/runtest.sh
   fi
 else
   echo "run all ut"
@@ -35,5 +35,5 @@ else
   bash ${CURRPATH}/python/runtest.sh $2
 
   # 2.run c++ ut testcases
-  # bash ${CURRPATH}/cpp/runtest.sh
+  bash ${CURRPATH}/cpp/runtest.sh
 fi
