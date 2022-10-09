@@ -21,17 +21,16 @@ import static com.mindspore.flclient.FLParameter.RESTART_TIME_PER_ITER;
 import static com.mindspore.flclient.FLParameter.SLEEP_TIME;
 import static com.mindspore.flclient.LocalFLParameter.ANDROID;
 
+import com.mindspore.config.Version;
 import com.mindspore.flclient.common.FLLoggerGenerater;
 import com.mindspore.flclient.model.Client;
 import com.mindspore.flclient.model.ClientManager;
 import com.mindspore.flclient.model.RunType;
 import com.mindspore.flclient.model.Status;
 import com.mindspore.flclient.pki.PkiUtil;
+
 import java.security.SecureRandom;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.logging.*;
 
 /**
@@ -50,6 +49,12 @@ public class SyncFLJob {
     private int tryTimePerIter = 0;
     private int lastIteration = -1;
     private int waitTryTime = 0;
+
+    // mindspore versions compatible for cur version of federated
+    private HashSet<String> msVersions = new HashSet<>(
+            Arrays.asList(
+                    "MindSpore Lite 1.9.0",
+                    "MindSpore Lite 2.0.0"));
 
     private void initFlIDForPkiVerify() {
         if (flParameter.isPkiVerify()) {
@@ -72,6 +77,14 @@ public class SyncFLJob {
         try {
             LOGGER.info("the flName: " + flParameter.getFlName());
             Class.forName(flParameter.getFlName());
+            String msVersion = Version.version();
+            if (msVersions.contains(msVersion)) {
+                LOGGER.info("Got compatible mindspore lite version:" + msVersions);
+            } else {
+                String expInfo = "Expect mindspore lite version in " + msVersions.toString() +
+                        ", but got incompatible mindspore lite version:" + msVersion;
+                throw new RuntimeException(expInfo);
+            }
         } catch (ClassNotFoundException e) {
             LOGGER.severe("catch ClassNotFoundException error, the set flName does not exist, " +
                     "please " +
@@ -317,7 +330,7 @@ public class SyncFLJob {
             return null;
         }
         Status modelInitRet = client.initModel(flParameter);
-        if(modelInitRet != Status.SUCCESS){
+        if (modelInitRet != Status.SUCCESS) {
             LOGGER.severe("initModel failed");
             return null;
         }
