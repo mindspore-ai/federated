@@ -38,4 +38,5 @@ cmd_sched += " --yaml_config=" + str(yaml_config)
 cmd_sched += " --scheduler_manage_address=" + str(scheduler_manage_address)
 cmd_sched += " > scheduler.log 2>&1 &"
 
+print("subprocess: " + cmd_sched)
 subprocess.call(['bash', '-c', cmd_sched])
