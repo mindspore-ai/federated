@@ -49,6 +49,12 @@ def fl_test(func):
         os.system(f"rm -rf {fl_ckpt_dir}")
         os.system(f"rm -f metrics.json")
         os.system(f"rm -f event.txt")
+        os.system(f"rm -f alice_check")
+        os.system(f"rm -f alice_pba_bf")
+        os.system(f"rm -f bob_align_result")
+        os.system(f"rm -f bob_p_b")
+        os.system(f"rm -f client_psi_init")
+        os.system(f"rm -f server_psi_init")
 
     @wraps(func)
     def wrap_test(*args, **kwargs):

@@ -51,7 +51,11 @@ struct PsiCtx {
     return true;
   }
 
-  bool SetRole(std::string peer_role_str) {
+  bool SetRole(std::string peer_role_str, size_t peer_dataset_size) {
+    if (peer_dataset_size == 0) {
+      MS_LOG(WARNING) << "Context peer_dataset_size is 0, please check!";
+    }
+    peer_num = peer_dataset_size;
     if (peer_role_str == "alice") {
       role = "bob";
       peer_role = "alice";
@@ -114,7 +118,7 @@ void FindWrong(const PsiCtx &psi_ctx, const std::vector<std::string> &align_resu
 void DelWrong(std::vector<std::string> *align_results_vector, const std::vector<std::string> &recv_wrong_vct);
 
 MS_EXPORT std::vector<std::string> RunPSIDemo(const std::vector<std::string> &alice_input,
-                                              const std::vector<std::string> &bob_input);
+                                              const std::vector<std::string> &bob_input, size_t thread_num);
 
 void RunEcdhPsi(const PsiCtx &psi_ctx_alice, const PsiCtx &psi_ctx_bob);
 
@@ -122,7 +126,7 @@ void RunInverseEcdhPsi(const PsiCtx &psi_ctx_alice, const PsiCtx &psi_ctx_bob);
 
 std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx_alice, const PsiCtx &psi_ctx_bob);
 
-MS_EXPORT std::vector<std::string> RunPSI(const std::vector<std::string> &input_vct, const std::string &COM_role,
+MS_EXPORT std::vector<std::string> RunPSI(const std::vector<std::string> &input_vct, const std::string &comm_role,
                                           const std::string &http_server_address,
                                           const std::string &remote_server_address, size_t thread_num, size_t bin_id);
 }  // namespace psi

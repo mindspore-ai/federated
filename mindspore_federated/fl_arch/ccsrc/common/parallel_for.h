@@ -26,8 +26,7 @@
 namespace mindspore {
 namespace fl {
 
-const size_t RESERVE_THREAD_NUM = 10;
-const size_t MAX_THREAD_NUM = 100;
+const size_t RESERVE_THREAD_NUM = 5;
 const size_t CORE_THREAD_NUM = std::thread::hardware_concurrency();
 
 struct ParallelSync {
@@ -37,8 +36,8 @@ struct ParallelSync {
     if (available_thread_num <= 0) {
       available_thread_num = CORE_THREAD_NUM;
     }
-    if (thread_num_input > 0 && thread_num_input <= MAX_THREAD_NUM) {
-      thread_num_ = std::min(available_thread_num, thread_num_input);
+    if (thread_num_input > 0 && thread_num_input <= CORE_THREAD_NUM) {
+      thread_num_ = thread_num_input;
     } else if (thread_num_input == 0) {
       thread_num_ = available_thread_num;
     } else {
