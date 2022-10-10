@@ -80,8 +80,11 @@ struct BloomFilter {
     array_bit_length_ = input_num * bits_of_per_item_;
     hash_out_of_bits_ = (size_t)log2(static_cast<double>(array_bit_length_));
     bit_array_ = new unsigned char[bitArrayByteLen()];
-    if (!bit_array.empty())
+    if (!bit_array.empty()) {
+      if (bit_array.size() != bitArrayByteLen())
+        MS_LOG(ERROR) << "(BloomFilter) Received bit array size does not match the peer input number.";
       bit_array_ = reinterpret_cast<uint8_t *>(memcpy(bit_array_, bit_array.c_str(), bit_array.size()));
+    }
   }
 
   ~BloomFilter() { delete[] bit_array_; }

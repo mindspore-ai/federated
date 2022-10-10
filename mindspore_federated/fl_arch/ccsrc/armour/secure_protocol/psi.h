@@ -74,21 +74,27 @@ struct PsiCtx {
     bool ret = true;
     if (compress_length != LENGTH_32 && compress_length != LENGTH_33) {
       ret = false;
-      MS_LOG(INFO) << "Compress_length can only be set to " << LENGTH_32 << " or " << LENGTH_33 << ".";
+      MS_LOG(WARNING) << "Compress_length can only be set to " << LENGTH_32 << " or " << LENGTH_33 << ".";
     }
-
     if (compare_length < LENGTH_12 || compare_length > LENGTH_32) {
       ret = false;
-      MS_LOG(INFO) << "Compare_length should be in [12, 32], but get " << compare_length << ".";
+      MS_LOG(WARNING) << "Compare_length should be in [12, 32], but get " << compare_length << ".";
     }
-
     if (psi_type == "Filter_ecdh" && compare_length != LENGTH_32) {
       ret = false;
-      MS_LOG(INFO) << "If use filter ecdh, compare length must be 32, but get " << compare_length << ".";
+      MS_LOG(WARNING) << "If use filter ecdh, compare length must be 32, but get " << compare_length << ".";
     }
     if (role == peer_role) {
       ret = false;
-      MS_LOG(INFO) << "Server and Client hava the same role: " << role << ".";
+      MS_LOG(WARNING) << "Server and Client have the same role: " << role << ".";
+    }
+    if (self_num == 0) {
+      ret = false;
+      MS_LOG(WARNING) << "Input data is empty.";
+    }
+    if (peer_num == 0) {
+      ret = false;
+      MS_LOG(WARNING) << "Peer input data is empty.";
     }
     return ret;
   }
@@ -111,6 +117,9 @@ struct PsiCtx {
   size_t self_num = 0;
   size_t peer_num = 0;
 };
+
+std::vector<std::string> Align(std::vector<std::string> *alice_vct, const std::vector<std::string> &bob_vct,
+                               const PsiCtx &psi_ctx);
 
 void FindWrong(const PsiCtx &psi_ctx, const std::vector<std::string> &align_result, std::vector<std::string> *wrong_vct,
                std::vector<std::string> *fix_vct);

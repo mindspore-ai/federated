@@ -193,10 +193,13 @@ struct AliceCheck {
   void set_wrong_id(const std::vector<std::string> &wrong_id) { wrong_id_ = wrong_id; }
   std::vector<std::string> wrong_id() const { return wrong_id_; }
 
+  std::string msg() const { return msg_; }
+
  private:
   size_t bin_id_ = 0;
   size_t wrong_num_ = 0;
   std::vector<std::string> wrong_id_;
+  std::string msg_ = "AliceCheck";
 };
 
 bool Send(const AliceCheck &alice_check);
