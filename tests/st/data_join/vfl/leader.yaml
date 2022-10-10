@@ -1,7 +1,7 @@
-main_table_files: ["vfl/datasets/test_data_0.csv"]
-output_file_name: "vfl/output/leader_mindrecord"
+main_table_files: ["vfl/datasets/leader_data_0.csv", "vfl/datasets/leader_data_1.csv", "vfl/datasets/leader_data_2.csv", "vfl/datasets/leader_data_3.csv"]
+output_dir: "vfl/output/leader/"
 primary_key: "oaid"
-bin_num: 5
+bucket_num: 5
 store_type: "csv"
 
 # export config
@@ -12,5 +12,5 @@ join_type: "psi"
 thread_num: 0
 
 # communicator config
-http_server_address: "10.113.216.40:9027"
-remote_server_address: "10.113.216.40:9028"
+http_server_address: "127.0.0.1:9027"
+remote_server_address: "127.0.0.1:9028"

@@ -13,12 +13,13 @@
 # limitations under the License.
 # ============================================================================
 """Communicator client in data join."""
+from mindspore_federated._mindspore_federated import RunPSI
 
 
 class _SimplifiedWorkerConfig:
     def __init__(self, worker_config_dict):
         self.join_type = worker_config_dict["join_type"]
-        self.bin_num = worker_config_dict["bin_num"]
+        self.bucket_num = worker_config_dict["bucket_num"]
         self.primary_key = worker_config_dict["primary_key"]
         self.shard_num = worker_config_dict["shard_num"]
 
@@ -41,11 +42,11 @@ def request_params(http_server_address, remote_server_address):
     return worker_config
 
 
-def wait_util_server_psi_is_ready(bin_id):
+def wait_util_server_psi_is_ready(bucket_id):
     import os
     while True:
-        if os.path.exists("server_psi_{}.txt".format(bin_id)):
-            os.remove("server_psi_{}.txt".format(bin_id))
+        if os.path.exists("server_psi_{}.txt".format(bucket_id)):
+            os.remove("server_psi_{}.txt".format(bucket_id))
             break
 
 
@@ -72,7 +73,7 @@ class _DataJoinClient:
 
         The hyper parameters include:
             primary_key (str)
-            bin_num (int)
+            bucket_num (int)
             shard_num (int)
             join_type (str)
 
@@ -84,18 +85,18 @@ class _DataJoinClient:
         remote_server_address = self._worker_config.remote_server_address
         worker_config = request_params(http_server_address, remote_server_address)
         self._worker_config.primary_key = worker_config.primary_key
-        self._worker_config.bin_num = worker_config.bin_num
+        self._worker_config.bucket_num = worker_config.bucket_num
         self._worker_config.shard_num = worker_config.shard_num
         self._worker_config.join_type = worker_config.join_type
         return self._worker_config
 
-    def join_func(self, input_vct, bin_id):
+    def join_func(self, input_vct, bucket_id):
         """
         Join function.
 
         Args:
             input_vct (list(str)): The keys need to be joined. The type of each key must be "str".
-            bin_id (int): The id of the bin.
+            bucket_id (int): The id of the bucket.
 
         Returns:
             - intersection_keys (list(str)): The intersection keys.
@@ -103,14 +104,12 @@ class _DataJoinClient:
         Raises:
             ValueError: If the join type is not supported.
         """
-        wait_util_server_psi_is_ready(bin_id)
+        wait_util_server_psi_is_ready(bucket_id)
         if self._worker_config.join_type == "psi":
-            # TODO: real psi
-            # thread_num = self._worker_config.thread_num
-            # http_server_address = self._worker_config.http_server_address
-            # remote_server_address = self._worker_config.remote_server_address
-            # intersection_keys = RunPSI(input_vct, "client", http_server_address, remote_server_address,
-            #                            thread_num, bin_id)
-            # return intersection_keys
-            return input_vct[:666]
+            thread_num = self._worker_config.thread_num
+            http_server_address = self._worker_config.http_server_address
+            remote_server_address = self._worker_config.remote_server_address
+            intersection_keys = RunPSI(input_vct, "client", http_server_address, remote_server_address,
+                                       thread_num, bucket_id)
+            return intersection_keys
         raise ValueError("join type: {} is not support currently".format(self._worker_config.join_type))

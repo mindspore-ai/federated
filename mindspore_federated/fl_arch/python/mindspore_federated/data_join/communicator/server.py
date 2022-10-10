@@ -13,6 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """Communicator server in data join."""
+from mindspore_federated._mindspore_federated import RunPSI
 
 
 def start_data_server(http_server_address, remote_server_address, worker_config):
@@ -24,7 +25,7 @@ def start_data_server(http_server_address, remote_server_address, worker_config)
     import yaml
     worker_config_dict = {
         "join_type": worker_config.join_type,
-        "bin_num": worker_config.bin_num,
+        "bucket_num": worker_config.bucket_num,
         "primary_key": worker_config.primary_key,
         "shard_num": worker_config.shard_num,
     }
@@ -32,8 +33,8 @@ def start_data_server(http_server_address, remote_server_address, worker_config)
         yaml.safe_dump(data=worker_config_dict, stream=f)
 
 
-def server_psi_is_ready(bin_id):
-    with open("server_psi_{}.txt".format(bin_id), "w") as f:
+def server_psi_is_ready(bucket_id):
+    with open("server_psi_{}.txt".format(bucket_id), "w") as f:
         f.write("")
 
 
@@ -60,7 +61,7 @@ class _DataJoinServer:
 
         The hyper parameters include:
             primary_key (str)
-            bin_num (int)
+            bucket_num (int)
             shard_num (int)
             join_type (str)
 
@@ -73,13 +74,13 @@ class _DataJoinServer:
         start_data_server(http_server_address, remote_server_address, self._worker_config)
         return self._worker_config
 
-    def join_func(self, input_vct, bin_id):
+    def join_func(self, input_vct, bucket_id):
         """
         Join function.
 
         Args:
             input_vct (list(str)): The keys need to be joined. The type of each key must be "str".
-            bin_id (int): The id of the bin.
+            bucket_id (int): The id of the bucket.
 
         Returns:
             - intersection_keys (list(str)): The intersection keys.
@@ -87,14 +88,12 @@ class _DataJoinServer:
         Raises:
             ValueError: If the join type is not supported.
         """
-        server_psi_is_ready(bin_id)
+        server_psi_is_ready(bucket_id)
         if self._worker_config.join_type == "psi":
-            # TODO: real psi
-            # thread_num = self._worker_config.thread_num
-            # http_server_address = self._worker_config.http_server_address
-            # remote_server_address = self._worker_config.remote_server_address
-            # intersection_keys = RunPSI(input_vct, "server", http_server_address, remote_server_address,
-            #                            thread_num, bin_id)
-            # return intersection_keys
-            return input_vct[:666]
+            thread_num = self._worker_config.thread_num
+            http_server_address = self._worker_config.http_server_address
+            remote_server_address = self._worker_config.remote_server_address
+            intersection_keys = RunPSI(input_vct, "server", http_server_address, remote_server_address,
+                                       thread_num, bucket_id)
+            return intersection_keys
         raise ValueError("join type: {} is not support currently".format(self._worker_config.join_type))
