@@ -51,10 +51,9 @@ public class SyncFLJob {
     private int waitTryTime = 0;
 
     // mindspore versions compatible for cur version of federated
-    private HashSet<String> msVersions = new HashSet<>(
-            Arrays.asList(
-                    "MindSpore Lite 1.9.0",
-                    "MindSpore Lite 2.0.0"));
+    private ArrayList<String> msVersions = new ArrayList<>(Arrays.asList(
+            "MindSpore Lite 1.9.0",
+            "MindSpore Lite 2.0.0"));
 
     private void initFlIDForPkiVerify() {
         if (flParameter.isPkiVerify()) {
@@ -73,18 +72,39 @@ public class SyncFLJob {
         }
     }
 
+    private void msVersionCheck() {
+        String msVersion = Version.version();
+        boolean versionMatch = false;
+        for (String ver : msVersions) {
+            if (msVersion.equals(ver)) {
+                versionMatch = true;
+                break;
+            }
+        }
+
+        if (versionMatch) {
+            LOGGER.info("Got compatible mindspore lite version:" + msVersion);
+            return;
+        }
+
+        String minCompatibleVersion = msVersions.get(0);
+        if (msVersion.compareTo(minCompatibleVersion) > 0) {
+            LOGGER.warning("Expect mindspore lite version in " + msVersions.toString() +
+                    ", but got incompatible mindspore lite version:" + msVersion);
+            return;
+        }
+
+        String expInfo = "Expect mindspore lite version in " + msVersions.toString() +
+                ", but got incompatible mindspore lite version:" + msVersion;
+        throw new RuntimeException(expInfo);
+
+    }
+
     public SyncFLJob() {
         try {
             LOGGER.info("the flName: " + flParameter.getFlName());
             Class.forName(flParameter.getFlName());
-            String msVersion = Version.version();
-            if (msVersions.contains(msVersion)) {
-                LOGGER.info("Got compatible mindspore lite version:" + msVersions);
-            } else {
-                String expInfo = "Expect mindspore lite version in " + msVersions.toString() +
-                        ", but got incompatible mindspore lite version:" + msVersion;
-                throw new RuntimeException(expInfo);
-            }
+            msVersionCheck();
         } catch (ClassNotFoundException e) {
             LOGGER.severe("catch ClassNotFoundException error, the set flName does not exist, " +
                     "please " +
