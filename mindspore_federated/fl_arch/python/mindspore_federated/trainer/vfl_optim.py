@@ -253,7 +253,7 @@ class PartyGradScaler:
         elif isinstance(self._sens, str):
             if self._sens not in sens:
                 raise ValueError('Input sens of PartyGradScaler not containing ', self._sens)
-            sens_value = sens[self._sens]
+            sens_value = sens[self._sens][self._output_name]
             grad_scale_value = self._grad_op(self._loss_net)(*input_data_batch, sens_value)
         remote_data_names = remote_data_batch.keys()
         remote_grad_scale_keys = []
