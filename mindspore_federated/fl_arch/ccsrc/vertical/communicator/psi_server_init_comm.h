@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <map>
 
 #include "vertical/communicator/abstract_communicator.h"
 #include "vertical/common.h"
@@ -35,20 +36,20 @@ class ServerPSIInitCommunicator : public AbstractCommunicator {
   ServerPSIInitCommunicator() = default;
   ~ServerPSIInitCommunicator() = default;
 
-  bool Send(const psi::ServerPSIInit &serverPSIInit);
+  bool Send(const std::string &target_server_name, const psi::ServerPSIInit &serverPSIInit);
 
   bool LaunchMsgHandler(const std::shared_ptr<MessageHandler> &message) override;
 
   void InitCommunicator(const std::shared_ptr<HttpCommunicator> &http_communicator) override;
 
-  psi::ServerPSIInit Receive();
+  psi::ServerPSIInit Receive(const std::string &target_server_name);
 
  private:
   bool VerifyProtoMessage(const psi::ServerPSIInit &serverPSIInit);
 
   std::mutex message_received_mutex_;
 
-  std::shared_ptr<MessageQueue<psi::ServerPSIInit>> message_queue_ = nullptr;
+  std::map<std::string, std::shared_ptr<MessageQueue<psi::ServerPSIInit>>> message_queues_ = {};
 };
 }  // namespace fl
 }  // namespace mindspore

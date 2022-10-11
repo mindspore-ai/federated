@@ -136,8 +136,7 @@ void RunInverseEcdhPsi(const PsiCtx &psi_ctx_alice, const PsiCtx &psi_ctx_bob);
 std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx_alice, const PsiCtx &psi_ctx_bob);
 
 MS_EXPORT std::vector<std::string> RunPSI(const std::vector<std::string> &input_vct, const std::string &comm_role,
-                                          const std::string &http_server_address,
-                                          const std::string &remote_server_address, size_t thread_num, size_t bin_id);
+                                          size_t thread_num, size_t bin_id, const std::string &http_server_address);
 }  // namespace psi
 }  // namespace fl
 }  // namespace mindspore

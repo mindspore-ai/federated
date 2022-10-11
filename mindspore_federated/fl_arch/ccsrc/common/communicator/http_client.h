@@ -63,13 +63,16 @@ class HttpClient {
   bool Stop();
   void SetMessageCallback(const OnMessage &cb);
   bool SendMessage(const void *data, size_t data_size, const std::shared_ptr<ResponseTrack> &response_track,
-                   const std::string &msg_type, const std::string &content_type);
+                   const std::string &target_msg_type, const std::string &content_type);
+  bool SendMessage(const void *data, size_t data_size, const std::shared_ptr<ResponseTrack> &response_track,
+                   const std::string &target_msg_type, const std::string &request_msg_type,
+                   const std::string &content_type);
   event_base *get_event_base() const;
   bool BreakLoopEvent();
   void set_response_track(const std::shared_ptr<ResponseTrack> &response_track);
   std::shared_ptr<ResponseTrack> response_track() const;
-  void set_msg_type(const std::string msg_type);
-  std::string msg_type() const;
+  void set_target_msg_type(const std::string target_msg_type);
+  std::string target_msg_type() const;
   void set_response_msg(const std::shared_ptr<std::vector<unsigned char>> &response_msg);
   const std::shared_ptr<std::vector<unsigned char>> response_msg() const;
 
@@ -88,7 +91,7 @@ class HttpClient {
   OnTimer on_timer_callback_;
 
   std::string remote_server_address_;
-  std::string msg_type_;
+  std::string target_msg_type_;
   event_base *event_base_;
   bufferevent *buffer_event_;
 

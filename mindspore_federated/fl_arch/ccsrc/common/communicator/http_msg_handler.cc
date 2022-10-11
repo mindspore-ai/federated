@@ -16,11 +16,13 @@
 
 #include "common/communicator/http_msg_handler.h"
 #include <memory>
+#include <string>
 
 namespace mindspore {
 namespace fl {
-HttpMsgHandler::HttpMsgHandler(const std::shared_ptr<HttpMessageHandler> &http_msg, void* data, size_t len)
-    : http_msg_(http_msg), data_(data), len_(len) {}
+HttpMsgHandler::HttpMsgHandler(const std::shared_ptr<HttpMessageHandler> &http_msg, void *data, size_t len,
+                               std::string message_type)
+    : http_msg_(http_msg), data_(data), len_(len), message_type_(message_type) {}
 
 const void *HttpMsgHandler::data() const {
   MS_ERROR_IF_NULL_W_RET_VAL(data_, nullptr);
@@ -28,6 +30,8 @@ const void *HttpMsgHandler::data() const {
 }
 
 size_t HttpMsgHandler::len() const { return len_; }
+
+std::string HttpMsgHandler::message_type() const { return message_type_; }
 
 bool HttpMsgHandler::SendResponse(const void *data, const size_t &len) {
   MS_ERROR_IF_NULL_W_RET_VAL(data, false);

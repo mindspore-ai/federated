@@ -28,7 +28,12 @@ void AliceCheckCommunicator::InitCommunicator(const std::shared_ptr<HttpCommunic
   }
   RegisterMsgCallBack(http_communicator, KAliceCheck);
   InitHttpClient();
-  message_queue_ = std::make_shared<MessageQueue<psi::AliceCheck>>();
+  auto remote_server_address = VFLContext::instance()->remote_server_address();
+  for (const auto &item : remote_server_address) {
+    auto target_server_name = item.first;
+    auto queue = std::make_shared<MessageQueue<psi::AliceCheck>>();
+    message_queues_[target_server_name] = queue;
+  }
 }
 
 bool AliceCheckCommunicator::LaunchMsgHandler(const std::shared_ptr<MessageHandler> &message) {
@@ -36,23 +41,33 @@ bool AliceCheckCommunicator::LaunchMsgHandler(const std::shared_ptr<MessageHandl
   try {
     MS_LOG(INFO) << "Launching psi AliceCheck message handler.";
     if (message->data() == nullptr || message->len() == 0) {
-      std::string reason = "request data is nullptr or data len is 0.";
+      std::string reason = "Request data is nullptr or data len is 0.";
       MS_LOG(WARNING) << reason;
       SendResponseMsg(message, reason.c_str(), reason.size());
       return false;
     }
+    std::string message_type = message->message_type();
+    if (message_type.empty() || message_queues_.count(message_type) <= 0) {
+      std::string reason = "Request message type is invalid.";
+      MS_LOG(WARNING) << reason;
+      SendResponseMsg(message, reason.c_str(), reason.size());
+      return false;
+    }
+    MS_LOG(INFO) << "Request message type is " << message_type;
 
-    datajoin::AliceCheckProto AliceCheckProto;
-    AliceCheckProto.ParseFromArray(message->data(), static_cast<int>(message->len()));
+    datajoin::AliceCheckProto proto;
+    proto.ParseFromArray(message->data(), static_cast<int>(message->len()));
 
-    psi::AliceCheck AliceCheck = ParseAliceCheckProto(AliceCheckProto);
-    if (!VerifyProtoMessage(AliceCheck)) {
+    psi::AliceCheck aliceCheck = ParseAliceCheckProto(proto);
+    if (!VerifyProtoMessage(aliceCheck)) {
       std::string reason = "Verify AliceCheck data failed for vertical psi.";
       MS_LOG(WARNING) << reason;
       SendResponseMsg(message, reason.c_str(), reason.size());
       return false;
     }
-    message_queue_->push(AliceCheck);
+    auto queue = message_queues_[message_type];
+    MS_EXCEPTION_IF_NULL(queue);
+    queue->push(aliceCheck);
     std::string res = std::to_string(ResponseElem::SUCCESS);
     SendResponseMsg(message, res.c_str(), res.size());
     MS_LOG(INFO) << "Launching psi AliceCheck message handler successful.";
@@ -65,18 +80,24 @@ bool AliceCheckCommunicator::LaunchMsgHandler(const std::shared_ptr<MessageHandl
 
 bool AliceCheckCommunicator::VerifyProtoMessage(const psi::AliceCheck &AliceCheck) { return true; }
 
-bool AliceCheckCommunicator::Send(const psi::AliceCheck &aliceCheck) {
+bool AliceCheckCommunicator::Send(const std::string &target_server_name, const psi::AliceCheck &aliceCheck) {
   auto alice_check_proto_ptr = std::make_shared<datajoin::AliceCheckProto>();
   CreateAliceCheckProto(alice_check_proto_ptr.get(), aliceCheck);
   std::string data = alice_check_proto_ptr->SerializeAsString();
   size_t data_size = data.size();
-  return SendMessage(data.c_str(), data_size, KAliceCheckMsgType);
+  return SendMessage(target_server_name, data.c_str(), data_size, KAliceCheckMsgType);
 }
 
-psi::AliceCheck AliceCheckCommunicator::Receive() {
+psi::AliceCheck AliceCheckCommunicator::Receive(const std::string &target_server_name) {
   std::unique_lock<std::mutex> message_lock(message_received_mutex_);
   MS_LOG(INFO) << "Begin receive AliceCheck message.";
-  return message_queue_->pop();
+
+  if (message_queues_.count(target_server_name) <= 0) {
+    MS_LOG(EXCEPTION) << "Target server name " << target_server_name << " for message queues is invalid.";
+  }
+  auto queue = message_queues_[target_server_name];
+  MS_EXCEPTION_IF_NULL(queue);
+  return queue->pop();
 }
 }  // namespace fl
 }  // namespace mindspore

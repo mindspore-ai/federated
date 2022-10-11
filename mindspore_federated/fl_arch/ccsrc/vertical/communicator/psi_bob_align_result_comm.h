@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <map>
 
 #include "vertical/communicator/abstract_communicator.h"
 #include "vertical/common.h"
@@ -39,16 +40,16 @@ class BobAlignResultCommunicator : public AbstractCommunicator {
 
   void InitCommunicator(const std::shared_ptr<HttpCommunicator> &http_communicator) override;
 
-  bool Send(const psi::BobAlignResult &bobAlignResult);
+  bool Send(const std::string &target_server_name, const psi::BobAlignResult &bobAlignResult);
 
-  psi::BobAlignResult Receive();
+  psi::BobAlignResult Receive(const std::string &target_server_name);
 
  private:
   bool VerifyProtoMessage(const psi::BobAlignResult &BobAlignResult);
 
   std::mutex message_received_mutex_;
 
-  std::shared_ptr<MessageQueue<psi::BobAlignResult>> message_queue_ = nullptr;
+  std::map<std::string, std::shared_ptr<MessageQueue<psi::BobAlignResult>>> message_queues_ = {};
 };
 }  // namespace fl
 }  // namespace mindspore

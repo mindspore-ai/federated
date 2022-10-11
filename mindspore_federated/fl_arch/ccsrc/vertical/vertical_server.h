@@ -51,33 +51,33 @@ class VerticalServer {
 
   std::map<std::string, std::shared_ptr<AbstractCommunicator>> &communicators();
 
-  void Send(const TensorListItemPy &tensorListItemPy);
+  void Send(const std::string &target_server_name, const TensorListItemPy &tensorListItemPy);
 
-  void Send(const psi::BobPb &bobPb);
+  void Send(const std::string &target_server_name, const psi::BobPb &bobPb);
 
-  void Send(const psi::ClientPSIInit &clientPSIInit);
+  void Send(const std::string &target_server_name, const psi::ClientPSIInit &clientPSIInit);
 
-  void Send(const psi::ServerPSIInit &serverPSIInit);
+  void Send(const std::string &target_server_name, const psi::ServerPSIInit &serverPSIInit);
 
-  void Send(const psi::BobAlignResult &bobAlignResult);
+  void Send(const std::string &target_server_name, const psi::BobAlignResult &bobAlignResult);
 
-  void Send(const psi::AlicePbaAndBF &alicePbaAndBF);
+  void Send(const std::string &target_server_name, const psi::AlicePbaAndBF &alicePbaAndBF);
 
-  void Send(const psi::AliceCheck &aliceCheck);
+  void Send(const std::string &target_server_name, const psi::AliceCheck &aliceCheck);
 
-  void Receive(TensorListItemPy *tensorListItemPy);
+  void Receive(const std::string &target_server_name, TensorListItemPy *tensorListItemPy);
 
-  void Receive(psi::BobPb *bobPb);
+  void Receive(const std::string &target_server_name, psi::BobPb *bobPb);
 
-  void Receive(psi::ClientPSIInit *clientPSIInit);
+  void Receive(const std::string &target_server_name, psi::ClientPSIInit *clientPSIInit);
 
-  void Receive(psi::ServerPSIInit *serverPSIInit);
+  void Receive(const std::string &target_server_name, psi::ServerPSIInit *serverPSIInit);
 
-  void Receive(psi::BobAlignResult *bobAlignResult);
+  void Receive(const std::string &target_server_name, psi::BobAlignResult *bobAlignResult);
 
-  void Receive(psi::AlicePbaAndBF *alicePbaAndBF);
+  void Receive(const std::string &target_server_name, psi::AlicePbaAndBF *alicePbaAndBF);
 
-  void Receive(psi::AliceCheck *aliceCheck);
+  void Receive(const std::string &target_server_name, psi::AliceCheck *aliceCheck);
 
  private:
   std::atomic_bool running_ = false;

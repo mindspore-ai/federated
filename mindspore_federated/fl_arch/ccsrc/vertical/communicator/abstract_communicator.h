@@ -56,12 +56,15 @@ class AbstractCommunicator : public AbstractNode {
 
   void InitHttpClient();
 
-  bool SendMessage(const void *data, size_t data_size, const std::string &msg_type);
+  bool SendMessage(const std::string &target_server_name, const void *data, size_t data_size,
+                   const std::string &msg_type);
+
+  std::string name() const;
 
  private:
-  std::string remote_server_address_;
+  std::map<std::string, std::string> remote_server_address_;
 
-  std::shared_ptr<HttpClient> http_client_ = nullptr;
+  std::map<std::string, std::shared_ptr<HttpClient>> http_clients_ = {};
 
   static std::mutex communicator_mtx_;
 };

@@ -52,7 +52,7 @@ void AbstractCommunicator::StartHttpServer(const std::shared_ptr<HttpCommunicato
 void AbstractCommunicator::RegisterMsgCallBack(const std::shared_ptr<HttpCommunicator> &http_communicator,
                                                const std::string &name) {
   MS_EXCEPTION_IF_NULL(http_communicator);
-  MS_LOG(INFO) << "Vertical " << name << " register message callback.";
+  MS_LOG(INFO) << "Vertical communicator register message callback for " << name;
   http_communicator->RegisterRoundMsgCallback(
     name, [this](const std::shared_ptr<MessageHandler> &message) { LaunchMsgHandler(message); });
 }
@@ -60,40 +60,63 @@ void AbstractCommunicator::RegisterMsgCallBack(const std::shared_ptr<HttpCommuni
 void AbstractCommunicator::InitHttpClient() {
   remote_server_address_ = VFLContext::instance()->remote_server_address();
   if (VFLContext::instance()->enable_ssl()) {
-    remote_server_address_ = "https://" + remote_server_address_;
+    for (const auto &item : remote_server_address_) {
+      auto target_server_name = item.first;
+      auto server_address = item.second;
+      remote_server_address_[target_server_name] = "https://" + server_address;
+    }
   } else {
-    remote_server_address_ = "http://" + remote_server_address_;
+    for (const auto &item : remote_server_address_) {
+      auto target_server_name = item.first;
+      auto server_address = item.second;
+      remote_server_address_[target_server_name] = "http://" + server_address;
+    }
   }
-
   MS_LOG(INFO) << "Request will be sent to server domain:" << remote_server_address_;
-  http_client_ = std::make_shared<HttpClient>(remote_server_address_);
 
-  http_client_->SetMessageCallback([&](const std::shared_ptr<ResponseTrack> &response_track,
-                                       const std::string &msg_type) { NotifyMessageArrival(response_track); });
-  http_client_->Init();
+  for (const auto &item : remote_server_address_) {
+    auto target_server_name = item.first;
+    auto server_address = item.second;
+    auto http_client = std::make_shared<HttpClient>(server_address);
+
+    http_client->SetMessageCallback([&](const std::shared_ptr<ResponseTrack> &response_track,
+                                        const std::string &msg_type) { NotifyMessageArrival(response_track); });
+    http_client->Init();
+
+    http_clients_[target_server_name] = http_client;
+  }
 }
 
-bool AbstractCommunicator::SendMessage(const void *data, size_t data_size, const std::string &msg_type) {
+bool AbstractCommunicator::SendMessage(const std::string &target_server_name, const void *data, size_t data_size,
+                                       const std::string &target_msg_type) {
   if (data == nullptr) {
     MS_LOG(WARNING) << "Data for sending request is nullptr.";
     return false;
   }
   if (data_size == 0) {
-    MS_LOG(WARNING) << "Data size for sending request must be > 0";
+    MS_LOG(WARNING) << "Data size for sending request must be greater than 0";
     return false;
   }
+  if (remote_server_address_.count(target_server_name) <= 0 || http_clients_.count(target_server_name) <= 0) {
+    MS_LOG(WARNING) << "Remote server name is invalid.";
+    return false;
+  }
+  auto http_client = http_clients_[target_server_name];
+  MS_EXCEPTION_IF_NULL(http_client);
   auto request_track = AddMessageTrack(1, nullptr);
-  if (!http_client_->SendMessage(data, data_size, request_track, msg_type, HTTP_CONTENT_TYPE_URL_ENCODED)) {
-    MS_LOG(WARNING) << "Sending request for msg type:" << msg_type << " to server " << remote_server_address_
+  auto http_server_name = VFLContext::instance()->http_server_name();
+  if (!http_client->SendMessage(data, data_size, request_track, target_msg_type, http_server_name,
+                                HTTP_CONTENT_TYPE_URL_ENCODED)) {
+    MS_LOG(WARNING) << "Sending request for target msg type:" << target_msg_type << " to server " << target_server_name
                     << " failed.";
     return false;
   }
   if (!Wait(request_track)) {
     MS_LOG(WARNING) << "Sending http message timeout.";
-    http_client_->BreakLoopEvent();
+    http_client->BreakLoopEvent();
     return false;
   }
-  std::string res_msg = reinterpret_cast<char *>(http_client_->response_msg()->data());
+  std::string res_msg = reinterpret_cast<char *>(http_client->response_msg()->data());
   return res_msg == std::to_string(ResponseElem::SUCCESS);
 }
 

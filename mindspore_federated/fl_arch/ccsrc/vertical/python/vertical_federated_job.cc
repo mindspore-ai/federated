@@ -17,6 +17,7 @@
 #include "vertical/python/vertical_federated_job.h"
 
 #include <vector>
+#include <string>
 #include "vertical/communicator/trainer_communicator.h"
 #include "vertical/vertical_server.h"
 #include "vertical/common.h"
@@ -25,13 +26,13 @@ namespace mindspore {
 namespace fl {
 void VerticalFederatedJob::StartVerticalCommunicator() { VerticalServer::GetInstance().StartVerticalCommunicator(); }
 
-void VerticalFederatedJob::Send(const TensorListItemPy &tensorListItemPy) {
-  VerticalServer::GetInstance().Send(tensorListItemPy);
+void VerticalFederatedJob::Send(const std::string &target_server_name, const TensorListItemPy &tensorListItemPy) {
+  VerticalServer::GetInstance().Send(target_server_name, tensorListItemPy);
 }
 
-TensorListItemPy VerticalFederatedJob::Receive() {
+TensorListItemPy VerticalFederatedJob::Receive(const std::string &target_server_name) {
   TensorListItemPy tensorListItemPy;
-  VerticalServer::GetInstance().Receive(&tensorListItemPy);
+  VerticalServer::GetInstance().Receive(target_server_name, &tensorListItemPy);
   return tensorListItemPy;
 }
 }  // namespace fl

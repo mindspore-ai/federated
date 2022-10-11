@@ -28,7 +28,12 @@ void ServerPSIInitCommunicator::InitCommunicator(const std::shared_ptr<HttpCommu
   }
   RegisterMsgCallBack(http_communicator, KServerPSIInit);
   InitHttpClient();
-  message_queue_ = std::make_shared<MessageQueue<psi::ServerPSIInit>>();
+  auto remote_server_address = VFLContext::instance()->remote_server_address();
+  for (const auto &item : remote_server_address) {
+    auto target_server_name = item.first;
+    auto queue = std::make_shared<MessageQueue<psi::ServerPSIInit>>();
+    message_queues_[target_server_name] = queue;
+  }
 }
 
 bool ServerPSIInitCommunicator::LaunchMsgHandler(const std::shared_ptr<MessageHandler> &message) {
@@ -41,18 +46,27 @@ bool ServerPSIInitCommunicator::LaunchMsgHandler(const std::shared_ptr<MessageHa
       SendResponseMsg(message, reason.c_str(), reason.size());
       return false;
     }
+    std::string message_type = message->message_type();
+    if (message_type.empty() || message_queues_.count(message_type) <= 0) {
+      std::string reason = "Request message type is invalid.";
+      MS_LOG(WARNING) << reason;
+      SendResponseMsg(message, reason.c_str(), reason.size());
+      return false;
+    }
+    MS_LOG(INFO) << "Request message type is " << message_type;
+    datajoin::ServerPSIInitProto proto;
+    proto.ParseFromArray(message->data(), static_cast<int>(message->len()));
 
-    datajoin::ServerPSIInitProto serverPSIInitProto;
-    serverPSIInitProto.ParseFromArray(message->data(), static_cast<int>(message->len()));
-
-    psi::ServerPSIInit serverPSIInit = ParseServerPSIInitProto(serverPSIInitProto);
+    psi::ServerPSIInit serverPSIInit = ParseServerPSIInitProto(proto);
     if (!VerifyProtoMessage(serverPSIInit)) {
       std::string reason = "Verify serverPSIInitProto failed for vertical psi.";
       MS_LOG(WARNING) << reason;
       SendResponseMsg(message, reason.c_str(), reason.size());
       return false;
     }
-    message_queue_->push(serverPSIInit);
+    auto queue = message_queues_[message_type];
+    MS_EXCEPTION_IF_NULL(queue);
+    queue->push(serverPSIInit);
     std::string res = std::to_string(ResponseElem::SUCCESS);
     SendResponseMsg(message, res.c_str(), res.size());
     MS_LOG(INFO) << "Launching psi ServerPSIInit message handler successful.";
@@ -65,19 +79,24 @@ bool ServerPSIInitCommunicator::LaunchMsgHandler(const std::shared_ptr<MessageHa
 
 bool ServerPSIInitCommunicator::VerifyProtoMessage(const psi::ServerPSIInit &serverPSIInit) { return true; }
 
-bool ServerPSIInitCommunicator::Send(const psi::ServerPSIInit &serverPSIInit) {
+bool ServerPSIInitCommunicator::Send(const std::string &target_server_name, const psi::ServerPSIInit &serverPSIInit) {
   auto client_psi_init_proto_ptr = std::make_shared<datajoin::ServerPSIInitProto>();
   CreateServerPSIInitProto(client_psi_init_proto_ptr.get(), serverPSIInit);
   std::string data = client_psi_init_proto_ptr->SerializeAsString();
   size_t data_size = data.size();
   MS_LOG(INFO) << "Send serverPSIInitProto size is " << data_size;
-  return SendMessage(data.c_str(), data_size, KServerPSIInitMsgType);
+  return SendMessage(target_server_name, data.c_str(), data_size, KServerPSIInitMsgType);
 }
 
-psi::ServerPSIInit ServerPSIInitCommunicator::Receive() {
+psi::ServerPSIInit ServerPSIInitCommunicator::Receive(const std::string &target_server_name) {
   std::unique_lock<std::mutex> message_lock(message_received_mutex_);
   MS_LOG(INFO) << "Begin receive ServerPSIInit message.";
-  return message_queue_->pop();
+  if (message_queues_.count(target_server_name) <= 0) {
+    MS_LOG(EXCEPTION) << "Target server name " << target_server_name << " for message queues is invalid.";
+  }
+  auto queue = message_queues_[target_server_name];
+  MS_EXCEPTION_IF_NULL(queue);
+  return queue->pop();
 }
 }  // namespace fl
 }  // namespace mindspore
