@@ -12,12 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+"""Store by pandas."""
 
 import pandas as pd
 from .base_data import BaseData
 
 
 class PandasData(BaseData):
+    """
+    Pandas Data format.
+    """
     def __init__(self, store=None, primary_key=None, schema=None, desc=None):
         super().__init__()
         self._store = pd.DataFrame() if store is None else store
@@ -31,6 +35,7 @@ class PandasData(BaseData):
         return list(self._store.loc[:, self._primary_key])
 
     def values(self, keys=None):
+        self._store = self._store.sort_values(by=self._primary_key, ascending=False)
         if keys is None:
             values = self._store.values
         else:

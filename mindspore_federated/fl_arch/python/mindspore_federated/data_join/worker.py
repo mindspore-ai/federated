@@ -13,6 +13,8 @@
 # limitations under the License.
 # ============================================================================
 """Worker in data join."""
+
+import os
 import yaml
 import mmh3
 from mindspore._checkparam import Validator, Rel
@@ -35,15 +37,15 @@ class _WorkerConfig:
 
     Attribute:
         main_table_files (Union(list(str), str): The raw data paths.
-        file_name (str): The prefix of output file name.
+        output_dir (str): The output directory.
         join_type (str): The data join type. Default: "psi".
-        bin_num (int): The number of bins. Default: 1.
+        bucket_num (int): The number of buckets. Default: 1.
         store_type (str): The data store type. Default: "csv".
         primary_key (str): The primary key. Default: "oaid".
         http_server_address (str): The address of local address. Default: "127.0.0.1:8080".
         remote_server_address (str): The address of remote address. Default: "127.0.0.1:18080".
         thread_num (int): The thread number of psi. The prefix of output file name. Default: 0.
-        shard_num (int): The output number of each bin when export. Default: 1.
+        shard_num (int): The output number of each bucket when export. Default: 1.
     """
 
     def __init__(self, worker_config_path):
@@ -53,12 +55,12 @@ class _WorkerConfig:
             self.main_table_files = worker_config_dict.get("main_table_files")
         else:
             raise ValueError("main_table_files must be in worker_config")
-        if "output_file_name" in worker_config_dict:
-            self.file_name = worker_config_dict.get("output_file_name")
+        if "output_dir" in worker_config_dict:
+            self.output_dir = worker_config_dict.get("output_dir")
         else:
-            raise ValueError("output_file_name must be in worker_config")
+            raise ValueError("output_dir must be in worker_config")
         self.join_type = worker_config_dict.get("join_type", "psi")
-        self.bin_num = worker_config_dict.get("bin_num", 1)
+        self.bucket_num = worker_config_dict.get("bucket_num", 1)
         self.store_type = worker_config_dict.get("store_type", "csv")
         self.primary_key = worker_config_dict.get("primary_key", "oaid")
         self.http_server_address = worker_config_dict.get("http_server_address", "127.0.0.1:8080")
@@ -75,32 +77,32 @@ def _check_str(arg_value, arg_name=None, prim_name=None):
     return arg_value
 
 
-class _DivideKeyTobin:
+class _DivideKeyTobucket:
     """
-    Divide key to bin.
+    Divide key to bucket.
 
     Args:
         keys (list(str)): The keys need to be divided.
-        bin_num (int): The number of bins.
+        bucket_num (int): The number of buckets.
     """
 
-    def __init__(self, keys, bin_num=64):
-        self._bin_num = bin_num
+    def __init__(self, keys, bucket_num=64):
+        self._bucket_num = bucket_num
         self._keys = keys
 
-    def _get_bin_id(self, key):
-        return mmh3.hash(key) % self._bin_num
+    def _get_bucket_id(self, key):
+        return mmh3.hash(key) % self._bucket_num
 
-    def get_bins(self):
+    def get_buckets(self):
         """
         Returns:
-            - bins (list(str)): The list of ids in different bins.
+            - buckets (list(str)): The list of ids in different buckets.
         """
-        bins = [list() for _ in range(self._bin_num)]
+        buckets = [list() for _ in range(self._bucket_num)]
         for key in self._keys:
-            bin_id = self._get_bin_id(key)
-            bins[bin_id].append(key)
-        return bins
+            bucket_id = self._get_bucket_id(key)
+            buckets[bucket_id].append(key)
+        return buckets
 
 
 class FLDataWorker:
@@ -142,9 +144,9 @@ class FLDataWorker:
         main_table_files = self._worker_config.main_table_files
         if not isinstance(main_table_files, list) and not isinstance(main_table_files, str):
             raise TypeError("main_table_files must be list or str, but get {}".format(type(main_table_files)))
-        _check_str(self._worker_config.file_name, arg_name="file_name")
+        _check_str(self._worker_config.output_dir, arg_name="output_dir")
         Validator.check_string(self._worker_config.join_type, SUPPORT_JOIN_TYPES, arg_name="join_type")
-        Validator.check_int_range(self._worker_config.bin_num, 1, 1000000, Rel.INC_BOTH, arg_name="bin_num")
+        Validator.check_int_range(self._worker_config.bucket_num, 1, 1000000, Rel.INC_BOTH, arg_name="bucket_num")
         Validator.check_string(self._worker_config.store_type, SUPPORT_STORE_TYPES, arg_name="store_type")
 
         _check_str(self._worker_config.primary_key, arg_name="primary_key")
@@ -206,18 +208,18 @@ class FLDataWorker:
             raise ValueError("store type: {} is not support currently".format(self._worker_config.store_type))
         return raw_data
 
-    def _join_func(self, input_vct, bin_id):
+    def _join_func(self, input_vct, bucket_id):
         """
         Join function.
 
         Args:
             input_vct (list(str)): The keys need to be joined. The type of each key must be "str".
-            bin_id (int): The id of the bin.
+            bucket_id (int): The id of the bucket.
 
         Returns:
             - intersection_keys (list(str)): The intersection keys.
         """
-        return self.communicator.join_func(input_vct, bin_id)
+        return self.communicator.join_func(input_vct, bucket_id)
 
     def export(self):
         """
@@ -225,17 +227,17 @@ class FLDataWorker:
         """
         raw_data = self._load_raw_data()
         keys = raw_data.keys()
-        divide_key_to_bin = _DivideKeyTobin(bin_num=self._worker_config.bin_num, keys=keys)
-        bins = divide_key_to_bin.get_bins()
+        divide_key_to_bucket = _DivideKeyTobucket(bucket_num=self._worker_config.bucket_num, keys=keys)
+        buckets = divide_key_to_bucket.get_buckets()
         shard_num = self._worker_config.shard_num
         export_count = 0
-        for bin_id, input_vct in enumerate(bins):
-            intersection_keys = self._join_func(input_vct, bin_id)
+        for bucket_id, input_vct in enumerate(buckets):
+            intersection_keys = self._join_func(input_vct, bucket_id + 1)
             if not intersection_keys:
                 continue
-            output_file_name = "{}_{}_".format(self._worker_config.file_name, bin_id) if shard_num > 1 else \
-                "{}_{}".format(self._worker_config.file_name, bin_id)
+            file_name = "mindrecord_{}_".format(bucket_id) if shard_num > 1 else "mindrecord_{}".format(bucket_id)
+            output_file_name = os.path.join(self._worker_config.output_dir, file_name)
             export_mindrecord(output_file_name, raw_data, intersection_keys, shard_num=shard_num)
             export_count += 1
         if export_count == 0:
-            raise ValueError("The intersection_keys of all bins is empty")
+            raise ValueError("The intersection_keys of all buckets is empty")
