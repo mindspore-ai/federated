@@ -31,7 +31,12 @@ void TrainerCommunicator::InitCommunicator(const std::shared_ptr<HttpCommunicato
   }
   RegisterMsgCallBack(http_communicator, KTrainer);
   InitHttpClient();
-  message_queue_ = std::make_shared<MessageQueue<TensorListItemPy>>();
+  auto remote_server_address = VFLContext::instance()->remote_server_address();
+  for (const auto &item : remote_server_address) {
+    auto target_server_name = item.first;
+    auto queue = std::make_shared<MessageQueue<TensorListItemPy>>();
+    message_queues_[target_server_name] = queue;
+  }
 }
 
 bool TrainerCommunicator::VerifyTensorListItem(const TensorListItemPy &tensorListItemPy) {
@@ -51,7 +56,14 @@ bool TrainerCommunicator::LaunchMsgHandler(const std::shared_ptr<MessageHandler>
       SendResponseMsg(message, reason.c_str(), reason.size());
       return false;
     }
-
+    std::string message_type = message->message_type();
+    if (message_type.empty() || message_queues_.count(message_type) <= 0) {
+      std::string reason = "Request message type is invalid.";
+      MS_LOG(WARNING) << reason;
+      SendResponseMsg(message, reason.c_str(), reason.size());
+      return false;
+    }
+    MS_LOG(INFO) << "Request message type is " << message_type;
     TensorListProto tensorListProto;
     if (!tensorListProto.ParseFromArray(message->data(), message->len())) {
       MS_LOG(WARNING) << "Tensor list proto parse from array failed.";
@@ -65,7 +77,9 @@ bool TrainerCommunicator::LaunchMsgHandler(const std::shared_ptr<MessageHandler>
       return false;
     }
 
-    TensorMsgReceiveHandler(tensorListItemPy);
+    auto queue = message_queues_[message_type];
+    MS_EXCEPTION_IF_NULL(queue);
+    queue->push(tensorListItemPy);
     std::string res = std::to_string(ResponseElem::SUCCESS);
     SendResponseMsg(message, res.c_str(), res.size());
     MS_LOG(INFO) << "Launching vertical trainer message handler successful.";
@@ -76,24 +90,23 @@ bool TrainerCommunicator::LaunchMsgHandler(const std::shared_ptr<MessageHandler>
   return true;
 }
 
-bool TrainerCommunicator::Send(const TensorListItemPy &tensorListItemPy) {
+bool TrainerCommunicator::Send(const std::string &target_server_name, const TensorListItemPy &tensorListItemPy) {
   std::shared_ptr<TensorListProto> tensor_list_proto_ptr = std::make_shared<TensorListProto>();
   CreateTensorListProto(tensor_list_proto_ptr.get(), tensorListItemPy);
   std::string data = tensor_list_proto_ptr->SerializeAsString();
   size_t data_size = data.size();
-  return SendMessage(data.c_str(), data_size, KTrainerMsgType);
+  return SendMessage(target_server_name, data.c_str(), data_size, KTrainerMsgType);
 }
 
-bool TrainerCommunicator::TensorMsgReceiveHandler(const TensorListItemPy &tensorListItemPy) {
-  message_queue_->push(tensorListItemPy);
-  MS_LOG(INFO) << "Trainer push tensorListItemPy message success.";
-  return true;
-}
-
-TensorListItemPy TrainerCommunicator::Receive(const uint32_t &timeout) {
+TensorListItemPy TrainerCommunicator::Receive(const std::string &target_server_name, const uint32_t &timeout) {
   std::unique_lock<std::mutex> message_lock(message_received_mutex_);
   MS_LOG(INFO) << "Begin receive tensor message.";
-  return message_queue_->pop();
+  if (message_queues_.count(target_server_name) <= 0) {
+    MS_LOG(EXCEPTION) << "Target server name " << target_server_name << " for message queues is invalid.";
+  }
+  auto queue = message_queues_[target_server_name];
+  MS_EXCEPTION_IF_NULL(queue);
+  return queue->pop();
 }
 }  // namespace fl
 }  // namespace mindspore

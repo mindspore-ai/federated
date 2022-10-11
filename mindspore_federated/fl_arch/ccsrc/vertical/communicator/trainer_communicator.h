@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <map>
 
 #include "vertical/communicator/abstract_communicator.h"
 #include "vertical/common.h"
@@ -41,20 +42,16 @@ class TrainerCommunicator : public AbstractCommunicator {
 
   void InitCommunicator(const std::shared_ptr<HttpCommunicator> &http_communicator) override;
 
-  bool Send(const TensorListItemPy &tensorListItemPy);
+  bool Send(const std::string &target_server_name, const TensorListItemPy &tensorListItemPy);
 
-  TensorListItemPy Receive(const uint32_t &timeout = 100000);
+  TensorListItemPy Receive(const std::string &target_server_name, const uint32_t &timeout = 100000);
 
  private:
-  bool TensorMsgReceiveHandler(const TensorListItemPy &tensorListItemPy);
-
   bool VerifyTensorListItem(const TensorListItemPy &tensorListItemPy);
-
-  std::vector<VerticalConfig> vertical_config_ = {};
 
   std::mutex message_received_mutex_;
 
-  std::shared_ptr<MessageQueue<TensorListItemPy>> message_queue_ = nullptr;
+  std::map<std::string, std::shared_ptr<MessageQueue<TensorListItemPy>>> message_queues_ = {};
 };
 }  // namespace fl
 }  // namespace mindspore

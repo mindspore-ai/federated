@@ -44,8 +44,10 @@ void InitVFLContext(const py::module &m) {
     .def_static("get_instance", &VFLContext::instance, "Get fl context instance.")
     .def("set_http_server_address", &VFLContext::set_http_server_address, "Set federated learning http server address.")
     .def("http_server_address", &VFLContext::http_server_address, "Get federated learning http server address.")
+    .def("set_http_server_name", &VFLContext::set_http_server_name, "Set federated learning http server name.")
+    .def("http_server_name", &VFLContext::http_server_name, "Get federated learning http server name.")
     .def("set_remote_server_address", &VFLContext::set_remote_server_address,
-         "Set federated learning remote server address.")
+         "Set vertical federated learning remote server address.")
     .def("remote_server_address", &VFLContext::remote_server_address, "Get federated learning remote server address.")
     .def("http_server_address", &VFLContext::http_server_address, "Get federated learning http server address.")
     .def("set_enable_ssl", &VFLContext::set_enable_ssl, "Set PS SSL mode enabled or disabled.")
@@ -90,7 +92,7 @@ PYBIND11_MODULE(_mindspore_federated, m) {
   m.def("RunPSIDemo", &mindspore::fl::psi::RunPSIDemo, "run psi demo", py::arg("alice_list"), py::arg("bob_list"),
         py::arg("thread_num"));
   m.def("RunPSI", &mindspore::fl::psi::RunPSI, "run psi with communicate", py::arg("input_list"), py::arg("comm_role"),
-        py::arg("http_server_address"), py::arg("remote_server_address"), py::arg("thread_num"), py::arg("bin_id"));
+        py::arg("thread_num"), py::arg("bin_id"), py::arg("target_server_name"));
 
   (void)py::class_<FederatedJob, std::shared_ptr<FederatedJob>>(m, "Federated_")
     .def_static("start_federated_server", &FederatedJob::StartFederatedServer)

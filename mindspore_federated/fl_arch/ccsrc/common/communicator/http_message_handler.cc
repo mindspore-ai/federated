@@ -53,8 +53,7 @@ void HttpMessageHandler::InitHttpMessage() {
 std::string HttpMessageHandler::GetHeadParam(const std::string &key) const {
   MS_EXCEPTION_IF_NULL(head_params_);
   const char *val = evhttp_find_header(head_params_, key.c_str());
-  MS_EXCEPTION_IF_NULL(val);
-  return std::string(val);
+  return val == nullptr ? "" : std::string(val);
 }
 
 std::string HttpMessageHandler::GetPathParam(const std::string &key) const {

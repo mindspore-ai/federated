@@ -371,7 +371,7 @@ std::vector<std::string> RunPSIDemo(const std::vector<std::string> &alice_input,
   return ret;
 }
 
-std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx) {
+std::vector<std::string> RunInverseFilterEcdhPsi(const std::string &target_server_name, const PsiCtx &psi_ctx) {
   std::vector<std::string> align_results_vector;
   auto &verticalServer = VerticalServer::GetInstance();
   if (psi_ctx.role == "alice") {
@@ -381,24 +381,24 @@ std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx) {
 
     MS_LOG(INFO) << "----------------------- 2. alice receive bob_p_b -----------------------";
     BobPb bob_p_b_recv;
-    verticalServer.Receive(&bob_p_b_recv);
+    verticalServer.Receive(target_server_name, &bob_p_b_recv);
     MS_LOG(INFO) << "Alice start decompress and compute p2^b^a --------------------------";
     auto p_b_a_vct = psi_ctx.ecc->DcpsAndMul(bob_p_b_recv.p_b_vct(), psi_ctx.compress_length, psi_ctx.compress_length);
 
     MS_LOG(INFO) << " -------------------------- 3. alice send AlicePbaAndBFProto ------------------------";
     AlicePbaAndBF alice_p_b_a_bf(psi_ctx.bin_id, p_b_a_vct, bf_alice.GetData());
-    verticalServer.Send(alice_p_b_a_bf);
+    verticalServer.Send(target_server_name, alice_p_b_a_bf);
 
     MS_LOG(INFO) << "-------------------------- 6. alice receive align_result -----------------------";
     std::vector<std::string> wrong_vct;
     std::vector<std::string> fix_vct;
     BobAlignResult bob_align_result_recv;
-    verticalServer.Receive(&bob_align_result_recv);
+    verticalServer.Receive(target_server_name, &bob_align_result_recv);
     FindWrong(psi_ctx, bob_align_result_recv.align_result(), &wrong_vct, &fix_vct);
 
     MS_LOG(INFO) << "-------------------------- 7. alice send wrong_id -----------------------";
     AliceCheck alice_check(psi_ctx.bin_id, wrong_vct.size(), wrong_vct);
-    verticalServer.Send(alice_check);
+    verticalServer.Send(target_server_name, alice_check);
     return fix_vct;
   } else {
     MS_LOG(INFO) << "[outline] Bob start computing p2^b...";
@@ -406,11 +406,11 @@ std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx) {
       psi_ctx.ecc->HashToCurveAndMul(psi_ctx.input_hash_vct, psi_ctx.compress_length, psi_ctx.compress_length);
     MS_LOG(INFO) << "-------------------------- 1. bob send bobPb -----------------------";
     BobPb bob_p_b(psi_ctx.bin_id, p_b_vct);
-    verticalServer.Send(bob_p_b);
+    verticalServer.Send(target_server_name, bob_p_b);
 
     MS_LOG(INFO) << "-------------------------- 4. bob receive alice_p_b_a_bf -----------------------";
     AlicePbaAndBF alice_p_b_a_bf_recv;
-    verticalServer.Receive(&alice_p_b_a_bf_recv);
+    verticalServer.Receive(target_server_name, &alice_p_b_a_bf_recv);
     MS_LOG(INFO) << "Bob start decompress and compute p2^b^a^(b^-1) --------------------------";
     auto p_b_a_bI_vct =
       psi_ctx.ecc->DcpsAndInverseMul(alice_p_b_a_bf_recv.p_b_a_vct(), psi_ctx.compress_length, LENGTH_32);
@@ -426,22 +426,19 @@ std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx) {
 
     MS_LOG(INFO) << "-------------------------- 5. bob send align_result -----------------------";
     BobAlignResult bob_align_result(psi_ctx.bin_id, align_results_vector);
-    verticalServer.Send(bob_align_result);
+    verticalServer.Send(target_server_name, bob_align_result);
 
     MS_LOG(INFO) << "-------------------------- 8. bob receive wrong_id -----------------------";
     AliceCheck alice_check_recv;
-    verticalServer.Receive(&alice_check_recv);
+    verticalServer.Receive(target_server_name, &alice_check_recv);
     DelWrong(&align_results_vector, alice_check_recv.wrong_id());
     return align_results_vector;
   }
 }
 
 std::vector<std::string> RunPSI(const std::vector<std::string> &input_vct, const std::string &comm_role,
-                                const std::string &http_server_address, const std::string &remote_server_address,
-                                size_t thread_num, size_t bin_id) {
+                                size_t thread_num, size_t bin_id, const std::string &target_server_name) {
   std::vector<std::string> ret;
-  VFLContext::instance()->set_http_server_address(http_server_address);
-  VFLContext::instance()->set_remote_server_address(remote_server_address);
   auto &verticalServer = VerticalServer::GetInstance();
   verticalServer.StartVerticalCommunicator();
 
@@ -458,15 +455,15 @@ std::vector<std::string> RunPSI(const std::vector<std::string> &input_vct, const
   if (comm_role == "client") {
     MS_LOG(INFO) << "-------------------------- 1. client send clientPsiInit -----------------------";
     ClientPSIInit client_psi_init(psi_ctx.bin_id, psi_ctx.psi_type, psi_ctx.self_num);
-    verticalServer.Send(client_psi_init);
+    verticalServer.Send(target_server_name, client_psi_init);
     MS_LOG(INFO) << "-------------------------- 4. client receive serverPsiInit -----------------------";
     ServerPSIInit server_psi_init_recv;
-    verticalServer.Receive(&server_psi_init_recv);
+    verticalServer.Receive(target_server_name, &server_psi_init_recv);
     psi_ctx.SetRole(server_psi_init_recv.self_role(), server_psi_init_recv.self_size());
   } else if (comm_role == "server") {
     MS_LOG(INFO) << "-------------------------- 2. server receive clientPsiInit -----------------------";
     ClientPSIInit client_psi_init_recv;
-    verticalServer.Receive(&client_psi_init_recv);
+    verticalServer.Receive(target_server_name, &client_psi_init_recv);
     if (client_psi_init_recv.bin_id() != psi_ctx.bin_id) {
       MS_LOG(ERROR) << "The bin_id is not same, please check bin_id: " << client_psi_init_recv.bin_id();
       return ret;
@@ -474,7 +471,7 @@ std::vector<std::string> RunPSI(const std::vector<std::string> &input_vct, const
     psi_ctx.SetRole(client_psi_init_recv.self_size());
     MS_LOG(INFO) << "-------------------------- 3. server send serverPsiInit -----------------------";
     ServerPSIInit server_psi_init(psi_ctx.bin_id, psi_ctx.self_num, psi_ctx.role);
-    verticalServer.Send(server_psi_init);
+    verticalServer.Send(target_server_name, server_psi_init);
   } else {
     MS_LOG(ERROR) << "Unknown communication role, wrong input role is " << comm_role;
     return ret;
@@ -487,7 +484,7 @@ std::vector<std::string> RunPSI(const std::vector<std::string> &input_vct, const
     MS_LOG(INFO) << "Set PSI_CTX over, start computing...";
   }
   if (psi_ctx.psi_type == "filter_ecdh") {
-    ret = RunInverseFilterEcdhPsi(psi_ctx);
+    ret = RunInverseFilterEcdhPsi(target_server_name, psi_ctx);
   } else {
     MS_LOG(INFO) << "The psi protocol is not supported currently.";
   }

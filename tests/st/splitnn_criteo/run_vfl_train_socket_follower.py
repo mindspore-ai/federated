@@ -22,21 +22,24 @@ import logging
 
 from mindspore import context
 from mindspore_federated import FLModel, vfl_utils, tensor_utils
-from mindspore_federated.startup.vertical_federated_local import VFLTrainer
+from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig
 from network.wide_and_deep import FollowerNet, FollowerLossNet
 
 from network_config import config
 from run_vfl_train_local import construct_local_dataset
 
 
-class FollowerTrainer():
+class FollowerTrainer:
     """Process of follower party"""
+
     def __init__(self):
         super(FollowerTrainer, self).__init__()
         self.content = None
-        self.vfl_trainer = VFLTrainer(http_server_address='10.113.216.44:6666',
-                                      remote_http_address='10.113.216.44:6667')
-        self.vfl_trainer.start_communicator()
+        http_server_config = ServerConfig(server_name='serverA', server_address='10.113.216.44:6666')
+        remote_server_config = ServerConfig(server_name='serverB', server_address='10.113.216.44:6667')
+        self.vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+                                                                   remote_server_config=remote_server_config)
+        self.vertical_communicator.launch()
         logging.info('start vfl trainer success')
         follower_yaml_data, follower_fp = vfl_utils.parse_yaml_file(config.follower_yaml_path)
         follower_fp.close()
@@ -55,8 +58,8 @@ class FollowerTrainer():
             current_item = item
             follower_out = self.follower_fl_model.forward_one_step(item)
             embedding_data = tensor_utils.tensor_dict_to_tensor_list_pybind_obj(follower_out)
-            self.vfl_trainer.send(embedding_data)
-            receive_msg = self.vfl_trainer.receive()
+            self.vertical_communicator.send("serverB", embedding_data)
+            receive_msg = self.vertical_communicator.receive("serverB")
             _, scale = tensor_utils.tensor_list_pybind_obj_to_tensor_dict(receive_msg)
             self.follower_fl_model.backward_one_step(item, sens=scale)
 

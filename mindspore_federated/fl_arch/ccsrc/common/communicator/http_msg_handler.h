@@ -18,6 +18,7 @@
 #define MINDSPORE_CCSRC_FL_COMMUNICATOR_HTTP_MSG_HANDLER_H_
 
 #include <memory>
+#include <string>
 #include "common/communicator/http_message_handler.h"
 #include "common/communicator/message_handler.h"
 
@@ -26,11 +27,13 @@ namespace fl {
 constexpr int kHttpSuccess = 200;
 class HttpMsgHandler : public MessageHandler {
  public:
-  HttpMsgHandler(const std::shared_ptr<HttpMessageHandler> &http_msg, void* data, size_t len);
+  HttpMsgHandler(const std::shared_ptr<HttpMessageHandler> &http_msg, void *data, size_t len, std::string message_type);
   ~HttpMsgHandler() override = default;
 
   const void *data() const override;
   size_t len() const override;
+  std::string message_type() const override;
+
   bool SendResponse(const void *data, const size_t &len) override;
   bool SendResponseInference(const void *data, const size_t &len, RefBufferRelCallback cb) override;
 
@@ -38,6 +41,7 @@ class HttpMsgHandler : public MessageHandler {
   std::shared_ptr<HttpMessageHandler> http_msg_;
   void *data_;
   size_t len_;
+  std::string message_type_;
 };
 }  // namespace fl
 }  // namespace mindspore

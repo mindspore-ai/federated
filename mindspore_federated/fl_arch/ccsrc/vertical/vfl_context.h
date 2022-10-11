@@ -44,6 +44,9 @@ class MS_EXPORT VFLContext {
   void set_http_server_address(const std::string &http_server_address);
   std::string http_server_address() const;
 
+  void set_http_server_name(const std::string &http_server_name);
+  std::string http_server_name() const;
+
   bool enable_ssl() const;
   void set_enable_ssl(bool enabled);
 
@@ -59,8 +62,8 @@ class MS_EXPORT VFLContext {
   std::string http_url_prefix() const;
   void set_http_url_prefix(const std::string &http_url_prefix);
 
-  void set_remote_server_address(const std::string &remote_server_address);
-  std::string remote_server_address() const;
+  void set_remote_server_address(const std::map<std::string, std::string> &remote_server_address);
+  std::map<std::string, std::string> remote_server_address() const;
 
  private:
   VFLContext() = default;
@@ -70,6 +73,7 @@ class MS_EXPORT VFLContext {
 
   // Http port of federated learning server.
   std::string http_server_address_;
+  std::string http_server_name_;
 
   // Whether to enable ssl for network communication.
   bool enable_ssl_ = false;
@@ -80,7 +84,7 @@ class MS_EXPORT VFLContext {
   // http url prefix for http communication
   std::string http_url_prefix_;
   SslConfig ssl_config_;
-  std::string remote_server_address_;
+  std::map<std::string, std::string> remote_server_address_;
 };
 }  // namespace fl
 }  // namespace mindspore

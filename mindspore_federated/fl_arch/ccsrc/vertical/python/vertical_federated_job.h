@@ -16,6 +16,8 @@
 
 #ifndef MINDSPORE_FL_ARCH_CCSRC_VERTICAL_PYTHON_FEDERATED_JOB_H_
 #define MINDSPORE_FL_ARCH_CCSRC_VERTICAL_PYTHON_FEDERATED_JOB_H_
+
+#include <string>
 #include "vertical/python/tensor_list_py.h"
 #include "common/utils/visible.h"
 
@@ -26,8 +28,8 @@ class MS_EXPORT VerticalFederatedJob {
   VerticalFederatedJob() = default;
   ~VerticalFederatedJob() = default;
   static void StartVerticalCommunicator();
-  static void Send(const TensorListItemPy &tensorListItemPy);
-  static TensorListItemPy Receive();
+  static void Send(const std::string &target_server_name, const TensorListItemPy &tensorListItemPy);
+  static TensorListItemPy Receive(const std::string &target_server_name);
 };
 }  // namespace fl
 }  // namespace mindspore

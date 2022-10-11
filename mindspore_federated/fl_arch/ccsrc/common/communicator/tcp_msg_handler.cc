@@ -16,6 +16,7 @@
 
 #include "communicator/tcp_msg_handler.h"
 #include <memory>
+#include <string>
 
 namespace mindspore {
 namespace fl {
@@ -48,5 +49,7 @@ bool TcpMsgHandler::SendResponse(const void *data, const size_t &len) {
   has_sent_response_ = true;
   return true;
 }
+
+std::string TcpMsgHandler::message_type() const { return message_type_; }
 }  // namespace fl
 }  // namespace mindspore

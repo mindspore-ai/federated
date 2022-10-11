@@ -17,6 +17,9 @@
 #ifndef MINDSPORE_CCSRC_FL_COMMUNICATOR_MESSAGE_HANDLER_H_
 #define MINDSPORE_CCSRC_FL_COMMUNICATOR_MESSAGE_HANDLER_H_
 
+#include <string>
+#include "common/utils/log_adapter.h"
+
 namespace mindspore {
 namespace fl {
 typedef void (*RefBufferRelCallback)(const void *data, size_t datalen, void *extra);
@@ -32,6 +35,9 @@ class MessageHandler {
 
   // Raw data size of this message.(Number of bytes)
   virtual size_t len() const = 0;
+
+  // string message type of this message.
+  virtual std::string message_type() const = 0;
 
   bool HasSentResponse() { return has_sent_response_; }
   virtual bool SendResponse(const void *data, const size_t &len) = 0;

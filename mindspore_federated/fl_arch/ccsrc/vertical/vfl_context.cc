@@ -40,6 +40,13 @@ void VFLContext::set_http_server_address(const std::string &http_server_address)
 
 std::string VFLContext::http_server_address() const { return http_server_address_; }
 
+void VFLContext::set_http_server_name(const std::string &http_server_name) {
+  http_server_name_ = http_server_name;
+  MS_LOG(INFO) << "Local http server name is:" << http_server_name_;
+}
+
+std::string VFLContext::http_server_name() const { return http_server_name_; }
+
 void VFLContext::set_ssl_config(const SslConfig &config) { ssl_config_ = config; }
 
 const SslConfig &VFLContext::ssl_config() const { return ssl_config_; }
@@ -58,11 +65,11 @@ std::string VFLContext::http_url_prefix() const { return http_url_prefix_; }
 
 void VFLContext::set_http_url_prefix(const std::string &http_url_prefix) { http_url_prefix_ = http_url_prefix; }
 
-void VFLContext::set_remote_server_address(const std::string &remote_server_address) {
+void VFLContext::set_remote_server_address(const std::map<std::string, std::string> &remote_server_address) {
   remote_server_address_ = remote_server_address;
   MS_LOG(INFO) << "Remote http server address is:" << remote_server_address_;
 }
 
-std::string VFLContext::remote_server_address() const { return remote_server_address_; }
+std::map<std::string, std::string> VFLContext::remote_server_address() const { return remote_server_address_; }
 }  // namespace fl
 }  // namespace mindspore

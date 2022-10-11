@@ -18,6 +18,7 @@
 #define MINDSPORE_CCSRC_FL_TCP_MSG_HANDLER_H_
 
 #include <memory>
+#include <string>
 #include "communicator/tcp_communicator.h"
 #include "communicator/message_handler.h"
 
@@ -31,6 +32,7 @@ class TcpMsgHandler : public MessageHandler {
   const void *data() const override;
   size_t len() const override;
   bool SendResponse(const void *data, const size_t &len) override;
+  std::string message_type() const override;
 
  private:
   std::shared_ptr<TcpConnection> tcp_conn_;
@@ -38,6 +40,7 @@ class TcpMsgHandler : public MessageHandler {
   MessageMeta meta_;
   // We use data of shared_ptr array so that the raw pointer won't be released until the reference is 0.
   VectorPtr data_;
+  std::string message_type_;
 };
 }  // namespace fl
 }  // namespace mindspore

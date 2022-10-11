@@ -25,7 +25,7 @@ import logging
 
 from mindspore import context
 from mindspore_federated import FLModel, vfl_utils, tensor_utils
-from mindspore_federated.startup.vertical_federated_local import VFLTrainer
+from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig
 from network.wide_and_deep import LeaderNet, LeaderLossNet, LeaderEvalNet, AUCMetric
 
 from network_config import config
@@ -38,9 +38,11 @@ class LeaderTrainer:
     def __init__(self):
         super(LeaderTrainer, self).__init__()
         self.data = None
-        self.vfl_trainer = VFLTrainer(http_server_address='10.113.216.44:6667',
-                                      remote_http_address='10.113.216.44:6666')
-        self.vfl_trainer.start_communicator()
+        http_server_config = ServerConfig(server_name='serverB', server_address='10.113.216.44:6667')
+        remote_server_config = ServerConfig(server_name='serverA', server_address='10.113.216.44:6666')
+        self.vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+                                                                   remote_server_config=remote_server_config)
+        self.vertical_communicator.launch()
 
         leader_yaml_data, leader_fp = vfl_utils.parse_yaml_file(config.leader_yaml_path)
         leader_fp.close()
@@ -64,12 +66,12 @@ class LeaderTrainer:
             logging.info('Begin leader trainer')
             for _, item in itertools.product(range(config.epochs), train_iter):
                 current_item = item
-                msg = self.vfl_trainer.receive()
+                msg = self.vertical_communicator.receive("serverA")
                 _, follower_out = tensor_utils.tensor_list_pybind_obj_to_tensor_dict(msg)
                 leader_out = self.leader_fl_model.forward_one_step(current_item, follower_out)
                 scale = self.leader_fl_model.backward_one_step(current_item, follower_out)
                 grad_scale = tensor_utils.tensor_dict_to_tensor_list_pybind_obj(scale)
-                self.vfl_trainer.send(grad_scale)
+                self.vertical_communicator.send("serverA", grad_scale)
                 # if step % 10 == 0:
                 logging.info('epoch %d step %d/%d wide_loss: %f deep_loss: %f',
                              1, 1, train_size, leader_out['wide_loss'], leader_out['deep_loss'])

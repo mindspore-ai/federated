@@ -21,6 +21,7 @@
 #include <string>
 #include <vector>
 #include <memory>
+#include <map>
 
 #include "vertical/communicator/abstract_communicator.h"
 #include "vertical/common.h"
@@ -35,20 +36,20 @@ class AliceCheckCommunicator : public AbstractCommunicator {
   AliceCheckCommunicator() = default;
   ~AliceCheckCommunicator() = default;
 
-  bool Send(const psi::AliceCheck &aliceCheck);
+  bool Send(const std::string &target_server_name, const psi::AliceCheck &aliceCheck);
 
   bool LaunchMsgHandler(const std::shared_ptr<MessageHandler> &message) override;
 
   void InitCommunicator(const std::shared_ptr<HttpCommunicator> &http_communicator) override;
 
-  psi::AliceCheck Receive();
+  psi::AliceCheck Receive(const std::string &target_server_name);
 
  private:
   bool VerifyProtoMessage(const psi::AliceCheck &AliceCheck);
 
   std::mutex message_received_mutex_;
 
-  std::shared_ptr<MessageQueue<psi::AliceCheck>> message_queue_ = nullptr;
+  std::map<std::string, std::shared_ptr<MessageQueue<psi::AliceCheck>>> message_queues_ = {};
 };
 }  // namespace fl
 }  // namespace mindspore

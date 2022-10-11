@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+"""Essential tools to check the users input."""
 
 def check_str(arg_name, str_val):
     """Check whether the input parameters are reasonable str input"""
@@ -19,3 +20,11 @@ def check_str(arg_name, str_val):
         raise RuntimeError(f"Parameter '{arg_name}' should be str, but actually {type(str_val)}")
     if not str_val:
         raise RuntimeError(f"Parameter '{arg_name}' should not be empty str")
+
+
+def check_list(arg_name, list_val):
+    """Check whether the input parameters are reasonable list input"""
+    if not isinstance(list_val, list):
+        raise RuntimeError(f"Parameter '{arg_name}' should be list, but actually {type(list)}")
+    if not list_val:
+        raise RuntimeError(f"Parameter '{arg_name}' should not be empty list")

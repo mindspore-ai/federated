@@ -28,7 +28,12 @@ void BobAlignResultCommunicator::InitCommunicator(const std::shared_ptr<HttpComm
   }
   RegisterMsgCallBack(http_communicator, KBobAlignResult);
   InitHttpClient();
-  message_queue_ = std::make_shared<MessageQueue<psi::BobAlignResult>>();
+  auto remote_server_address = VFLContext::instance()->remote_server_address();
+  for (const auto &item : remote_server_address) {
+    auto target_server_name = item.first;
+    auto queue = std::make_shared<MessageQueue<psi::BobAlignResult>>();
+    message_queues_[target_server_name] = queue;
+  }
 }
 
 bool BobAlignResultCommunicator::LaunchMsgHandler(const std::shared_ptr<MessageHandler> &message) {
@@ -41,18 +46,28 @@ bool BobAlignResultCommunicator::LaunchMsgHandler(const std::shared_ptr<MessageH
       SendResponseMsg(message, reason.c_str(), reason.size());
       return false;
     }
+    std::string message_type = message->message_type();
+    if (message_type.empty() || message_queues_.count(message_type) <= 0) {
+      std::string reason = "Request message type is invalid.";
+      MS_LOG(WARNING) << reason;
+      SendResponseMsg(message, reason.c_str(), reason.size());
+      return false;
+    }
+    MS_LOG(INFO) << "Request message type is " << message_type;
 
-    datajoin::BobAlignResultProto BobAlignResultProto;
-    BobAlignResultProto.ParseFromArray(message->data(), static_cast<int>(message->len()));
+    datajoin::BobAlignResultProto proto;
+    proto.ParseFromArray(message->data(), static_cast<int>(message->len()));
 
-    psi::BobAlignResult BobAlignResult = ParseBobAlignResultProto(BobAlignResultProto);
-    if (!VerifyProtoMessage(BobAlignResult)) {
+    psi::BobAlignResult bobAlignResult = ParseBobAlignResultProto(proto);
+    if (!VerifyProtoMessage(bobAlignResult)) {
       std::string reason = "Verify BobAlignResult data failed for vertical psi.";
       MS_LOG(WARNING) << reason;
       SendResponseMsg(message, reason.c_str(), reason.size());
       return false;
     }
-    message_queue_->push(BobAlignResult);
+    auto queue = message_queues_[message_type];
+    MS_EXCEPTION_IF_NULL(queue);
+    queue->push(bobAlignResult);
     std::string res = std::to_string(ResponseElem::SUCCESS);
     SendResponseMsg(message, res.c_str(), res.size());
     MS_LOG(INFO) << "Launching psi BobAlignResult message handler successful.";
@@ -65,18 +80,24 @@ bool BobAlignResultCommunicator::LaunchMsgHandler(const std::shared_ptr<MessageH
 
 bool BobAlignResultCommunicator::VerifyProtoMessage(const psi::BobAlignResult &BobAlignResult) { return true; }
 
-bool BobAlignResultCommunicator::Send(const psi::BobAlignResult &BobAlignResult) {
+bool BobAlignResultCommunicator::Send(const std::string &target_server_name,
+                                      const psi::BobAlignResult &BobAlignResult) {
   auto bob_align_result_proto_ptr = std::make_shared<datajoin::BobAlignResultProto>();
   CreateBobAlignResultProto(bob_align_result_proto_ptr.get(), BobAlignResult);
   std::string data = bob_align_result_proto_ptr->SerializeAsString();
   size_t data_size = data.size();
-  return SendMessage(data.c_str(), data_size, KBobAlignResultMsgType);
+  return SendMessage(target_server_name, data.c_str(), data_size, KBobAlignResultMsgType);
 }
 
-psi::BobAlignResult BobAlignResultCommunicator::Receive() {
+psi::BobAlignResult BobAlignResultCommunicator::Receive(const std::string &target_server_name) {
   std::unique_lock<std::mutex> message_lock(message_received_mutex_);
   MS_LOG(INFO) << "Begin receive BobAlignResult message.";
-  return message_queue_->pop();
+  if (message_queues_.count(target_server_name) <= 0) {
+    MS_LOG(EXCEPTION) << "Target server name " << target_server_name << " for message queues is invalid.";
+  }
+  auto queue = message_queues_[target_server_name];
+  MS_EXCEPTION_IF_NULL(queue);
+  return queue->pop();
 }
 }  // namespace fl
 }  // namespace mindspore
