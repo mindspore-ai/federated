@@ -205,6 +205,31 @@ struct AliceCheck {
 bool Send(const AliceCheck &alice_check);
 
 void Recv(AliceCheck *alice_check);
+
+struct PlainData {
+ public:
+  ~PlainData() = default;
+  PlainData() = default;
+  PlainData(const size_t &bin_id, const std::vector<std::string> &plain_data_vct, const std::string &msg)
+      : bin_id_(bin_id) {
+    plain_data_vct_ = plain_data_vct;
+    msg_ = msg;
+  }
+
+  void set_bin_id(const size_t &bin_id) { bin_id_ = bin_id; }
+  size_t bin_id() const { return bin_id_; }
+
+  void set_plain_data_vct(const std::vector<std::string> &plain_data_vct) { plain_data_vct_ = plain_data_vct; }
+  std::vector<std::string> plain_data_vct() const { return plain_data_vct_; }
+
+  void set_msg(const std::string &msg) { msg_ = msg; }
+  std::string msg() const { return msg_; }
+
+ private:
+  size_t bin_id_ = 0;
+  std::vector<std::string> plain_data_vct_;
+  std::string msg_;
+};
 }  // namespace psi
 }  // namespace fl
 }  // namespace mindspore

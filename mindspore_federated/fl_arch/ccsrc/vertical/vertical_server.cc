@@ -29,8 +29,9 @@ VerticalServer &VerticalServer::GetInstance() {
 }
 
 void VerticalServer::InitVerticalConfigs() {
-  std::vector<VerticalConfig> vertical_config = {
-    {KTrainer}, {KBobPb}, {KClientPSIInit}, {KServerPSIInit}, {KAlicePbaAndBF}, {KBobAlignResult}, {KAliceCheck}};
+  std::vector<VerticalConfig> vertical_config = {{KTrainer},       {KBobPb},         {KClientPSIInit},
+                                                 {KServerPSIInit}, {KAlicePbaAndBF}, {KBobAlignResult},
+                                                 {KAliceCheck},    {KPlainData}};
   vertical_config_ = vertical_config;
 }
 
@@ -73,6 +74,8 @@ void VerticalServer::InitVerticalCommunicator(const std::shared_ptr<HttpCommunic
       vertical_comm = std::make_shared<BobAlignResultCommunicator>();
     } else if (name == KAliceCheck) {
       vertical_comm = std::make_shared<AliceCheckCommunicator>();
+    } else if (name == KPlainData) {
+      vertical_comm = std::make_shared<PlainDataCommunicator>();
     } else {
       MS_LOG(EXCEPTION) << "Vertical config is not valid.";
     }
@@ -126,6 +129,12 @@ void VerticalServer::Send(const std::string &target_server_name, const psi::Alic
   communicator_ptr->Send(target_server_name, aliceCheck);
 }
 
+void VerticalServer::Send(const std::string &target_server_name, const psi::PlainData &plainData) {
+  auto communicator_ptr = reinterpret_cast<PlainDataCommunicator *>(communicators_[KPlainData].get());
+  MS_EXCEPTION_IF_NULL(communicator_ptr);
+  communicator_ptr->Send(target_server_name, plainData);
+}
+
 void VerticalServer::Receive(const std::string &target_server_name, TensorListItemPy *tensorListItemPy) {
   auto communicator_ptr = reinterpret_cast<TrainerCommunicator *>(communicators_[KTrainer].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
@@ -166,6 +175,12 @@ void VerticalServer::Receive(const std::string &target_server_name, psi::AliceCh
   auto communicator_ptr = reinterpret_cast<AliceCheckCommunicator *>(communicators_[KAliceCheck].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
   *aliceCheck = std::move(communicator_ptr->Receive(target_server_name));
+}
+
+void VerticalServer::Receive(const std::string &target_server_name, psi::PlainData *plainData) {
+  auto communicator_ptr = reinterpret_cast<PlainDataCommunicator *>(communicators_[KPlainData].get());
+  MS_EXCEPTION_IF_NULL(communicator_ptr);
+  *plainData = std::move(communicator_ptr->Receive(target_server_name));
 }
 }  // namespace fl
 }  // namespace mindspore

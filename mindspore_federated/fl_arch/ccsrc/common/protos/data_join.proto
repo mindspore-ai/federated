@@ -76,3 +76,9 @@ message AliceCheckProto {
   repeated bytes wrong_id = 3;
   string msg = 4;
 }
+
+message PlainDataProto {
+  uint64 bin_id = 1;
+  repeated bytes plain_data_vct = 2;
+  string msg = 3;
+}

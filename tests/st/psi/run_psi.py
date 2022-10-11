@@ -15,7 +15,9 @@
 """psi with communication st"""
 
 import argparse
+from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig
 from mindspore_federated._mindspore_federated import RunPSI
+from mindspore_federated._mindspore_federated import PlainIntersection
 
 
 def get_parser():
@@ -23,38 +25,42 @@ def get_parser():
     parser = argparse.ArgumentParser(description="Run PSI with Communication")
 
     parser.add_argument("--comm_role", type=str, default="server")
-    parser.add_argument("--input_begin", type=int, default=1)
-    parser.add_argument("--input_end", type=int, default=1000)
-    parser.add_argument("--read_file", type=bool, default=False)
-    parser.add_argument("--file_name", type=str, default="null")
+    parser.add_argument("--peer_comm_role", type=str, default="client")
     parser.add_argument("--domain_name", type=str, default="127.0.0.1:8004")
     parser.add_argument("--peer_domain_name", type=str, default="127.0.0.1:8005")
-    parser.add_argument("--bin_id", type=int, default=1)
-    parser.add_argument("--thread_num", type=int, default=0)
-    parser.add_argument("--need_check", type=bool, default=False)
+    parser.add_argument("--input_begin", type=int, default=1)
+    parser.add_argument("--input_end", type=int, default=1000)
     parser.add_argument("--peer_input_begin", type=int, default=1)
     parser.add_argument("--peer_input_end", type=int, default=1000)
+    parser.add_argument("--read_file", type=bool, default=False)
+    parser.add_argument("--file_name", type=str, default="null")
     parser.add_argument("--peer_read_file", type=bool, default=False)
     parser.add_argument("--peer_file_name", type=str, default="null")
+    parser.add_argument("--bucket_size", type=int, default=1)
+    parser.add_argument("--thread_num", type=int, default=0)
+    parser.add_argument("--need_check", type=bool, default=False)
+    parser.add_argument("--plain_intersection", type=bool, default=False)
     return parser
 
 
 args, _ = get_parser().parse_known_args()
 
 comm_role = args.comm_role
-input_begin = args.input_begin
-input_end = args.input_end
-read_file = args.read_file
-file_name = args.file_name
+peer_comm_role = args.peer_comm_role
 domain_name = args.domain_name
 peer_domain_name = args.peer_domain_name
-bin_id = args.bin_id
-thread_num = args.thread_num
-need_check = args.need_check
+input_begin = args.input_begin
+input_end = args.input_end
 peer_input_begin = args.peer_input_begin
 peer_input_end = args.peer_input_end
+read_file = args.read_file
+file_name = args.file_name
 peer_read_file = args.peer_read_file
 peer_file_name = args.peer_file_name
+bucket_size = args.bucket_size
+thread_num = args.thread_num
+need_check = args.need_check
+plain_intersection = args.plain_intersection
 
 
 def compute_right_result(self_input, peer_input):
@@ -82,15 +88,24 @@ def generate_input_data(input_begin_, input_end_, read_file_, file_name_):
 
 
 if __name__ == "__main__":
+    http_server_config = ServerConfig(server_name=comm_role, server_address=domain_name)
+    remote_server_config = ServerConfig(server_name=peer_comm_role, server_address=peer_domain_name)
+    vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+                                                          remote_server_config=remote_server_config)
+    vertical_communicator.launch()
     input_data = generate_input_data(input_begin, input_end, read_file, file_name)
-    bin_size = 2
-    for bin_id in range(1, 1 + bin_size):
-        psi_result = RunPSI(input_data, comm_role, domain_name, peer_domain_name, thread_num, bin_id)
-        print("PSI result:{}".format(psi_result[0:20]))
+    for bucket_id in range(bucket_size):
+        if plain_intersection:
+            intersection_type = "Plain intersection"
+            intersection_result = PlainIntersection(input_data, comm_role, thread_num, bucket_id, peer_comm_role)
+        else:
+            intersection_type = "PSI"
+            intersection_result = RunPSI(input_data, comm_role, thread_num, bucket_id, peer_comm_role)
+        print("{} result:{}".format(intersection_type, intersection_result[0:20]))
         if need_check:
             peer_input_data = generate_input_data(peer_input_begin, peer_input_end, peer_read_file, peer_file_name)
             actual_result = compute_right_result(input_data, peer_input_data)
-            if check_psi(actual_result, psi_result) == 0:
-                print("success, PSI check pass!")
+            if check_psi(actual_result, intersection_result) == 0:
+                print("success, {} check pass!".format(intersection_type))
             else:
-                print("ERROR, PSI check failed!")
+                print("ERROR, {} check failed!".format(intersection_type))

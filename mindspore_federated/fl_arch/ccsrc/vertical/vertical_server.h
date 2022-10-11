@@ -33,6 +33,7 @@
 #include "vertical/communicator/psi_bob_align_result_comm.h"
 #include "vertical/communicator/psi_client_init_comm.h"
 #include "vertical/communicator/psi_server_init_comm.h"
+#include "vertical/communicator/psi_plain_comm.h"
 
 namespace mindspore {
 namespace fl {
@@ -65,6 +66,8 @@ class VerticalServer {
 
   void Send(const std::string &target_server_name, const psi::AliceCheck &aliceCheck);
 
+  void Send(const std::string &target_server_name, const psi::PlainData &plainData);
+
   void Receive(const std::string &target_server_name, TensorListItemPy *tensorListItemPy);
 
   void Receive(const std::string &target_server_name, psi::BobPb *bobPb);
@@ -78,6 +81,8 @@ class VerticalServer {
   void Receive(const std::string &target_server_name, psi::AlicePbaAndBF *alicePbaAndBF);
 
   void Receive(const std::string &target_server_name, psi::AliceCheck *aliceCheck);
+
+  void Receive(const std::string &target_server_name, psi::PlainData *plainData);
 
  private:
   std::atomic_bool running_ = false;
