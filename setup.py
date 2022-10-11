@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # encoding: utf-8
-# Copyright 2020 Huawei Technologies Co., Ltd
+# Copyright 2022 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ from setuptools import setup, find_packages
 from setuptools.command.egg_info import egg_info
 from setuptools.command.build_py import build_py
 
-version = '0.1.0'
+__version__ = '0.1.0'
 
 backend_policy = os.getenv('BACKEND_POLICY')
 commit_id = os.getenv('COMMIT_ID').replace("\n", "")
@@ -43,7 +43,7 @@ release = _read_file('RELEASE.md')
 
 
 def _write_version(file):
-    file.write("__version__ = '{}'\n".format(version))
+    file.write("__version__ = '{}'\n".format(__version__))
 
 
 def _write_config(file):
@@ -92,6 +92,7 @@ def build_dependencies():
     commit_file = os.path.join(pwd, 'mindspore_federated', '.commit_id')
     with open(commit_file, 'w') as f:
         _write_commit_file(f)
+
 
 build_dependencies()
 
@@ -177,7 +178,7 @@ class BuildPy(build_py):
 
 setup(
     name=package_name,
-    version=version,
+    version=__version__,
     author='The MindSpore Authors',
     author_email='contact@mindspore.cn',
     url='https://www.mindspore.cn',

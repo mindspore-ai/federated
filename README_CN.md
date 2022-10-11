@@ -80,6 +80,20 @@ Worker运行环境：混合模式和云云联邦场景，根据Worker依赖的�
 
 Server和Scheduler运行环境：只需要安装CPU版本的MindSpore whl，其他硬件版本的MindSpore whl包也能满足需要。
 
+### MindSpore版本依赖关系
+
+由于MindSpore Federated与MindSpore有依赖关系，请按照根据下表中所指示的对应关系，在[MindSpore下载页面](https://www.mindspore.cn/versions)下载并安装对应的whl包。
+
+```shell
+pip install https://ms-release.obs.cn-north-4.myhuaweicloud.com/{MindSpore-Version}/MindSpore/cpu/ubuntu_x86/mindspore-{MindSpore-Version}-cp37-cp37m-linux_x86_64.whl
+```
+
+| MindSpore Federated Version |                          Branch                          | MindSpore version |
+|:---------------------------:|:--------------------------------------------------------:|:-----------------:|
+|            0.1.0            | [r0.1](https://gitee.com/mindspore/federated/tree/r0.1/) |       1.7.0       |
+|            0.1.0            | [r0.1](https://gitee.com/mindspore/federated/tree/r0.1/) |       1.8.0       |
+|            0.1.0            | [r0.1](https://gitee.com/mindspore/federated/tree/r0.1/) |       1.9.0       |
+
 #### 非混合模式，端云联邦
 
 1、样例路径：
