@@ -28,6 +28,8 @@ void CreateAliceCheckProto(datajoin::AliceCheckProto *alice_check_proto, const p
   for (const auto &item : wrong_id) {
     alice_check_proto->add_wrong_id(item);
   }
+
+  alice_check_proto->set_msg(alice_check.msg());
 }
 
 void CreateClientPSIInitProto(datajoin::ClientPSIInitProto *client_init_proto, const psi::ClientPSIInit &client_init) {

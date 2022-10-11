@@ -74,4 +74,5 @@ message AliceCheckProto {
   uint64 bin_id = 1;
   uint64 wrong_num = 2;
   repeated bytes wrong_id = 3;
+  string msg = 4;
 }

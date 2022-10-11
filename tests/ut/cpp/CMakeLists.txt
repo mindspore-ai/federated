@@ -10,6 +10,7 @@ include_directories(${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/ccsrc)
 include_directories(${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/ccsrc/armour)
 include_directories(${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/ccsrc/common)
 include_directories(${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/ccsrc/common/utils)
+include_directories(${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/ccsrc/vertical)
 include_directories(${CMAKE_BINARY_DIR})
 MESSAGE("check  ut_test ${CMAKE_BINARY_DIR}")
 
@@ -17,10 +18,13 @@ link_directories(${BUILD_PATH}/mindspore_federated/mindspore_federated/ccsrc)
 link_directories(${BUILD_PATH}/mindspore_federated/common/protos)
 
 file(GLOB_RECURSE MINDSPORE_FEDERATED_SRC_LIST RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
-        "../../../mindspore_federated/fl_arch/ccsrc/armour/base_crypto/*.cc"
-        "../../../mindspore_federated/fl_arch/ccsrc/armour/secure_protocol/psi.cc"
-        "../../../mindspore_federated/fl_arch/ccsrc/armour/util/*.cc"
+        "../../../mindspore_federated/fl_arch/ccsrc/armour/*.cc"
         "../../../mindspore_federated/fl_arch/ccsrc/common/*.cc"
+        "../../../mindspore_federated/fl_arch/ccsrc/compression/*.cc"
+        "../../../mindspore_federated/fl_arch/ccsrc/scheduler/*.cc"
+        "../../../mindspore_federated/fl_arch/ccsrc/server/*.cc"
+        "../../../mindspore_federated/fl_arch/ccsrc/worker/*.cc"
+        "../../../mindspore_federated/fl_arch/ccsrc/vertical/*.cc"
         )
 
 file(GLOB_RECURSE UT_SRCS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}

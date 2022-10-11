@@ -64,3 +64,7 @@ find_package(Threads REQUIRED)
 
 add_subdirectory(mindspore_federated)
 include(cmake/package.cmake)
+
+if(ENABLE_TESTCASES OR ENABLE_CPP_ST)
+    add_subdirectory(tests)
+endif()
