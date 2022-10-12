@@ -1,3 +1,18 @@
+# Copyright 2022 Huawei Technologies Co., Ltd
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ============================================================================
+"""Simulated federated learning client."""
 import time
 from src.deepfm import ModelBuilder, AUCMetric
 from collections import defaultdict
@@ -6,6 +21,7 @@ from mindspore.train.model import Model
 from mindspore.train.callback import ModelCheckpoint, CheckpointConfig, TimeMonitor
 from src.callback import EvalCallBack, LossCallBack
 from copy import deepcopy
+
 
 class Client(object):
     """Simulated federated learning client."""
@@ -23,9 +39,9 @@ class Client(object):
         self.loss_callback = LossCallBack(loss_file_path=self.config.loss_file_name)
         self.callback_list = [self.time_callback, self.loss_callback]
 
-        self.exec = False#设置当前参与者是否正在本地更新
-        self.round_time = 0#参与fl的轮数
-        self.pi = 0.1#记录当前的模型退化情况
+        self.exec = False  # 设置当前参与者是否正在本地更新
+        self.round_time = 0  # 参与fl的轮数
+        self.pi = 0.1  # 记录当前的模型退化情况
         self.num_sele = 0
         self.num_agg = 0
         self.config = self.download(config)
@@ -52,16 +68,17 @@ class Client(object):
         print(out_str)
         local_log['res'] = res
 
-
         self.local_result = {
             'state_dict': state_dict,
             'log': local_log
         }
+
     def set_round_time(self, t):
         self.round_time = t
 
-    def set_exec(self):#改变节点的执行状态
+    def set_exec(self):  # 改变节点的执行状态
         self.exec = not self.exec
+
     def set_agg(self):
         self.agg = not self.agg
 

@@ -22,6 +22,7 @@ class PandasData(BaseData):
     """
     Pandas Data format.
     """
+
     def __init__(self, store=None, primary_key=None, schema=None, desc=None):
         super().__init__()
         self._store = pd.DataFrame() if store is None else store
