@@ -48,7 +48,7 @@ bool ClientPSIInitCommunicator::LaunchMsgHandler(const std::shared_ptr<MessageHa
     }
     std::string message_type = message->message_type();
 
-    if (message_type.empty() || message_queues_.count(message_type) <= 0) {
+    if (message_type.empty() || message_queues_.count(message_type) == 0) {
       std::string reason = "Request message type is invalid.";
       MS_LOG(WARNING) << reason;
       SendResponseMsg(message, reason.c_str(), reason.size());
@@ -92,7 +92,7 @@ bool ClientPSIInitCommunicator::Send(const std::string &target_server_name, cons
 psi::ClientPSIInit ClientPSIInitCommunicator::Receive(const std::string &target_server_name) {
   std::unique_lock<std::mutex> message_lock(message_received_mutex_);
   MS_LOG(INFO) << "Begin receive ClientPSIInit message.";
-  if (message_queues_.count(target_server_name) <= 0) {
+  if (message_queues_.count(target_server_name) == 0) {
     MS_LOG(EXCEPTION) << "Target server name " << target_server_name << " for message queues is invalid.";
   }
   auto queue = message_queues_[target_server_name];

@@ -64,7 +64,7 @@ std::vector<std::string> ECC::DcpsAndMul(const std::vector<std::string> &compres
   });
 
   time(&time_end);
-  MS_LOG(INFO) << "Bob decompress and compute p1^a^b, time cost: " << difftime(time_end, time_start) << " s.";
+  MS_LOG(INFO) << "Decompress and compute p^k, time cost: " << difftime(time_end, time_start) << " s.";
   return p_a_b_vector;
 }
 

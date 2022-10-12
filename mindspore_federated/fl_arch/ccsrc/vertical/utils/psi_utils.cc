@@ -65,14 +65,25 @@ void CreateAlicePbaAndBFProto(datajoin::AlicePbaAndBFProto *alice_pba_bf_proto,
   alice_pba_bf_proto->set_bf_alice(alice_pba_bf.bf_alice());
 }
 
-void CreateBobAlignResultProto(datajoin::BobAlignResultProto *bob_alice_result_proto,
+void CreateBobAlignResultProto(datajoin::BobAlignResultProto *bob_align_result_proto,
                                const psi::BobAlignResult &bob_align_result) {
-  bob_alice_result_proto->set_bin_id(bob_align_result.bin_id());
+  bob_align_result_proto->set_bin_id(bob_align_result.bin_id());
 
   auto align_result = bob_align_result.align_result();
   for (const auto &item : align_result) {
-    bob_alice_result_proto->add_align_result(item);
+    bob_align_result_proto->add_align_result(item);
   }
+}
+
+void CreatePlainDataProto(datajoin::PlainDataProto *plain_data_proto, const psi::PlainData &plain_data) {
+  plain_data_proto->set_bin_id(plain_data.bin_id());
+
+  auto plain_data_vct = plain_data.plain_data_vct();
+  for (const auto &item : plain_data_vct) {
+    plain_data_proto->add_plain_data_vct(item);
+  }
+
+  plain_data_proto->set_msg(plain_data.msg());
 }
 
 psi::BobPb ParseBobPbProto(datajoin::BobPbProto bobPbProto) {
@@ -84,8 +95,8 @@ psi::BobPb ParseBobPbProto(datajoin::BobPbProto bobPbProto) {
     p_b_vct.push_back(bobPbProto.p_b_vct(i));
   }
   bobPb.set_p_b_vct(p_b_vct);
-  MS_LOG(INFO) << "bob_p_b, bin_id is " << bobPb.bin_id();
-  MS_LOG(INFO) << "bob_p_b size is " << bobPb.p_b_vct().size();
+  MS_LOG(INFO) << "(bob_p_b) bin_id is " << bobPb.bin_id()
+               << ", vector size is " << bobPb.p_b_vct().size();
   return bobPb;
 }
 
@@ -94,9 +105,9 @@ psi::ClientPSIInit ParseClientPSIInitProto(datajoin::ClientPSIInitProto clientPS
   clientPSIInit.set_bin_id(clientPSIInitProto.bin_id());
   clientPSIInit.set_psi_type(clientPSIInitProto.psi_type());
   clientPSIInit.set_self_size(clientPSIInitProto.self_size());
-  MS_LOG(INFO) << "client_psi_init, bin_id is " << clientPSIInit.bin_id();
-  MS_LOG(INFO) << "client_psi_init, psi_type is " << clientPSIInit.psi_type();
-  MS_LOG(INFO) << "client_psi_init, self_size is " << clientPSIInit.self_size();
+  MS_LOG(INFO) << "(client_psi_init) bin_id is " << clientPSIInit.bin_id()
+               << ", psi_type is " << clientPSIInit.psi_type()
+               << ", self_size is " << clientPSIInit.self_size();
   return clientPSIInit;
 }
 psi::ServerPSIInit ParseServerPSIInitProto(datajoin::ServerPSIInitProto serverPSIInitProto) {
@@ -104,9 +115,9 @@ psi::ServerPSIInit ParseServerPSIInitProto(datajoin::ServerPSIInitProto serverPS
   serverPSIInit.set_bin_id(serverPSIInitProto.bin_id());
   serverPSIInit.set_self_size(serverPSIInitProto.self_size());
   serverPSIInit.set_self_role(serverPSIInitProto.self_role());
-  MS_LOG(INFO) << "server_psi_init, bin_id is " << serverPSIInit.bin_id();
-  MS_LOG(INFO) << "server_psi_init, self_size is " << serverPSIInit.self_size();
-  MS_LOG(INFO) << "server_psi_init, self_role is " << serverPSIInit.self_role();
+  MS_LOG(INFO) << "(server_psi_init) bin_id is " << serverPSIInit.bin_id()
+               << ", self_size is " << serverPSIInit.self_size()
+               << ", self_role is " << serverPSIInit.self_role();
   return serverPSIInit;
 }
 
@@ -120,9 +131,9 @@ psi::AlicePbaAndBF ParseAlicePbaAndBFProto(datajoin::AlicePbaAndBFProto alicePba
   }
   alicePbaAndBF.set_p_b_a_vct(p_b_vct);
   alicePbaAndBF.set_bf_alice(alicePbaAndBFProto.bf_alice());
-  MS_LOG(INFO) << "alice_pba_bf, bin_id is " << alicePbaAndBF.bin_id();
-  MS_LOG(INFO) << "alice_p_b_a size is " << alicePbaAndBF.p_b_a_vct().size();
-  MS_LOG(INFO) << "bf_alice size is " << alicePbaAndBF.bf_alice().size();
+  MS_LOG(INFO) << "(alice_pba_bf) bin_id is " << alicePbaAndBF.bin_id()
+               << ", alice_p_b_a size is " << alicePbaAndBF.p_b_a_vct().size()
+               << ", bf_alice size is " << alicePbaAndBF.bf_alice().size();
   return alicePbaAndBF;
 }
 
@@ -135,8 +146,8 @@ psi::BobAlignResult ParseBobAlignResultProto(datajoin::BobAlignResultProto bobAl
     align_result.push_back(bobAlignResultProto.align_result(i));
   }
   bobAlignResult.set_align_resul(align_result);
-  MS_LOG(INFO) << "bob_align_result, bin_id is " << bobAlignResult.bin_id();
-  MS_LOG(INFO) << "bob_align_result size is " << bobAlignResult.align_result().size();
+  MS_LOG(INFO) << "(bob_align_result), bin_id is " << bobAlignResult.bin_id()
+               << ", vector size is " << bobAlignResult.align_result().size();
   return bobAlignResult;
 }
 
@@ -150,9 +161,25 @@ psi::AliceCheck ParseAliceCheckProto(datajoin::AliceCheckProto aliceCheckProto) 
     wrong_id_vct.push_back(aliceCheckProto.wrong_id(i));
   }
   aliceCheck.set_wrong_id(wrong_id_vct);
-  MS_LOG(INFO) << "alice_check, bin_id is " << aliceCheck.bin_id();
-  MS_LOG(INFO) << "alice_check, wrong_id size is " << aliceCheck.wrong_id().size();
+  MS_LOG(INFO) << "(alice_check) bin_id is " << aliceCheck.bin_id()
+               << ", wrong_id size is " << aliceCheck.wrong_id().size();
   return aliceCheck;
+}
+
+psi::PlainData ParsePlainDataProto(datajoin::PlainDataProto plainDataProto) {
+  psi::PlainData plainData;
+  plainData.set_bin_id(plainDataProto.bin_id());
+  std::vector<std::string> plain_data_vct;
+  int plain_data_vct_size = plainDataProto.plain_data_vct_size();
+  for (int i = 0; i < plain_data_vct_size; i++) {
+    plain_data_vct.push_back(plainDataProto.plain_data_vct(i));
+  }
+  plainData.set_plain_data_vct(plain_data_vct);
+  plainData.set_msg(plainDataProto.msg());
+  MS_LOG(INFO) << "(plain_data) bin_id is " << plainData.bin_id()
+               << ", vector size is " << plainData.plain_data_vct().size()
+               << ", message: " << plainData.msg();
+  return plainData;
 }
 }  // namespace fl
 }  // namespace mindspore

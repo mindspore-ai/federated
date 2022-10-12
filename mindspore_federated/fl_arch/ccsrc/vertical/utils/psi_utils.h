@@ -30,10 +30,12 @@ void CreateAlicePbaAndBFProto(datajoin::AlicePbaAndBFProto *alice_pba_bf_proto, 
 
 void CreateServerPSIInitProto(datajoin::ServerPSIInitProto *server_init_proto, const psi::ServerPSIInit &server_init);
 
-void CreateBobAlignResultProto(datajoin::BobAlignResultProto *bob_alice_result_proto,
+void CreateBobAlignResultProto(datajoin::BobAlignResultProto *bob_align_result_proto,
                                const psi::BobAlignResult &bob_align_result);
 
 void CreateAliceCheckProto(datajoin::AliceCheckProto *alice_check_proto, const psi::AliceCheck &alice_check);
+
+void CreatePlainDataProto(datajoin::PlainDataProto *plain_data_proto, const psi::PlainData &plain_data);
 
 psi::BobPb ParseBobPbProto(datajoin::BobPbProto bobPbProto);
 
@@ -46,6 +48,8 @@ psi::AlicePbaAndBF ParseAlicePbaAndBFProto(datajoin::AlicePbaAndBFProto alicePba
 psi::BobAlignResult ParseBobAlignResultProto(datajoin::BobAlignResultProto bobAlignResultProto);
 
 psi::AliceCheck ParseAliceCheckProto(datajoin::AliceCheckProto aliceCheckProto);
+
+psi::PlainData ParsePlainDataProto(datajoin::PlainDataProto plainDataProto);
 }  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_FL_ARCH_CCSRC_VERTICAL_UTILS_PSI_UTILS_H_
