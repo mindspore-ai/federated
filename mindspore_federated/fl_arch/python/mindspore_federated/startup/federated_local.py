@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+
 """Interface for start up single core servable"""
 import os.path
 import numpy as np
@@ -92,6 +93,7 @@ class Callback:
     """
     define callback of fl server job
     """
+
     def __init__(self):
         pass
 
@@ -116,8 +118,16 @@ class Callback:
 
 class FLServerJob:
     """
-    define fl server job
+    Define federated server job.
+
+    Args:
+        yaml_config (str): The yaml file path. more detail see `federated_server_yaml <https://gitee.com/mindspore/federated/blob/master/docs/federated_server_yaml.md>`_.
+        http_server_address (str): The http server address used for communicating.
+        tcp_server_ip (str): The tcp server ip used for communicating. Default: "127.0.0.1".
+        checkpoint_dir (str): Path of checkpoint. Default: "./fl_ckpt/".
+        ssl_config (Union(None, SSLConfig)) : Config of ssl. Default: None.
     """
+
     def __init__(self, yaml_config, http_server_address, tcp_server_ip="127.0.0.1",
                  checkpoint_dir="./fl_ckpt/", ssl_config=None):
         check_type.check_str("yaml_config", yaml_config)
@@ -142,6 +152,9 @@ class FLServerJob:
     def run(self, feature_map=None, callback=None):
         """
         run fl server job
+        Args:
+            feature_map (Union(dict, FeatureMap, str)): Feature map.
+            callback (Union(None, Callback)): Callback function.
         """
         if callback is not None and not isinstance(callback, Callback):
             raise RuntimeError("Parameter 'callback' is expected to be instance of Callback when it's not None, but"
@@ -182,6 +195,12 @@ class FLServerJob:
                                   iteration_valid, iteration_reason):
         """
         define callback of iteration ending
+        Args:
+            feature_list (list): Feature list.
+            fl_name (str): The name of current federated.
+            instance_name (str): The name of instance name.
+            iteration_valid (int): Value of valid iteration.
+            iteration_reason (str): Reason of iteration.
         """
         logger.info("on iteration end callback")
         feature_map = {}
@@ -289,8 +308,14 @@ class FLServerJob:
 
 class FlSchedulerJob:
     """
-    Define the fl scheduler job
+    Define federated scheduler job.
+
+    Args:
+        yaml_config (str): The yaml file path.
+        manage_address (str): The address of manage.
+        ssl_config (Union(None, SSLConfig)): Config of ssl. Default: None.
     """
+
     def __init__(self, yaml_config, manage_address, ssl_config=None):
         check_type.check_str("yaml_config", yaml_config)
         check_type.check_str("manage_address", manage_address)
@@ -305,4 +330,7 @@ class FlSchedulerJob:
         load_yaml_config(yaml_config, _fl_context.ROLE_OF_SCHEDULER)
 
     def run(self):
+        """
+        run scheduler job
+        """
         Federated_.start_federated_scheduler()
