@@ -54,6 +54,7 @@ class _DataJoinClient:
     """
     Data join client.
     """
+
     def __init__(self, worker_config):
         """
         Args:

@@ -42,6 +42,7 @@ class _DataJoinServer:
     """
     Data join server.
     """
+
     def __init__(self, worker_config):
         """
         Args:

@@ -109,6 +109,7 @@ class FLDataWorker:
     """
     Data join worker.
     """
+
     def __init__(self,
                  role,
                  worker_config_path,
