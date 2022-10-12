@@ -73,7 +73,6 @@ void AbstractCommunicator::InitHttpClient() {
     }
   }
   MS_LOG(INFO) << "Request will be sent to server domain:" << remote_server_address_;
-
   for (const auto &item : remote_server_address_) {
     auto target_server_name = item.first;
     auto server_address = item.second;
@@ -82,24 +81,21 @@ void AbstractCommunicator::InitHttpClient() {
     http_client->SetMessageCallback([&](const std::shared_ptr<ResponseTrack> &response_track,
                                         const std::string &msg_type) { NotifyMessageArrival(response_track); });
     http_client->Init();
-
     http_clients_[target_server_name] = http_client;
   }
 }
 
-bool AbstractCommunicator::SendMessage(const std::string &target_server_name, const void *data, size_t data_size,
-                                       const std::string &target_msg_type) {
+std::shared_ptr<std::vector<unsigned char>> AbstractCommunicator::SendMessage(const std::string &target_server_name,
+                                                                              const void *data, size_t data_size,
+                                                                              const std::string &target_msg_type) {
   if (data == nullptr) {
-    MS_LOG(WARNING) << "Data for sending request is nullptr.";
-    return false;
+    MS_LOG(EXCEPTION) << "Data for sending request is nullptr.";
   }
   if (data_size == 0) {
-    MS_LOG(WARNING) << "Data size for sending request must be greater than 0";
-    return false;
+    MS_LOG(EXCEPTION) << "Data size for sending request must be greater than 0";
   }
   if (remote_server_address_.count(target_server_name) <= 0 || http_clients_.count(target_server_name) <= 0) {
-    MS_LOG(WARNING) << "Remote server name is invalid.";
-    return false;
+    MS_LOG(EXCEPTION) << "Remote server name is invalid.";
   }
   auto http_client = http_clients_[target_server_name];
   MS_EXCEPTION_IF_NULL(http_client);
@@ -109,15 +105,14 @@ bool AbstractCommunicator::SendMessage(const std::string &target_server_name, co
                                 HTTP_CONTENT_TYPE_URL_ENCODED)) {
     MS_LOG(WARNING) << "Sending request for target msg type:" << target_msg_type << " to server " << target_server_name
                     << " failed.";
-    return false;
+    return nullptr;
   }
   if (!Wait(request_track)) {
     MS_LOG(WARNING) << "Sending http message timeout.";
     http_client->BreakLoopEvent();
-    return false;
+    return nullptr;
   }
-  std::string res_msg = reinterpret_cast<char *>(http_client->response_msg()->data());
-  return res_msg == std::to_string(ResponseElem::SUCCESS);
+  return http_client->response_msg();
 }
 
 void AbstractCommunicator::SendResponseMsg(const std::shared_ptr<MessageHandler> &message, const void *data,

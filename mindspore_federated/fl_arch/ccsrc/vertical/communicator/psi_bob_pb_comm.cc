@@ -84,7 +84,9 @@ bool BobPbCommunicator::Send(const std::string &target_server_name, const psi::B
   CreateBobPbProto(bob_proto_ptr.get(), bob_pb);
   std::string data = bob_proto_ptr->SerializeAsString();
   size_t data_size = data.size();
-  return SendMessage(target_server_name, data.c_str(), data_size, KBobPbMsgType);
+  auto response_msg = SendMessage(target_server_name, data.c_str(), data_size, KBobPbMsgType);
+  std::string response_data = response_msg == nullptr ? "" : reinterpret_cast<char *>(response_msg->data());
+  return response_data == std::to_string(ResponseElem::SUCCESS);
 }
 
 psi::BobPb BobPbCommunicator::Receive(const std::string &target_server_name) {

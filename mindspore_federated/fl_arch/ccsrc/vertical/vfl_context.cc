@@ -71,5 +71,8 @@ void VFLContext::set_remote_server_address(const std::map<std::string, std::stri
 }
 
 std::map<std::string, std::string> VFLContext::remote_server_address() const { return remote_server_address_; }
+
+void VFLContext::set_worker_config(const WorkerConfigItemPy &worker_config) { worker_config_ = worker_config; }
+WorkerConfigItemPy VFLContext::worker_config() { return worker_config_; }
 }  // namespace fl
 }  // namespace mindspore

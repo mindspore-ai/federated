@@ -85,7 +85,9 @@ bool AlicePbaAndBFCommunicator::Send(const std::string &target_server_name, cons
   CreateAlicePbaAndBFProto(alice_pba_bf_proto_ptr.get(), alicePbaAndBF);
   std::string data = alice_pba_bf_proto_ptr->SerializeAsString();
   size_t data_size = data.size();
-  return SendMessage(target_server_name, data.c_str(), data_size, KAlicePbaAndBFMsgType);
+  auto response_msg = SendMessage(target_server_name, data.c_str(), data_size, KAlicePbaAndBFMsgType);
+  std::string response_data = response_msg == nullptr ? "" : reinterpret_cast<char *>(response_msg->data());
+  return response_data == std::to_string(ResponseElem::SUCCESS);
 }
 
 psi::AlicePbaAndBF AlicePbaAndBFCommunicator::Receive(const std::string &target_server_name) {

@@ -31,7 +31,7 @@ VerticalServer &VerticalServer::GetInstance() {
 void VerticalServer::InitVerticalConfigs() {
   std::vector<VerticalConfig> vertical_config = {{KTrainer},       {KBobPb},         {KClientPSIInit},
                                                  {KServerPSIInit}, {KAlicePbaAndBF}, {KBobAlignResult},
-                                                 {KAliceCheck},    {KPlainData}};
+                                                 {KAliceCheck},    {KPlainData},     {KDataJoin}};
   vertical_config_ = vertical_config;
 }
 
@@ -76,6 +76,8 @@ void VerticalServer::InitVerticalCommunicator(const std::shared_ptr<HttpCommunic
       vertical_comm = std::make_shared<AliceCheckCommunicator>();
     } else if (name == KPlainData) {
       vertical_comm = std::make_shared<PlainDataCommunicator>();
+    } else if (name == KDataJoin) {
+      vertical_comm = std::make_shared<DataJoinCommunicator>();
     } else {
       MS_LOG(EXCEPTION) << "Vertical config is not valid.";
     }
@@ -135,6 +137,13 @@ void VerticalServer::Send(const std::string &target_server_name, const psi::Plai
   communicator_ptr->Send(target_server_name, plainData);
 }
 
+WorkerConfigItemPy VerticalServer::Send(const std::string &target_server_name,
+                                        const WorkerRegisterItemPy &workerRegisterItem) {
+  auto communicator_ptr = reinterpret_cast<DataJoinCommunicator *>(communicators_[KDataJoin].get());
+  MS_EXCEPTION_IF_NULL(communicator_ptr);
+  return communicator_ptr->Send(target_server_name, workerRegisterItem);
+}
+
 void VerticalServer::Receive(const std::string &target_server_name, TensorListItemPy *tensorListItemPy) {
   auto communicator_ptr = reinterpret_cast<TrainerCommunicator *>(communicators_[KTrainer].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
@@ -181,6 +190,16 @@ void VerticalServer::Receive(const std::string &target_server_name, psi::PlainDa
   auto communicator_ptr = reinterpret_cast<PlainDataCommunicator *>(communicators_[KPlainData].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
   *plainData = std::move(communicator_ptr->Receive(target_server_name));
+}
+
+bool VerticalServer::DataJoinWaitForStart() {
+  auto communicator_ptr = reinterpret_cast<DataJoinCommunicator *>(communicators_[KDataJoin].get());
+  MS_EXCEPTION_IF_NULL(communicator_ptr);
+  bool res = communicator_ptr->waitForRegister();
+  if (!res) {
+    MS_LOG(EXCEPTION) << "Data join for starting is time out.";
+  }
+  return true;
 }
 }  // namespace fl
 }  // namespace mindspore

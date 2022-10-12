@@ -13,7 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """Interface for start up single core servable"""
-from mindspore_federated._mindspore_federated import VerticalFederated_, TensorListItem_
+from mindspore_federated._mindspore_federated import VerticalFederated_, TensorListItem_, WorkerRegisterItemPy_
 from .ssl_config import init_ssl_config, SSLConfig
 from .server_config import ServerConfig, init_server_config
 
@@ -29,7 +29,7 @@ class VerticalFederatedCommunicator:
             raise RuntimeError(
                 f"Parameter 'http_server_config' should be instance of ServerConfig,"
                 f"but got {type(http_server_config)}")
-        if remote_server_config is not None and not isinstance(remote_server_config, ServerConfig)\
+        if remote_server_config is not None and not isinstance(remote_server_config, ServerConfig) \
                 and not isinstance(remote_server_config, list):
             raise RuntimeError(
                 f"Parameter 'remote_server_address' should be instance of ServerConfig or list,"
@@ -38,18 +38,29 @@ class VerticalFederatedCommunicator:
         if ssl_config is not None and not isinstance(ssl_config, SSLConfig):
             raise RuntimeError(
                 f"Parameter 'ssl_config' should be None or instance of SSLConfig, but got {type(ssl_config)}")
+        self._http_server_config = http_server_config
+        self._remote_server_config = remote_server_config
+        self._ssl_config = ssl_config
+        init_ssl_config(self._ssl_config)
+        init_server_config(self._http_server_config, self._remote_server_config)
 
-        init_ssl_config(ssl_config)
-        init_server_config(http_server_config, remote_server_config)
-
-    @staticmethod
-    def launch():
+    def launch(self):
         VerticalFederated_.start_vertical_communicator()
 
-    @staticmethod
-    def send(target_server_name: str, tensor_list_item: TensorListItem_):
-        return VerticalFederated_.send(target_server_name, tensor_list_item)
+    def send_tensors(self, target_server_name: str, tensor_list_item: TensorListItem_):
+        return VerticalFederated_.send_tensor_list(target_server_name, tensor_list_item)
 
-    @staticmethod
-    def receive(target_server_name: str):
+    def send_register(self, target_server_name: str, worker_register_item_py: WorkerRegisterItemPy_):
+        return VerticalFederated_.send_worker_register(target_server_name, worker_register_item_py)
+
+    def receive(self, target_server_name: str):
         return VerticalFederated_.receive(target_server_name)
+
+    def data_join_wait_for_start(self):
+        return VerticalFederated_.data_join_wait_for_start()
+
+    def http_server_config(self):
+        return self._http_server_config
+
+    def remote_server_config(self):
+        return self._remote_server_config

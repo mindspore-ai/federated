@@ -19,6 +19,8 @@
 
 #include <string>
 #include "vertical/python/tensor_list_py.h"
+#include "vertical/python/worker_register_py.h"
+#include "vertical/python/worker_config_py.h"
 #include "common/utils/visible.h"
 
 namespace mindspore {
@@ -28,8 +30,11 @@ class MS_EXPORT VerticalFederatedJob {
   VerticalFederatedJob() = default;
   ~VerticalFederatedJob() = default;
   static void StartVerticalCommunicator();
-  static void Send(const std::string &target_server_name, const TensorListItemPy &tensorListItemPy);
+  static void SendTensorList(const std::string &target_server_name, const TensorListItemPy &tensorListItemPy);
+  static WorkerConfigItemPy SendWorkerRegister(const std::string &target_server_name,
+                                               const WorkerRegisterItemPy &workerRegisterItemPy);
   static TensorListItemPy Receive(const std::string &target_server_name);
+  static bool DataJoinWaitForStart();
 };
 }  // namespace fl
 }  // namespace mindspore

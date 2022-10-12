@@ -95,7 +95,9 @@ bool TrainerCommunicator::Send(const std::string &target_server_name, const Tens
   CreateTensorListProto(tensor_list_proto_ptr.get(), tensorListItemPy);
   std::string data = tensor_list_proto_ptr->SerializeAsString();
   size_t data_size = data.size();
-  return SendMessage(target_server_name, data.c_str(), data_size, KTrainerMsgType);
+  auto response_msg = SendMessage(target_server_name, data.c_str(), data_size, KTrainerMsgType);
+  std::string response_data = response_msg == nullptr ? "" : reinterpret_cast<char *>(response_msg->data());
+  return response_data == std::to_string(ResponseElem::SUCCESS);
 }
 
 TensorListItemPy TrainerCommunicator::Receive(const std::string &target_server_name, const uint32_t &timeout) {

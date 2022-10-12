@@ -44,6 +44,7 @@ constexpr auto KAlicePbaAndBF = "alicePbaAndBF";
 constexpr auto KBobAlignResult = "bobAlignResult";
 constexpr auto KAliceCheck = "aliceCheck";
 constexpr auto KPlainData = "plainData";
+constexpr auto KDataJoin = "dataJoin";
 
 constexpr auto KTrainerMsgType = "/trainer";
 constexpr auto KBobPbMsgType = "/bobPb";
@@ -53,6 +54,7 @@ constexpr auto KAlicePbaAndBFMsgType = "/alicePbaAndBF";
 constexpr auto KBobAlignResultMsgType = "/bobAlignResult";
 constexpr auto KAliceCheckMsgType = "/aliceCheck";
 constexpr auto KPlainDataMsgType = "/plainData";
+constexpr auto KDataJoinMsgType = "/dataJoin";
 }  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_FL_ARCH_CCSRC_VERTICAL_COMMON_H_
