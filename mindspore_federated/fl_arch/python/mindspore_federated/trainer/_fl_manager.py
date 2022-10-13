@@ -324,7 +324,7 @@ class FederatedLearningManager(Callback):
 
     def start_pull_weight(self):
         """
-        pull weight from server in hybrid training mode.
+        Pull weight from server in hybrid training mode.
         """
         logger.info("Try to pull weights. Local step number: {}".format(self._global_step))
         # The worker has to train kWorkerTrainStepNum standalone iterations before it communicates with server.
@@ -359,7 +359,7 @@ class FederatedLearningManager(Callback):
 
     def start_push_weight(self):
         """
-        push weight to server in hybrid training mode.
+        Push weight to server in hybrid training mode.
         """
         logger.info("Try to push weights. Local step number: {}".format(self._global_step))
         if self._global_step % self._sync_frequency != TRAIN_END_STEP_NUM:
