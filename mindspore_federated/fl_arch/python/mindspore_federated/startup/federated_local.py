@@ -151,7 +151,8 @@ class FLServerJob:
 
     def run(self, feature_map=None, callback=None):
         """
-        run fl server job
+        Run fl server job.
+
         Args:
             feature_map (Union(dict, FeatureMap, str)): Feature map.
             callback (Union(None, Callback)): Callback function.
@@ -171,7 +172,7 @@ class FLServerJob:
 
     def after_started_callback(self):
         """
-        define callback after fl job is started
+        Define callback after fl job is started.
         """
         logger.info("after started callback")
         if self.callback is not None:
@@ -182,7 +183,7 @@ class FLServerJob:
 
     def before_stopped_callback(self):
         """
-        define callback before fl job is stopped
+        Define callback before fl job is stopped.
         """
         logger.info("before stopped callback")
         if self.callback is not None:
@@ -194,7 +195,8 @@ class FLServerJob:
     def on_iteration_end_callback(self, feature_list, fl_name, instance_name, iteration_num,
                                   iteration_valid, iteration_reason):
         """
-        define callback of iteration ending
+        Define callback of iteration ending.
+
         Args:
             feature_list (list): Feature list.
             fl_name (str): The name of current federated.
@@ -220,7 +222,7 @@ class FLServerJob:
 
     def _save_feature_map(self, feature_map, iteration_num):
         """
-        save feature map
+        save feature map.
         """
         recovery_ckpt_file = self._get_current_recovery_ckpt_file()
         import datetime
@@ -235,7 +237,7 @@ class FLServerJob:
 
     def _load_feature_map(self, feature_map):
         """
-        load feature map
+        load feature map.
         """
         if isinstance(feature_map, dict):
             new_feature_map = FeatureMap()
@@ -280,7 +282,7 @@ class FLServerJob:
 
     def _get_current_recovery_ckpt_file(self):
         """
-        get current recovery ckpt file
+        get current recovery ckpt file.
         """
         # get checkpoint files from the latest to the next new in self.checkpoint_dir: {checkpoint_dir}/
         # checkpoint file: {fl_name}_recovery_iteration_xxx_20220601_164030.ckpt
@@ -331,6 +333,6 @@ class FlSchedulerJob:
 
     def run(self):
         """
-        run scheduler job
+        Run scheduler job.
         """
         Federated_.start_federated_scheduler()

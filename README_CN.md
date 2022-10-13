@@ -8,7 +8,7 @@ MindSpore Federated是一款开源联邦学习框架，支持面向千万级无�
 
 联邦学习是一种加密的分布式机器学习技术，其支持机器学习的各参与方在不直接共享本地数据的前提下，共建AI模型。MindSpore Federated目前优先专注于参与方数量规模较大的横向联邦学习应用场景。
 
-<img src="docs/architecture.png" alt="MindSpore Architecture" width="600"/>
+<img src="docs/api/api_python/architecture.png" alt="MindSpore Architecture" width="600"/>
 
 ## 安装
 

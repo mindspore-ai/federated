@@ -6,7 +6,7 @@
     在训练过程中管理联邦学习。
 
     参数：
-        - **yaml_config** (str) - yaml文件路径。更多细节见 https://gitee.com/mindspore/federated/blob/master/docs/federated_server_yaml.md。
+        - **yaml_config** (str) - yaml文件路径。更多细节见 https://gitee.com/mindspore/federated/blob/master/docs/api/api_python/federated_server_yaml.md。
         - **model** (nn.Cell) - 一个用于联邦训练的模型。
         - **sync_frequency** (int) - 联邦学习中的参数同步频率。
           需要注意在数据下沉模式中，频率的单位是epoch的数量。否则，频率的单位是step的数量。
