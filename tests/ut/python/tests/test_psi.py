@@ -14,7 +14,7 @@
 # ============================================================================
 """Test the functions of PSIDemo"""
 
-from mindspore_federated._mindspore_federated import RunPSIDemo
+from mindspore_federated._mindspore_federated import _RunPSIDemo
 from common import fl_test
 
 
@@ -40,6 +40,6 @@ def test_case_from_eazy_list():
     """
     server_input = ["1", "2", "3"]
     client_input = ["2", "3", "4", "5"]
-    psi_result = RunPSIDemo(server_input, client_input, 0)
+    psi_result = _RunPSIDemo(server_input, client_input, 0)
     actual_result = compute_right_result(server_input, client_input)
     assert not bool(check_psi_is_ok(actual_result, psi_result))

@@ -29,8 +29,9 @@ namespace mindspore {
 namespace fl {
 namespace psi {
 MS_EXPORT std::vector<std::string> PlainIntersection(const std::vector<std::string> &input_vct,
-                                                     const std::string &comm_role, size_t thread_num, size_t bin_id,
-                                                     const std::string &target_server_name);
+                                                     const std::string &comm_role,
+                                                     const std::string &target_server_name, size_t bin_id,
+                                                     size_t thread_num);
 }  // namespace psi
 }  // namespace fl
 }  // namespace mindspore

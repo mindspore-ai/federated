@@ -20,7 +20,7 @@ namespace mindspore {
 namespace fl {
 namespace psi {
 std::vector<std::string> PlainIntersection(const std::vector<std::string> &input_vct, const std::string &comm_role,
-                                           size_t thread_num, size_t bin_id, const std::string &target_server_name) {
+                                           const std::string &target_server_name, size_t bin_id, size_t thread_num) {
   std::vector<std::string> ret;
   auto &verticalServer = VerticalServer::GetInstance();
   verticalServer.StartVerticalCommunicator();
@@ -32,11 +32,11 @@ std::vector<std::string> PlainIntersection(const std::vector<std::string> &input
   psi_ctx.input_vct = input_vct;
   psi_ctx.self_num = psi_ctx.input_vct.size();
   MS_LOG(INFO) << comm_role << " start to hash input and truncate to compare_length (12 bytes)...";
-  psi_ctx.input_hash_vct = HashInputs(psi_ctx.input_vct, psi_ctx.thread_num, psi_ctx.chunk_size);
+  std::vector<std::string> input_hash_vct = HashInputs(psi_ctx.input_vct, psi_ctx.thread_num, psi_ctx.chunk_size);
   ParallelSync parallel_sync(thread_num);
   parallel_sync.parallel_for(0, psi_ctx.self_num, psi_ctx.chunk_size, [&](size_t beg, size_t end) {
     for (size_t i = beg; i < end; i++) {
-      psi_ctx.input_hash_vct[i] = psi_ctx.input_hash_vct[i].substr(0, psi_ctx.compare_length);
+      input_hash_vct[i] = input_hash_vct[i].substr(0, psi_ctx.compare_length);
     }
   });
 
@@ -45,7 +45,8 @@ std::vector<std::string> PlainIntersection(const std::vector<std::string> &input
     PlainData clientPlain;
     verticalServer.Receive(target_server_name, &clientPlain);
     std::vector<std::string> recv_vct = clientPlain.plain_data_vct();
-    ret = Align(&recv_vct, psi_ctx.input_hash_vct, psi_ctx);
+    clientPlain.set_empty();
+    ret = Align(&recv_vct, input_hash_vct, psi_ctx);
     MS_LOG(INFO) << "-------------------------- 3. server send alignResult -----------------------";
     PlainData alignResult(psi_ctx.bin_id, ret, "alignResult");
     verticalServer.Send(target_server_name, alignResult);
@@ -54,7 +55,7 @@ std::vector<std::string> PlainIntersection(const std::vector<std::string> &input
 
   if (comm_role == "client") {
     MS_LOG(INFO) << "-------------------------- 1. client send clientPlain -----------------------";
-    PlainData clientPlain(psi_ctx.bin_id, psi_ctx.input_hash_vct, "clientPlain");
+    PlainData clientPlain(psi_ctx.bin_id, input_hash_vct, "clientPlain");
     verticalServer.Send(target_server_name, clientPlain);
     MS_LOG(INFO) << "-------------------------- 4. client receive alignResult -----------------------";
     PlainData alignResult;

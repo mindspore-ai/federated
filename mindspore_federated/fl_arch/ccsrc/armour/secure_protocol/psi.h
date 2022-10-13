@@ -113,7 +113,6 @@ struct PsiCtx {
   bool need_check = true;
 
   std::vector<std::string> input_vct;
-  std::vector<std::string> input_hash_vct;
   size_t self_num = 0;
   size_t peer_num = 0;
 };
@@ -129,14 +128,10 @@ void DelWrong(std::vector<std::string> *align_results_vector, const std::vector<
 MS_EXPORT std::vector<std::string> RunPSIDemo(const std::vector<std::string> &alice_input,
                                               const std::vector<std::string> &bob_input, size_t thread_num);
 
-void RunEcdhPsi(const PsiCtx &psi_ctx_alice, const PsiCtx &psi_ctx_bob);
-
-void RunInverseEcdhPsi(const PsiCtx &psi_ctx_alice, const PsiCtx &psi_ctx_bob);
-
 std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx_alice, const PsiCtx &psi_ctx_bob);
 
 MS_EXPORT std::vector<std::string> RunPSI(const std::vector<std::string> &input_vct, const std::string &comm_role,
-                                          size_t thread_num, size_t bin_id, const std::string &http_server_address);
+                                          const std::string &target_server_name, size_t bin_id, size_t thread_num);
 }  // namespace psi
 }  // namespace fl
 }  // namespace mindspore

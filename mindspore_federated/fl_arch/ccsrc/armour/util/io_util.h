@@ -107,13 +107,15 @@ struct BobPb {
  public:
   ~BobPb() = default;
   BobPb() = default;
-  BobPb(const size_t &bin_id, const std::vector<std::string> &p_b_vct) : bin_id_(bin_id) { p_b_vct_ = p_b_vct; }
+  BobPb(const size_t &bin_id, const std::vector<std::string> &p_b_vct) : bin_id_(bin_id), p_b_vct_(p_b_vct) {}
 
   void set_bin_id(const size_t &bin_id) { bin_id_ = bin_id; }
   size_t bin_id() const { return bin_id_; }
 
   void set_p_b_vct(const std::vector<std::string> &p_b_vct) { p_b_vct_ = p_b_vct; }
   std::vector<std::string> p_b_vct() const { return p_b_vct_; }
+
+  void set_empty() { std::vector<std::string>().swap(p_b_vct_); }
 
  private:
   size_t bin_id_ = 0;
@@ -129,9 +131,7 @@ struct AlicePbaAndBF {
   ~AlicePbaAndBF() = default;
   AlicePbaAndBF() = default;
   AlicePbaAndBF(const size_t &bin_id, const std::vector<std::string> &p_b_a_vct, const std::string &bf_alice)
-      : bin_id_(bin_id), bf_alice_(bf_alice) {
-    p_b_a_vct_ = p_b_a_vct;
-  }
+      : bin_id_(bin_id), p_b_a_vct_(p_b_a_vct), bf_alice_(bf_alice) {}
 
   void set_bin_id(const size_t &bin_id) { bin_id_ = bin_id; }
   size_t bin_id() const { return bin_id_; }
@@ -141,6 +141,11 @@ struct AlicePbaAndBF {
 
   void set_bf_alice(const std::string &bf_alice) { bf_alice_ = bf_alice; }
   std::string bf_alice() const { return bf_alice_; }
+
+  void set_empty() {
+    std::vector<std::string>().swap(p_b_a_vct_);
+    std::string().swap(bf_alice_);
+  }
 
  private:
   size_t bin_id_ = 0;
@@ -156,15 +161,16 @@ struct BobAlignResult {
  public:
   ~BobAlignResult() = default;
   BobAlignResult() = default;
-  BobAlignResult(const size_t &bin_id, const std::vector<std::string> &align_result) : bin_id_(bin_id) {
-    align_result_ = align_result;
-  }
+  BobAlignResult(const size_t &bin_id, const std::vector<std::string> &align_result)
+      : bin_id_(bin_id), align_result_(align_result) {}
 
   void set_bin_id(const size_t &bin_id) { bin_id_ = bin_id; }
   size_t bin_id() const { return bin_id_; }
 
-  void set_align_resul(const std::vector<std::string> &align_result) { align_result_ = align_result; }
+  void set_align_result(const std::vector<std::string> &align_result) { align_result_ = align_result; }
   std::vector<std::string> align_result() const { return align_result_; }
+
+  void set_empty() { std::vector<std::string>().swap(align_result_); }
 
  private:
   size_t bin_id_ = 0;
@@ -180,9 +186,7 @@ struct AliceCheck {
   ~AliceCheck() = default;
   AliceCheck() = default;
   AliceCheck(const size_t &bin_id, const size_t &wrong_num, const std::vector<std::string> &wrong_id)
-      : bin_id_(bin_id), wrong_num_(wrong_num) {
-    wrong_id_ = wrong_id;
-  }
+      : bin_id_(bin_id), wrong_num_(wrong_num), wrong_id_(wrong_id) {}
 
   void set_bin_id(const size_t &bin_id) { bin_id_ = bin_id; }
   size_t bin_id() const { return bin_id_; }
@@ -211,10 +215,7 @@ struct PlainData {
   ~PlainData() = default;
   PlainData() = default;
   PlainData(const size_t &bin_id, const std::vector<std::string> &plain_data_vct, const std::string &msg)
-      : bin_id_(bin_id) {
-    plain_data_vct_ = plain_data_vct;
-    msg_ = msg;
-  }
+      : bin_id_(bin_id), plain_data_vct_(plain_data_vct), msg_(msg) {}
 
   void set_bin_id(const size_t &bin_id) { bin_id_ = bin_id; }
   size_t bin_id() const { return bin_id_; }
@@ -224,6 +225,8 @@ struct PlainData {
 
   void set_msg(const std::string &msg) { msg_ = msg; }
   std::string msg() const { return msg_; }
+
+  void set_empty() { std::vector<std::string>().swap(plain_data_vct_); }
 
  private:
   size_t bin_id_ = 0;
