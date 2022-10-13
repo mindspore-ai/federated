@@ -130,14 +130,16 @@ class FederatedLearningManager(Callback):
     Manage Federated Learning during training.
 
     Args:
-        yaml_config (str): The yaml file path. more detail see `federated_server_yaml <https://gitee.com/mindspore/federated/blob/master/docs/federated_server_yaml.md>`_.
-        model (nn.Cell): A training model.
+        yaml_config (str): The yaml file path. More detail see `federated_server_yaml <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python_en/federated_server_yaml.md>`_.
+        model (nn.Cell): A model for Federated Training.
         sync_frequency (int): Synchronization frequency of parameters in Federated Learning.
                               Note that in dataset sink mode, the unit of the frequency is the number of epochs.
                               Otherwise, the unit of the frequency is the number of steps.
-        http_server_address (str): The http server address used for communicating. Default: ""
-        data_size (int): The size of data volume server need report to worker. Default: 1.
-        sync_type (str): Parameter synchronization type in Federated Learning.
+                              The initial synchronization frequency is in adaptive synchronization frequency mode and
+                              the synchronization frequency in fixed frequency mode.
+        http_server_address (str): The http server address used for communicating. Default: "".
+        data_size (int): The data size to be reported to the worker. Default: 1.
+        sync_type (str): The synchronization type of parameter in Federated Learning.
                          Supports ["fixed", "adaptive"]. Default: "fixed".
 
                          - fixed: The frequency of parameter synchronization is fixed.
