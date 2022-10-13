@@ -88,7 +88,7 @@ std::vector<std::string> ECC::DcpsAndInverseMul(const std::vector<std::string> &
   });
 
   time(&time_end);
-  MS_LOG(INFO) << "Bob decompress and compute p1^a^b^(b^-1), time cost: " << difftime(time_end, time_start) << " s.";
+  MS_LOG(INFO) << "Bob decompress and compute p2^b^a^(b^-1), time cost: " << difftime(time_end, time_start) << " s.";
   return p_a_b_bI_vector;
 }
 

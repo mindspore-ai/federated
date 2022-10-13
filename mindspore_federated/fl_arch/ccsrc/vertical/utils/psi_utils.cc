@@ -145,7 +145,7 @@ psi::BobAlignResult ParseBobAlignResultProto(datajoin::BobAlignResultProto bobAl
   for (int i = 0; i < align_result_size; i++) {
     align_result.push_back(bobAlignResultProto.align_result(i));
   }
-  bobAlignResult.set_align_resul(align_result);
+  bobAlignResult.set_align_result(align_result);
   MS_LOG(INFO) << "(bob_align_result), bin_id is " << bobAlignResult.bin_id()
                << ", vector size is " << bobAlignResult.align_result().size();
   return bobAlignResult;

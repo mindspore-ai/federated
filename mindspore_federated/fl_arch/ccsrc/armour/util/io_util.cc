@@ -265,7 +265,7 @@ void Recv(BobAlignResult *bob_align_result) {
   for (int i = 0; i < align_result_size; i++) {
     align_result.push_back(bob_align_result_proto.align_result(i));
   }
-  bob_align_result->set_align_resul(align_result);
+  bob_align_result->set_align_result(align_result);
   MS_LOG(INFO) << "bob_align_result, bin_id is " << bob_align_result->bin_id();
   MS_LOG(INFO) << "bob_align_result size is " << bob_align_result->align_result().size();
 }

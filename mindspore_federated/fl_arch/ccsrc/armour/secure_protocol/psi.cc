@@ -139,86 +139,28 @@ void DelWrong(std::vector<std::string> *align_results_vector, const std::vector<
   MS_LOG(INFO) << "Do DelWrong, time cost: " << difftime(time_end, time_start) << " s.";
 }
 
-void RunEcdhPsi(const PsiCtx &psi_ctx_alice, const PsiCtx &psi_ctx_bob) {
-  // bob
-  MS_LOG(INFO) << "2. bob start computing p2^b...";
-  auto p_b_vct =
-    psi_ctx_bob.ecc->HashToCurveAndMul(psi_ctx_bob.input_vct, psi_ctx_bob.compress_length, psi_ctx_bob.compress_length);
-  FlattenAndWriteFile("p2_b", p_b_vct);
-  // send
-
-  // alice
-  MS_LOG(INFO) << "1. alice start computing p1^a...";
-  auto p_a_vct = psi_ctx_alice.ecc->HashToCurveAndMul(psi_ctx_alice.input_vct, psi_ctx_alice.compress_length,
-                                                      psi_ctx_alice.compress_length);
-  FlattenAndWriteFile("p1_a", p_a_vct);
-
-  MS_LOG(INFO) << "3. alice start decompress and compute p2^b^a ";
-  auto recv_p_b_vct = ReadFileAndDeserialize("p2_b", psi_ctx_alice.peer_num, psi_ctx_alice.compress_length);
-  auto p_b_a_vct =
-    psi_ctx_alice.ecc->DcpsAndMul(recv_p_b_vct, psi_ctx_alice.compress_length, psi_ctx_alice.compare_length);
-  //  auto p_b_a_vct = psi_conf.alice_ecc_ecdh->DcpsAndMask(p_b_vct);
-  FlattenAndWriteFile("p2_b_a", p_b_a_vct);
-
-  // bob
-  MS_LOG(INFO) << "4. bob start decompress and compute p1^a^b ";
-  auto recv_p_a_vct = ReadFileAndDeserialize("p1_a", psi_ctx_bob.peer_num, psi_ctx_bob.compress_length);
-  auto p_a_b_vct = psi_ctx_bob.ecc->DcpsAndMul(recv_p_a_vct, psi_ctx_bob.compress_length, psi_ctx_bob.compare_length);
-
-  // bob do align
-  MS_LOG(INFO) << "5. bob start align ";
-  auto recv_p_b_a_vct = ReadFileAndDeserialize("p2_b_a", psi_ctx_bob.self_num, psi_ctx_bob.compare_length);
-  auto align_results_vec = Align(&p_a_b_vct, recv_p_b_a_vct, psi_ctx_bob);
-  WriteFile("result.csv", align_results_vec);
-}
-
-void RunInverseEcdhPsi(const PsiCtx &psi_ctx_alice, const PsiCtx &psi_ctx_bob) {
-  // bob
-  MS_LOG(INFO) << "bob start computing p2^b...";
-  auto p_b_vct = psi_ctx_bob.ecc->HashToCurveAndMul(psi_ctx_bob.input_hash_vct, psi_ctx_bob.compress_length,
-                                                    psi_ctx_bob.compress_length);
-  FlattenAndWriteFile("p2_b", p_b_vct);
-
-  // alice
-  MS_LOG(INFO) << "alice start computing p1^a...";
-  // 32byte
-  auto p_a_vct =
-    psi_ctx_alice.ecc->HashToCurveAndMul(psi_ctx_alice.input_hash_vct, LENGTH_32, psi_ctx_alice.compare_length);
-  FlattenAndWriteFile("p1_a", p_a_vct);
-
-  MS_LOG(INFO) << "alice start decompress and compute p2^b^a ";
-  auto recv_p_b_vct = ReadFileAndDeserialize("p2_b", psi_ctx_alice.peer_num, psi_ctx_alice.compress_length);
-  auto p_b_a_vct =
-    psi_ctx_alice.ecc->DcpsAndMul(recv_p_b_vct, psi_ctx_alice.compress_length, psi_ctx_alice.compress_length);
-  FlattenAndWriteFile("p2_b_a", p_b_a_vct);
-
-  // bob
-  MS_LOG(INFO) << "bob start decompress and compute p2^b^a^(b^-1) ";
-  auto recv_p_b_a_vct = ReadFileAndDeserialize("p2_b_a", psi_ctx_bob.peer_num, psi_ctx_bob.compress_length);
-  // 32
-  auto p_a_b_bI_vct = psi_ctx_bob.ecc->DcpsAndInverseMul(recv_p_b_a_vct, LENGTH_32, psi_ctx_bob.compare_length);
-
-  // bob do align
-  auto recv_p_a_vct = ReadFileAndDeserialize("p1_a", psi_ctx_bob.peer_num, psi_ctx_bob.compare_length);
-  auto align_results_vector = Align(&recv_p_a_vct, p_a_b_bI_vct, psi_ctx_bob);
-  MS_LOG(INFO) << "Number of false positive cases: " << align_results_vector.size() - psi_ctx_bob.input_vct.size() / 2;
-  WriteFile("result.csv", align_results_vector);
-}
-
 std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx_alice, const PsiCtx &psi_ctx_bob) {
   // bob
-  MS_LOG(INFO) << "  -------------------------- 0.[outline] Bob start computing p2^b...----------------------";
-  auto p_b_vct = psi_ctx_bob.ecc->HashToCurveAndMul(psi_ctx_bob.input_hash_vct, psi_ctx_bob.compress_length,
-                                                    psi_ctx_bob.compress_length);
+  MS_LOG(INFO)
+    << "  -------------------------- 0.[offline] Bob start hashing and computing p2^b...----------------------";
+  std::vector<std::string> bob_input_hash_vct =
+    HashInputs(psi_ctx_bob.input_vct, psi_ctx_bob.thread_num, psi_ctx_bob.chunk_size);
+  auto p_b_vct =
+    psi_ctx_bob.ecc->HashToCurveAndMul(bob_input_hash_vct, psi_ctx_bob.compress_length, psi_ctx_bob.compress_length);
+  std::vector<std::string>().swap(bob_input_hash_vct);
   MS_LOG(INFO) << "  -------------------------- 1. bob send bobPb -----------------------";
   BobPb bob_p_b(psi_ctx_bob.bin_id, p_b_vct);
   Send(bob_p_b);
 
   // alice
-  MS_LOG(INFO) << "  -------------------------- 0.[outline] Alice start computing p1^a...----------------------";
-  auto p_a_vct =
-    psi_ctx_alice.ecc->HashToCurveAndMul(psi_ctx_alice.input_hash_vct, LENGTH_32, psi_ctx_alice.compare_length);
+  MS_LOG(INFO)
+    << "  -------------------------- 0.[offline] Alice start hashing and computing p1^a...----------------------";
+  std::vector<std::string> alice_input_hash_vct =
+    HashInputs(psi_ctx_alice.input_vct, psi_ctx_alice.thread_num, psi_ctx_alice.chunk_size);
+  auto p_a_vct = psi_ctx_alice.ecc->HashToCurveAndMul(alice_input_hash_vct, LENGTH_32, psi_ctx_alice.compare_length);
+  std::vector<std::string>().swap(alice_input_hash_vct);
   BloomFilter bf_alice(p_a_vct, psi_ctx_alice.thread_num, psi_ctx_alice.neg_log_fp_rate);
+  std::vector<std::string>().swap(p_a_vct);
 
   MS_LOG(INFO) << "  -------------------------- 2. alice receive bob_p_b -----------------------";
   BobPb bob_p_b_recv;
@@ -226,6 +168,7 @@ std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx_alice, co
   MS_LOG(INFO) << "Alice start decompress and compute p2^b^a ";
   auto p_b_a_vct =
     psi_ctx_alice.ecc->DcpsAndMul(bob_p_b_recv.p_b_vct(), psi_ctx_alice.compress_length, psi_ctx_alice.compress_length);
+  bob_p_b_recv.set_empty();
 
   MS_LOG(INFO) << "  -------------------------- 3. alice send AlicePbaAndBFProto -----------------------";
   AlicePbaAndBF alice_p_b_a_bf(psi_ctx_alice.bin_id, p_b_a_vct, bf_alice.GetData());
@@ -240,7 +183,9 @@ std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx_alice, co
     psi_ctx_bob.ecc->DcpsAndInverseMul(alice_p_b_a_bf_recv.p_b_a_vct(), LENGTH_32, psi_ctx_bob.compare_length);
 
   BloomFilter bf_alice_recv(alice_p_b_a_bf_recv.bf_alice(), psi_ctx_bob.peer_num, psi_ctx_bob.neg_log_fp_rate);
+  alice_p_b_a_bf_recv.set_empty();
   auto align_results_vector = Align(p_b_a_bI_vct, bf_alice_recv, psi_ctx_bob);
+  std::vector<std::string>().swap(p_b_a_bI_vct);
   MS_LOG(INFO) << "Number of false positive cases: "
                << static_cast<int>(align_results_vector.size() - psi_ctx_bob.input_vct.size() / 2);
 
@@ -270,6 +215,7 @@ std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx_alice, co
     BobAlignResult bob_align_result_recv;
     Recv(&bob_align_result_recv);
     FindWrong(psi_ctx_alice, bob_align_result_recv.align_result(), &wrong_vct, &fix_vct);
+    bob_align_result_recv.set_empty();
 
     MS_LOG(INFO) << "  -------------------------- 7. alice send wrong_id -----------------------";
     AliceCheck alice_check(psi_ctx_alice.bin_id, wrong_vct.size(), wrong_vct);
@@ -305,10 +251,6 @@ std::vector<std::string> RunPSIDemo(const std::vector<std::string> &alice_input,
     psi_ctx_alice.compare_length = LENGTH_32;
   }
 
-  MS_LOG(INFO) << "Alice start hash input...";
-  psi_ctx_alice.input_hash_vct =
-    HashInputs(psi_ctx_alice.input_vct, psi_ctx_alice.thread_num, psi_ctx_alice.chunk_size);
-
   if (!psi_ctx_alice.CheckPsiCtxOK()) {
     MS_LOG(ERROR) << "Set PSI CTX ERROR!";
     return ret;
@@ -342,8 +284,6 @@ std::vector<std::string> RunPSIDemo(const std::vector<std::string> &alice_input,
     psi_ctx_bob.compare_length = LENGTH_32;
   }
   psi_ctx_bob.SetRole(client_psi_init_recv.self_size());
-  MS_LOG(INFO) << "Bob start hash input...";
-  psi_ctx_bob.input_hash_vct = HashInputs(psi_ctx_bob.input_vct, psi_ctx_bob.thread_num, psi_ctx_bob.chunk_size);
 
   if (!psi_ctx_bob.CheckPsiCtxOK()) {
     MS_LOG(ERROR) << "Set PSI CTX ERROR!";
@@ -374,16 +314,22 @@ std::vector<std::string> RunPSIDemo(const std::vector<std::string> &alice_input,
 std::vector<std::string> RunInverseFilterEcdhPsi(const std::string &target_server_name, const PsiCtx &psi_ctx) {
   std::vector<std::string> align_results_vector;
   auto &verticalServer = VerticalServer::GetInstance();
+  MS_LOG(INFO) << "Start hash input...";
+  std::vector<std::string> input_hash_vct = HashInputs(psi_ctx.input_vct, psi_ctx.thread_num, psi_ctx.chunk_size);
+
   if (psi_ctx.role == "alice") {
-    MS_LOG(INFO) << "[outline] Alice start computing p1^a...";
-    auto p_a_vct = psi_ctx.ecc->HashToCurveAndMul(psi_ctx.input_hash_vct, psi_ctx.compress_length, LENGTH_32);
+    MS_LOG(INFO) << "[offline] Alice start computing p1^a...";
+    auto p_a_vct = psi_ctx.ecc->HashToCurveAndMul(input_hash_vct, psi_ctx.compress_length, LENGTH_32);
+    std::vector<std::string>().swap(input_hash_vct);
     BloomFilter bf_alice(p_a_vct, psi_ctx.thread_num, psi_ctx.neg_log_fp_rate);
+    std::vector<std::string>().swap(p_a_vct);
 
     MS_LOG(INFO) << "----------------------- 2. alice receive bob_p_b -----------------------";
     BobPb bob_p_b_recv;
     verticalServer.Receive(target_server_name, &bob_p_b_recv);
     MS_LOG(INFO) << "Alice start decompress and compute p2^b^a --------------------------";
     auto p_b_a_vct = psi_ctx.ecc->DcpsAndMul(bob_p_b_recv.p_b_vct(), psi_ctx.compress_length, psi_ctx.compress_length);
+    bob_p_b_recv.set_empty();
 
     MS_LOG(INFO) << " -------------------------- 3. alice send AlicePbaAndBFProto ------------------------";
     AlicePbaAndBF alice_p_b_a_bf(psi_ctx.bin_id, p_b_a_vct, bf_alice.GetData());
@@ -395,15 +341,16 @@ std::vector<std::string> RunInverseFilterEcdhPsi(const std::string &target_serve
     BobAlignResult bob_align_result_recv;
     verticalServer.Receive(target_server_name, &bob_align_result_recv);
     FindWrong(psi_ctx, bob_align_result_recv.align_result(), &wrong_vct, &fix_vct);
+    bob_align_result_recv.set_empty();
 
     MS_LOG(INFO) << "-------------------------- 7. alice send wrong_id -----------------------";
     AliceCheck alice_check(psi_ctx.bin_id, wrong_vct.size(), wrong_vct);
     verticalServer.Send(target_server_name, alice_check);
     return fix_vct;
   } else {
-    MS_LOG(INFO) << "[outline] Bob start computing p2^b...";
-    auto p_b_vct =
-      psi_ctx.ecc->HashToCurveAndMul(psi_ctx.input_hash_vct, psi_ctx.compress_length, psi_ctx.compress_length);
+    MS_LOG(INFO) << "[offline] Bob start computing p2^b...";
+    auto p_b_vct = psi_ctx.ecc->HashToCurveAndMul(input_hash_vct, psi_ctx.compress_length, psi_ctx.compress_length);
+    std::vector<std::string>().swap(input_hash_vct);
     MS_LOG(INFO) << "-------------------------- 1. bob send bobPb -----------------------";
     BobPb bob_p_b(psi_ctx.bin_id, p_b_vct);
     verticalServer.Send(target_server_name, bob_p_b);
@@ -415,7 +362,9 @@ std::vector<std::string> RunInverseFilterEcdhPsi(const std::string &target_serve
     auto p_b_a_bI_vct =
       psi_ctx.ecc->DcpsAndInverseMul(alice_p_b_a_bf_recv.p_b_a_vct(), psi_ctx.compress_length, LENGTH_32);
     BloomFilter bf_alice_recv(alice_p_b_a_bf_recv.bf_alice(), psi_ctx.peer_num, psi_ctx.neg_log_fp_rate);
+    alice_p_b_a_bf_recv.set_empty();
     align_results_vector = Align(p_b_a_bI_vct, bf_alice_recv, psi_ctx);
+    std::vector<std::string>().swap(p_b_a_bI_vct);
 
     time_t time_start;
     time_t time_end;
@@ -437,7 +386,7 @@ std::vector<std::string> RunInverseFilterEcdhPsi(const std::string &target_serve
 }
 
 std::vector<std::string> RunPSI(const std::vector<std::string> &input_vct, const std::string &comm_role,
-                                size_t thread_num, size_t bin_id, const std::string &target_server_name) {
+                                const std::string &target_server_name, size_t bin_id, size_t thread_num) {
   std::vector<std::string> ret;
   auto &verticalServer = VerticalServer::GetInstance();
   verticalServer.StartVerticalCommunicator();
@@ -449,8 +398,6 @@ std::vector<std::string> RunPSI(const std::vector<std::string> &input_vct, const
   psi_ctx.input_vct = input_vct;
   psi_ctx.self_num = psi_ctx.input_vct.size();
   psi_ctx.ecc = std::make_unique<ECC>(psi_ctx.curve_name, psi_ctx.thread_num, psi_ctx.chunk_size);
-  MS_LOG(INFO) << "Start hash input...";
-  psi_ctx.input_hash_vct = HashInputs(psi_ctx.input_vct, psi_ctx.thread_num, psi_ctx.chunk_size);
 
   if (comm_role == "client") {
     MS_LOG(INFO) << "-------------------------- 1. client send clientPsiInit -----------------------";

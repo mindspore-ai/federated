@@ -90,13 +90,13 @@ void InitTensorListItemPy(const py::module &m) {
 
 // cppcheck-suppress syntaxError
 PYBIND11_MODULE(_mindspore_federated, m) {
-  m.def("RunPSIDemo", &mindspore::fl::psi::RunPSIDemo, "run psi demo", py::arg("alice_list"), py::arg("bob_list"),
+  m.def("_RunPSIDemo", &mindspore::fl::psi::RunPSIDemo, "run psi demo", py::arg("alice_list"), py::arg("bob_list"),
         py::arg("thread_num"));
   m.def("RunPSI", &mindspore::fl::psi::RunPSI, "run psi with communication", py::arg("input_list"),
-        py::arg("comm_role"), py::arg("thread_num"), py::arg("bin_id"), py::arg("target_server_name"));
+        py::arg("comm_role"), py::arg("peer_comm_role"), py::arg("bucket_id"), py::arg("thread_num"));
   m.def("PlainIntersection", &mindspore::fl::psi::PlainIntersection, "plain intersection with communication",
-        py::arg("input_list"), py::arg("comm_role"), py::arg("thread_num"), py::arg("bin_id"),
-        py::arg("target_server_name"));
+        py::arg("input_list"), py::arg("comm_role"), py::arg("peer_comm_role"), py::arg("bucket_id"),
+        py::arg("thread_num"));
 
   (void)py::class_<FederatedJob, std::shared_ptr<FederatedJob>>(m, "Federated_")
     .def_static("start_federated_server", &FederatedJob::StartFederatedServer)

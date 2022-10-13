@@ -97,10 +97,10 @@ if __name__ == "__main__":
     for bucket_id in range(bucket_size):
         if plain_intersection:
             intersection_type = "Plain intersection"
-            intersection_result = PlainIntersection(input_data, comm_role, thread_num, bucket_id, peer_comm_role)
+            intersection_result = PlainIntersection(input_data, comm_role, peer_comm_role, bucket_id, thread_num)
         else:
             intersection_type = "PSI"
-            intersection_result = RunPSI(input_data, comm_role, thread_num, bucket_id, peer_comm_role)
+            intersection_result = RunPSI(input_data, comm_role, peer_comm_role, bucket_id, thread_num)
         print("{} result:{}".format(intersection_type, intersection_result[0:20]))
         if need_check:
             peer_input_data = generate_input_data(peer_input_begin, peer_input_end, peer_read_file, peer_file_name)
