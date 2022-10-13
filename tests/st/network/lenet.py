@@ -68,7 +68,8 @@ class LeNet5(nn.Cell):
         self.fc3 = fc_with_initialize(84, self.num_class)
         self.relu = nn.ReLU()
         self.max_pool2d = nn.MaxPool2d(kernel_size=2, stride=2)
-        self.flatten = nn.Flatten()
+        # self.flatten = nn.Flatten()
+        self.flatten = mindspore.ops.Flatten()
 
     def construct(self, x):
         """construct"""

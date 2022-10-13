@@ -59,4 +59,5 @@ for i in range(local_server_num):
     import time
 
     time.sleep(0.3)
+    print("subprocess: " + cmd_server)
     subprocess.call(['bash', '-c', cmd_server])
