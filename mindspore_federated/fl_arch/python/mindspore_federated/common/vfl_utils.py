@@ -36,50 +36,107 @@ def parse_yaml_file(file_path):
     return yaml_data, fp
 
 
-class YamlDataParser:
+class FLYamlData:
     """
-    Parse the yaml file describing the vfl process, and generate corresponding data structures.
+    Data class storing configuration information on the vertical federated learning process, including
+    inputs, outputs, and hyper-parameters of networks, optimizers, operators, etc. The information
+    mentioned above is parsed from the yaml file provided by the developer of the vertical federated
+    learning system. The class will verify the yaml file in the parsing process.
 
     Args:
-        yaml_path: path to the yaml file
+        yaml_path: Path of the yaml file
     """
-    def __init__(self, yaml_data):
-        self.role = yaml_data['role']
-        model_data = yaml_data['model']
-        self.train_net = model_data['train_net']
-        self.train_net_ins = [input_config['name'] for input_config in self.train_net['inputs']]
-        self.train_net_outs = [output_config['name'] for output_config in self.train_net['outputs']]
-        self.eval_net = model_data['eval_net']
-        self.opt_list = yaml_data['opts']
-        if 'grad_scales' in yaml_data:
-            self.grad_scaler_list = yaml_data['grad_scales']
-        self.dataset = yaml_data['dataset']
-        self.train_hyper_parameters = yaml_data['train_hyper_parameters']
+    def __init__(self, yaml_path: str):
+        yaml_path = os.path.abspath(yaml_path)
+        if not os.path.exists(yaml_path):
+            raise ValueError(f'File {yaml_path} not exit')
+        with open(yaml_path, 'r', encoding='utf-8') as self.fp:
+            self.yaml_data = yaml.safe_load(self.fp)
+
+        if 'role' not in self.yaml_data:
+            raise ValueError('FLYamlData init failed: missing field of \'role\'')
+        self.role = self.yaml_data['role']
+        if self.role not in ['leader', 'follower', 'leader&follower']:
+            raise ValueError(f'FLYamlData init failed: value of role ({self.role}) is illegal, \
+                             role shall be either \'leader\' or \'follower\'')
+
+        if 'model' not in self.yaml_data:
+            raise ValueError('FLYamlData init failed: missing field of \'model\'')
+        self.model_data = self.yaml_data['model']
+        self._parse_train_net()
+        self._parse_eval_net()
+
+        if 'opts' not in self.yaml_data:
+            raise ValueError('FLYamlData init failed: missing field of \'opts\'')
+        self.opts = self.yaml_data['opts']
         self._check_opts()
-        self._check_grad_scales()
+
+        self.grad_scalers = self.yaml_data['grad_scalers'] if 'grad_scalers' in self.yaml_data else None
+        if self.grad_scalers:
+            self._check_grad_scalers()
+
+        self.dataset = self.yaml_data['dataset'] if 'dataset' in self.yaml_data else None
+        self.train_hyper_parameters = self.yaml_data['hyper_parameters'] \
+            if 'hyper_parameters' in self.yaml_data else None
+
+        if 'privacy' in self.yaml_data:
+            self.privacy = self.yaml_data['privacy']
+            if 'label_dp' not in self.privacy:
+                raise ValueError('FLYamlData init failed: missing field of \'label_dp\' under \'privacy\'')
+            if 'eps' not in self.privacy['label_dp']:
+                raise ValueError('FLYamlData init failed: missing field of \'eps\' under \'label_dp\'')
+            self.privacy_eps = self.privacy['label_dp']['eps']
+        self.fp.close()
+
+    def _parse_train_net(self):
+        """Parse information on training net."""
+        if 'train_net' not in self.model_data:
+            raise ValueError('FLYamlData init failed: missing field of \'train_net\'')
+        self.train_net = self.model_data['train_net']
+        self.train_net_ins = [input_config for input_config in self.train_net['inputs']]
+        if not self.train_net_ins:
+            raise ValueError('FLYamlData init failed: inputs of \'train_net\' are empty')
+        self.train_net_in_names = [input_config['name'] for input_config in self.train_net['inputs']]
+        self.train_net_outs = [output_config for output_config in self.train_net['outputs']]
+        if not self.train_net_outs:
+            raise ValueError('FLYamlData init failed: outputs of \'train_net\' are empty')
+        self.train_net_out_names = [input_config['name'] for input_config in self.train_net['outputs']]
+
+    def _parse_eval_net(self):
+        """Parse information on evaluation net."""
+        if 'eval_net' not in self.model_data:
+            raise ValueError('FLYamlData init failed: missing field of \'eval_net\'')
+        self.eval_net = self.model_data['eval_net']
+        self.eval_net_ins = [input_config for input_config in self.eval_net['inputs']]
+        if not self.eval_net_ins:
+            raise ValueError('FLYamlData init failed: inputs of \'eval_net\' are empty')
+        self.eval_net_outs = [output_config for output_config in self.eval_net['outputs']]
+        if not self.eval_net_outs:
+            raise ValueError('FLYamlData init failed: outputs of \'eval_net\' are empty')
+        self.eval_net_gt = self.eval_net['gt'] if 'gt' in self.eval_net else None
 
     def _check_opts(self):
-        """check whether the parameters defined in opts is logical"""
-        for opt_config in self.opt_list:
+        """Verify configurations of optimizers defined in the yaml file."""
+        for opt_config in self.opts:
             for grad_config in opt_config['grads']:
                 grad_inputs = {grad_in['name'] for grad_in in grad_config['inputs']}
-                if not grad_inputs.issubset(self.train_net_ins):
+                if not grad_inputs.issubset(self.train_net_in_names):
                     raise ValueError('optimizer %s config error: containing undefined inputs' % opt_config['type'])
                 grad_out = grad_config['output']['name']
-                if grad_out not in self.train_net_outs:
+                if grad_out not in self.train_net_out_names:
                     raise ValueError('optimizer %s config error: containing undefined output %s'
                                      % (opt_config['type'], grad_out))
                 if not isinstance('sens', (str, int, float)):
                     raise ValueError('optimizer %s config error: unsupported sens type of grads' % opt_config['type'])
 
-    def _check_grad_scales(self):
-        """check whether the parameters defined in grad_scales is logical"""
-        for grad_scale_config in self.grad_scaler_list:
+    def _check_grad_scalers(self):
+        """Verify configurations of grad_scales defined in the yaml file."""
+        for grad_scale_config in self.grad_scalers:
             grad_scale_ins = {grad_scale_in['name'] for grad_scale_in in grad_scale_config['inputs']}
-            if not grad_scale_ins.issubset(self.train_net_ins):
+            if not grad_scale_ins.issubset(self.train_net_in_names):
                 raise ValueError('grad_scales config error: containing undefined inputs')
             grad_scale_out = grad_scale_config['output']['name']
-            if grad_scale_out not in self.train_net_outs:
+            if grad_scale_out not in self.train_net_out_names:
                 raise ValueError('grad_scales config error: containing undefined output %s' % grad_scale_out)
 
 

@@ -1,0 +1,6 @@
+mindspore==1.8.1
+scikit-learn
+numpy
+pyyaml
+jieba
+sentencepiece

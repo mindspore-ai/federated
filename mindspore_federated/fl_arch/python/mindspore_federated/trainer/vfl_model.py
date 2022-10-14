@@ -19,7 +19,6 @@ from collections import OrderedDict
 from mindspore import nn, context
 from mindspore.ops import PrimitiveWithInfer, prim_attr_register
 from mindspore.context import ParallelMode
-from mindspore.nn.metrics import Metric
 from mindspore_federated.privacy import LabelDP
 
 from .vfl_optim import PartyOptimizer, PartyGradScaler, _reorganize_input_data
@@ -74,33 +73,37 @@ class _VirtualDatasetCell(nn.Cell):
 
 class FLModel:
     """
-    Construct the training and evaluating process of split-learning using the yaml file and the nn.Cell provided
-    by the user. The interface of the class follows the Model of mindspore, and try to encapulate the communication
-    and weight updating processes.
+    High-level API for training and inference of the vertical federated learning. The FLModel groups networks,
+    optimizers, and other data structures into a high-level object. Then the FLModel builds the vertical federated
+    learning process according to the yaml file provided by the developer, and provides interfaces controlling the
+    training and inference processes.
 
     Args:
-        role (enum): role of the party.
-        network (nn.Cell): the backbone network of the party.
-        train_network (nn.Cell): the loss network of the party.
-        loss_fn  (nn.Cell): the loss_fn of the party, no need to provide if specified train_network
-        optimizer (nn.Cell): the optimizer of the party, no need to provide if specified in the yaml file.
-        metrics (class): metrics class of the party, used in the evaluation process.
-        eval_network (nn.Cell): the evaluation network of the party, alternative to provide.
-        eval_indexes (union[tuple, list, int]): indexes of data used in evaluation.
-        yaml_data (dict): data structure describing info. of optimizers, grad calculator, communication and etc,
-            parsing from the yaml file.
+        role (str): Role of the vertical federated learning party, shall be either 'leader' or 'follower'.
+        yaml_data (class): Data class containing information on the vertical federated learning process, including
+            optimizers, gradient calculators, etc. The information mentioned above is parsed from the yaml file
+            provided by the developer.
+        network (Cell): Backbone network of the party, weights of which will be shared by the training network
+            and the evaluation network.
+        train_network (Cell): Training network of the party, which outputs the loss. If not specified, FLModel
+            will construct the training network using the input network and loss_fn. Default: None.
+        loss_fn (Cell): Loss function to construct the training network on the basis of the input network. If a
+            train_network has been specified, it will not work even has been provided. Default: None.
+        optimizer (Cell): Customized optimizer for training the train_network. If not specified, FLModel will try
+            to use standard optimizers of MindSpore specified in the yaml file. Default: None.
+        metrics (Metric): Metrics to evaluate the evaluation network. Default: None.
+        eval_network (nn.Cell): Evaluation network of the party, which outputs the predict value. Default: None.
     """
 
     def __init__(self,
                  role,
+                 yaml_data,
                  network,
-                 train_network,
+                 train_network=None,
                  loss_fn=None,
                  optimizers=None,
                  metrics=None,
                  eval_network=None,
-                 eval_indexes=None,
-                 yaml_data=None,
                  grad_network=None):
         self._role = role
         self._backbone_net = network
@@ -108,17 +111,15 @@ class FLModel:
         self._grad_network = grad_network
         self._metrics = metrics
         self._eval_network = eval_network
-        self._eval_indexes = eval_indexes
         self._label_dp = None
 
         self._yaml_data = yaml_data
-        self._train_net_yaml = self._yaml_data['model']['train_net']
-        self._eval_net_yaml = self._yaml_data['model']['eval_net']
+        self._train_net_yaml = self._yaml_data.train_net
+        self._eval_net_yaml = self._yaml_data.eval_net
 
-        if 'privacy' in self._yaml_data:
-            if 'label_dp' in self._yaml_data['privacy']:
-                label_dp_eps = self._yaml_data['privacy']['label_dp']['eps']
-                self._label_dp = LabelDP(eps=label_dp_eps)
+        if hasattr(self._yaml_data, 'privacy'):
+            label_dp_eps = self._yaml_data.privacy_eps
+            self._label_dp = LabelDP(eps=label_dp_eps)
 
         if self._label_dp is not None and self._role != 'leader':
             raise AttributeError('FLModel: only a leader party can employ the label dp strategy')
@@ -149,14 +150,11 @@ class FLModel:
             else:
                 self._optimizers = [optimizers]
 
-            if 'grad_scalers' in self._yaml_data:
-                self._grad_scalers = self._build_grad_scaler()
-            else:
-                self._grad_scalers = None
+            self._grad_scalers = self._build_grad_scaler() if self._yaml_data.grad_scalers else None
 
     def _build_train_network(self):
         """
-        build the network object using the input loss_fn and network.
+        Build the network object using the input loss_fn and network.
         """
         network = nn.WithLossCell(self._backbone_net, self._loss_fn)
         net_inputs = self._backbone_net.get_inputs()
@@ -173,30 +171,33 @@ class FLModel:
 
     def _build_optimizer(self):
         """
-        build the optimizer object using the info. parsed from the yaml file.
+        Build the optimizer object using the information parsed from the yaml file.
         """
         if self._yaml_data is None:
             raise AttributeError("yaml_data is required to build GrapOperation and Optimizer")
-        for optim_data in self._yaml_data['opts']:
+        for optim_data in self._yaml_data.opts:
             optim_inst = PartyOptimizer(optim_data, self._train_network, self._train_net_yaml)
             self._optimizers.append(optim_inst)
 
     def _build_grad_scaler(self):
         """
-        building the grad scale calulator of the leader/active party using the info. parsed from the yaml file.
+        Building the grad scale calulator of the party using the information parsed from the yaml file.
         """
-        if self._role == 'follower':
-            raise AttributeError('follower party cannot call _build_grad_scaler')
-        if 'grad_scalers' not in self._yaml_data:
-            raise ValueError('info of grad_scaler is not defined in the yaml')
         grad_scalers = []
-        for grad_scaler_yaml in self._yaml_data['grad_scalers']:
+        for grad_scaler_yaml in self._yaml_data.grad_scalers:
             grad_scalers.append(PartyGradScaler(grad_scaler_yaml, self._train_network, self._train_net_yaml))
         return grad_scalers
 
-    def eval_one_step(self, local_data_batch: dict = None, remote_data_batch: dict = None, eval_metric: Metric = None):
+    def eval_one_step(self, local_data_batch: dict = None, remote_data_batch: dict = None):
         """
-        evaluate the trained network using a data batch.
+        Evaluate the evaluation network using a data batch.
+
+        Args:
+            local_data_batch (dict): Data batch read from local server.
+            remote_data_batch (dict): Data batch read from remote server of other parties.
+
+        Returns:
+            Dict, outputs of the evaluation network. key is the name of output, value is tensors.
         """
         item_list = []
         if isinstance(local_data_batch, dict):
@@ -205,29 +206,36 @@ class FLModel:
             item_list.extend(remote_data_batch.items())
         data_batch = dict(item_list)
         input_data_batch = OrderedDict()
-        for input_data in self._eval_net_yaml['inputs']:
+        for input_data in self._yaml_data.eval_net_ins:
             if input_data['name'] in data_batch:
                 input_data_batch[input_data['name']] = data_batch[input_data['name']]
             else:
                 raise ValueError('missing input data \'%s\'' % input_data['name'])
         out_tuple = self._eval_network(**input_data_batch)
-        if len(self._eval_net_yaml['outputs']) != len(out_tuple):
+        if len(self._yaml_data.eval_net_outs) != len(out_tuple):
             raise ValueError('output of %s do not match the description of yaml' % self._eval_network.__name__)
-        if self._eval_net_yaml['gt'] not in data_batch:
-            raise ValueError('the label \'%s\'descripped in the yaml do not exist' % self._eval_net_yaml['gt'])
-        if eval_metric is None:
+        if self._yaml_data.eval_net_gt not in data_batch:
+            raise ValueError('the label \'%s\'descripped in the yaml do not exist' % self._yaml_data.eval_net_gt)
+        if self._metrics is None:
             raise ValueError('not specify eval_metric')
-        eval_metric.update(*out_tuple, data_batch[self._eval_net_yaml['gt']])
+        self._metrics.update(*out_tuple, data_batch[self._yaml_data.eval_net_gt])
         out = OrderedDict()
         idx = 0
-        for output_data in self._eval_net_yaml['outputs']:
+        for output_data in self._yaml_data.eval_net_outs:
             out[output_data['name']] = out_tuple[idx]
             idx += 1
         return out
 
     def forward_one_step(self, local_data_batch: dict = None, remote_data_batch: dict = None):
         """
-        forward the network using a data batch.
+        Forward the training network using a data batch.
+
+        Args:
+            local_data_batch (dict): Data batch read from local server.
+            remote_data_batch (dict): Data batch read from remote server of other parties.
+
+        Returns:
+            Dict, outputs of the training network. key is the name of output, value is the tensor.
         """
         item_list = []
         if isinstance(local_data_batch, dict):
@@ -236,29 +244,43 @@ class FLModel:
             item_list.extend(remote_data_batch.items())
         data_batch = dict(item_list)
         input_data_batch = OrderedDict()
-        for input_data in self._train_net_yaml['inputs']:
+        for input_data in self._yaml_data.train_net_ins:
             if input_data['name'] in data_batch:
                 input_data_batch[input_data['name']] = data_batch[input_data['name']]
             else:
                 raise ValueError("missing input data \'%s\'" % input_data['name'])
         input_data_batch = tuple(input_data_batch.values())
         out_tuple = self._train_network(*input_data_batch)
-        if len(self._train_net_yaml['outputs']) != len(out_tuple):
+        if len(self._yaml_data.train_net_outs) != len(out_tuple):
             raise ValueError(f'output of {self._train_network.__name__} do not match the description of yaml')
 
         out = OrderedDict()
-        for idx, output_data in enumerate(self._train_net_yaml['outputs']):
+        for idx, output_data in enumerate(self._yaml_data.train_net_outs):
             out[output_data['name']] = out_tuple[idx]
         return out
 
     def backward_one_step(self, local_data_batch: dict = None, remote_data_batch: dict = None, sens: dict = None):
         """
-        backward the network using a data batch.
+        Backward the training network using a data batch.
+
+        Args:
+            local_data_batch (dict): Data batch read from local server.
+            remote_data_batch (dict): Data batch read from remote server of other parties.
+            sens (dict): Sense parameters or scale values to calculate the gradient values of the traning network.
+            key is the label name specified in the yaml file. value is the dict of sense parameters or gradient scale
+            values. the key of the value dict is the name of the output of the training network, and the value of the
+            value dict is the sense tensor of corresponding output.
+
+        Returns:
+            Dict, sense parameters or gradient scale values sending to other parties. key is the label name specified
+            in the yaml file. value is the dict of sense parameters or gradient scale values. the key of the value dict
+            is the input of the training network, and the value of the value dict is the sense tensor of corresponding
+            input.
         """
         if self._role == 'leader' and self._label_dp is not None:
-            label = local_data_batch[self._yaml_data['model']['eval_net']['gt']]
+            label = local_data_batch[self._yaml_data.eval_net_gt]
             dp_label = self._label_dp(label)
-            local_data_batch[self._yaml_data['model']['eval_net']['gt']] = dp_label
+            local_data_batch[self._yaml_data.eval_net_gt] = dp_label
 
         if self._grad_network:
             return self._grad_network(local_data_batch, remote_data_batch)
@@ -274,13 +296,35 @@ class FLModel:
                 if isinstance(optimizer, PartyOptimizer):  # standard optimizer
                     optimizer(local_data_batch, remote_data_batch, sens)
                 else:  # customized optimizer
-                    input_names = [input_name['name'] for input_name in self._train_net_yaml['inputs']]
+                    input_names = [input_name['name'] for input_name in self._yaml_data.train_net_ins]
                     input_data_batch = _reorganize_input_data([local_data_batch, remote_data_batch],
                                                               input_names, type(optimizer).__name__)
                     input_data_batch = list(input_data_batch.values())
                     optimizer(*input_data_batch, sens=sens)
 
         if self._role == 'leader' and self._label_dp is not None:
-            local_data_batch[self._yaml_data['model']['eval_net']['gt']] = label
+            local_data_batch[self._yaml_data.eval_net_gt] = label
 
         return scales
+
+    def save_ckpt(self, path: str = None):
+        """
+        Save checkpoints of the training network.
+
+        Args:
+            path (str): Path to save the checkpoint. If not specified, using the ckpt_path specified in the
+                yaml file. Default: None.
+        """
+        print('save_ckpt to %s', path)
+
+    def load_ckpt(self, phrase: str = 'eval', path: str = None):
+        """
+        Load checkpoints for the training network and the evaluation network.
+
+        Args:
+            phrase (str): Load checkpoint to either training network (if set 'eval') or evaluation network (if set
+                'train').  Default: 'eval'.
+            path (str): Path to load the checkpoint. If not specified, using the ckpt_path specified in the
+                yaml file. Default: None.
+        """
+        print('load_ckpt to %s, %s', (phrase, path))

@@ -85,8 +85,8 @@ class PanguAlphaAdam(TrainOneStepWithLossScaleCell):
     def __init__(self, net, optim_inst, scale_update_cell, config, yaml_data) -> None:
         super(PanguAlphaAdam, self).__init__(net, optim_inst, scale_update_cell)
         self.net = net
-        self.optim_yaml = yaml_data['opts'][0]
-        self.net_yaml = yaml_data['model']['train_net']
+        self.optim_yaml = yaml_data.opts[0]
+        self.net_yaml = yaml_data.train_net
         self.weights = optim_inst.parameters
         self.optimizer = optim_inst
 
@@ -117,13 +117,7 @@ class PanguAlphaAdam(TrainOneStepWithLossScaleCell):
         self.enable_global_norm = True
         self.enable_offload = config.enable_offload
         self.clip_value = Tensor([1.0], dtype=mstype.float32)
-        # if config.enable_offload:
-        #     self.clip = GlobalNorm(self.weights, config)
-        # else:
-        #     self.clip = ClipByGlobalNorm(self.weights, config)
         self.cast = P.Cast()
-
-        # defined for clip
         self._init_clip_global_norm(self.weights, config)
 
     def _init_clip_global_norm(self, params, config, clip_norm=1.0):
@@ -186,7 +180,6 @@ class PanguAlphaAdam(TrainOneStepWithLossScaleCell):
             else:
                 zipped = zip(grads, grad_sum)
                 grad_sum = tuple(map(sum, zipped))
-                # del zipped
 
         clip_value = self.clip_value
         if self.enable_global_norm:
@@ -199,7 +192,6 @@ class PanguAlphaAdam(TrainOneStepWithLossScaleCell):
                 self.optimizer(grad_sum, clip_value)
             else:
                 self.optimizer(grad_sum)
-        # return loss, cond, scaling_sens
 
     def clip(self, grads):
         grads, global_norm_value = self.global_norm(grads)

@@ -99,8 +99,4 @@ dataset:
 hyper_parameters:
   epochs: 20
   batch_size: 16000
-  workers: 1
   is_eval: True
-network:
-  master_ip: 127.0.0.1:8082
-  peer_ip: 127.0.0.1:8081

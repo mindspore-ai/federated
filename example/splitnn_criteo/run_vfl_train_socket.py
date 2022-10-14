@@ -24,11 +24,11 @@ import itertools
 
 from mindspore import context
 
-from mindspore_federated import FLModel, vfl_utils
+from mindspore_federated import FLModel, FLYamlData, vfl_utils
 
 from run_vfl_train_local import construct_local_dataset
 from network_config import config
-from network.wide_and_deep import LeaderNet, LeaderLossNet, LeaderEvalNet, \
+from wide_and_deep import LeaderNet, LeaderLossNet, LeaderEvalNet, \
     FollowerNet, FollowerLossNet, AUCMetric
 
 
@@ -40,19 +40,17 @@ class LeaderThread(threading.Thread):
         self.socket.bind(('0.0.0.0', 6001))
         self.socket.listen(5)
 
-        leader_yaml_data, leader_fp = vfl_utils.parse_yaml_file(config.leader_yaml_path)
-        leader_fp.close()
+        leader_yaml_data = FLYamlData(config.leader_yaml_path)
         leader_base_net = LeaderNet(config)
         leader_train_net = LeaderLossNet(leader_base_net, config)
         leader_eval_net = LeaderEvalNet(leader_base_net)
-        eval_metric = AUCMetric()
+        self.eval_metric = AUCMetric()
         self.leader_fl_model = FLModel(role='leader',
+                                       yaml_data=leader_yaml_data,
                                        network=leader_base_net,
                                        train_network=leader_train_net,
-                                       metrics=eval_metric,
-                                       eval_network=leader_eval_net,
-                                       yaml_data=leader_yaml_data)
-        self.eval_metric = AUCMetric()
+                                       metrics=self.eval_metric,
+                                       eval_network=leader_eval_net)
         self.embedding_proto = vfl_utils.TensorListProto()
         self.grad_scale_proto = vfl_utils.TensorListProto()
 
@@ -85,15 +83,14 @@ class FollowerThread(threading.Thread):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect(('127.0.0.1', 6001))
 
-        follower_yaml_data, follower_fp = vfl_utils.parse_yaml_file('follower.yaml')
-        follower_fp.close()
+        follower_yaml_data = FLYamlData(config.follower_yaml_path)
         follower_eval_net = follower_base_net = FollowerNet(config)
         follower_train_net = FollowerLossNet(follower_base_net, config)
         self.follower_fl_model = FLModel(role='follower',
+                                         yaml_data=follower_yaml_data,
                                          network=follower_base_net,
                                          train_network=follower_train_net,
-                                         eval_network=follower_eval_net,
-                                         yaml_data=follower_yaml_data)
+                                         eval_network=follower_eval_net)
         self.embedding_proto = vfl_utils.TensorListProto()
         self.grad_scale_proto = vfl_utils.TensorListProto()
 

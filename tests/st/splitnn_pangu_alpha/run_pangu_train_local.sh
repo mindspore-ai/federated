@@ -23,6 +23,15 @@ WORKPATH=$(
   pwd
 )
 
+vocab_folder="./bpe_4w_pcl"
+if [ ! -d "$vocab_folder" ]; then
+  mkdir "$vocab_folder"
+fi
+vocab_model="./bpe_4w_pcl/vocab.model"
+if [ ! -f "$vocab_model" ]; then
+  wget -P ./bpe_4w_pcl https://git.openi.org.cn/PCL-Platform.Intelligence/PanGu-Alpha/src/branch/master/tokenizer/vocab.model --no-check-certificate
+fi
+
 export PYTHONPATH="${PYTHONPATH}:${WORKPATH}/../"
-echo "Start executing Wide&Deep splitnn demo."
+echo "Start executing pangu_alpha splitnn demo (standalone simulation mode)."
 python run_pangu_train_local.py
