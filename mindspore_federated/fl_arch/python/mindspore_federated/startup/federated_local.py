@@ -118,10 +118,10 @@ class Callback:
 
 class FLServerJob:
     """
-    Define federated server job.
+    Define Federated Learning cloud-side tasks.
 
     Args:
-        yaml_config (str): The yaml file path. more detail see `federated_server_yaml <https://gitee.com/mindspore/federated/blob/master/docs/federated_server_yaml.md>`_.
+        yaml_config (str): The yaml file path. More detail see `federated_server_yaml <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python_en/federated_server_yaml.md>`_.
         http_server_address (str): The http server address used for communicating.
         tcp_server_ip (str): The tcp server ip used for communicating. Default: "127.0.0.1".
         checkpoint_dir (str): Path of checkpoint. Default: "./fl_ckpt/".
@@ -159,7 +159,7 @@ class FLServerJob:
         """
         if callback is not None and not isinstance(callback, Callback):
             raise RuntimeError("Parameter 'callback' is expected to be instance of Callback when it's not None, but"
-                               f" got {type(callback)}")
+                               f" got {type(callback)}.")
         self.callback = callback
         feature_map = self._load_feature_map(feature_map)
         feature_list_cxx = []
@@ -179,7 +179,7 @@ class FLServerJob:
             try:
                 self.callback.after_started()
             except RuntimeError as e:
-                logger.warning(f"Catch exception when invoke callback after started: {str(e)}")
+                logger.warning(f"Catch exception when invoke callback after started: {str(e)}.")
 
     def before_stopped_callback(self):
         """
@@ -190,21 +190,22 @@ class FLServerJob:
             try:
                 self.callback.before_stopped()
             except RuntimeError as e:
-                logger.warning(f"Catch exception when invoke callback before stopped: {str(e)}")
+                logger.warning(f"Catch exception when invoke callback before stopped: {str(e)}.")
 
     def on_iteration_end_callback(self, feature_list, fl_name, instance_name, iteration_num,
                                   iteration_valid, iteration_reason):
         """
-        Define callback of iteration ending.
+        Define the callback function after the iteration ends.
 
         Args:
-            feature_list (list): Feature list.
-            fl_name (str): The name of current federated.
-            instance_name (str): The name of instance name.
-            iteration_valid (int): Value of valid iteration.
-            iteration_reason (str): Reason of iteration.
+            feature_list (list): Feature list. Default: None.
+            fl_name (str): The name of current federated learning.
+            instance_name (str): The name of current instance name.
+            iteration_num (int): The number of iterations.
+            iteration_valid (int): The number of iterations to enable validation.
+            iteration_reason (str): The reason for enabling verification.
         """
-        logger.info("on iteration end callback")
+        logger.info("on iteration end callback.")
         feature_map = {}
         checkpoint_file = ""
         if os.path.exists(self.checkpoint_dir):
@@ -218,7 +219,7 @@ class FLServerJob:
                                           iteration_num, iteration_valid, iteration_reason)
                 self.callback.on_iteration_end(context)
             except RuntimeError as e:
-                logger.warning(f"Catch exception when invoke callback on iteration end: {str(e)}")
+                logger.warning(f"Catch exception when invoke callback on iteration end: {str(e)}.")
 
     def _save_feature_map(self, feature_map, iteration_num):
         """
@@ -252,10 +253,10 @@ class FLServerJob:
             for _, _, ckpt_file in recovery_ckpt_file:
                 try:
                     feature_map_ckpt = load_ms_checkpoint(ckpt_file)
-                    logger.info(f"Load recovery checkpoint file {ckpt_file} successfully")
+                    logger.info(f"Load recovery checkpoint file {ckpt_file} successfully.")
                     break
                 except ValueError as e:
-                    logger.warning(f"Failed to load recovery checkpoint file {ckpt_file}: {str(e)}")
+                    logger.warning(f"Failed to load recovery checkpoint file {ckpt_file}: {str(e)}.")
                     continue
             if feature_map_ckpt is not None:
                 if not isinstance(feature_map, FeatureMap):
@@ -278,7 +279,7 @@ class FLServerJob:
                                f"when the type of parameter 'feature_map' is str.")
         raise RuntimeError(
             f"The parameter 'feature_map' is expected to be instance of dict(feature_name, feature_val), FeatureMap, "
-            f"or a checkpoint or mindir file path, but got '{type(feature_map)}'")
+            f"or a checkpoint or mindir file path, but got '{type(feature_map)}'.")
 
     def _get_current_recovery_ckpt_file(self):
         """
@@ -313,8 +314,8 @@ class FlSchedulerJob:
     Define federated scheduler job.
 
     Args:
-        yaml_config (str): The yaml file path.
-        manage_address (str): The address of manage.
+        yaml_config (str): The yaml file path. More detail see `federated_server_yaml <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python_en/federated_server_yaml.md>`_.
+        manage_address (str): The management address.
         ssl_config (Union(None, SSLConfig)): Config of ssl. Default: None.
     """
 

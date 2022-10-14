@@ -1,18 +1,18 @@
 云云联邦学习
 ================================
 
-.. py:class:: mindspore.FederatedLearningManager(model, sync_frequency, sync_type="fixed", **kwargs)
+.. py:class:: mindspore.FederatedLearningManager(yaml_config, model, sync_frequency, http_server_address="", data_size=1, sync_type='fixed', ssl_config=None, **kwargs)
 
     在训练过程中管理联邦学习。
 
     参数：
-        - **yaml_config** (str) - yaml文件路径。更多细节见 https://gitee.com/mindspore/federated/blob/master/docs/api/api_python/federated_server_yaml.md。
+        - **yaml_config** (str) - yaml文件路径。更多细节见 `yaml配置说明 <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python/federated_server_yaml.md>`_。
         - **model** (nn.Cell) - 一个用于联邦训练的模型。
         - **sync_frequency** (int) - 联邦学习中的参数同步频率。
-          需要注意在数据下沉模式中，频率的单位是epoch的数量。否则，频率的单位是step的数量。
+          需要注意在数据下沉模式中，频率的值等于epoch。否则，频率的值等于step。
           在自适应同步频率模式下为初始同步频率，在固定频率模式下为同步频率。
         - **http_server_address** (str) - 用于通信的http服务器地址。默认值：“”。
-        - **data_size** (int) - 需要向worker报告的数据量。默认为值：1。
+        - **data_size** (int) - 需要向worker报告的数据量。默认值：1。
         - **sync_type** (str) - 采用同步策略类型的参数。
           支持["fixed", "adaptive"]。默认值："fixed"。
           - fixed：参数的同步频率是固定的。
