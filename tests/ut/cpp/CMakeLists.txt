@@ -15,7 +15,6 @@ include_directories(${CMAKE_BINARY_DIR})
 MESSAGE("check  ut_test ${CMAKE_BINARY_DIR}")
 
 link_directories(${BUILD_PATH}/mindspore_federated/mindspore_federated/ccsrc)
-link_directories(${BUILD_PATH}/mindspore_federated/common/protos)
 
 file(GLOB_RECURSE MINDSPORE_FEDERATED_SRC_LIST RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
         "../../../mindspore_federated/fl_arch/ccsrc/armour/*.cc"
@@ -34,27 +33,10 @@ file(GLOB_RECURSE UT_SRCS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
 
 add_library(_ut_mindspore_federated_obj OBJECT ${MINDSPORE_FEDERATED_SRC_LIST})
 add_library(_ut_ut_obj OBJECT ${UT_SRCS})
-#add_dependencies(_ut_ut_obj engine-cache-server)
-
 
 set(ut_objects $<TARGET_OBJECTS:_ut_ut_obj> $<TARGET_OBJECTS:_ut_mindspore_federated_obj>)
 
 add_executable(ut_tests ${ut_objects})
-
-add_dependencies(ut_tests
-        mindspore_federated::ssl
-        mindspore_federated::crypto
-        mindspore_federated::protobuf
-        mindspore_federated::event
-        mindspore_federated::event_pthreads
-        mindspore_federated::event_core
-        mindspore_federated::event_openssl
-        mindspore_federated::glog
-        ${SECUREC_LIBRARY}
-        mindspore_federated::hiredis
-        mindspore_federated::hiredis_ssl
-        mindspore_federated::gtest
-        )
 
 target_link_libraries(ut_tests PRIVATE
         PROTO_SRC_LIB
@@ -72,5 +54,3 @@ target_link_libraries(ut_tests PRIVATE
         ${PYTHON_LIBRARIES} pthread util dl
         mindspore_federated::gtest
         )
-
-
