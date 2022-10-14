@@ -1,0 +1,78 @@
+role: follower
+model: # define the net of vFL party
+  train_net:
+    name: follower_loss_net
+    inputs:
+      - name: input_ids
+        source: local
+      - name: position_id
+        source: local
+      - name: attention_mask
+        source: local
+    outputs:
+      - name: embedding_table
+        destination: remote
+      - name: word_table
+        destination: remote
+      - name: position_id
+        destination: remote
+      - name: attention_mask
+        destination: remote
+  eval_net:
+    name: follower_net
+    inputs:
+      - name: input_ids
+        source: local
+      - name: position_id
+        source: local
+      - name: attention_mask
+        source: local
+    outputs:
+      - name: embedding_table
+        destination: remote
+opts: # define ms optimizer
+  - type: CustomizedAdam
+    grads:
+      - inputs:
+          - name: input_ids
+          - name: position_id
+          - name: attention_mask
+        output:
+          name: embedding_table
+          index: 0
+        sens: hidden_states
+        get_all: False
+        get_by_list: True
+        sens_param: True
+      - inputs:
+          - name: input_ids
+          - name: position_id
+          - name: attention_mask
+        output:
+          name: word_table
+          index: 1
+        sens: word_table
+        get_all: False
+        get_by_list: True
+        sens_param: True
+    params:
+      - name: word_embedding
+      - name: position_embedding
+    hyper_parameters:
+      learning_rate: 5.e-6
+      eps: 1.e-8
+      loss_scale: 1024.0
+dataset:
+  name: wiki
+  features:
+    - input_ids
+    - position_id
+    - attention_mask
+hyper_parameters:
+  epochs: 20
+  batch_size: 2
+  workers: 1
+  is_eval: False
+network:
+  master_ip: 127.0.0.1:8081
+  peer_ip: 127.0.0.1:8082
