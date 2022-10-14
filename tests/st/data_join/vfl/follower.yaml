@@ -10,7 +10,3 @@ shard_num: 1
 # psi config
 join_type: "psi"
 thread_num: 0
-
-# communicator config
-http_server_address: "127.0.0.1:9028"
-remote_server_address: "127.0.0.1:9027"

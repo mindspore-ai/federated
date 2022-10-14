@@ -37,19 +37,19 @@ void CreateAliceCheckProto(datajoin::AliceCheckProto *alice_check_proto, const p
 
 void CreatePlainDataProto(datajoin::PlainDataProto *plain_data_proto, const psi::PlainData &plain_data);
 
-psi::BobPb ParseBobPbProto(datajoin::BobPbProto bobPbProto);
+psi::BobPb ParseBobPbProto(const datajoin::BobPbProto &bobPbProto);
 
-psi::ClientPSIInit ParseClientPSIInitProto(datajoin::ClientPSIInitProto clientPSIInitProto);
+psi::ClientPSIInit ParseClientPSIInitProto(const datajoin::ClientPSIInitProto &clientPSIInitProto);
 
-psi::ServerPSIInit ParseServerPSIInitProto(datajoin::ServerPSIInitProto serverPSIInitProto);
+psi::ServerPSIInit ParseServerPSIInitProto(const datajoin::ServerPSIInitProto &serverPSIInitProto);
 
-psi::AlicePbaAndBF ParseAlicePbaAndBFProto(datajoin::AlicePbaAndBFProto alicePbaAndBFProto);
+psi::AlicePbaAndBF ParseAlicePbaAndBFProto(const datajoin::AlicePbaAndBFProto &alicePbaAndBFProto);
 
-psi::BobAlignResult ParseBobAlignResultProto(datajoin::BobAlignResultProto bobAlignResultProto);
+psi::BobAlignResult ParseBobAlignResultProto(const datajoin::BobAlignResultProto &bobAlignResultProto);
 
-psi::AliceCheck ParseAliceCheckProto(datajoin::AliceCheckProto aliceCheckProto);
+psi::AliceCheck ParseAliceCheckProto(const datajoin::AliceCheckProto &aliceCheckProto);
 
-psi::PlainData ParsePlainDataProto(datajoin::PlainDataProto plainDataProto);
+psi::PlainData ParsePlainDataProto(const datajoin::PlainDataProto &plainDataProto);
 }  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_FL_ARCH_CCSRC_VERTICAL_UTILS_PSI_UTILS_H_

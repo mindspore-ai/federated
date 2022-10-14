@@ -58,7 +58,7 @@ class FollowerTrainer:
             current_item = item
             follower_out = self.follower_fl_model.forward_one_step(item)
             embedding_data = tensor_utils.tensor_dict_to_tensor_list_pybind_obj(follower_out)
-            self.vertical_communicator.send("serverB", embedding_data)
+            self.vertical_communicator.send_tensors("serverB", tensor_list_item=embedding_data)
             receive_msg = self.vertical_communicator.receive("serverB")
             _, scale = tensor_utils.tensor_list_pybind_obj_to_tensor_dict(receive_msg)
             self.follower_fl_model.backward_one_step(item, sens=scale)

@@ -25,6 +25,7 @@
 #include "common/constants.h"
 #include "common/common.h"
 #include "common/core/yaml_config.h"
+#include "vertical/python/worker_config_py.h"
 
 namespace mindspore {
 namespace fl {
@@ -65,6 +66,9 @@ class MS_EXPORT VFLContext {
   void set_remote_server_address(const std::map<std::string, std::string> &remote_server_address);
   std::map<std::string, std::string> remote_server_address() const;
 
+  void set_worker_config(const WorkerConfigItemPy &worker_config);
+  WorkerConfigItemPy worker_config();
+
  private:
   VFLContext() = default;
 
@@ -83,8 +87,12 @@ class MS_EXPORT VFLContext {
   std::string server_password_;
   // http url prefix for http communication
   std::string http_url_prefix_;
+
   SslConfig ssl_config_;
+
   std::map<std::string, std::string> remote_server_address_;
+
+  WorkerConfigItemPy worker_config_;
 };
 }  // namespace fl
 }  // namespace mindspore

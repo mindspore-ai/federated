@@ -86,7 +86,9 @@ bool BobAlignResultCommunicator::Send(const std::string &target_server_name,
   CreateBobAlignResultProto(bob_align_result_proto_ptr.get(), BobAlignResult);
   std::string data = bob_align_result_proto_ptr->SerializeAsString();
   size_t data_size = data.size();
-  return SendMessage(target_server_name, data.c_str(), data_size, KBobAlignResultMsgType);
+  auto response_msg = SendMessage(target_server_name, data.c_str(), data_size, KBobAlignResultMsgType);
+  std::string response_data = response_msg == nullptr ? "" : reinterpret_cast<char *>(response_msg->data());
+  return response_data == std::to_string(ResponseElem::SUCCESS);
 }
 
 psi::BobAlignResult BobAlignResultCommunicator::Receive(const std::string &target_server_name) {

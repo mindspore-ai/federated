@@ -14,6 +14,7 @@
 # ============================================================================
 """Communicator client in data join."""
 from mindspore_federated._mindspore_federated import RunPSI
+from mindspore_federated.common import data_join_utils
 
 
 class _SimplifiedWorkerConfig:
@@ -24,12 +25,10 @@ class _SimplifiedWorkerConfig:
         self.shard_num = worker_config_dict["shard_num"]
 
 
-def request_params(http_server_address, remote_server_address):
+def request_params():
     """
     fake communication
     """
-    print("http_server_address:", http_server_address)
-    print("remote_server_address:", remote_server_address)
     import yaml
     import os
     while True:
@@ -55,20 +54,17 @@ class _DataJoinClient:
     Data join client.
     """
 
-    def __init__(self, worker_config):
+    def __init__(self, worker_config, vertical_communicator, worker_register):
         """
         Args:
             worker_config (_WorkerConfig): The config of worker.
         """
         self._worker_config = worker_config
+        self._worker_register = worker_register
+        self._vertical_communicator = vertical_communicator
+        self._target_server_name = vertical_communicator.remote_server_config().server_name
 
-    def wait_for_negotiated(self):
-        """
-        Negotiate hyper parameters with server.
-        """
-        return self._request_hyper_params()
-
-    def _request_hyper_params(self):
+    def launch(self):
         """
         Request and verify hyper parameters from server. Overwrite hyper parameters in local worker config.
 
@@ -81,14 +77,22 @@ class _DataJoinClient:
         Returns:
             - worker_config (_WorkerConfig): The config of worker.
         """
-        # TODO: send the above hyper parameters to client
-        http_server_address = self._worker_config.http_server_address
-        remote_server_address = self._worker_config.remote_server_address
-        worker_config = request_params(http_server_address, remote_server_address)
-        self._worker_config.primary_key = worker_config.primary_key
-        self._worker_config.bucket_num = worker_config.bucket_num
-        self._worker_config.shard_num = worker_config.shard_num
-        self._worker_config.join_type = worker_config.join_type
+        return self._register()
+
+    def _register(self):
+        """
+        Register to server worker.
+        """
+        worker_register_item_py = data_join_utils.worker_register_to_pybind_obj(self._worker_register)
+        worker_config_item_py = self._vertical_communicator.send_register(
+            self._target_server_name,
+            worker_register_item_py=worker_register_item_py)
+        primary_key, bucket_num, shard_num, join_type = \
+            data_join_utils.pybind_obj_to_worker_config(worker_config_item_py)
+        self._worker_config.primary_key = primary_key
+        self._worker_config.bucket_num = bucket_num
+        self._worker_config.shard_num = shard_num
+        self._worker_config.join_type = join_type
         return self._worker_config
 
     def join_func(self, input_vct, bucket_id):
@@ -98,19 +102,18 @@ class _DataJoinClient:
         Args:
             input_vct (list(str)): The keys need to be joined. The type of each key must be "str".
             bucket_id (int): The id of the bucket.
+            target_server_name (str): The target communicator server name:
 
         Returns:
             - intersection_keys (list(str)): The intersection keys.
 
         Raises:
             ValueError: If the join type is not supported.
+            :param target_server_name:
         """
         wait_util_server_psi_is_ready(bucket_id)
         if self._worker_config.join_type == "psi":
             thread_num = self._worker_config.thread_num
-            http_server_address = self._worker_config.http_server_address
-            remote_server_address = self._worker_config.remote_server_address
-            intersection_keys = RunPSI(input_vct, "client", http_server_address, remote_server_address,
-                                       thread_num, bucket_id)
+            intersection_keys = RunPSI(input_vct, "client", self._target_server_name, bucket_id, thread_num)
             return intersection_keys
         raise ValueError("join type: {} is not support currently".format(self._worker_config.join_type))

@@ -14,23 +14,8 @@
 # ============================================================================
 """Communicator server in data join."""
 from mindspore_federated._mindspore_federated import RunPSI
-
-
-def start_data_server(http_server_address, remote_server_address, worker_config):
-    """
-    fake communication
-    """
-    print("http_server_address:", http_server_address)
-    print("remote_server_address:", remote_server_address)
-    import yaml
-    worker_config_dict = {
-        "join_type": worker_config.join_type,
-        "bucket_num": worker_config.bucket_num,
-        "primary_key": worker_config.primary_key,
-        "shard_num": worker_config.shard_num,
-    }
-    with open("server_psi_yaml.yaml", "w") as f:
-        yaml.safe_dump(data=worker_config_dict, stream=f)
+from mindspore_federated._mindspore_federated import VFLContext
+from mindspore_federated.common import data_join_utils
 
 
 def server_psi_is_ready(bucket_id):
@@ -43,20 +28,27 @@ class _DataJoinServer:
     Data join server.
     """
 
-    def __init__(self, worker_config):
+    def __init__(self, worker_config, vertical_communicator):
         """
         Args:
             worker_config (_WorkerConfig): The config of worker.
+            target_server_name (str): The target communicator server name.
         """
         self._worker_config = worker_config
+        self._vertical_communicator = vertical_communicator
+        self._target_server_name = vertical_communicator.remote_server_config().server_name
 
-    def wait_for_negotiated(self):
+        ctx = VFLContext.get_instance()
+        worker_config_item_py = data_join_utils.worker_config_to_pybind_obj(self._worker_config)
+        ctx.set_worker_config(worker_config_item_py)
+
+    def launch(self):
         """
         Negotiate hyper parameters with client.
         """
-        return self._start()
+        return self._wait_for_negotiated()
 
-    def _start(self):
+    def _wait_for_negotiated(self):
         """
         Wait for hyper parameters request from client.
 
@@ -69,11 +61,7 @@ class _DataJoinServer:
         Returns:
             - worker_config (_WorkerConfig): The config of worker.
         """
-        # TODO: send the above hyper parameters to client
-        http_server_address = self._worker_config.http_server_address
-        remote_server_address = self._worker_config.remote_server_address
-        start_data_server(http_server_address, remote_server_address, self._worker_config)
-        return self._worker_config
+        return self._vertical_communicator.data_join_wait_for_start()
 
     def join_func(self, input_vct, bucket_id):
         """
@@ -82,6 +70,7 @@ class _DataJoinServer:
         Args:
             input_vct (list(str)): The keys need to be joined. The type of each key must be "str".
             bucket_id (int): The id of the bucket.
+            target_server_name (str): The target communicator server name.
 
         Returns:
             - intersection_keys (list(str)): The intersection keys.
@@ -92,9 +81,6 @@ class _DataJoinServer:
         server_psi_is_ready(bucket_id)
         if self._worker_config.join_type == "psi":
             thread_num = self._worker_config.thread_num
-            http_server_address = self._worker_config.http_server_address
-            remote_server_address = self._worker_config.remote_server_address
-            intersection_keys = RunPSI(input_vct, "server", http_server_address, remote_server_address,
-                                       thread_num, bucket_id)
+            intersection_keys = RunPSI(input_vct, "server", self._target_server_name, bucket_id, thread_num)
             return intersection_keys
         raise ValueError("join type: {} is not support currently".format(self._worker_config.join_type))

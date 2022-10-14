@@ -86,7 +86,7 @@ void CreatePlainDataProto(datajoin::PlainDataProto *plain_data_proto, const psi:
   plain_data_proto->set_msg(plain_data.msg());
 }
 
-psi::BobPb ParseBobPbProto(datajoin::BobPbProto bobPbProto) {
+psi::BobPb ParseBobPbProto(const datajoin::BobPbProto &bobPbProto) {
   psi::BobPb bobPb;
   bobPb.set_bin_id(bobPbProto.bin_id());
   std::vector<std::string> p_b_vct;
@@ -95,33 +95,30 @@ psi::BobPb ParseBobPbProto(datajoin::BobPbProto bobPbProto) {
     p_b_vct.push_back(bobPbProto.p_b_vct(i));
   }
   bobPb.set_p_b_vct(p_b_vct);
-  MS_LOG(INFO) << "(bob_p_b) bin_id is " << bobPb.bin_id()
-               << ", vector size is " << bobPb.p_b_vct().size();
+  MS_LOG(INFO) << "(bob_p_b) bin_id is " << bobPb.bin_id() << ", vector size is " << bobPb.p_b_vct().size();
   return bobPb;
 }
 
-psi::ClientPSIInit ParseClientPSIInitProto(datajoin::ClientPSIInitProto clientPSIInitProto) {
+psi::ClientPSIInit ParseClientPSIInitProto(const datajoin::ClientPSIInitProto &clientPSIInitProto) {
   psi::ClientPSIInit clientPSIInit;
   clientPSIInit.set_bin_id(clientPSIInitProto.bin_id());
   clientPSIInit.set_psi_type(clientPSIInitProto.psi_type());
   clientPSIInit.set_self_size(clientPSIInitProto.self_size());
-  MS_LOG(INFO) << "(client_psi_init) bin_id is " << clientPSIInit.bin_id()
-               << ", psi_type is " << clientPSIInit.psi_type()
-               << ", self_size is " << clientPSIInit.self_size();
+  MS_LOG(INFO) << "(client_psi_init) bin_id is " << clientPSIInit.bin_id() << ", psi_type is "
+               << clientPSIInit.psi_type() << ", self_size is " << clientPSIInit.self_size();
   return clientPSIInit;
 }
-psi::ServerPSIInit ParseServerPSIInitProto(datajoin::ServerPSIInitProto serverPSIInitProto) {
+psi::ServerPSIInit ParseServerPSIInitProto(const datajoin::ServerPSIInitProto &serverPSIInitProto) {
   psi::ServerPSIInit serverPSIInit;
   serverPSIInit.set_bin_id(serverPSIInitProto.bin_id());
   serverPSIInit.set_self_size(serverPSIInitProto.self_size());
   serverPSIInit.set_self_role(serverPSIInitProto.self_role());
-  MS_LOG(INFO) << "(server_psi_init) bin_id is " << serverPSIInit.bin_id()
-               << ", self_size is " << serverPSIInit.self_size()
-               << ", self_role is " << serverPSIInit.self_role();
+  MS_LOG(INFO) << "(server_psi_init) bin_id is " << serverPSIInit.bin_id() << ", self_size is "
+               << serverPSIInit.self_size() << ", self_role is " << serverPSIInit.self_role();
   return serverPSIInit;
 }
 
-psi::AlicePbaAndBF ParseAlicePbaAndBFProto(datajoin::AlicePbaAndBFProto alicePbaAndBFProto) {
+psi::AlicePbaAndBF ParseAlicePbaAndBFProto(const datajoin::AlicePbaAndBFProto &alicePbaAndBFProto) {
   psi::AlicePbaAndBF alicePbaAndBF;
   alicePbaAndBF.set_bin_id(alicePbaAndBFProto.bin_id());
   std::vector<std::string> p_b_vct;
@@ -131,13 +128,12 @@ psi::AlicePbaAndBF ParseAlicePbaAndBFProto(datajoin::AlicePbaAndBFProto alicePba
   }
   alicePbaAndBF.set_p_b_a_vct(p_b_vct);
   alicePbaAndBF.set_bf_alice(alicePbaAndBFProto.bf_alice());
-  MS_LOG(INFO) << "(alice_pba_bf) bin_id is " << alicePbaAndBF.bin_id()
-               << ", alice_p_b_a size is " << alicePbaAndBF.p_b_a_vct().size()
-               << ", bf_alice size is " << alicePbaAndBF.bf_alice().size();
+  MS_LOG(INFO) << "(alice_pba_bf) bin_id is " << alicePbaAndBF.bin_id() << ", alice_p_b_a size is "
+               << alicePbaAndBF.p_b_a_vct().size() << ", bf_alice size is " << alicePbaAndBF.bf_alice().size();
   return alicePbaAndBF;
 }
 
-psi::BobAlignResult ParseBobAlignResultProto(datajoin::BobAlignResultProto bobAlignResultProto) {
+psi::BobAlignResult ParseBobAlignResultProto(const datajoin::BobAlignResultProto &bobAlignResultProto) {
   psi::BobAlignResult bobAlignResult;
   bobAlignResult.set_bin_id(bobAlignResultProto.bin_id());
   std::vector<std::string> align_result;
@@ -146,12 +142,12 @@ psi::BobAlignResult ParseBobAlignResultProto(datajoin::BobAlignResultProto bobAl
     align_result.push_back(bobAlignResultProto.align_result(i));
   }
   bobAlignResult.set_align_result(align_result);
-  MS_LOG(INFO) << "(bob_align_result), bin_id is " << bobAlignResult.bin_id()
-               << ", vector size is " << bobAlignResult.align_result().size();
+  MS_LOG(INFO) << "(bob_align_result), bin_id is " << bobAlignResult.bin_id() << ", vector size is "
+               << bobAlignResult.align_result().size();
   return bobAlignResult;
 }
 
-psi::AliceCheck ParseAliceCheckProto(datajoin::AliceCheckProto aliceCheckProto) {
+psi::AliceCheck ParseAliceCheckProto(const datajoin::AliceCheckProto &aliceCheckProto) {
   psi::AliceCheck aliceCheck;
   aliceCheck.set_bin_id(aliceCheckProto.bin_id());
   aliceCheck.set_wrong_num(aliceCheckProto.wrong_num());
@@ -161,12 +157,12 @@ psi::AliceCheck ParseAliceCheckProto(datajoin::AliceCheckProto aliceCheckProto) 
     wrong_id_vct.push_back(aliceCheckProto.wrong_id(i));
   }
   aliceCheck.set_wrong_id(wrong_id_vct);
-  MS_LOG(INFO) << "(alice_check) bin_id is " << aliceCheck.bin_id()
-               << ", wrong_id size is " << aliceCheck.wrong_id().size();
+  MS_LOG(INFO) << "(alice_check) bin_id is " << aliceCheck.bin_id() << ", wrong_id size is "
+               << aliceCheck.wrong_id().size();
   return aliceCheck;
 }
 
-psi::PlainData ParsePlainDataProto(datajoin::PlainDataProto plainDataProto) {
+psi::PlainData ParsePlainDataProto(const datajoin::PlainDataProto &plainDataProto) {
   psi::PlainData plainData;
   plainData.set_bin_id(plainDataProto.bin_id());
   std::vector<std::string> plain_data_vct;
@@ -176,9 +172,8 @@ psi::PlainData ParsePlainDataProto(datajoin::PlainDataProto plainDataProto) {
   }
   plainData.set_plain_data_vct(plain_data_vct);
   plainData.set_msg(plainDataProto.msg());
-  MS_LOG(INFO) << "(plain_data) bin_id is " << plainData.bin_id()
-               << ", vector size is " << plainData.plain_data_vct().size()
-               << ", message: " << plainData.msg();
+  MS_LOG(INFO) << "(plain_data) bin_id is " << plainData.bin_id() << ", vector size is "
+               << plainData.plain_data_vct().size() << ", message: " << plainData.msg();
   return plainData;
 }
 }  // namespace fl

@@ -40,75 +40,7 @@ using StartFLJobKernelMod = mindspore::fl::worker::kernel::StartFLJobKernelMod;
 namespace mindspore {
 namespace fl {
 // Interface with python
-void InitVFLContext(const py::module &m) {
-  (void)py::class_<VFLContext, std::shared_ptr<VFLContext>>(m, "VFLContext")
-    .def_static("get_instance", &VFLContext::instance, "Get fl context instance.")
-    .def("set_http_server_address", &VFLContext::set_http_server_address, "Set federated learning http server address.")
-    .def("http_server_address", &VFLContext::http_server_address, "Get federated learning http server address.")
-    .def("set_http_server_name", &VFLContext::set_http_server_name, "Set federated learning http server name.")
-    .def("http_server_name", &VFLContext::http_server_name, "Get federated learning http server name.")
-    .def("set_remote_server_address", &VFLContext::set_remote_server_address,
-         "Set vertical federated learning remote server address.")
-    .def("remote_server_address", &VFLContext::remote_server_address, "Get federated learning remote server address.")
-    .def("http_server_address", &VFLContext::http_server_address, "Get federated learning http server address.")
-    .def("set_enable_ssl", &VFLContext::set_enable_ssl, "Set PS SSL mode enabled or disabled.")
-    .def("enable_ssl", &VFLContext::enable_ssl, "Get PS SSL mode enabled or disabled.")
-    .def("set_client_password", &VFLContext::set_client_password, "Set the client password to decode the p12 file.")
-    .def("client_password", &VFLContext::client_password, "Get the client password to decode the p12 file.")
-    .def("set_server_password", &VFLContext::set_server_password, "Set the server password to decode the p12 file.")
-    .def("server_password", &VFLContext::server_password, "Get the server password to decode the p12 file.")
-    .def("http_url_prefix", &VFLContext::http_url_prefix, "http url prefix for http communication.")
-    .def("load_yaml_config", &VFLContext::LoadYamlConfig, "Load yaml config");
-}
-
-void InitTensorItemPy(const py::module &m) {
-  (void)py::class_<TensorItemPy, std::shared_ptr<TensorItemPy>>(m, "TensorItem_")
-    .def(py::init<>())
-    .def("set_name", &TensorItemPy::set_name, "Set name.")
-    .def("set_ref_key", &TensorItemPy::set_ref_key, "Get tensors.")
-    .def("set_shape", &TensorItemPy::set_shape, "Set shape.")
-    .def("set_dtype", &TensorItemPy::set_dtype, "Set dtype.")
-    .def("set_data", &TensorItemPy::set_data, "Set data.")
-    .def("name", &TensorItemPy::name, "Get name.")
-    .def("ref_key", &TensorItemPy::ref_key, "Get ref_key.")
-    .def("shape", &TensorItemPy::shape, "Get shape.")
-    .def("dtype", &TensorItemPy::dtype, "Get dtype.")
-    .def("data", &TensorItemPy::data, "Get data.");
-}
-
-void InitTensorListItemPy(const py::module &m) {
-  (void)py::class_<TensorListItemPy, std::shared_ptr<TensorListItemPy>>(m, "TensorListItem_")
-    .def(py::init<>())
-    .def(py::init<const std::string &, const std::vector<TensorItemPy> &, const std::vector<TensorListItemPy> &>())
-    .def("name", &TensorListItemPy::name, "Get tensor list name.")
-    .def("tensors", &TensorListItemPy::tensors, "Get tensors.")
-    .def("tensorListItems", &TensorListItemPy::tensorListItems, "Get tensorListItems.")
-    .def("set_name", &TensorListItemPy::set_name, "Set name.")
-    .def("add_tensor", &TensorListItemPy::add_tensor, "Add tensor.")
-    .def("add_tensor_list_item", &TensorListItemPy::add_tensor_list_item, "Add tensor list item.");
-}
-
-// cppcheck-suppress syntaxError
-PYBIND11_MODULE(_mindspore_federated, m) {
-  m.def("_RunPSIDemo", &mindspore::fl::psi::RunPSIDemo, "run psi demo", py::arg("alice_list"), py::arg("bob_list"),
-        py::arg("thread_num"));
-  m.def("RunPSI", &mindspore::fl::psi::RunPSI, "run psi with communication", py::arg("input_list"),
-        py::arg("comm_role"), py::arg("peer_comm_role"), py::arg("bucket_id"), py::arg("thread_num"));
-  m.def("PlainIntersection", &mindspore::fl::psi::PlainIntersection, "plain intersection with communication",
-        py::arg("input_list"), py::arg("comm_role"), py::arg("peer_comm_role"), py::arg("bucket_id"),
-        py::arg("thread_num"));
-
-  (void)py::class_<FederatedJob, std::shared_ptr<FederatedJob>>(m, "Federated_")
-    .def_static("start_federated_server", &FederatedJob::StartFederatedServer)
-    .def_static("start_federated_scheduler", &FederatedJob::StartFederatedScheduler)
-    .def_static("init_federated_worker", &FederatedJob::InitFederatedWorker)
-    .def_static("stop_federated_worker", &FederatedJob::StopFederatedWorker)
-    .def_static("start_fl_job", &FederatedJob::StartFLJob)
-    .def_static("update_and_get_model", &FederatedJob::UpdateAndGetModel)
-    .def_static("pull_weight", &FederatedJob::PullWeight)
-    .def_static("push_weight", &FederatedJob::PushWeight)
-    .def_static("push_metrics", &FederatedJob::PushMetrics);
-
+void InitFLContext(const py::module &m) {
   (void)py::class_<FLContext, std::shared_ptr<FLContext>>(m, "FLContext")
     .def_static("get_instance", &FLContext::instance, "Get fl context instance.")
     .def("reset", &FLContext::Reset, "Reset fl context attributes.")
@@ -153,6 +85,99 @@ PYBIND11_MODULE(_mindspore_federated, m) {
     .def("participation_time_level", &FLContext::participation_time_level, "Get participation time level.")
     .def("continuous_failure_times", &FLContext::continuous_failure_times, "Get continuous failure times.")
     .def("load_yaml_config", &FLContext::LoadYamlConfig, "Load yaml config");
+}
+
+void InitVFLContext(const py::module &m) {
+  (void)py::class_<VFLContext, std::shared_ptr<VFLContext>>(m, "VFLContext")
+    .def_static("get_instance", &VFLContext::instance, "Get fl context instance.")
+    .def("set_http_server_address", &VFLContext::set_http_server_address, "Set federated learning http server address.")
+    .def("http_server_address", &VFLContext::http_server_address, "Get federated learning http server address.")
+    .def("set_http_server_name", &VFLContext::set_http_server_name, "Set federated learning http server name.")
+    .def("http_server_name", &VFLContext::http_server_name, "Get federated learning http server name.")
+    .def("set_remote_server_address", &VFLContext::set_remote_server_address,
+         "Set vertical federated learning remote server address.")
+    .def("remote_server_address", &VFLContext::remote_server_address, "Get federated learning remote server address.")
+    .def("http_server_address", &VFLContext::http_server_address, "Get federated learning http server address.")
+    .def("set_enable_ssl", &VFLContext::set_enable_ssl, "Set PS SSL mode enabled or disabled.")
+    .def("enable_ssl", &VFLContext::enable_ssl, "Get PS SSL mode enabled or disabled.")
+    .def("set_client_password", &VFLContext::set_client_password, "Set the client password to decode the p12 file.")
+    .def("client_password", &VFLContext::client_password, "Get the client password to decode the p12 file.")
+    .def("set_server_password", &VFLContext::set_server_password, "Set the server password to decode the p12 file.")
+    .def("server_password", &VFLContext::server_password, "Get the server password to decode the p12 file.")
+    .def("http_url_prefix", &VFLContext::http_url_prefix, "http url prefix for http communication.")
+    .def("load_yaml_config", &VFLContext::LoadYamlConfig, "Load yaml config")
+    .def("set_worker_config", &VFLContext::set_worker_config, "Set data join worker config.")
+    .def("worker_config", &VFLContext::worker_config, "Get data join worker config.");
+}
+
+void InitTensorItemPy(const py::module &m) {
+  (void)py::class_<TensorItemPy, std::shared_ptr<TensorItemPy>>(m, "TensorItem_")
+    .def(py::init<>())
+    .def("set_name", &TensorItemPy::set_name, "Set name.")
+    .def("set_ref_key", &TensorItemPy::set_ref_key, "Get tensors.")
+    .def("set_shape", &TensorItemPy::set_shape, "Set shape.")
+    .def("set_dtype", &TensorItemPy::set_dtype, "Set dtype.")
+    .def("set_data", &TensorItemPy::set_data, "Set data.")
+    .def("name", &TensorItemPy::name, "Get name.")
+    .def("ref_key", &TensorItemPy::ref_key, "Get ref_key.")
+    .def("shape", &TensorItemPy::shape, "Get shape.")
+    .def("dtype", &TensorItemPy::dtype, "Get dtype.")
+    .def("data", &TensorItemPy::data, "Get data.");
+}
+
+void InitTensorListItemPy(const py::module &m) {
+  (void)py::class_<TensorListItemPy, std::shared_ptr<TensorListItemPy>>(m, "TensorListItem_")
+    .def(py::init<>())
+    .def(py::init<const std::string &, const std::vector<TensorItemPy> &, const std::vector<TensorListItemPy> &>())
+    .def("name", &TensorListItemPy::name, "Get tensor list name.")
+    .def("tensors", &TensorListItemPy::tensors, "Get tensors.")
+    .def("tensorListItems", &TensorListItemPy::tensorListItems, "Get tensorListItems.")
+    .def("set_name", &TensorListItemPy::set_name, "Set name.")
+    .def("add_tensor", &TensorListItemPy::add_tensor, "Add tensor.")
+    .def("add_tensor_list_item", &TensorListItemPy::add_tensor_list_item, "Add tensor list item.");
+}
+
+void InitWorkerConfigItemPy(const py::module &m) {
+  (void)py::class_<WorkerConfigItemPy, std::shared_ptr<WorkerConfigItemPy>>(m, "WorkerConfigItemPy_")
+    .def(py::init<>())
+    .def("primary_key", &WorkerConfigItemPy::primary_key, "Get primary key.")
+    .def("bucket_num", &WorkerConfigItemPy::bucket_num, "Get bucket num.")
+    .def("shard_num", &WorkerConfigItemPy::shard_num, "Get shard num.")
+    .def("join_type", &WorkerConfigItemPy::join_type, "Set join type.")
+    .def("set_primary_key", &WorkerConfigItemPy::set_primary_key, "Set primary key.")
+    .def("set_bucket_num", &WorkerConfigItemPy::set_bucket_num, "Set bucket num.")
+    .def("set_shard_num", &WorkerConfigItemPy::set_shard_num, "Set shard num.")
+    .def("set_join_type", &WorkerConfigItemPy::set_join_type, "Set join type.");
+}
+
+void InitWorkerRegisterItemPy(const py::module &m) {
+  (void)py::class_<WorkerRegisterItemPy, std::shared_ptr<WorkerRegisterItemPy>>(m, "WorkerRegisterItemPy_")
+    .def(py::init<>())
+    .def("worker_name", &WorkerRegisterItemPy::worker_name, "Get worker name.")
+    .def("set_worker_name", &WorkerRegisterItemPy::set_worker_name, "Set worker name.");
+}
+
+// cppcheck-suppress syntaxError
+PYBIND11_MODULE(_mindspore_federated, m) {
+  m.def("_RunPSIDemo", &mindspore::fl::psi::RunPSIDemo, "run psi demo", py::arg("alice_list"), py::arg("bob_list"),
+        py::arg("thread_num"));
+  m.def("RunPSI", &mindspore::fl::psi::RunPSI, "run psi with communication", py::arg("input_list"),
+        py::arg("comm_role"), py::arg("peer_comm_role"), py::arg("bucket_id"), py::arg("thread_num"));
+  m.def("PlainIntersection", &mindspore::fl::psi::PlainIntersection, "plain intersection with communication",
+        py::arg("input_list"), py::arg("comm_role"), py::arg("peer_comm_role"), py::arg("bucket_id"),
+        py::arg("thread_num"));
+
+  (void)py::class_<FederatedJob, std::shared_ptr<FederatedJob>>(m, "Federated_")
+    .def_static("start_federated_server", &FederatedJob::StartFederatedServer)
+    .def_static("start_federated_scheduler", &FederatedJob::StartFederatedScheduler)
+    .def_static("init_federated_worker", &FederatedJob::InitFederatedWorker)
+    .def_static("stop_federated_worker", &FederatedJob::StopFederatedWorker)
+    .def_static("start_fl_job", &FederatedJob::StartFLJob)
+    .def_static("update_and_get_model", &FederatedJob::UpdateAndGetModel)
+    .def_static("pull_weight", &FederatedJob::PullWeight)
+    .def_static("push_weight", &FederatedJob::PushWeight)
+    .def_static("push_metrics", &FederatedJob::PushMetrics);
+
 
   (void)py::class_<FeatureItemPy, std::shared_ptr<FeatureItemPy>>(m, "FeatureItem_")
     .def(py::init<const std::string &, const py::array &, const std::vector<size_t> &, const std::string &, bool>())
@@ -190,12 +215,17 @@ PYBIND11_MODULE(_mindspore_federated, m) {
 
   (void)py::class_<VerticalFederatedJob, std::shared_ptr<VerticalFederatedJob>>(m, "VerticalFederated_")
     .def_static("start_vertical_communicator", &VerticalFederatedJob::StartVerticalCommunicator)
-    .def_static("send", &VerticalFederatedJob::Send)
+    .def_static("send_tensor_list", &VerticalFederatedJob::SendTensorList)
+    .def_static("send_worker_register", &VerticalFederatedJob::SendWorkerRegister)
+    .def_static("data_join_wait_for_start", &VerticalFederatedJob::DataJoinWaitForStart)
     .def_static("receive", &VerticalFederatedJob::Receive);
 
+  InitFLContext(m);
   InitVFLContext(m);
   InitTensorItemPy(m);
   InitTensorListItemPy(m);
+  InitWorkerConfigItemPy(m);
+  InitWorkerRegisterItemPy(m);
 }
 }  // namespace fl
 }  // namespace mindspore

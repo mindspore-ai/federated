@@ -56,8 +56,8 @@ class AbstractCommunicator : public AbstractNode {
 
   void InitHttpClient();
 
-  bool SendMessage(const std::string &target_server_name, const void *data, size_t data_size,
-                   const std::string &msg_type);
+  std::shared_ptr<std::vector<unsigned char>> SendMessage(const std::string &target_server_name, const void *data,
+                                                          size_t data_size, const std::string &msg_type);
 
   std::string name() const;
 

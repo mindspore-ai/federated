@@ -86,7 +86,9 @@ bool PlainDataCommunicator::Send(const std::string &target_server_name, const ps
   CreatePlainDataProto(plain_proto_ptr.get(), plain_data);
   std::string data = plain_proto_ptr->SerializeAsString();
   size_t data_size = data.size();
-  return SendMessage(target_server_name, data.c_str(), data_size, KPlainDataMsgType);
+  auto response_msg = SendMessage(target_server_name, data.c_str(), data_size, KPlainDataMsgType);
+  std::string response_data = response_msg == nullptr ? "" : reinterpret_cast<char *>(response_msg->data());
+  return response_data == std::to_string(ResponseElem::SUCCESS);
 }
 
 psi::PlainData PlainDataCommunicator::Receive(const std::string &target_server_name) {

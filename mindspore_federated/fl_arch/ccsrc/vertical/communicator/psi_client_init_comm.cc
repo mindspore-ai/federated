@@ -86,7 +86,9 @@ bool ClientPSIInitCommunicator::Send(const std::string &target_server_name, cons
   std::string data = client_psi_init_proto_ptr->SerializeAsString();
   size_t data_size = data.size();
   MS_LOG(INFO) << "Send clientPSIInitProto size is " << data_size;
-  return SendMessage(target_server_name, data.c_str(), data_size, KClientPSIInitMsgType);
+  auto response_msg = SendMessage(target_server_name, data.c_str(), data_size, KClientPSIInitMsgType);
+  std::string response_data = response_msg == nullptr ? "" : reinterpret_cast<char *>(response_msg->data());
+  return response_data == std::to_string(ResponseElem::SUCCESS);
 }
 
 psi::ClientPSIInit ClientPSIInitCommunicator::Receive(const std::string &target_server_name) {

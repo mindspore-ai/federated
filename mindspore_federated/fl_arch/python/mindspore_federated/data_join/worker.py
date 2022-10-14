@@ -18,55 +18,16 @@ import os
 import yaml
 import mmh3
 from mindspore._checkparam import Validator, Rel
+from mindspore_federated.data_join.server import _DataJoinServer
+from mindspore_federated.data_join.client import _DataJoinClient
+from mindspore_federated.data_join.context import _WorkerRegister, _WorkerConfig
+from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig
 from .io import export_mindrecord
-from .communicator import _DataJoinServer, _DataJoinClient
 
 SUPPORT_JOIN_TYPES = ("psi",)
 SUPPORT_STORE_TYPES = ("csv",)
 SUPPORT_TYPES = ("int32", "int64", "float32", "float64", "string", "bytes")
 SUPPORT_ARRAY_TYPES = ("int32", "int64", "float32", "float64")
-
-
-class _WorkerConfig:
-    """
-    Config of worker.
-
-    Args:
-        worker_config_path (str): The config path. The content of the file corresponding to the path must be in the
-            YAML format.
-
-    Attribute:
-        main_table_files (Union(list(str), str): The raw data paths.
-        output_dir (str): The output directory.
-        join_type (str): The data join type. Default: "psi".
-        bucket_num (int): The number of buckets. Default: 1.
-        store_type (str): The data store type. Default: "csv".
-        primary_key (str): The primary key. Default: "oaid".
-        http_server_address (str): The address of local address. Default: "127.0.0.1:8080".
-        remote_server_address (str): The address of remote address. Default: "127.0.0.1:18080".
-        thread_num (int): The thread number of psi. The prefix of output file name. Default: 0.
-        shard_num (int): The output number of each bucket when export. Default: 1.
-    """
-
-    def __init__(self, worker_config_path):
-        with open(worker_config_path, "r") as f:
-            worker_config_dict = yaml.load(f, yaml.Loader)
-        if "main_table_files" in worker_config_dict:
-            self.main_table_files = worker_config_dict.get("main_table_files")
-        else:
-            raise ValueError("main_table_files must be in worker_config")
-        if "output_dir" in worker_config_dict:
-            self.output_dir = worker_config_dict.get("output_dir")
-        else:
-            raise ValueError("output_dir must be in worker_config")
-        self.join_type = worker_config_dict.get("join_type", "psi")
-        self.bucket_num = worker_config_dict.get("bucket_num", 1)
-        self.store_type = worker_config_dict.get("store_type", "csv")
-        self.primary_key = worker_config_dict.get("primary_key", "oaid")
-        self.http_server_address = worker_config_dict.get("http_server_address", "127.0.0.1:8080")
-        self.remote_server_address = worker_config_dict.get("remote_server_address", "127.0.0.1:18080")
-        self.thread_num = worker_config_dict.get("thread_num", 0)
-        self.shard_num = worker_config_dict.get("shard_num", 1)
 
 
 def _check_str(arg_value, arg_name=None, prim_name=None):
@@ -114,6 +75,8 @@ class FLDataWorker:
                  role,
                  worker_config_path,
                  data_schema_path,
+                 server_address,
+                 peer_server_address
                  ):
         """
         Data join worker.
@@ -126,16 +89,31 @@ class FLDataWorker:
         self._role = role
         self._worker_config = _WorkerConfig(worker_config_path)
         self._data_schema_path = data_schema_path
+        if self._role == "leader":
+            server_name = "server"
+            peer_server_name = "client"
+        elif self._role == "follower":
+            server_name = "client"
+            peer_server_name = "server"
+        http_server_config = ServerConfig(server_name=server_name, server_address=server_address)
+        remote_server_config = ServerConfig(server_name=peer_server_name, server_address=peer_server_address)
+        vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+                                                              remote_server_config=remote_server_config)
+        self._vertical_communicator = vertical_communicator
+        vertical_communicator.launch()
+
         with open(self._data_schema_path, "r") as f:
             self._schema = yaml.load(f, yaml.Loader)
         self._verify()
         if role == "leader":
-            self.communicator = _DataJoinServer(self._worker_config)
+            self.data_join_obj = _DataJoinServer(self._worker_config, self._vertical_communicator)
+            self.data_join_obj.launch()
         elif role == "follower":
-            self.communicator = _DataJoinClient(self._worker_config)
+            worker_register = _WorkerRegister(self._role)
+            self.data_join_obj = _DataJoinClient(self._worker_config, self._vertical_communicator, worker_register)
+            self._worker_config = self.data_join_obj.launch()
         else:
             raise ValueError("role must be \"leader\" or \"follower\"")
-        self._worker_config = self.communicator.wait_for_negotiated()
         self._verify()
 
     def _verify(self):
@@ -151,8 +129,6 @@ class FLDataWorker:
         Validator.check_string(self._worker_config.store_type, SUPPORT_STORE_TYPES, arg_name="store_type")
 
         _check_str(self._worker_config.primary_key, arg_name="primary_key")
-        _check_str(self._worker_config.http_server_address, arg_name="http_server_address")
-        _check_str(self._worker_config.remote_server_address, arg_name="remote_server_address")
         Validator.check_non_negative_int(self._worker_config.thread_num, arg_name="thread_num")
         Validator.check_int_range(self._worker_config.shard_num, 1, 1000, Rel.INC_BOTH, arg_name="shard_num")
         self._verify_schema()
@@ -220,7 +196,7 @@ class FLDataWorker:
         Returns:
             - intersection_keys (list(str)): The intersection keys.
         """
-        return self.communicator.join_func(input_vct, bucket_id)
+        return self.data_join_obj.join_func(input_vct, bucket_id)
 
     def export(self):
         """
