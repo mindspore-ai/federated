@@ -25,6 +25,7 @@ parameter_server: 0
 field_slice: False
 sparse: False
 deep_table_slice_mode: "column_slice"
+enable_TEE: False
 
 # WideDeepConfig
 weight_bias_init: ["normal", "normal"]

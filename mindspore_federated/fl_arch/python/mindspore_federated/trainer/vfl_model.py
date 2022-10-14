@@ -100,10 +100,12 @@ class FLModel:
                  metrics=None,
                  eval_network=None,
                  eval_indexes=None,
-                 yaml_data=None):
+                 yaml_data=None,
+                 grad_network=None):
         self._role = role
         self._backbone_net = network
         self._loss_fn = loss_fn
+        self._grad_network = grad_network
         self._metrics = metrics
         self._eval_network = eval_network
         self._eval_indexes = eval_indexes
@@ -138,18 +140,19 @@ class FLModel:
             self._train_network.set_broadcast_flag()
         self._train_network.set_train(mode=True)
 
-        if optimizers is None:
-            self._optimizers = []
-            self._build_optimizer()
-        elif isinstance(optimizers, list):
-            self._optimizers = optimizers
-        else:
-            self._optimizers = [optimizers]
+        if self._grad_network is None:
+            if optimizers is None:
+                self._optimizers = []
+                self._build_optimizer()
+            elif isinstance(optimizers, list):
+                self._optimizers = optimizers
+            else:
+                self._optimizers = [optimizers]
 
-        if 'grad_scalers' in self._yaml_data:
-            self._grad_scalers = self._build_grad_scaler()
-        else:
-            self._grad_scalers = None
+            if 'grad_scalers' in self._yaml_data:
+                self._grad_scalers = self._build_grad_scaler()
+            else:
+                self._grad_scalers = None
 
     def _build_train_network(self):
         """
@@ -256,6 +259,9 @@ class FLModel:
             label = local_data_batch[self._yaml_data['model']['eval_net']['gt']]
             dp_label = self._label_dp(label)
             local_data_batch[self._yaml_data['model']['eval_net']['gt']] = dp_label
+
+        if self._grad_network:
+            return self._grad_network(local_data_batch, remote_data_batch)
 
         scales = dict()
         if self._grad_scalers:
