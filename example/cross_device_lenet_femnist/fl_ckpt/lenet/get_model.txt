@@ -1,0 +1,1 @@
+the model can get by using wget: https://ms-release.obs.cn-north-4.myhuaweicloud.com/ms-dependencies/Lenet.ckpt
