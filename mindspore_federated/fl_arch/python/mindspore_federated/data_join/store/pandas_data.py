@@ -29,6 +29,13 @@ class PandasData(BaseData):
         self._primary_key = primary_key
         self._schema = dict() if schema is None else schema
         self._desc = desc
+        self._pd_schema = dict() if schema is None else {_: schema[_]["type"] for _ in schema}
+        self._usecols = None if schema is None else [_ for _ in schema]
+        self._need_sorted = True
+
+    def load_raw_data(self, data_path):
+        df = pd.read_csv(data_path, usecols=self._usecols, dtype=self._pd_schema)
+        self.merge(df)
 
     def keys(self):
         if self._primary_key is None:
@@ -36,7 +43,9 @@ class PandasData(BaseData):
         return list(self._store.loc[:, self._primary_key])
 
     def values(self, keys=None):
-        self._store = self._store.sort_values(by=self._primary_key, ascending=False)
+        if self._need_sorted:
+            self._store = self._store.sort_values(by=self._primary_key, ascending=False)
+            self._need_sorted = False
         if keys is None:
             values = self._store.values
         else:

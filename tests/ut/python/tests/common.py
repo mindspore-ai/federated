@@ -37,6 +37,7 @@ from mindspore_federated import log as logger
 from common_client import ResponseCode, ResponseFLJob, ResponseGetModel
 from common_client import post_start_fl_job, post_get_model, post_update_model
 from common_client import server_safemode_rsp
+from common_data import generate_random_data
 
 
 def fl_test(func):
@@ -83,6 +84,40 @@ def fl_test(func):
             g_server_processes = []
             clean_temp_files()
             logger.info("Fl test end clear")
+
+    return wrap_test
+
+
+def vfl_data_test(func):
+    """vfl data test"""
+
+    def clean_temp_files():
+        cwd_dir = os.getcwd()
+        temp_dir = os.path.join(cwd_dir, "temp")
+        os.system(f"rm -rf {temp_dir}")
+
+    def mkdir(directory):
+        try:
+            os.mkdir(directory)
+        except FileExistsError:
+            pass
+
+    @wraps(func)
+    def wrap_test(*args, **kwargs):
+        try:
+            clean_temp_files()
+            mkdir("temp")
+            mkdir("temp/leader")
+            mkdir("temp/follower")
+            generate_random_data()
+            func(*args, **kwargs)
+        except Exception:
+            logger.error("VFL data test catch exception")
+            raise
+        finally:
+            logger.info("VFl data test begin to clear")
+            clean_temp_files()
+            logger.info("VFl data test end clear")
 
     return wrap_test
 

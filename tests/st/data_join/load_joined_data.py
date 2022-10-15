@@ -15,7 +15,6 @@
 """Load joined data."""
 
 import argparse
-from mindspore import dataset as ds
 from mindspore_federated.data_join.io import load_mindrecord
 
 
@@ -24,8 +23,6 @@ def get_parser():
 
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--input_dir", type=str, default="vfl/output/")
-    parser.add_argument("--batch_size", type=int, default=16)
-    parser.add_argument("--drop_remainder", type=bool, default=False)
     parser.add_argument("--shuffle", type=bool, default=True)
     return parser
 
@@ -36,14 +33,9 @@ if __name__ == "__main__":
         print('[', key, ']', args.__dict__[key], flush=True)
     seed = args.seed
     input_dir = args.input_dir
-    batch_size = args.batch_size
-    drop_remainder = args.drop_remainder
     shuffle = args.shuffle
 
-    ds.config.set_seed(seed)
-    dataset = load_mindrecord(input_dir=input_dir, batch_size=batch_size, drop_remainder=drop_remainder,
-                              shuffle=shuffle)
+    dataset = load_mindrecord(input_dir=input_dir, shuffle=shuffle, seed=seed)
     print("dataset size: ", dataset.get_dataset_size())
-    print("batch size: ", dataset.get_batch_size())
     for key in dataset.create_dict_iterator():
         print(key)

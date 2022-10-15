@@ -95,16 +95,18 @@ class FLDataWorker:
         elif self._role == "follower":
             server_name = "client"
             peer_server_name = "server"
+        else:
+            raise ValueError("role must be \"leader\" or \"follower\"")
+        with open(self._data_schema_path, "r") as f:
+            self._schema = yaml.load(f, yaml.Loader)
+        self._verify()
+
         http_server_config = ServerConfig(server_name=server_name, server_address=server_address)
         remote_server_config = ServerConfig(server_name=peer_server_name, server_address=peer_server_address)
         vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
                                                               remote_server_config=remote_server_config)
         self._vertical_communicator = vertical_communicator
         vertical_communicator.launch()
-
-        with open(self._data_schema_path, "r") as f:
-            self._schema = yaml.load(f, yaml.Loader)
-        self._verify()
         if role == "leader":
             self.data_join_obj = _DataJoinServer(self._worker_config, self._vertical_communicator)
             self.data_join_obj.launch()
@@ -120,10 +122,10 @@ class FLDataWorker:
         """
         Verify hyper parameters and schema.
         """
-        main_table_files = self._worker_config.main_table_files
-        if not isinstance(main_table_files, list) and not isinstance(main_table_files, str):
-            raise TypeError("main_table_files must be list or str, but get {}".format(type(main_table_files)))
+        self._verify_main_table_files()
         _check_str(self._worker_config.output_dir, arg_name="output_dir")
+        if not os.path.isdir(self._worker_config.output_dir):
+            raise ValueError("output_dir: {} is not a directory.".format(self._worker_config.output_dir))
         Validator.check_string(self._worker_config.join_type, SUPPORT_JOIN_TYPES, arg_name="join_type")
         Validator.check_int_range(self._worker_config.bucket_num, 1, 1000000, Rel.INC_BOTH, arg_name="bucket_num")
         Validator.check_string(self._worker_config.store_type, SUPPORT_STORE_TYPES, arg_name="store_type")
@@ -132,6 +134,26 @@ class FLDataWorker:
         Validator.check_non_negative_int(self._worker_config.thread_num, arg_name="thread_num")
         Validator.check_int_range(self._worker_config.shard_num, 1, 1000, Rel.INC_BOTH, arg_name="shard_num")
         self._verify_schema()
+
+    def _verify_main_table_files(self):
+        """
+        Verify main_table_files.
+        """
+        main_table_files = self._worker_config.main_table_files
+        if isinstance(main_table_files, list):
+            for main_table_file in main_table_files:
+                if not os.path.isfile(main_table_file):
+                    raise ValueError("{} in main_table_files is not a file.".format(main_table_file))
+        elif isinstance(main_table_files, str):
+            if not os.path.exists(main_table_files):
+                raise ValueError("main_table_files: {} is not exist.".format(main_table_files))
+            if os.path.isdir(main_table_files):
+                for main_table_file in os.listdir(main_table_files):
+                    main_table_file = os.path.join(main_table_files, main_table_file)
+                    if not os.path.isfile(main_table_file):
+                        raise ValueError("{} in main_table_files is not a file.".format(main_table_file))
+        else:
+            raise TypeError("main_table_files must be list or str, but get {}".format(type(main_table_files)))
 
     def _verify_schema(self):
         """
@@ -166,21 +188,24 @@ class FLDataWorker:
             - raw_data (BaseData): The raw data.
         """
         if self._worker_config.store_type == "csv":
-            import pandas as pd
             from .store import PandasData
-            if isinstance(self._worker_config.main_table_files, list):
-                raw_data = PandasData(None, primary_key=self._worker_config.primary_key, schema=self._schema)
-                for main_table_file in self._worker_config.main_table_files:
-                    df = pd.read_csv(main_table_file)
-                    df[self._worker_config.primary_key] = df[self._worker_config.primary_key].astype("str")
-                    raw_data.merge(df)
-            elif isinstance(self._worker_config.main_table_files, str):
-                df = pd.read_csv(self._worker_config.main_table_files)
-                df[self._worker_config.primary_key] = df[self._worker_config.primary_key].astype("str")
-                raw_data = PandasData(df, primary_key=self._worker_config.primary_key, schema=self._schema)
+            raw_data = PandasData(None, primary_key=self._worker_config.primary_key, schema=self._schema)
+            main_table_files = self._worker_config.main_table_files
+            if isinstance(main_table_files, list):
+                for main_table_file in main_table_files:
+                    raw_data.load_raw_data(main_table_file)
+            elif isinstance(main_table_files, str):
+                if os.path.isdir(main_table_files):
+                    index = 0
+                    for main_table_file in os.listdir(main_table_files):
+                        index += 1
+                        main_table_file = os.path.join(main_table_files, main_table_file)
+                        raw_data.load_raw_data(main_table_file)
+                else:
+                    raw_data.load_raw_data(main_table_files)
             else:
                 raise TypeError("main_table_files must be list or str, but get {}".format(
-                    type(self._worker_config.main_table_files)))
+                    type(main_table_files)))
         else:
             raise ValueError("store type: {} is not support currently".format(self._worker_config.store_type))
         return raw_data
