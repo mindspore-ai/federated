@@ -68,7 +68,7 @@ def get_trainable_params(network):
 
 def start_one_server():
     """start one server"""
-    from network.lenet import LeNet5
+    from tests.st.network.lenet import LeNet5
     from mindspore_federated import FLServerJob
 
     yaml_config = args.yaml_config
