@@ -73,6 +73,7 @@ void CreateBobAlignResultProto(datajoin::BobAlignResultProto *bob_align_result_p
   for (const auto &item : align_result) {
     bob_align_result_proto->add_align_result(item);
   }
+  bob_align_result_proto->set_msg(bob_align_result.msg());
 }
 
 void CreatePlainDataProto(datajoin::PlainDataProto *plain_data_proto, const psi::PlainData &plain_data) {
@@ -108,6 +109,7 @@ psi::ClientPSIInit ParseClientPSIInitProto(const datajoin::ClientPSIInitProto &c
                << clientPSIInit.psi_type() << ", self_size is " << clientPSIInit.self_size();
   return clientPSIInit;
 }
+
 psi::ServerPSIInit ParseServerPSIInitProto(const datajoin::ServerPSIInitProto &serverPSIInitProto) {
   psi::ServerPSIInit serverPSIInit;
   serverPSIInit.set_bin_id(serverPSIInitProto.bin_id());
