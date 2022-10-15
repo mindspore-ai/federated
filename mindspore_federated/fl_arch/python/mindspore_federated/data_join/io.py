@@ -35,9 +35,9 @@ def export_mindrecord(file_name, raw_data, keys, shard_num=1, overwrite=True):
     writer.commit()
 
 
-def load_mindrecord(input_dir, batch_size=1, drop_remainder=False, **kwargs):
+def load_mindrecord(input_dir, seed=0, **kwargs):
+    ds.config.set_seed(seed)
     dataset_files = [os.path.join(input_dir, _) for _ in os.listdir(input_dir) if "db" not in _]
     dataset_files.sort()
     dataset = ds.MindDataset(dataset_files, **kwargs)
-    dataset = dataset.batch(batch_size=batch_size, drop_remainder=drop_remainder)
     return dataset

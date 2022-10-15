@@ -1,12 +1,6 @@
 main_table_files: ["vfl/datasets/follower_data_0.csv", "vfl/datasets/follower_data_1.csv"]
 output_dir: "vfl/output/follower/"
-primary_key: "oaid"
-bucket_num: 5
 store_type: "csv"
 
-# export config
-shard_num: 1
-
 # psi config
-join_type: "psi"
 thread_num: 0
