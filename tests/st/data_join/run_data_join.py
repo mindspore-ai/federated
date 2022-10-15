@@ -14,7 +14,7 @@
 # ============================================================================
 """Run data join."""
 import argparse
-from mindspore_federated.data_join.worker import FLDataWorker
+from mindspore_federated.data_join import FLDataWorker
 
 
 def get_parser():

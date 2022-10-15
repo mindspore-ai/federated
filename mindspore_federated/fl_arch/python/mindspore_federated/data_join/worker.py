@@ -69,6 +69,23 @@ class _DivideKeyTobucket:
 class FLDataWorker:
     """
     Data join worker.
+
+    Args:
+        role (str): Role of the worker. Supports ["leader", "follower"].
+        worker_config_path (str): Path for storing the hyperparameter file to be configured during intersection.
+        data_schema_path (str): Path for storing the hyperparameter file to be exported. User need to provide the
+            column name and type of the data to be exported.
+        server_address (str): Local IP and Port Address.
+        peer_server_address (str): Peer IP and Port Address.
+
+    Examples:
+        >>> worker = FLDataWorker(role="leader",
+        ...                       worker_config_path="leader.yaml",
+        ...                       data_schema_path="leader_schema.yaml",
+        ...                       server_address="127.0.0.1:1086",
+        ...                       peer_server_address="127.0.0.1:1087"
+        ...                       )
+        >>> worker.export()
     """
 
     def __init__(self,
@@ -78,14 +95,6 @@ class FLDataWorker:
                  server_address,
                  peer_server_address
                  ):
-        """
-        Data join worker.
-
-        Args:
-            role (str): mark "leader" of "follower" role of the worker
-            worker_config_path (str):
-            data_schema_path (str):
-        """
         self._role = role
         self._worker_config = _WorkerConfig(worker_config_path)
         self._data_schema_path = data_schema_path

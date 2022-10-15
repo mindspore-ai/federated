@@ -90,8 +90,6 @@ def generate_worker_config(
         shard_num=1,
         join_type="psi",
         thread_num=0,
-        http_server_address="127.0.0.1:9027",
-        remote_server_address="127.0.0.1:9028",
 ):
     """generate worker config"""
     worker_config_path = "temp/{}.yaml".format(role)
@@ -104,8 +102,6 @@ def generate_worker_config(
         "shard_num": shard_num,
         "join_type": join_type,
         "thread_num": thread_num,
-        "http_server_address": http_server_address,
-        "remote_server_address": remote_server_address,
     }
     with open(worker_config_path, "w") as f:
         yaml.dump(data=worker_schema, stream=f)

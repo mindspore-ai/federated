@@ -105,6 +105,7 @@ def vfl_data_test(func):
     @wraps(func)
     def wrap_test(*args, **kwargs):
         try:
+            stop_data_join()
             clean_temp_files()
             mkdir("temp")
             mkdir("temp/leader")
@@ -116,10 +117,22 @@ def vfl_data_test(func):
             raise
         finally:
             logger.info("VFl data test begin to clear")
+            stop_data_join()
             clean_temp_files()
             logger.info("VFl data test end clear")
 
     return wrap_test
+
+
+def stop_data_join():
+    cmd = f"pid=`ps aux | grep data_join | grep :6969"
+    cmd += " | grep -v \"grep\" |awk '{print $2}'` && "
+    cmd += "for id in $pid; do kill -9 $id && echo \"killed $id\"; done"
+    subprocess.call(['bash', '-c', cmd])
+    cmd = f"pid=`ps aux | grep data_join | grep :9696"
+    cmd += " | grep -v \"grep\" |awk '{print $2}'` && "
+    cmd += "for id in $pid; do kill -9 $id && echo \"killed $id\"; done"
+    subprocess.call(['bash', '-c', cmd])
 
 
 g_server_processes = []
