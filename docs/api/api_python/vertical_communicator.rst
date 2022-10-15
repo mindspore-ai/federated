@@ -1,0 +1,62 @@
+纵向联邦学习通信器
+======================
+
+.. py:class:: VerticalFederatedCommunicator(http_server_config, remote_server_config)
+
+    定义纵向联邦学习通信器。
+
+    参数：
+        - **http_server_config** (ServerConfig) - 本地服务器配置。
+        - **remote_server_config** (ServerConfig) - 对端服务器配置。
+
+    .. py:method:: launch()
+
+        启动纵向联邦学习通信器。
+
+    .. py:method:: send_tensors(target_server_name, tensor_list_item_py)
+
+        发送分布式训练Tensor数据。
+
+        参数：
+            - **target_server_name** (str) - 指定对端服务器名字。
+            - **tensor_list_item_py** (list[Tensor]) - Tensor集合。
+
+    .. py:method:: send_register(target_server_name, worker_register_item_py)
+
+        发送worker注册消息。
+
+        参数：
+            - **target_server_name** (str) - 指定对端服务器名字。
+            - **worker_register_item_py** (str) - worker注册信息。
+
+    .. py:method:: receive(target_server_name)
+
+        获取对端发送的Tensor数据。
+
+        参数：
+            - **target_server_name** (str) - 指定对端服务器名字。
+
+    .. py:method:: data_join_wait_for_start()
+
+        阻塞等待client worker的注册信息。
+
+    .. py:method:: http_server_config()
+
+        返回本地服务器配置。
+
+    .. py:method:: remote_server_config()
+
+       返回远端服务器配置。
+
+.. py:class:: ServerConfig(server_name, server_address)
+
+    定义纵向联邦服务器配置。
+
+    参数：
+        - **server_name** (str) - 服务器名字。
+        - **server_address** (str) - 服务器地址。
+
+    .. py:method:: init_server_config(http_server_config, remote_server_config)
+
+        初始化本地服务器配置与远端服务器配置，其中remote_server_config可以是list[ServerConfig]。
+

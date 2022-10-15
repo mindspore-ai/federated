@@ -39,8 +39,12 @@ class MessageHandler {
   // string message type of this message.
   virtual std::string message_type() const = 0;
 
+  // string message id of this message.
+  virtual std::string message_id() const = 0;
+
   bool HasSentResponse() { return has_sent_response_; }
   virtual bool SendResponse(const void *data, const size_t &len) = 0;
+  virtual bool SendResponse(const void *data, const size_t &len, const std::string &message_id) = 0;
   virtual bool SendResponseInference(const void *data, const size_t &len, RefBufferRelCallback cb) {
     auto ret = SendResponse(data, len);
     if (cb) {

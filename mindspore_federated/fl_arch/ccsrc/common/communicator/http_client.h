@@ -76,6 +76,12 @@ class HttpClient {
   void set_response_msg(const std::shared_ptr<std::vector<unsigned char>> &response_msg);
   const std::shared_ptr<std::vector<unsigned char>> response_msg() const;
 
+  void set_message_id(const std::string message_id);
+  std::string message_id() const;
+
+  std::string CreateMessageId(const std::shared_ptr<ResponseTrack> &response_track, const std::string &target_msg_type,
+                              const std::string &request_msg_type);
+
  protected:
   static void ReadCallback(struct evhttp_request *http_req, void *message_callback);
   bool EstablishSSL();
@@ -104,6 +110,7 @@ class HttpClient {
   evhttp_uri *uri;
   std::shared_ptr<ResponseTrack> response_track_;
   std::shared_ptr<std::vector<unsigned char>> response_msg_;
+  std::string message_id_;
 };
 }  // namespace fl
 }  // namespace mindspore

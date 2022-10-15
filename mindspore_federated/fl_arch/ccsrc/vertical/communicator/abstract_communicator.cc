@@ -101,18 +101,29 @@ std::shared_ptr<std::vector<unsigned char>> AbstractCommunicator::SendMessage(co
   MS_EXCEPTION_IF_NULL(http_client);
   auto request_track = AddMessageTrack(1, nullptr);
   auto http_server_name = VFLContext::instance()->http_server_name();
-  if (!http_client->SendMessage(data, data_size, request_track, target_msg_type, http_server_name,
-                                HTTP_CONTENT_TYPE_URL_ENCODED)) {
-    MS_LOG(WARNING) << "Sending request for target msg type:" << target_msg_type << " to server " << target_server_name
-                    << " failed.";
-    return nullptr;
+  std::shared_ptr<std::vector<unsigned char>> response_msg;
+  for (size_t i = 0; i < kRetryCommunicateTimes; i++) {
+    if (!http_client->SendMessage(data, data_size, request_track, target_msg_type, http_server_name,
+                                  HTTP_CONTENT_TYPE_URL_ENCODED)) {
+      MS_LOG(WARNING) << "Sending request failed.";
+    }
+    if (!Wait(request_track)) {
+      MS_LOG(WARNING) << "Sending http message timeout.";
+      http_client->BreakLoopEvent();
+    }
+    response_msg = http_client->response_msg();
+    if (!response_msg) {
+      MS_LOG(WARNING) << "Sending request for target msg type:" << target_msg_type << " to server "
+                      << target_server_name << " failed, now retry time is " << i;
+    } else {
+      break;
+    }
+    std::this_thread::sleep_for(std::chrono::seconds(kSleepSecondsOfCommunicate));
   }
-  if (!Wait(request_track)) {
-    MS_LOG(WARNING) << "Sending http message timeout.";
-    http_client->BreakLoopEvent();
-    return nullptr;
+  if (!response_msg) {
+    MS_LOG(EXCEPTION) << "Send data join message timeout for retry " << kRetryCommunicateTimes << " times.";
   }
-  return http_client->response_msg();
+  return response_msg;
 }
 
 void AbstractCommunicator::SendResponseMsg(const std::shared_ptr<MessageHandler> &message, const void *data,
@@ -120,7 +131,7 @@ void AbstractCommunicator::SendResponseMsg(const std::shared_ptr<MessageHandler>
   if (!verifyResponse(message, data, len)) {
     return;
   }
-  if (!message->SendResponse(data, len)) {
+  if (!message->SendResponse(data, len, message->message_id())) {
     MS_LOG(WARNING) << "Sending response failed.";
     return;
   }

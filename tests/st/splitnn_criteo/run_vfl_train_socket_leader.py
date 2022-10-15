@@ -71,7 +71,7 @@ class LeaderTrainer:
                 leader_out = self.leader_fl_model.forward_one_step(current_item, follower_out)
                 scale = self.leader_fl_model.backward_one_step(current_item, follower_out)
                 grad_scale = tensor_utils.tensor_dict_to_tensor_list_pybind_obj(scale)
-                self.vertical_communicator.send_tensors("serverA", tensor_list_item=grad_scale)
+                self.vertical_communicator.send_tensors("serverA", grad_scale)
                 # if step % 10 == 0:
                 logging.info('epoch %d step %d/%d wide_loss: %f deep_loss: %f',
                              1, 1, train_size, leader_out['wide_loss'], leader_out['deep_loss'])

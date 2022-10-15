@@ -31,8 +31,10 @@ void HttpCommunicator::RegisterRoundMsgCallback(const std::string &msg_type, con
         http_msg->ErrorResponse(HTTP_INTERNAL, result);
         return;
       }
+      std::string message_type = http_msg->GetHeadParam("Message-Type");
+      std::string message_id = http_msg->GetHeadParam("Message-Id");
       std::shared_ptr<MessageHandler> http_msg_handler =
-        std::make_shared<HttpMsgHandler>(http_msg, data, len, http_msg->GetHeadParam("Message-Type"));
+        std::make_shared<HttpMsgHandler>(http_msg, data, len, message_type, message_id);
       MS_EXCEPTION_IF_NULL(http_msg_handler);
       callback(http_msg_handler);
     } catch (const std::exception &e) {
