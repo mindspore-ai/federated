@@ -172,9 +172,12 @@ struct BobAlignResult {
 
   void set_empty() { std::vector<std::string>().swap(align_result_); }
 
+  std::string msg() const { return msg_; }
+
  private:
   size_t bin_id_ = 0;
   std::vector<std::string> align_result_;
+  std::string msg_ = "BobAlignResult";
 };
 
 bool Send(const BobAlignResult &bob_align_result);
