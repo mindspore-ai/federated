@@ -119,7 +119,8 @@ def get_config():
                         help="Config file path")
     path_args, _ = parser.parse_known_args()
     default, helper, choices = parse_yaml(path_args.config_path)
-    args = parse_cli_to_yaml(parser=parser, cfg=default, helper=helper, choices=choices, cfg_path=path_args.config_path)
+    args = parse_cli_to_yaml(parser=parser, cfg=default, helper=helper,
+                             choices=choices, cfg_path=path_args.config_path)
     final_config = merge(args, default)
     final_config = Config(final_config)
     if final_config.host_device_mix == 1:

@@ -22,7 +22,6 @@ include_directories("${CMAKE_BINARY_DIR}/mindspore_federated" ${CMAKE_BINARY_DIR
 include_directories("fl_arch")
 include_directories("fl_arch/ccsrc")
 include_directories("fl_arch/ccsrc/common")
-include_directories()
 
 set(SERVER_FLATBUFFER_OUTPUT "${CMAKE_BINARY_DIR}/schema")
 set(FBS_FILES
@@ -30,6 +29,8 @@ set(FBS_FILES
         ${CMAKE_CURRENT_SOURCE_DIR}/schema/fl_job.fbs
         )
 ms_build_flatbuffers(FBS_FILES ${CMAKE_CURRENT_SOURCE_DIR}../schema generated_fbs_files ${SERVER_FLATBUFFER_OUTPUT})
+
+add_definitions(-DEnclavePATH="${CMAKE_CURRENT_SOURCE_DIR}/fl_arch/ccsrc/armour/lib/enclave.signed.so")
 
 # federated for c++ server and python interface
 file(GLOB_RECURSE FEDERATED_SRC RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
@@ -40,6 +41,10 @@ file(GLOB_RECURSE FEDERATED_SRC RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
         "fl_arch/ccsrc/server/*.cc"
         "fl_arch/ccsrc/worker/*.cc"
         "fl_arch/ccsrc/vertical/*.cc")
+
+if(NOT (CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "x86_64" AND ENABLE_SGX))
+    list(REMOVE_ITEM FEDERATED_SRC "fl_arch/ccsrc/armour/secure_protocol/enclave_call.cc")
+endif()
 
 add_library(federated SHARED ${FEDERATED_SRC})
 
@@ -58,6 +63,15 @@ target_link_libraries(federated PRIVATE ${SECUREC_LIBRARY})
 target_link_libraries(federated PRIVATE mindspore_federated::flatbuffers)
 target_link_libraries(federated PRIVATE mindspore_federated::hiredis)
 target_link_libraries(federated PRIVATE mindspore_federated::hiredis_ssl)
+
+if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "x86_64" AND ENABLE_SGX)
+    add_compile_definitions(ENABLE_TEE)
+    target_link_libraries(federated PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/fl_arch/ccsrc/armour/lib/libsgx_0.so)
+    target_link_libraries(federated PRIVATE
+                          ${CMAKE_CURRENT_SOURCE_DIR}/fl_arch/ccsrc/armour/lib/libcsecure_channel_static.a)
+    find_library(SGX_SSL_LIB NAMES sgx_usgxssl HINTS /opt/intel/sgxssl/lib64)
+    target_link_libraries(federated PRIVATE ${SGX_SSL_LIB})
+endif()
 
 set_target_properties(federated PROPERTIES SKIP_BUILD_RPATH TRUE)
 
