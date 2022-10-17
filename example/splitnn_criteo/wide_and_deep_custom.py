@@ -25,7 +25,7 @@ from mindspore.context import ParallelMode
 from mindspore.communication.management import get_group_size
 from mindspore_federated.common import vfl_utils
 
-from .wide_and_deep import init_method, init_var_dict
+from wide_and_deep import init_method, init_var_dict
 
 
 class DenseLayer(nn.Cell):
@@ -139,7 +139,10 @@ class WideDeepModel(nn.Cell):
         self.reshape = ops.Reshape()
         self.deep_reshape = ops.Reshape()
         self.concat = ops.Concat(axis=1)
+        self._init_embedding(config, is_auto_parallel, sparse, host_device_mix, parameter_server)
 
+    def _init_embedding(self, config, is_auto_parallel, sparse, host_device_mix, parameter_server):
+        """init the embedding layer of the model"""
         if is_auto_parallel and sparse and not config.field_slice and not parameter_server:
             target = 'CPU' if host_device_mix else 'DEVICE'
             self.wide_embeddinglookup = nn.EmbeddingLookup(config.vocab_size, 1, target=target,

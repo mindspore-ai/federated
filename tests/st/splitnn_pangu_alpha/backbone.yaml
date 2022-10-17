@@ -1,16 +1,16 @@
-role: leader
+role: follower
 model: # define the net of vFL party
   train_net:
     name: leader_loss_net
     inputs:
       - name: embedding_table
-        destination: remote
+        source: remote
       - name: word_table
-        destination: remote
+        source: remote
       - name: position_id
-        destination: remote
+        source: remote
       - name: attention_mask
-        destination: remote
+        source: remote
     outputs:
       - name: hidden_states
         destination: remote
@@ -46,9 +46,6 @@ opts: # define ms optimizer
         output:
           name: hidden_states
           index: 0
-        get_all: False
-        get_by_list: True
-        sens_param: True
         sens: output
     params:
       - name: backbone
@@ -84,8 +81,4 @@ dataset:
 hyper_parameters:
   epochs: 20
   batch_size: 2
-  workers: 1
   is_eval: False
-network:
-  master_ip: 127.0.0.1:8082
-  peer_ip: 127.0.0.1:8081

@@ -19,11 +19,11 @@ import logging
 from mindspore import context, Tensor
 from mindspore.train.summary import SummaryRecord
 
-from mindspore_federated import FLModel, vfl_utils
+from mindspore_federated import FLModel, FLYamlData
 
 from criteo_dataset import create_dataset, DataType
 from network_config import config
-from network.wide_and_deep import LeaderNet, LeaderLossNet, LeaderEvalNet, \
+from wide_and_deep import LeaderNet, LeaderLossNet, LeaderEvalNet, \
     FollowerNet, FollowerLossNet, AUCMetric
 
 
@@ -47,8 +47,8 @@ def construct_local_dataset():
 if __name__ == '__main__':
     logging.basicConfig(filename='log_local_{}.txt'.format(config.device_target), level=logging.INFO)
     context.set_context(mode=context.GRAPH_MODE, device_target=config.device_target)
-    leader_yaml_data, leader_fp = vfl_utils.parse_yaml_file(config.leader_yaml_path)
-    follower_yaml_data, follower_fp = vfl_utils.parse_yaml_file(config.follower_yaml_path)
+    leader_yaml_data = FLYamlData(config.leader_yaml_path)
+    follower_yaml_data = FLYamlData(config.follower_yaml_path)
     # local data iteration for experiment
     ds_train, ds_eval = construct_local_dataset()
     train_iter = ds_train.create_dict_iterator()
@@ -61,22 +61,21 @@ if __name__ == '__main__':
     leader_eval_net = LeaderEvalNet(leader_base_net)
     eval_metric = AUCMetric()
     leader_fl_model = FLModel(role='leader',
+                              yaml_data=leader_yaml_data,
                               network=leader_base_net,
                               train_network=leader_train_net,
                               metrics=eval_metric,
-                              eval_network=leader_eval_net,
-                              yaml_data=leader_yaml_data)
+                              eval_network=leader_eval_net)
 
     # Follower Part
     follower_eval_net = follower_base_net = FollowerNet(config)
     follower_train_net = FollowerLossNet(follower_base_net, config)
     follower_fl_model = FLModel(role='follower',
+                                yaml_data=follower_yaml_data,
                                 network=follower_base_net,
                                 train_network=follower_train_net,
-                                eval_network=follower_eval_net,
-                                yaml_data=follower_yaml_data)
+                                eval_network=follower_eval_net)
     # forward/backward batch by batch
-    eval_metric = AUCMetric()
     with SummaryRecord('./summary') as summary_record:
         for epoch in range(config.epochs):
             for step, item in enumerate(train_iter, start=1):
@@ -92,10 +91,8 @@ if __name__ == '__main__':
                                  epoch, step, train_size, leader_out['wide_loss'], leader_out['deep_loss'])
             for eval_item in eval_iter:
                 follower_out = follower_fl_model.forward_one_step(eval_item)
-                leader_eval_out = leader_fl_model.eval_one_step(eval_item, follower_out, eval_metric)
+                leader_eval_out = leader_fl_model.eval_one_step(eval_item, follower_out)
             auc = eval_metric.eval()
             eval_metric.clear()
             summary_record.add_value('scalar', 'auc', Tensor(auc))
             logging.info('----evaluation---- epoch %d auc %f', epoch, auc)
-    leader_fp.close()
-    follower_fp.close()

@@ -199,7 +199,6 @@ class PanGuHead(Cell):
 
     def __init__(self, config):
         super(PanGuHead, self).__init__(config)
-        # dp = config.parallel_config.data_parallel
         self.matmul = P.MatMul(transpose_b=True).shard(((config.parallel_config.data_parallel, 1), (1, 1)))
         self.hidden_size = config.hidden_size
         self.dtype = mstype.float16
@@ -312,7 +311,7 @@ class PanguAlphaModel(Cell):
 
 class BackboneLossNet(nn.Cell):
     """
-    Net of the leader party.
+    Net of the backbone party, which is the 2nd sub-network and is deployed on the server B.
     Args:
         net (Cell): PanguAlphaModel, which is the 2nd sub-network.
     """
@@ -328,7 +327,7 @@ class BackboneLossNet(nn.Cell):
 
 class BackboneEvalNet(nn.Cell):
     """
-    Eval net of the leader party, which warps LeaderNet.
+    Eval net of the backbone party, which warps PanguAlphaModel.
     Args:
         backbone (class): PanguAlphaModel, which is the 2nd sub-network.
     """
@@ -387,9 +386,6 @@ class EmbeddingLossNet(nn.Cell):
     def construct(self, input_ids, position_id, attention_mask):
         """forward process of FollowerLossNet"""
         tokens = self.slice(input_ids, (0, 0), (self.batch_size, -1), (1, 1))
-        labels = self.slice(input_ids, (0, 1), (self.batch_size, self.len + 1), (1, 1))
-        labels = P.Reshape()(labels, (-1,))
-
         embedding_table, word_table = self.net(tokens, position_id, batch_valid_length=None)
         return embedding_table, word_table, position_id, attention_mask
 
@@ -461,8 +457,7 @@ class HeadLossNet(nn.Cell):
                             mstype.float32)
         logits = self.network(encoder_output, word_table)
         # Get label corresponding to input tokens
-        labels = self.slice(input_ids, (0, 1), (self.batch_size, self.len + 1),
-                            (1, 1))
+        labels = self.slice(input_ids, (0, 1), (self.batch_size, self.len + 1), (1, 1))
         labels = P.Reshape()(labels, (-1,))
         input_mask = P.Reshape()(input_mask, (-1,))
         output = self.loss(logits, labels, input_mask)

@@ -24,9 +24,9 @@ import itertools
 import logging
 
 from mindspore import context
-from mindspore_federated import FLModel, vfl_utils, tensor_utils
+from mindspore_federated import FLModel, FLYamlData, tensor_utils
 from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig
-from network.wide_and_deep import LeaderNet, LeaderLossNet, LeaderEvalNet, AUCMetric
+from wide_and_deep import LeaderNet, LeaderLossNet, LeaderEvalNet, AUCMetric
 
 from network_config import config
 from run_vfl_train_local import construct_local_dataset
@@ -44,19 +44,17 @@ class LeaderTrainer:
                                                                    remote_server_config=remote_server_config)
         self.vertical_communicator.launch()
 
-        leader_yaml_data, leader_fp = vfl_utils.parse_yaml_file(config.leader_yaml_path)
-        leader_fp.close()
+        leader_yaml_data = FLYamlData(config.leader_yaml_path)
         leader_base_net = LeaderNet(config)
         leader_train_net = LeaderLossNet(leader_base_net, config)
         leader_eval_net = LeaderEvalNet(leader_base_net)
-        eval_metric = AUCMetric()
+        self.eval_metric = AUCMetric()
         self.leader_fl_model = FLModel(role='leader',
+                                       yaml_data=leader_yaml_data,
                                        network=leader_base_net,
                                        train_network=leader_train_net,
-                                       metrics=eval_metric,
-                                       eval_network=leader_eval_net,
-                                       yaml_data=leader_yaml_data)
-        self.eval_metric = AUCMetric()
+                                       metrics=self.eval_metric,
+                                       eval_network=leader_eval_net)
 
     def Start(self):
         """

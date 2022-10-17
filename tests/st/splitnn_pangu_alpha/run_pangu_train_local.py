@@ -17,15 +17,13 @@ import os
 import logging
 
 from mindspore import context
-
 from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
 from mindspore.nn.wrap.cell_wrapper import _VirtualDatasetCell
 from mindspore.train.summary import SummaryRecord
-from mindspore_federated import FLModel, vfl_utils
+from mindspore_federated import FLModel, FLYamlData
 
 from src.split_pangu_alpha import PanguAlphaModel, BackboneLossNet, PanGuHead, HeadLossNet, EmbeddingLayer, \
     EmbeddingLossNet, AUCMetric
-
 from src.utils import LearningRate, get_args, construct_local_dataset, load_train_net, set_weight_decay, \
     set_embedding_weight_decay
 from src.pangu_optim import PanguAlphaAdam, FP32StateAdamWeightDecay
@@ -43,10 +41,12 @@ if __name__ == '__main__':
     set_parse(opt)
     logging.basicConfig(filename='splitnn_pangu_local.txt', level=logging.INFO)
     context.set_context(mode=context.GRAPH_MODE, device_target='GPU')
+
     # read, parse and check the .yaml files of sub-networks
-    embedding_yaml, embedding_fp = vfl_utils.parse_yaml_file('./embedding.yaml')
-    backbone_yaml, backbone_fp = vfl_utils.parse_yaml_file('./backbone.yaml')
-    head_yaml, head_fp = vfl_utils.parse_yaml_file('./head.yaml')
+    embedding_yaml = FLYamlData('./embedding.yaml')
+    backbone_yaml = FLYamlData('./backbone.yaml')
+    head_yaml = FLYamlData('./head.yaml')
+
     # local data iteration for experiment
     ds_train = construct_local_dataset(opt, rank_id, device_num)
     train_iter = ds_train.create_dict_iterator()
@@ -85,28 +85,27 @@ if __name__ == '__main__':
     head_optim = PanguAlphaAdam(head_train_net, head_optim_inst, update_cell, config, head_yaml)
 
     # FLModel definition
-    backbone_fl_model = FLModel(role='leader',
-                                network=backbone_base_net,
-                                train_network=backbone_train_net,
-                                eval_network=backbone_eval_net,
-                                optimizers=backbone_optim,
-                                metrics=eval_metric,
-                                yaml_data=backbone_yaml)
-    head_fl_model = FLModel(role='leaderhead',
+    head_fl_model = FLModel(role='leader',
+                            yaml_data=head_yaml,
                             network=head_base_net,
                             train_network=head_train_net,
                             eval_network=head_eval_net,
                             optimizers=head_optim,
-                            metrics=eval_metric,
-                            yaml_data=head_yaml)
-    embedding_fl_model = FLModel(role='follower',
+                            metrics=eval_metric)
+    backbone_fl_model = FLModel(role='follower',
+                                yaml_data=backbone_yaml,
+                                network=backbone_base_net,
+                                train_network=backbone_train_net,
+                                eval_network=backbone_eval_net,
+                                optimizers=backbone_optim)
+    embedding_fl_model = FLModel(role='leader',
+                                 yaml_data=embedding_yaml,
                                  network=embedding_base_net,
                                  train_network=embedding_train_net,
                                  eval_network=embedding_eval_net,
-                                 optimizers=embedding_optim,
-                                 yaml_data=embedding_yaml)
+                                 optimizers=embedding_optim)
+
     # forward/backward batch by batch
-    eval_metric = AUCMetric()
     with SummaryRecord('./summary') as summary_record:
         for epoch in range(50):
             for step, item in enumerate(train_iter, start=1):

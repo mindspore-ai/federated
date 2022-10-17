@@ -21,9 +21,9 @@ import itertools
 import logging
 
 from mindspore import context
-from mindspore_federated import FLModel, vfl_utils, tensor_utils
+from mindspore_federated import FLModel, tensor_utils, FLYamlData
 from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig
-from network.wide_and_deep import FollowerNet, FollowerLossNet
+from wide_and_deep import FollowerNet, FollowerLossNet
 
 from network_config import config
 from run_vfl_train_local import construct_local_dataset
@@ -41,15 +41,14 @@ class FollowerTrainer:
                                                                    remote_server_config=remote_server_config)
         self.vertical_communicator.launch()
         logging.info('start vfl trainer success')
-        follower_yaml_data, follower_fp = vfl_utils.parse_yaml_file(config.follower_yaml_path)
-        follower_fp.close()
+        follower_yaml_data = FLYamlData(config.follower_yaml_path)
         follower_eval_net = follower_base_net = FollowerNet(config)
         follower_train_net = FollowerLossNet(follower_base_net, config)
         self.follower_fl_model = FLModel(role='follower',
+                                         yaml_data=follower_yaml_data,
                                          network=follower_base_net,
                                          train_network=follower_train_net,
-                                         eval_network=follower_eval_net,
-                                         yaml_data=follower_yaml_data)
+                                         eval_network=follower_eval_net)
         logging.info('Init follower trainer finish.')
 
     def Start(self):
