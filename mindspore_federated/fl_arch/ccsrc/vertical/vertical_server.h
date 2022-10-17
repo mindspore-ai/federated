@@ -53,21 +53,21 @@ class VerticalServer {
 
   std::map<std::string, std::shared_ptr<AbstractCommunicator>> &communicators();
 
-  void Send(const std::string &target_server_name, const TensorListItemPy &tensorListItemPy);
+  bool Send(const std::string &target_server_name, const TensorListItemPy &tensorListItemPy);
 
-  void Send(const std::string &target_server_name, const psi::BobPb &bobPb);
+  bool Send(const std::string &target_server_name, const psi::BobPb &bobPb);
 
-  void Send(const std::string &target_server_name, const psi::ClientPSIInit &clientPSIInit);
+  bool Send(const std::string &target_server_name, const psi::ClientPSIInit &clientPSIInit);
 
-  void Send(const std::string &target_server_name, const psi::ServerPSIInit &serverPSIInit);
+  bool Send(const std::string &target_server_name, const psi::ServerPSIInit &serverPSIInit);
 
-  void Send(const std::string &target_server_name, const psi::BobAlignResult &bobAlignResult);
+  bool Send(const std::string &target_server_name, const psi::BobAlignResult &bobAlignResult);
 
-  void Send(const std::string &target_server_name, const psi::AlicePbaAndBF &alicePbaAndBF);
+  bool Send(const std::string &target_server_name, const psi::AlicePbaAndBF &alicePbaAndBF);
 
-  void Send(const std::string &target_server_name, const psi::AliceCheck &aliceCheck);
+  bool Send(const std::string &target_server_name, const psi::AliceCheck &aliceCheck);
 
-  void Send(const std::string &target_server_name, const psi::PlainData &plainData);
+  bool Send(const std::string &target_server_name, const psi::PlainData &plainData);
 
   WorkerConfigItemPy Send(const std::string &target_server_name, const WorkerRegisterItemPy &workerRegisterItem);
 

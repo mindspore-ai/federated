@@ -89,52 +89,52 @@ void VerticalServer::InitVerticalCommunicator(const std::shared_ptr<HttpCommunic
 
 std::map<std::string, std::shared_ptr<AbstractCommunicator>> &VerticalServer::communicators() { return communicators_; }
 
-void VerticalServer::Send(const std::string &target_server_name, const TensorListItemPy &tensorListItemPy) {
+bool VerticalServer::Send(const std::string &target_server_name, const TensorListItemPy &tensorListItemPy) {
   auto communicator_ptr = reinterpret_cast<TrainerCommunicator *>(communicators_[KTrainer].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
-  communicator_ptr->Send(target_server_name, tensorListItemPy);
+  return communicator_ptr->Send(target_server_name, tensorListItemPy);
 }
 
-void VerticalServer::Send(const std::string &target_server_name, const psi::BobPb &bobPb) {
+bool VerticalServer::Send(const std::string &target_server_name, const psi::BobPb &bobPb) {
   auto communicator_ptr = reinterpret_cast<BobPbCommunicator *>(communicators_[KBobPb].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
-  communicator_ptr->Send(target_server_name, bobPb);
+  return communicator_ptr->Send(target_server_name, bobPb);
 }
 
-void VerticalServer::Send(const std::string &target_server_name, const psi::ClientPSIInit &clientPSIInit) {
+bool VerticalServer::Send(const std::string &target_server_name, const psi::ClientPSIInit &clientPSIInit) {
   auto communicator_ptr = reinterpret_cast<ClientPSIInitCommunicator *>(communicators_[KClientPSIInit].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
-  communicator_ptr->Send(target_server_name, clientPSIInit);
+  return communicator_ptr->Send(target_server_name, clientPSIInit);
 }
 
-void VerticalServer::Send(const std::string &target_server_name, const psi::ServerPSIInit &serverPSIInit) {
+bool VerticalServer::Send(const std::string &target_server_name, const psi::ServerPSIInit &serverPSIInit) {
   auto communicator_ptr = reinterpret_cast<ServerPSIInitCommunicator *>(communicators_[KServerPSIInit].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
-  communicator_ptr->Send(target_server_name, serverPSIInit);
+  return communicator_ptr->Send(target_server_name, serverPSIInit);
 }
 
-void VerticalServer::Send(const std::string &target_server_name, const psi::BobAlignResult &bobAlignResult) {
+bool VerticalServer::Send(const std::string &target_server_name, const psi::BobAlignResult &bobAlignResult) {
   auto communicator_ptr = reinterpret_cast<BobAlignResultCommunicator *>(communicators_[KBobAlignResult].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
-  communicator_ptr->Send(target_server_name, bobAlignResult);
+  return communicator_ptr->Send(target_server_name, bobAlignResult);
 }
 
-void VerticalServer::Send(const std::string &target_server_name, const psi::AlicePbaAndBF &alicePbaAndBF) {
+bool VerticalServer::Send(const std::string &target_server_name, const psi::AlicePbaAndBF &alicePbaAndBF) {
   auto communicator_ptr = reinterpret_cast<AlicePbaAndBFCommunicator *>(communicators_[KAlicePbaAndBF].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
-  communicator_ptr->Send(target_server_name, alicePbaAndBF);
+  return communicator_ptr->Send(target_server_name, alicePbaAndBF);
 }
 
-void VerticalServer::Send(const std::string &target_server_name, const psi::AliceCheck &aliceCheck) {
+bool VerticalServer::Send(const std::string &target_server_name, const psi::AliceCheck &aliceCheck) {
   auto communicator_ptr = reinterpret_cast<AliceCheckCommunicator *>(communicators_[KAliceCheck].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
-  communicator_ptr->Send(target_server_name, aliceCheck);
+  return communicator_ptr->Send(target_server_name, aliceCheck);
 }
 
-void VerticalServer::Send(const std::string &target_server_name, const psi::PlainData &plainData) {
+bool VerticalServer::Send(const std::string &target_server_name, const psi::PlainData &plainData) {
   auto communicator_ptr = reinterpret_cast<PlainDataCommunicator *>(communicators_[KPlainData].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
-  communicator_ptr->Send(target_server_name, plainData);
+  return communicator_ptr->Send(target_server_name, plainData);
 }
 
 WorkerConfigItemPy VerticalServer::Send(const std::string &target_server_name,
