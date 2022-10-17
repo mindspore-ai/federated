@@ -36,6 +36,25 @@ def export_mindrecord(file_name, raw_data, keys, shard_num=1, overwrite=True):
 
 
 def load_mindrecord(input_dir, seed=0, **kwargs):
+    """
+    Load MindRecord files.
+
+    Args:
+        input_dir (str): Input directory for storing MindRecord-related files.
+        seed (int): The seed of loading dataset. Default: 0.
+
+    Returns:
+        dataset (MindDataset): Order-preserving datasets.
+
+    Note:
+        This API transparently transfers the `kwargs` to MindDataset.
+        For details about more hyper parameters in `kwargs`, see the MindDataset.
+
+    Examples:
+        >>> dataset = load_mindrecord(input_dir="input_dir", seed=0, shuffle=True)
+        >>> for batch in dataset.create_tuple_iterator():
+        ...     print(batch)
+    """
     ds.config.set_seed(seed)
     dataset_files = [os.path.join(input_dir, _) for _ in os.listdir(input_dir) if "db" not in _]
     dataset_files.sort()

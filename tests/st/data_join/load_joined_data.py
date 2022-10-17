@@ -15,7 +15,7 @@
 """Load joined data."""
 
 import argparse
-from mindspore_federated.data_join.io import load_mindrecord
+from mindspore_federated.data_join import load_mindrecord
 
 
 def get_parser():
