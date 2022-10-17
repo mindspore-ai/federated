@@ -111,10 +111,14 @@ class FLModel:
                  eval_network=None,
                  grad_network=None):
         self._role = yaml_data.role
+        if not isinstance(network, nn.Cell):
+            raise TypeError('FLModel: type of \'network\' is not nn.Cell')
         self._backbone_net = network
         self._loss_fn = loss_fn
         self._grad_network = grad_network
         self._metrics = metrics
+        if eval_network and not isinstance(eval_network, nn.Cell):
+            raise TypeError('FLModel: type of \'eval_network\' is not nn.Cell')
         self._eval_network = eval_network
         self._label_dp = None
 
@@ -124,26 +128,29 @@ class FLModel:
         self._ckpoint_path = self._yaml_data.ckpt_path
         self.global_step = 0
 
-        if hasattr(self._yaml_data, 'privacy'):
+        if hasattr(self._yaml_data, 'privacy_eps'):
             label_dp_eps = self._yaml_data.privacy_eps
             self._label_dp = LabelDP(eps=label_dp_eps)
 
         if self._label_dp is not None and self._role != 'leader':
             raise AttributeError('FLModel: only a leader party can employ the label dp strategy')
-        if train_network is not None and self._loss_fn is not None:
+        if train_network is None and self._loss_fn is None:
             raise AttributeError('FLModel: the attribute train_network and loss_fn shall be selected only one')
         if train_network is None and self._loss_fn is not None:
             self._train_network = self._build_train_network()
         elif train_network is not None and self._loss_fn is None:
+            if not isinstance(train_network, nn.Cell):
+                raise TypeError('FLModel: type of \'train_network\' is not nn.Cell')
             self._train_network = train_network
         else:
             self._train_network = network
         parallel_mode = context.get_auto_parallel_context("parallel_mode")
         if parallel_mode in (ParallelMode.SEMI_AUTO_PARALLEL, ParallelMode.AUTO_PARALLEL):
             self._train_network = _VirtualDatasetCell(self._train_network)
-            self._eval_network = _VirtualDatasetCell(self._eval_network)
             self._train_network.set_auto_parallel()
-            self._eval_network.set_auto_parallel()
+            if self._eval_network:
+                self._eval_network = _VirtualDatasetCell(self._eval_network)
+                self._eval_network.set_auto_parallel()
         if parallel_mode == ParallelMode.DATA_PARALLEL:
             self._train_network.set_broadcast_flag()
         self._train_network.set_train(mode=True)
@@ -267,7 +274,7 @@ class FLModel:
 
         out = OrderedDict()
         for idx, output_data in enumerate(self._yaml_data.train_net_outs):
-            out[output_data['name']] = out_tuple[idx]
+            out[output_data['name']] = out_tuple[idx] if isinstance(out_tuple, tuple) else out_tuple
         return out
 
     def backward_one_step(self, local_data_batch: dict = None, remote_data_batch: dict = None, sens: dict = None):
@@ -313,7 +320,10 @@ class FLModel:
                     input_data_batch = _reorganize_input_data([local_data_batch, remote_data_batch],
                                                               input_names, type(optimizer).__name__)
                     input_data_batch = list(input_data_batch.values())
-                    optimizer(*input_data_batch, sens=sens)
+                    if not sens:
+                        optimizer(*input_data_batch)
+                    else:
+                        optimizer(*input_data_batch, sens=sens)
 
         if self._role == 'leader' and self._label_dp is not None:
             local_data_batch[self._yaml_data.eval_net_gt] = label
