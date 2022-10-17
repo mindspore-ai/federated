@@ -73,3 +73,4 @@ hyper_parameters:
   epochs: 20
   batch_size: 16000
   is_eval: True
+ckpt_path: ./checkpoints

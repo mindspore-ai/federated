@@ -86,6 +86,10 @@ class FLYamlData:
             if 'eps' not in self.privacy['label_dp']:
                 raise ValueError('FLYamlData init failed: missing field of \'eps\' under \'label_dp\'')
             self.privacy_eps = self.privacy['label_dp']['eps']
+
+        if 'ckpt_path' in self.yaml_data:
+            self.ckpt_path = self.yaml_data['ckpt_path']
+
         self.fp.close()
 
     def _parse_train_net(self):

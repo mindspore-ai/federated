@@ -16,14 +16,15 @@
 import os
 import logging
 
-from mindspore import context
+from mindspore import context, Tensor
 from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
 from mindspore.nn.wrap.cell_wrapper import _VirtualDatasetCell
 from mindspore.train.summary import SummaryRecord
 from mindspore_federated import FLModel, FLYamlData
 
 from src.split_pangu_alpha import PanguAlphaModel, BackboneLossNet, PanGuHead, HeadLossNet, EmbeddingLayer, \
-    EmbeddingLossNet, AUCMetric
+    EmbeddingLossNet, PPLMetric
+
 from src.utils import LearningRate, get_args, construct_local_dataset, load_train_net, set_weight_decay, \
     set_embedding_weight_decay
 from src.pangu_optim import PanguAlphaAdam, FP32StateAdamWeightDecay
@@ -51,6 +52,10 @@ if __name__ == '__main__':
     ds_train = construct_local_dataset(opt, rank_id, device_num)
     train_iter = ds_train.create_dict_iterator()
     train_size = ds_train.get_dataset_size()
+    # eval data iteration for example
+    ds_eval = construct_local_dataset(opt, rank_id, device_num, is_training=False)
+    eval_iter = ds_eval.create_dict_iterator()
+    eval_size = ds_eval.get_dataset_size()
 
     # loss scale
     lr = LearningRate(learning_rate=opt.start_lr, end_learning_rate=opt.end_lr,
@@ -58,7 +63,7 @@ if __name__ == '__main__':
 
     loss, config = load_train_net(opt)
     update_cell = DynamicLossScaleUpdateCell(loss_scale_value=1024.0, scale_factor=2, scale_window=1000)
-    eval_metric = AUCMetric()
+    eval_metric = PPLMetric(opt.seq_length)
     # Embedding/Tail Part
     embedding_base_net = EmbeddingLayer(config)
     embedding_eval_net = embedding_train_net = EmbeddingLossNet(embedding_base_net, config)
@@ -102,11 +107,17 @@ if __name__ == '__main__':
                                  eval_network=embedding_eval_net,
                                  optimizers=embedding_optim)
 
+    # resume if you have checkpoint file or dir
+    # embedding_fl_model.load_ckpt()
+    # backbone_fl_model.load_ckpt()
+    # head_fl_model.load_ckpt()
+
     # forward/backward batch by batch
     with SummaryRecord('./summary') as summary_record:
         for epoch in range(50):
             for step, item in enumerate(train_iter, start=1):
                 # forward process
+                step = epoch * train_size + step
                 embedding_out = embedding_fl_model.forward_one_step(item)
                 backbone_out = backbone_fl_model.forward_one_step(item, embedding_out)
                 logit_out = head_fl_model.forward_one_step(item, backbone_out)
@@ -119,6 +130,18 @@ if __name__ == '__main__':
                     summary_record.record(step)
                     logging.info('epoch %d step %d/%d loss: %f', epoch, step, train_size, logit_out['output'])
 
-    backbone_fp.close()
-    embedding_fp.close()
-    head_fp.close()
+                    # save checkpoint
+                    embedding_fl_model.save_ckpt()
+                    backbone_fl_model.save_ckpt()
+                    head_fl_model.save_ckpt()
+
+                    for eval_item in eval_iter:
+                        # forward process
+                        embedding_out = embedding_fl_model.forward_one_step(item)
+                        backbone_out = backbone_fl_model.forward_one_step(item, embedding_out)
+                        logit_out = head_fl_model.eval_one_step(item, backbone_out)
+
+                    ppl = eval_metric.eval()
+                    eval_metric.clear()
+                    summary_record.add_value('scalar', 'ppl', Tensor(ppl))
+                    logging.info('----evaluation---- epoch %d step %d ppl %f', epoch, step, ppl)

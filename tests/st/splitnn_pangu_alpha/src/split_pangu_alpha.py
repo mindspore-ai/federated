@@ -14,6 +14,7 @@
 # ============================================================================
 """PanguAlpha model"""
 import copy
+import math
 from sklearn.metrics import roc_auc_score
 
 import mindspore.nn as nn
@@ -28,6 +29,31 @@ from mindspore.nn.transformer import MoEConfig
 from mindspore.nn.transformer.layers import _LayerNorm, _Dropout
 from mindspore.nn.metrics import Metric
 
+class PPLMetric(Metric):
+    """
+    ppl metric
+    """
+
+    def __init__(self, data_length):
+        super(PPLMetric, self).__init__()
+        self.clear()
+        self.data_length = data_length
+
+    def clear(self):
+        """Clear the internal evaluation result."""
+        self.ppl = []
+        self.tokens_count = 0
+
+    def update(self, *inputs): # inputs
+        """Update list of ppl"""
+        logits = inputs[0].asnumpy().flatten().tolist() # logits
+        self.ppl.append(logits[0] * self.data_length)
+        self.tokens_count += 1
+
+    def eval(self):
+        val_loss = sum(self.ppl) / (self.tokens_count * self.data_length)
+        ppl = math.exp(min(20, val_loss))
+        return ppl
 
 class AUCMetric(Metric):
     """

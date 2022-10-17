@@ -73,10 +73,16 @@ if __name__ == '__main__':
                                 network=follower_base_net,
                                 train_network=follower_train_net,
                                 eval_network=follower_eval_net)
+    # resume if you have checkpoint file or dir
+    follower_fl_model.load_ckpt()
+    leader_fl_model.load_ckpt()
+
     # forward/backward batch by batch
+    steps_per_epoch = ds_train.get_dataset_size()
     with SummaryRecord('./summary') as summary_record:
         for epoch in range(config.epochs):
             for step, item in enumerate(train_iter, start=1):
+                step = steps_per_epoch * epoch + step
                 follower_out = follower_fl_model.forward_one_step(item)
                 leader_out = leader_fl_model.forward_one_step(item, follower_out)
                 scale = leader_fl_model.backward_one_step(item, follower_out)
@@ -87,10 +93,15 @@ if __name__ == '__main__':
                     summary_record.record(step)
                     logging.info('epoch %d step %d/%d wide_loss: %f deep_loss: %f',
                                  epoch, step, train_size, leader_out['wide_loss'], leader_out['deep_loss'])
-            for eval_item in eval_iter:
-                follower_out = follower_fl_model.forward_one_step(eval_item)
-                leader_eval_out = leader_fl_model.eval_one_step(eval_item, follower_out)
-            auc = eval_metric.eval()
-            eval_metric.clear()
-            summary_record.add_value('scalar', 'auc', Tensor(auc))
-            logging.info('----evaluation---- epoch %d auc %f', epoch, auc)
+
+                    # save checkpoint
+                    leader_fl_model.save_ckpt()
+                    follower_fl_model.save_ckpt()
+
+                    for eval_item in eval_iter:
+                        follower_out = follower_fl_model.forward_one_step(eval_item)
+                        leader_eval_out = leader_fl_model.eval_one_step(eval_item, follower_out)
+                    auc = eval_metric.eval()
+                    eval_metric.clear()
+                    summary_record.add_value('scalar', 'auc', Tensor(auc))
+                    logging.info('----evaluation---- epoch %d auc %f', epoch, auc)

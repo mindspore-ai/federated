@@ -114,7 +114,7 @@ class PartyOptimizer:
             optim_params = net.trainable_params()
         self.hyperparams['params'] = self._params = optim_params
         optim_module = importlib.import_module('mindspore.nn.optim')
-        self.optim = getattr(optim_module, self.type)(**self.hyperparams)
+        self.optimizer = getattr(optim_module, self.type)(**self.hyperparams)
         self.grad_list = []
         for grad_yaml in optim_yaml['grads']:
             grad_inst = PartyGradOperation(grad_yaml, net, net_yaml, optim_params)
@@ -129,7 +129,7 @@ class PartyOptimizer:
                 res = grad(local_data_batch, remote_data_batch, sens_dict)
                 zipped = zip(res, grad_value)
                 grad_value = tuple(map(sum, zipped))
-        self.optim(grad_value)
+        self.optimizer(grad_value)
 
 
 class PartyGradOperation:
