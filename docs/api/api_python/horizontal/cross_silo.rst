@@ -1,12 +1,12 @@
 云云联邦学习
 ================================
 
-.. py:class:: mindspore.FederatedLearningManager(yaml_config, model, sync_frequency, http_server_address="", data_size=1, sync_type='fixed', ssl_config=None, **kwargs)
+.. py:class:: mindspore_federated.FederatedLearningManager(yaml_config, model, sync_frequency, http_server_address="", data_size=1, sync_type='fixed', ssl_config=None, **kwargs)
 
     在训练过程中管理联邦学习。
 
     参数：
-        - **yaml_config** (str) - yaml文件路径。更多细节见 `yaml配置说明 <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python/federated_server_yaml.md>`_。
+        - **yaml_config** (str) - yaml文件路径。更多细节见 `yaml配置说明 <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python/horizontal/federated_server_yaml.md>`_。
         - **model** (nn.Cell) - 一个用于联邦训练的模型。
         - **sync_frequency** (int) - 联邦学习中的参数同步频率。
           需要注意在数据下沉模式中，频率的值等于epoch。否则，频率的值等于step。

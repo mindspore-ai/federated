@@ -7,7 +7,7 @@
 
     .. note::
         需要先通过 `from mindspore_federated._mindspore_federated import RunPSI` 导入该函数；
-        在调用本接口前，需要初始化纵向联邦通信实例，可参考`MindSpore federated ST <https://gitee.com/mindspore/federated/blob/master/tests/st/psi/run_psi.py>`_ 。
+        在调用本接口前，需要初始化纵向联邦通信实例，可参考 `MindSpore federated ST <https://gitee.com/mindspore/federated/blob/master/tests/st/psi/run_psi.py>`_ 。
 
     参数：
         - **input_data** (list[string]) - 己方的输入数据。
@@ -31,7 +31,7 @@
 
     .. note::
         需要先通过 `from mindspore_federated._mindspore_federated import PlainIntersection` 导入该函数；
-        在调用本接口前，需要初始化纵向联邦通信实例，可参考[MindSpore federated ST](https://gitee.com/mindspore/federated/blob/master/tests/st/psi/run_psi.py) 。
+        在调用本接口前，需要初始化纵向联邦通信实例，可参考 `MindSpore federated ST <https://gitee.com/mindspore/federated/blob/master/tests/st/psi/run_psi.py>`_ 。
 
     参数：
         - **input_data** (list[string]) - 己方的输入数据。

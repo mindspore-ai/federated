@@ -1,7 +1,7 @@
-数据接入
+mindspore_federated.data_join
 ================================
 
-.. py:class:: FLDataWorker(role, worker_config_path, data_schema_path, server_address, peer_server_address)
+.. py:class:: mindspore_federated.data_join.FLDataWorker(role, worker_config_path, data_schema_path, server_address, peer_server_address)
 
     数据接入进程。
 
@@ -17,7 +17,7 @@
         根据交集导出MindRecord。
 
 
-.. py:function:: load_mindrecord(input_dir, seed=0, **kwargs)
+.. py:function:: mindspore_federated.data_join.load_mindrecord(input_dir, seed=0, **kwargs)
 
     读取MindRecord文件。
 
@@ -29,5 +29,5 @@
         - **dataset** (MindDataset) - 保序的数据集。
 
     .. note::
-        该接口将`kwargs`透传给MindDataset。
-        有关`kwargs`中更多超参数的详细信息，请参见MindDataset。
+        该接口将 `kwargs` 透传给MindDataset。
+        有关 `kwargs` 中更多超参数的详细信息，请参见MindDataset。
