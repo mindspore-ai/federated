@@ -20,7 +20,7 @@ ${PROJECT_PATH}/graphengine/third_party/prebuild/aarch64:${LD_LIBRARY_PATH}
 export PYTHONPATH=${PROJECT_PATH}/tests/ut/cpp/python_input:\
 $PYTHONPATH:${PROJECT_PATH}/mindspore_federated/python:\
 ${PROJECT_PATH}/tests/ut/python:${PROJECT_PATH}
-export GLOG_v=2
+export GLOG_v=1
 export GC_COLLECT_IN_CELL=1
 ## set op info config path
 export MINDSPORE_OP_INFO_PATH=${PROJECT_PATH}/config/op_info.config
