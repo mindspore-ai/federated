@@ -60,8 +60,7 @@ if __name__ == '__main__':
     leader_train_net = LeaderLossNet(leader_base_net, config)
     leader_eval_net = LeaderEvalNet(leader_base_net)
     eval_metric = AUCMetric()
-    leader_fl_model = FLModel(role='leader',
-                              yaml_data=leader_yaml_data,
+    leader_fl_model = FLModel(yaml_data=leader_yaml_data,
                               network=leader_base_net,
                               train_network=leader_train_net,
                               metrics=eval_metric,
@@ -70,8 +69,7 @@ if __name__ == '__main__':
     # Follower Part
     follower_eval_net = follower_base_net = FollowerNet(config)
     follower_train_net = FollowerLossNet(follower_base_net, config)
-    follower_fl_model = FLModel(role='follower',
-                                yaml_data=follower_yaml_data,
+    follower_fl_model = FLModel(yaml_data=follower_yaml_data,
                                 network=follower_base_net,
                                 train_network=follower_train_net,
                                 eval_network=follower_eval_net)

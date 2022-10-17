@@ -56,7 +56,7 @@ class FLYamlData:
         if 'role' not in self.yaml_data:
             raise ValueError('FLYamlData init failed: missing field of \'role\'')
         self.role = self.yaml_data['role']
-        if self.role not in ['leader', 'follower', 'leader&follower']:
+        if self.role not in ['leader', 'follower']:
             raise ValueError(f'FLYamlData init failed: value of role ({self.role}) is illegal, \
                              role shall be either \'leader\' or \'follower\'')
 
