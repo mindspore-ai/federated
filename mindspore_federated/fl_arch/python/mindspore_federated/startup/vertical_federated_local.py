@@ -47,8 +47,8 @@ class VerticalFederatedCommunicator:
     def launch(self):
         VerticalFederated_.start_vertical_communicator()
 
-    def send_tensors(self, target_server_name: str, tensor_list_item: TensorListItem_):
-        return VerticalFederated_.send_tensor_list(target_server_name, tensor_list_item)
+    def send_tensors(self, target_server_name: str, tensor_list_item_py: TensorListItem_):
+        return VerticalFederated_.send_tensor_list(target_server_name, tensor_list_item_py)
 
     def send_register(self, target_server_name: str, worker_register_item_py: WorkerRegisterItemPy_):
         return VerticalFederated_.send_worker_register(target_server_name, worker_register_item_py)

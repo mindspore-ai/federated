@@ -25,8 +25,11 @@
 #include <queue>
 #include <deque>
 
+#include "common/utils/log_adapter.h"
+
 namespace mindspore {
 namespace fl {
+constexpr size_t kMaxQueueSize = 128;
 template <typename T>
 class MessageQueue {
  private:
@@ -37,6 +40,10 @@ class MessageQueue {
  public:
   void push(T data) {
     std::unique_lock<std::mutex> lock(msg_mutex_);
+    if (queue_.size() >= kMaxQueueSize) {
+      MS_LOG(WARNING) << "Reject the message because of over ther queue size.";
+      return;
+    }
     queue_.push_back(data);
     message_received_cond_.notify_all();
   }

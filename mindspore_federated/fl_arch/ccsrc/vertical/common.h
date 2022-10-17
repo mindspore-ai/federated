@@ -55,6 +55,9 @@ constexpr auto KBobAlignResultMsgType = "/bobAlignResult";
 constexpr auto KAliceCheckMsgType = "/aliceCheck";
 constexpr auto KPlainDataMsgType = "/plainData";
 constexpr auto KDataJoinMsgType = "/dataJoin";
+
+constexpr size_t kRetryCommunicateTimes = 900;
+constexpr size_t kSleepSecondsOfCommunicate = 1;
 }  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_FL_ARCH_CCSRC_VERTICAL_COMMON_H_

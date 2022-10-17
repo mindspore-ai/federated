@@ -53,7 +53,7 @@ bool DataJoinCommunicator::LaunchMsgHandler(const std::shared_ptr<MessageHandler
     MS_LOG(INFO) << "Worker register name is " << workerRegisterItemPy.worker_name();
     notifyForRegister();
     SendWorkerConfig(message);
-    MS_LOG(INFO) << "Launching psi ClientPSIInit message handler successful.";
+    MS_LOG(INFO) << "Launching data join message handler successful.";
   } catch (const std::exception &e) {
     MS_LOG(WARNING) << "Catch exception when handle job vertical psi " << e.what();
     return false;

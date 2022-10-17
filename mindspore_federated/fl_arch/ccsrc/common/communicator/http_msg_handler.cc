@@ -21,8 +21,8 @@
 namespace mindspore {
 namespace fl {
 HttpMsgHandler::HttpMsgHandler(const std::shared_ptr<HttpMessageHandler> &http_msg, void *data, size_t len,
-                               std::string message_type)
-    : http_msg_(http_msg), data_(data), len_(len), message_type_(message_type) {}
+                               std::string message_type, std::string message_id)
+    : http_msg_(http_msg), data_(data), len_(len), message_type_(message_type), message_id_(message_id) {}
 
 const void *HttpMsgHandler::data() const {
   MS_ERROR_IF_NULL_W_RET_VAL(data_, nullptr);
@@ -33,8 +33,18 @@ size_t HttpMsgHandler::len() const { return len_; }
 
 std::string HttpMsgHandler::message_type() const { return message_type_; }
 
+std::string HttpMsgHandler::message_id() const { return message_id_; }
+
 bool HttpMsgHandler::SendResponse(const void *data, const size_t &len) {
   MS_ERROR_IF_NULL_W_RET_VAL(data, false);
+  http_msg_->QuickResponse(kHttpSuccess, data, len);
+  has_sent_response_ = true;
+  return true;
+}
+
+bool HttpMsgHandler::SendResponse(const void *data, const size_t &len, const std::string &message_id) {
+  MS_ERROR_IF_NULL_W_RET_VAL(data, false);
+  http_msg_->AddRespHeadParam("Message-Id", message_id);
   http_msg_->QuickResponse(kHttpSuccess, data, len);
   has_sent_response_ = true;
   return true;

@@ -32,7 +32,9 @@ class TcpMsgHandler : public MessageHandler {
   const void *data() const override;
   size_t len() const override;
   bool SendResponse(const void *data, const size_t &len) override;
+  bool SendResponse(const void *data, const size_t &len, const std::string &message_id) override;
   std::string message_type() const override;
+  std::string message_id() const override;
 
  private:
   std::shared_ptr<TcpConnection> tcp_conn_;
@@ -41,6 +43,7 @@ class TcpMsgHandler : public MessageHandler {
   // We use data of shared_ptr array so that the raw pointer won't be released until the reference is 0.
   VectorPtr data_;
   std::string message_type_;
+  std::string message_id_;
 };
 }  // namespace fl
 }  // namespace mindspore

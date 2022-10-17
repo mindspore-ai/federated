@@ -27,21 +27,27 @@ namespace fl {
 constexpr int kHttpSuccess = 200;
 class HttpMsgHandler : public MessageHandler {
  public:
-  HttpMsgHandler(const std::shared_ptr<HttpMessageHandler> &http_msg, void *data, size_t len, std::string message_type);
+  HttpMsgHandler(const std::shared_ptr<HttpMessageHandler> &http_msg, void *data, size_t len, std::string message_type,
+                 std::string message_id);
   ~HttpMsgHandler() override = default;
 
   const void *data() const override;
   size_t len() const override;
   std::string message_type() const override;
+  std::string message_id() const override;
 
   bool SendResponse(const void *data, const size_t &len) override;
+  bool SendResponse(const void *data, const size_t &len, const std::string &message_id) override;
   bool SendResponseInference(const void *data, const size_t &len, RefBufferRelCallback cb) override;
 
  private:
   std::shared_ptr<HttpMessageHandler> http_msg_;
   void *data_;
   size_t len_;
+  // We use message type to make sure which server sends the message
   std::string message_type_;
+  // We use message id to track message request and response
+  std::string message_id_;
 };
 }  // namespace fl
 }  // namespace mindspore
