@@ -44,8 +44,7 @@ class FollowerTrainer:
         follower_yaml_data = FLYamlData(config.follower_yaml_path)
         follower_eval_net = follower_base_net = FollowerNet(config)
         follower_train_net = FollowerLossNet(follower_base_net, config)
-        self.follower_fl_model = FLModel(role='follower',
-                                         yaml_data=follower_yaml_data,
+        self.follower_fl_model = FLModel(yaml_data=follower_yaml_data,
                                          network=follower_base_net,
                                          train_network=follower_train_net,
                                          eval_network=follower_eval_net)

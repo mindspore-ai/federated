@@ -45,8 +45,7 @@ class LeaderThread(threading.Thread):
         leader_train_net = LeaderLossNet(leader_base_net, config)
         leader_eval_net = LeaderEvalNet(leader_base_net)
         self.eval_metric = AUCMetric()
-        self.leader_fl_model = FLModel(role='leader',
-                                       yaml_data=leader_yaml_data,
+        self.leader_fl_model = FLModel(yaml_data=leader_yaml_data,
                                        network=leader_base_net,
                                        train_network=leader_train_net,
                                        metrics=self.eval_metric,
@@ -86,8 +85,7 @@ class FollowerThread(threading.Thread):
         follower_yaml_data = FLYamlData(config.follower_yaml_path)
         follower_eval_net = follower_base_net = FollowerNet(config)
         follower_train_net = FollowerLossNet(follower_base_net, config)
-        self.follower_fl_model = FLModel(role='follower',
-                                         yaml_data=follower_yaml_data,
+        self.follower_fl_model = FLModel(yaml_data=follower_yaml_data,
                                          network=follower_base_net,
                                          train_network=follower_train_net,
                                          eval_network=follower_eval_net)

@@ -85,21 +85,18 @@ if __name__ == '__main__':
     head_optim = PanguAlphaAdam(head_train_net, head_optim_inst, update_cell, config, head_yaml)
 
     # FLModel definition
-    head_fl_model = FLModel(role='leader',
-                            yaml_data=head_yaml,
+    head_fl_model = FLModel(yaml_data=head_yaml,
                             network=head_base_net,
                             train_network=head_train_net,
                             eval_network=head_eval_net,
                             optimizers=head_optim,
                             metrics=eval_metric)
-    backbone_fl_model = FLModel(role='follower',
-                                yaml_data=backbone_yaml,
+    backbone_fl_model = FLModel(yaml_data=backbone_yaml,
                                 network=backbone_base_net,
                                 train_network=backbone_train_net,
                                 eval_network=backbone_eval_net,
                                 optimizers=backbone_optim)
-    embedding_fl_model = FLModel(role='leader',
-                                 yaml_data=embedding_yaml,
+    embedding_fl_model = FLModel(yaml_data=embedding_yaml,
                                  network=embedding_base_net,
                                  train_network=embedding_train_net,
                                  eval_network=embedding_eval_net,

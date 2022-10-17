@@ -79,7 +79,6 @@ class FLModel:
     training and inference processes.
 
     Args:
-        role (str): Role of the vertical federated learning party, shall be either 'leader' or 'follower'.
         yaml_data (class): Data class containing information on the vertical federated learning process, including
             optimizers, gradient calculators, etc. The information mentioned above is parsed from the yaml file
             provided by the developer.
@@ -93,10 +92,11 @@ class FLModel:
             to use standard optimizers of MindSpore specified in the yaml file. Default: None.
         metrics (Metric): Metrics to evaluate the evaluation network. Default: None.
         eval_network (nn.Cell): Evaluation network of the party, which outputs the predict value. Default: None.
+        grad_network (nn.Cell): Network running on the trusted execution environment(TEE) environment for protect
+            the data privacy. Default: None.
     """
 
     def __init__(self,
-                 role,
                  yaml_data,
                  network,
                  train_network=None,
@@ -105,7 +105,7 @@ class FLModel:
                  metrics=None,
                  eval_network=None,
                  grad_network=None):
-        self._role = role
+        self._role = yaml_data.role
         self._backbone_net = network
         self._loss_fn = loss_fn
         self._grad_network = grad_network
@@ -193,8 +193,10 @@ class FLModel:
         Evaluate the evaluation network using a data batch.
 
         Args:
-            local_data_batch (dict): Data batch read from local server.
-            remote_data_batch (dict): Data batch read from remote server of other parties.
+            local_data_batch (dict): Data batch read from local server. key is the name of the data item, value
+                is the corresponding tensor.
+            remote_data_batch (dict): Data batch read from remote server of other parties. key is the name of
+                the data item, value is the corresponding tensor.
 
         Returns:
             Dict, outputs of the evaluation network. key is the name of output, value is tensors.
@@ -231,8 +233,10 @@ class FLModel:
         Forward the training network using a data batch.
 
         Args:
-            local_data_batch (dict): Data batch read from local server.
-            remote_data_batch (dict): Data batch read from remote server of other parties.
+            local_data_batch (dict): Data batch read from local server.  key is the name of the data item, value
+                is the corresponding tensor.
+            remote_data_batch (dict): Data batch read from remote server of other parties. key is the name of
+                the data item, value is the corresponding tensor.
 
         Returns:
             Dict, outputs of the training network. key is the name of output, value is the tensor.
@@ -264,8 +268,10 @@ class FLModel:
         Backward the training network using a data batch.
 
         Args:
-            local_data_batch (dict): Data batch read from local server.
-            remote_data_batch (dict): Data batch read from remote server of other parties.
+            local_data_batch (dict): Data batch read from local server.  key is the name of the data item, value
+                is the corresponding tensor.
+            remote_data_batch (dict): Data batch read from remote server of other parties. key is the name of
+                the data item, value is the corresponding tensor.
             sens (dict): Sense parameters or scale values to calculate the gradient values of the traning network.
             key is the label name specified in the yaml file. value is the dict of sense parameters or gradient scale
             values. the key of the value dict is the name of the output of the training network, and the value of the
