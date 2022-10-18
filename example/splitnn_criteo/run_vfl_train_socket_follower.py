@@ -22,7 +22,7 @@ import logging
 
 from mindspore import context
 from mindspore_federated import FLModel, tensor_utils, FLYamlData
-from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig
+from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
 from wide_and_deep import FollowerNet, FollowerLossNet
 
 from network_config import config

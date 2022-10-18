@@ -25,7 +25,7 @@ import logging
 
 from mindspore import context
 from mindspore_federated import FLModel, FLYamlData, tensor_utils
-from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig
+from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
 from wide_and_deep import LeaderNet, LeaderLossNet, LeaderEvalNet, AUCMetric
 
 from network_config import config

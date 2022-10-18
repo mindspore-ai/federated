@@ -16,7 +16,7 @@
 
 import argparse
 import ast
-from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig
+from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
 from mindspore_federated._mindspore_federated import RunPSI
 from mindspore_federated._mindspore_federated import PlainIntersection
 
