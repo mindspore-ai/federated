@@ -30,78 +30,6 @@
 namespace mindspore {
 namespace fl {
 namespace psi {
-std::vector<std::string> ReadFile(const std::string &csv_path) {
-  MS_LOG(INFO) << "Start read CSV file " << csv_path << " ...";
-  std::vector<std::string> input_vector;
-  std::ifstream input(csv_path);
-  std::string line;
-  while (getline(input, line)) {
-    input_vector.emplace_back(line);
-  }
-  MS_LOG(INFO) << "Read CSV file success!";
-  return input_vector;
-}
-
-void WriteFile(const std::string &csv_path, const std::vector<std::string> &in_data) {
-  MS_LOG(INFO) << "Start write CSV file " << csv_path << " ...";
-  std::ofstream out_file;
-  out_file.open(csv_path, std::ios::out);
-  uint64_t line_num = in_data.size();
-  for (uint64_t i = 0; i < line_num; i++) {
-    out_file << in_data[i] << std::endl;
-  }
-  out_file.close();
-  MS_LOG(INFO) << "Write CSV file success!";
-}
-
-std::vector<std::string> ReadFileAndDeserialize(const std::string &csv_path, const size_t &input_num,
-                                                const size_t &item_length) {
-  MS_LOG(INFO) << "Start read";
-  MS_LOG(INFO) << "Per item length is " << item_length;
-
-  std::string flatten_str;
-  flatten_str.reserve(input_num * item_length);
-  std::ifstream input(csv_path);
-  std::ostringstream tmp;
-  tmp << input.rdbuf();
-  flatten_str = tmp.str();
-  if (input_num * item_length != flatten_str.length()) {
-    MS_LOG(INFO) << "length error, read length is " << flatten_str.length() << ", but should be "
-                 << input_num * item_length;
-  }
-  std::vector<std::string> ret;
-  ret.reserve(input_num);
-  for (size_t i = 0; i < input_num; i++) {
-    ret.push_back(flatten_str.substr(i * item_length, item_length));
-  }
-
-  return ret;
-}
-
-void FlattenAndWriteFile(const std::string &out_path, const std::vector<std::string> &in_data) {
-  MS_LOG(INFO) << "Start write";
-  size_t input_num = in_data.size();
-  size_t item_length = in_data[0].length();
-  std::string ret;
-  ret.reserve(input_num * item_length);
-  for (size_t i = 0; i < input_num; i++) {
-    ret.append(in_data[i]);
-  }
-  std::ofstream out_file;
-  out_file.open(out_path);
-  out_file << ret;
-  MS_LOG(INFO) << "Start write over, length is " << ret.length();
-}
-
-BloomFilter ReadFileAndBuildFilter(const std::string &csv_path, const size_t &input_num, const int &neg_log_fp_rate) {
-  MS_LOG(INFO) << "Start read and build filter...";
-
-  std::ifstream input(csv_path);
-  std::ostringstream tmp;
-  tmp << input.rdbuf();
-
-  return {tmp.str(), input_num, neg_log_fp_rate};
-}
 std::string ReadBinFile(const std::string &csv_path) {
   MS_LOG(INFO) << "Start read Bin file...";
   std::ifstream input(csv_path);
@@ -110,38 +38,12 @@ std::string ReadBinFile(const std::string &csv_path) {
   return tmp.str();
 }
 
-void FilterWriteFile(const std::string &out_path, const std::string &ret) {
+void WriteFile(const std::string &out_path, const std::string &ret) {
   MS_LOG(INFO) << "Start write Bin file: " << out_path;
   std::ofstream out_file;
   out_file.open(out_path);
   out_file << ret;
   MS_LOG(INFO) << "Start write filter over, file length is " << ret.length();
-}
-
-std::vector<std::string> CreateFakeDataset(size_t begin, size_t size) {
-  std::vector<std::string> fake_dataset;
-  for (size_t i = 0; i < size; i++) {
-    fake_dataset.push_back(std::to_string(begin + i));
-  }
-  srand((unsigned int)time(0));
-  shuffle(fake_dataset.begin(), fake_dataset.end(), std::mt19937(std::random_device()()));
-  return fake_dataset;
-}
-
-void GenDataSet() {
-  std::vector<size_t> num_list = {10, 1000, 10000, 100000, 1000000};
-  for (auto num : num_list) {
-    std::string alice_csv_path = "alice_" + std::to_string(num) + ".csv";
-    std::string bob_csv_path = "bob_" + std::to_string(num) + ".csv";
-
-    int alice_begin = 2 * num;
-    int bob_begin = 2.5 * num;
-    auto alice_input = CreateFakeDataset(alice_begin, num);
-    auto bob_input = CreateFakeDataset(bob_begin, num);
-    WriteFile(alice_csv_path, alice_input);
-    WriteFile(bob_csv_path, bob_input);
-    MS_LOG(INFO) << num << " is done.";
-  }
 }
 
 bool Send(const ClientPSIInit &client_psi_init) {
@@ -152,7 +54,7 @@ bool Send(const ClientPSIInit &client_psi_init) {
   size_t data_size = data.size();
   MS_LOG(INFO) << "Send client_psi_init data size is " << data_size;
   // write
-  FilterWriteFile("client_psi_init", data);
+  WriteFile("client_psi_init", data);
   return true;
 }
 
@@ -175,7 +77,7 @@ bool Send(const ServerPSIInit &server_psi_init) {
   std::string data = server_init_proto_ptr->SerializeAsString();
   size_t data_size = data.size();
   MS_LOG(INFO) << "Send server_psi_init data size is " << data_size;
-  FilterWriteFile("server_psi_init", data);
+  WriteFile("server_psi_init", data);
   return true;
 }
 
@@ -197,7 +99,7 @@ bool Send(const BobPb &bob_p_b) {
   std::string data = bob_p_b_proto_ptr->SerializeAsString();
   size_t data_size = data.size();
   MS_LOG(INFO) << "Send bob_p_b data size is " << data_size;
-  FilterWriteFile("bob_p_b", data);
+  WriteFile("bob_p_b", data);
   return true;
 }
 
@@ -223,7 +125,7 @@ bool Send(const AlicePbaAndBF &alice_pba_bf) {
   std::string data = alice_pba_bf_proto_ptr->SerializeAsString();
   size_t data_size = data.size();
   MS_LOG(INFO) << "Send alice_pba_bf data size is " << data_size;
-  FilterWriteFile("alice_pba_bf", data);
+  WriteFile("alice_pba_bf", data);
   return true;
 }
 
@@ -251,7 +153,7 @@ bool Send(const BobAlignResult &bob_align_result) {
   std::string data = alice_result_proto_ptr->SerializeAsString();
   size_t data_size = data.size();
   MS_LOG(INFO) << "Send bob_align_result data size is " << data_size;
-  FilterWriteFile("bob_align_result", data);
+  WriteFile("bob_align_result", data);
   return true;
 }
 
@@ -276,7 +178,7 @@ bool Send(const AliceCheck &alice_check) {
   std::string data = alice_check_proto_ptr->SerializeAsString();
   size_t data_size = data.size();
   MS_LOG(INFO) << "Send alice_check data size is " << data_size;
-  FilterWriteFile("alice_check", data);
+  WriteFile("alice_check", data);
   return true;
 }
 

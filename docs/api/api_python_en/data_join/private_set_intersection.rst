@@ -31,7 +31,7 @@ Private Set Intersection
 
     .. note::
         Use `from mindspore_federated._mindspore_federated import PlainIntersection` to import this interface;
-        A vertical federated communication instance must be initialized before calling this interface. See [MindSpore federated ST](https://gitee.com/mindspore/federated/blob/master/tests/st/psi/run_psi.py).
+        A vertical federated communication instance must be initialized before calling this interface. See `MindSpore federated ST <https://gitee.com/mindspore/federated/blob/master/tests/st/psi/run_psi.py>`_ .
 
     Parameters:
         - **input_data** (list[string]) - Self input dataset.
