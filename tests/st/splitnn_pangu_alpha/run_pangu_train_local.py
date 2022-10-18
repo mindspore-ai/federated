@@ -104,10 +104,14 @@ if __name__ == '__main__':
                                  eval_network=embedding_eval_net,
                                  optimizers=embedding_optim)
 
-    # resume if you have checkpoint file or dir
-    # embedding_fl_model.load_ckpt()
-    # backbone_fl_model.load_ckpt()
-    # head_fl_model.load_ckpt()
+    # resume if you have pretrained checkpoint file
+    if opt.resume:
+        if os.path.exists(opt.pre_trained_embedding):
+            embedding_fl_model.load_ckpt(path=opt.pre_trained_embedding)
+        if os.path.exists(opt.pre_trained_backbone):
+            backbone_fl_model.load_ckpt(path=opt.pre_trained_backbone)
+        if os.path.exists(opt.pre_trained_head):
+            head_fl_model.load_ckpt(path=opt.pre_trained_head)
 
     # forward/backward batch by batch
     with SummaryRecord('./summary') as summary_record:

@@ -464,6 +464,22 @@ def add_retrain_params(opt):
     """
     Add parameters about retrain.
     """
+    opt.add_argument("--resume",
+                     type=bool,
+                     default=False,
+                     help="Whether to resume the pretrained model.")
+    opt.add_argument("--pre_trained_embedding",
+                     type=str,
+                     default=None,
+                     help="Pretrained embedding checkpoint path.")
+    opt.add_argument("--pre_trained_backbone",
+                     type=str,
+                     default=None,
+                     help="Pretrained backbone checkpoint path.")
+    opt.add_argument("--pre_trained_head",
+                     type=str,
+                     default=None,
+                     help="Pretrained head checkpoint path.")
     opt.add_argument("--pre_trained",
                      type=str,
                      default=None,
