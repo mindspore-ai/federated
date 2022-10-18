@@ -4,7 +4,7 @@
 
 MindSpore Federated提供基于拆分学习（Split Learning）的纵向联邦学习基础功能组件。本样例以Wide&Deep网络和Criteo数据集为例，提供了面向推荐任务的联邦学习训练样例。
 
-<img src="../../../docs/api/api_python/splitnn_wide_and_deep.png" alt="MindSpore Federated纵向联邦学习样例（Wide&Deep）" width="854"/>
+<img src="../../../docs/splitnn_wide_and_deep.png" alt="MindSpore Federated纵向联邦学习样例（Wide&Deep）" width="854"/>
 
 如上图所示，该案例中，纵向联邦学习系统由Leader参与方和Follower参与方组成。其中，Leader参与方持有20×2维特征信息和标签信息，Follower参与方持有19×2维特征信息。Leader参与方和Follower参与方分别部署1组Wide&Deep网络，并通过交换embedding向量和梯度向量，在不泄露原始特征和标签信息的前提下，实现对网络模型的协同训练。
 

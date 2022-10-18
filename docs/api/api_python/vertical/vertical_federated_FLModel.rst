@@ -3,7 +3,7 @@
 
 .. py:class:: mindspore_federated.FLModel(yaml_data, network, train_network=None, loss_fn=None, optimizers=None, metrics=None, eval_network=None, eval_indexes=None, grad_network=None)
 
-    用于纵向联邦学习模型训练与推理的高阶API。FLModel将纵向联邦学习参与方训练所需的网络模型、优化器，以及其它数据结构封装为高阶对象.然后，FLModel根据开发者配置的yaml文件（参见[纵向联邦学习yaml详细配置项](https://gitee.com/mindspore/federated/blob/master/docs/api/api_python/vertical_federated_yaml.rst) ），构建纵向联邦学习流程，并提供控制训练和推理流程的接口。
+    用于纵向联邦学习模型训练与推理的高阶API。FLModel将纵向联邦学习参与方训练所需的网络模型、优化器，以及其它数据结构封装为高阶对象.然后，FLModel根据开发者配置的yaml文件（参见 `纵向联邦学习yaml详细配置项 <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python/vertical_federated_yaml.rst>`_ ），构建纵向联邦学习流程，并提供控制训练和推理流程的接口。
 
     参数：
         - **yaml_data** (class) - 包含纵向联邦学习流程相关信息的数据类，包括优化器、梯度计算器等模块信息。该数据类从开发者配置的yaml文件解析得到。
@@ -70,7 +70,7 @@
 
 .. py:class:: mindspore_federated.FLYamlData(path)
 
-    储存纵向联邦学习流程相关的配置信息，包括网络、优化器、算子等模块的输入/输出和超参数。上述信息从开发者提供的yaml文件（参见[纵向联邦学习yaml详细配置项](https://gitee.com/mindspore/federated/blob/master/docs/api/api_python/vertical_federated_yaml.rst) ）中解析上述配置信息。在解析过程中，将会校验yaml文件的合法性。
+    储存纵向联邦学习流程相关的配置信息，包括网络、优化器、算子等模块的输入/输出和超参数。上述信息从开发者提供的yaml文件（参见 `纵向联邦学习yaml详细配置项 <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python/vertical_federated_yaml.rst>`_ ）中解析上述配置信息。在解析过程中，将会校验yaml文件的合法性。
 
     参数：
         - **path** (str) - yaml文件路径。
