@@ -81,32 +81,6 @@ def generate_random_data(seed=0,
             f.write(intersection_output)
 
 
-def generate_worker_config(
-        role="leader",
-        file_num=4,
-        primary_key="oaid",
-        bucket_num=5,
-        store_type="csv",
-        shard_num=1,
-        join_type="psi",
-        thread_num=0,
-):
-    """generate worker config"""
-    worker_config_path = "temp/{}.yaml".format(role)
-    worker_schema = {
-        "main_table_files": ["temp/{}_data_{}.csv".format(role, _) for _ in range(file_num)],
-        "output_dir": "temp/{}/".format(role),
-        "primary_key": primary_key,
-        "bucket_num": bucket_num,
-        "store_type": store_type,
-        "shard_num": shard_num,
-        "join_type": join_type,
-        "thread_num": thread_num,
-    }
-    with open(worker_config_path, "w") as f:
-        yaml.dump(data=worker_schema, stream=f)
-
-
 def generate_schema(
         yaml_path="temp/schema.yaml",
         **kwargs,

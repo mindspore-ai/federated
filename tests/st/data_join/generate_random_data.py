@@ -14,7 +14,15 @@
 # ============================================================================
 """Generate random data."""
 import argparse
+import os
 import numpy as np
+
+
+def mkdir(directory):
+    try:
+        os.mkdir(directory)
+    except FileExistsError:
+        pass
 
 
 def get_parser():
@@ -22,10 +30,10 @@ def get_parser():
     parser = argparse.ArgumentParser(description="Run generate_random_data.py case")
 
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--total_output_path", type=str, default="vfl/datasets/total_data.csv")
-    parser.add_argument("--intersection_output_path", type=str, default="vfl/datasets/intersection_data.csv")
-    parser.add_argument("--leader_output_path", type=str, default="vfl/datasets/leader_data_*.csv")
-    parser.add_argument("--follower_output_path", type=str, default="vfl/datasets/follower_data_*.csv")
+    parser.add_argument("--total_output_path", type=str, default="vfl/input/total_data.csv")
+    parser.add_argument("--intersection_output_path", type=str, default="vfl/input/intersection_data.csv")
+    parser.add_argument("--leader_output_path", type=str, default="vfl/input/leader/data_*.csv")
+    parser.add_argument("--follower_output_path", type=str, default="vfl/input/follower/data_*.csv")
     parser.add_argument("--leader_file_num", type=int, default=4)
     parser.add_argument("--follower_file_num", type=int, default=2)
     parser.add_argument("--leader_data_num", type=int, default=300)
@@ -37,6 +45,10 @@ def get_parser():
 
 
 if __name__ == '__main__':
+    mkdir("vfl")
+    mkdir("vfl/input")
+    mkdir("vfl/input/leader")
+    mkdir("vfl/input/follower")
     args, _ = get_parser().parse_known_args()
     for key in args.__dict__:
         print('[', key, ']', args.__dict__[key], flush=True)

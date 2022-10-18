@@ -18,11 +18,6 @@ from mindspore_federated._mindspore_federated import VFLContext
 from mindspore_federated.common import data_join_utils
 
 
-def server_psi_is_ready(bucket_id):
-    with open("server_psi_{}.txt".format(bucket_id), "w") as f:
-        f.write("")
-
-
 class _DataJoinServer:
     """
     Data join server.
@@ -78,7 +73,6 @@ class _DataJoinServer:
         Raises:
             ValueError: If the join type is not supported.
         """
-        server_psi_is_ready(bucket_id)
         if self._worker_config.join_type == "psi":
             thread_num = self._worker_config.thread_num
             intersection_keys = RunPSI(input_vct, "server", self._target_server_name, bucket_id, thread_num)

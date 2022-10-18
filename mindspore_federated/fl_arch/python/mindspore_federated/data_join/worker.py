@@ -71,32 +71,71 @@ class FLDataWorker:
     Data join worker.
 
     Args:
-        role (str): Role of the worker. Supports ["leader", "follower"].
-        worker_config_path (str): Path for storing the hyperparameter file to be configured during intersection.
-        data_schema_path (str): Path for storing the hyperparameter file to be exported. User need to provide the
-            column name and type of the data to be exported.
-        server_address (str): Local IP and Port Address.
-        peer_server_address (str): Peer IP and Port Address.
+        role (str): Role of the worker, which must be set in both leader and follower. Supports ["leader", "follower"].
+        main_table_files (Union(list(str), str): The raw data paths, which must be set in both leader and follower.
+        output_dir (str): The output directory, which must be set in both leader and follower.
+        data_schema_path (str): Path of data schema file, which must be set in both leader and follower. User need to
+            provide the column name and type of the data to be exported in the schema.
+            The schema needs to be parsed as a two-level key-value dictionary.
+            The key of the first-level dictionary is the column name, and the value is the second-level dictionary.
+            The key of the second-level dictionary must be a string: "type", and the value is the type of the
+            exported data.
+            Currently, the types support ["int32", "int64", "float32", "float64", "string", "bytes"].
+        http_server_address (str): Local IP and Port Address, which must be set in both leader and follower.
+        remote_server_address (str): Peer IP and Port Address, which must be set in both leader and follower.
+        primary_key (str): The primary key. The value set by leader is used, and the value set by follower is invalid.
+            Default: "oaid".
+        bucket_num (int): The number of buckets. The value set by leader is used, and the value set by follower is
+            invalid. Default: 1.
+        store_type (str): The data store type. Default: "csv".
+        shard_num (int): The output number of each bucket when export. The value set by leader is used, and the value
+            set by follower is invalid. Default: 1.
+        join_type (str): The data join type. The value set by leader is used, and the value set by follower is
+            invalid. Default: "psi".
+        thread_num (int): The thread number of psi. Default: 0.
 
     Examples:
         >>> worker = FLDataWorker(role="leader",
-        ...                       worker_config_path="leader.yaml",
+        ...                       main_table_files=["input/leader_data_0.csv", "input/leader_data_1.csv"],
+        ...                       output_dir="output/leader/",
         ...                       data_schema_path="leader_schema.yaml",
-        ...                       server_address="127.0.0.1:1086",
-        ...                       peer_server_address="127.0.0.1:1087"
+        ...                       http_server_address="127.0.0.1:1086",
+        ...                       remote_server_address="127.0.0.1:1087",
+        ...                       primary_key="oaid",
+        ...                       bucket_num=5,
+        ...                       store_type="csv",
+        ...                       shard_num=1,
+        ...                       join_type="psi",
+        ...                       thread_num=0,
         ...                       )
         >>> worker.export()
     """
 
     def __init__(self,
                  role,
-                 worker_config_path,
+                 main_table_files,
+                 output_dir,
                  data_schema_path,
-                 server_address,
-                 peer_server_address
+                 http_server_address,
+                 remote_server_address,
+                 primary_key="oaid",
+                 bucket_num=5,
+                 store_type="csv",
+                 shard_num=1,
+                 join_type="psi",
+                 thread_num=0,
                  ):
         self._role = role
-        self._worker_config = _WorkerConfig(worker_config_path)
+        self._worker_config = _WorkerConfig(
+            main_table_files=main_table_files,
+            output_dir=output_dir,
+            primary_key=primary_key,
+            bucket_num=bucket_num,
+            store_type=store_type,
+            shard_num=shard_num,
+            join_type=join_type,
+            thread_num=thread_num,
+        )
         self._data_schema_path = data_schema_path
         if self._role == "leader":
             server_name = "server"
@@ -110,8 +149,8 @@ class FLDataWorker:
             self._schema = yaml.load(f, yaml.Loader)
         self._verify()
 
-        http_server_config = ServerConfig(server_name=server_name, server_address=server_address)
-        remote_server_config = ServerConfig(server_name=peer_server_name, server_address=peer_server_address)
+        http_server_config = ServerConfig(server_name=server_name, server_address=http_server_address)
+        remote_server_config = ServerConfig(server_name=peer_server_name, server_address=remote_server_address)
         vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
                                                               remote_server_config=remote_server_config)
         self._vertical_communicator = vertical_communicator

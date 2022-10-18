@@ -22,7 +22,7 @@ def get_parser():
     parser = argparse.ArgumentParser(description="Run load_joined_data.py case")
 
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--input_dir", type=str, default="vfl/output/")
+    parser.add_argument("--input_dir", type=str, default="vfl/output/leader/")
     parser.add_argument("--shuffle", type=bool, default=True)
     return parser
 
