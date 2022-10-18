@@ -27,8 +27,8 @@ def get_parser():
 
     parser.add_argument("--comm_role", type=str, default="server")
     parser.add_argument("--peer_comm_role", type=str, default="null")
-    parser.add_argument("--server_address", type=str, default="127.0.0.1:8004")
-    parser.add_argument("--peer_server_address", type=str, default="127.0.0.1:8005")
+    parser.add_argument("--http_server_address", type=str, default="127.0.0.1:8004")
+    parser.add_argument("--remote_server_address", type=str, default="127.0.0.1:8005")
     parser.add_argument("--input_begin", type=int, default=1)
     parser.add_argument("--input_end", type=int, default=1000)
     parser.add_argument("--peer_input_begin", type=int, default=1)
@@ -48,8 +48,8 @@ args, _ = get_parser().parse_known_args()
 
 comm_role = args.comm_role
 peer_comm_role = args.peer_comm_role
-server_address = args.server_address
-peer_server_address = args.peer_server_address
+http_server_address = args.http_server_address
+remote_server_address = args.remote_server_address
 input_begin = args.input_begin
 input_end = args.input_end
 peer_input_begin = args.peer_input_begin
@@ -93,8 +93,8 @@ if __name__ == "__main__":
         role = ["server", "client"]
         peer_comm_role = role[1 - role.index(comm_role)]
 
-    http_server_config = ServerConfig(server_name=comm_role, server_address=server_address)
-    remote_server_config = ServerConfig(server_name=peer_comm_role, server_address=peer_server_address)
+    http_server_config = ServerConfig(server_name=comm_role, server_address=http_server_address)
+    remote_server_config = ServerConfig(server_name=peer_comm_role, server_address=remote_server_address)
     vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
                                                           remote_server_config=remote_server_config)
     vertical_communicator.launch()

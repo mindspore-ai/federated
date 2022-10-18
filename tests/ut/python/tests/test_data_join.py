@@ -19,7 +19,7 @@ import pandas as pd
 from mindspore_federated.data_join import FLDataWorker
 from mindspore_federated.data_join import load_mindrecord
 from common import vfl_data_test
-from common_data import generate_worker_config, generate_schema
+from common_data import generate_schema
 
 
 @vfl_data_test
@@ -29,19 +29,6 @@ def test_case_data_join_role():
     Description: Input constructed through generate_random_data
     Expectation: ERROR log is right and success.
     """
-    role = "server"
-    worker_config_path = "temp/leader.yaml"
-    schema_path = "temp/schema.yaml"
-    generate_worker_config(
-        role="leader",
-        file_num=4,
-        primary_key="oaid",
-        bucket_num=5,
-        store_type="csv",
-        shard_num=1,
-        join_type="psi",
-        thread_num=0,
-    )
     generate_schema(
         yaml_path="temp/schema.yaml",
         oaid="string",
@@ -56,15 +43,16 @@ def test_case_data_join_role():
         feature8="float32",
         feature9="float32",
     )
-    server_address = "127.0.0.1:6969"
-    peer_server_address = "127.0.0.1:9696"
+    role = "wtc"
     with pytest.raises(ValueError) as err:
-        FLDataWorker(role=role,
-                     worker_config_path=worker_config_path,
-                     data_schema_path=schema_path,
-                     server_address=server_address,
-                     peer_server_address=peer_server_address,
-                     )
+        FLDataWorker(
+            role=role,
+            main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(4)],
+            output_dir="temp/{}/".format(role),
+            data_schema_path="temp/schema.yaml",
+            http_server_address="127.0.0.1:6969",
+            remote_server_address="127.0.0.1:9696",
+        )
     assert "role must be \"leader\" or \"follower\"" in str(err.value)
 
 
@@ -75,19 +63,6 @@ def test_case_data_join_join_type():
     Description: Input constructed through generate_random_data
     Expectation: ERROR log is right and success.
     """
-    role = "leader"
-    worker_config_path = "temp/leader.yaml"
-    schema_path = "temp/schema.yaml"
-    generate_worker_config(
-        role="leader",
-        file_num=4,
-        primary_key="oaid",
-        bucket_num=5,
-        store_type="csv",
-        shard_num=1,
-        join_type="wtc",
-        thread_num=0,
-    )
     generate_schema(
         yaml_path="temp/schema.yaml",
         oaid="string",
@@ -102,15 +77,17 @@ def test_case_data_join_join_type():
         feature8="float32",
         feature9="float32",
     )
-    server_address = "127.0.0.1:6969"
-    peer_server_address = "127.0.0.1:9696"
+    role = "leader"
     with pytest.raises(ValueError) as err:
-        FLDataWorker(role=role,
-                     worker_config_path=worker_config_path,
-                     data_schema_path=schema_path,
-                     server_address=server_address,
-                     peer_server_address=peer_server_address,
-                     )
+        FLDataWorker(
+            role=role,
+            main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(4)],
+            output_dir="temp/{}/".format(role),
+            join_type="wtc",
+            data_schema_path="temp/schema.yaml",
+            http_server_address="127.0.0.1:6969",
+            remote_server_address="127.0.0.1:9696",
+        )
     err_str = str(err.value)
     assert_msg = "join_type" in err_str and "str" in err_str
     assert assert_msg
@@ -123,19 +100,6 @@ def test_case_data_join_small_bucket_num():
     Description: Input constructed through generate_random_data
     Expectation: ERROR log is right and success.
     """
-    role = "leader"
-    worker_config_path = "temp/leader.yaml"
-    schema_path = "temp/schema.yaml"
-    generate_worker_config(
-        role="leader",
-        file_num=4,
-        primary_key="oaid",
-        bucket_num=0,
-        store_type="csv",
-        shard_num=1,
-        join_type="psi",
-        thread_num=0,
-    )
     generate_schema(
         yaml_path="temp/schema.yaml",
         oaid="string",
@@ -150,15 +114,17 @@ def test_case_data_join_small_bucket_num():
         feature8="float32",
         feature9="float32",
     )
-    server_address = "127.0.0.1:6969"
-    peer_server_address = "127.0.0.1:9696"
+    role = "leader"
     with pytest.raises(ValueError) as err:
-        FLDataWorker(role=role,
-                     worker_config_path=worker_config_path,
-                     data_schema_path=schema_path,
-                     server_address=server_address,
-                     peer_server_address=peer_server_address,
-                     )
+        FLDataWorker(
+            role=role,
+            main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(4)],
+            output_dir="temp/{}/".format(role),
+            bucket_num=0,
+            data_schema_path="temp/schema.yaml",
+            http_server_address="127.0.0.1:6969",
+            remote_server_address="127.0.0.1:9696",
+        )
     err_str = str(err.value)
     assert_msg = "bucket_num" in err_str and "[1, 1000000]" in err_str
     assert assert_msg
@@ -171,19 +137,6 @@ def test_case_data_join_big_bucket_num():
     Description: Input constructed through generate_random_data
     Expectation: ERROR log is right and success.
     """
-    role = "leader"
-    worker_config_path = "temp/leader.yaml"
-    schema_path = "temp/schema.yaml"
-    generate_worker_config(
-        role="leader",
-        file_num=4,
-        primary_key="oaid",
-        bucket_num=1000001,
-        store_type="csv",
-        shard_num=1,
-        join_type="psi",
-        thread_num=0,
-    )
     generate_schema(
         yaml_path="temp/schema.yaml",
         oaid="string",
@@ -198,15 +151,17 @@ def test_case_data_join_big_bucket_num():
         feature8="float32",
         feature9="float32",
     )
-    server_address = "127.0.0.1:6969"
-    peer_server_address = "127.0.0.1:9696"
+    role = "leader"
     with pytest.raises(ValueError) as err:
-        FLDataWorker(role=role,
-                     worker_config_path=worker_config_path,
-                     data_schema_path=schema_path,
-                     server_address=server_address,
-                     peer_server_address=peer_server_address,
-                     )
+        FLDataWorker(
+            role=role,
+            main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(4)],
+            output_dir="temp/{}/".format(role),
+            bucket_num=1000001,
+            data_schema_path="temp/schema.yaml",
+            http_server_address="127.0.0.1:6969",
+            remote_server_address="127.0.0.1:9696",
+        )
     err_str = str(err.value)
     assert_msg = "bucket_num" in err_str and "[1, 1000000]" in err_str
     assert assert_msg
@@ -219,19 +174,6 @@ def test_case_data_join_small_shard_num():
     Description: Input constructed through generate_random_data
     Expectation: ERROR log is right and success.
     """
-    role = "leader"
-    worker_config_path = "temp/leader.yaml"
-    schema_path = "temp/schema.yaml"
-    generate_worker_config(
-        role="leader",
-        file_num=4,
-        primary_key="oaid",
-        bucket_num=5,
-        store_type="csv",
-        shard_num=0,
-        join_type="psi",
-        thread_num=0,
-    )
     generate_schema(
         yaml_path="temp/schema.yaml",
         oaid="string",
@@ -246,15 +188,17 @@ def test_case_data_join_small_shard_num():
         feature8="float32",
         feature9="float32",
     )
-    server_address = "127.0.0.1:6969"
-    peer_server_address = "127.0.0.1:9696"
+    role = "leader"
     with pytest.raises(ValueError) as err:
-        FLDataWorker(role=role,
-                     worker_config_path=worker_config_path,
-                     data_schema_path=schema_path,
-                     server_address=server_address,
-                     peer_server_address=peer_server_address,
-                     )
+        FLDataWorker(
+            role=role,
+            main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(4)],
+            output_dir="temp/{}/".format(role),
+            shard_num=0,
+            data_schema_path="temp/schema.yaml",
+            http_server_address="127.0.0.1:6969",
+            remote_server_address="127.0.0.1:9696",
+        )
     err_str = str(err.value)
     assert_msg = "shard_num" in err_str and "[1, 1000]" in err_str
     assert assert_msg
@@ -267,19 +211,6 @@ def test_case_data_join_big_shard_num():
     Description: Input constructed through generate_random_data
     Expectation: ERROR log is right and success.
     """
-    role = "leader"
-    worker_config_path = "temp/leader.yaml"
-    schema_path = "temp/schema.yaml"
-    generate_worker_config(
-        role="leader",
-        file_num=4,
-        primary_key="oaid",
-        bucket_num=5,
-        store_type="csv",
-        shard_num=1001,
-        join_type="psi",
-        thread_num=0,
-    )
     generate_schema(
         yaml_path="temp/schema.yaml",
         oaid="string",
@@ -294,15 +225,17 @@ def test_case_data_join_big_shard_num():
         feature8="float32",
         feature9="float32",
     )
-    server_address = "127.0.0.1:6969"
-    peer_server_address = "127.0.0.1:9696"
+    role = "leader"
     with pytest.raises(ValueError) as err:
-        FLDataWorker(role=role,
-                     worker_config_path=worker_config_path,
-                     data_schema_path=schema_path,
-                     server_address=server_address,
-                     peer_server_address=peer_server_address,
-                     )
+        FLDataWorker(
+            role=role,
+            main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(4)],
+            output_dir="temp/{}/".format(role),
+            shard_num=1001,
+            data_schema_path="temp/schema.yaml",
+            http_server_address="127.0.0.1:6969",
+            remote_server_address="127.0.0.1:9696",
+        )
     err_str = str(err.value)
     assert_msg = "shard_num" in err_str and "[1, 1000]" in err_str
     assert assert_msg
@@ -310,16 +243,18 @@ def test_case_data_join_big_shard_num():
 
 def worker_process_fun(
         role="leader",
-        server_address="127.0.0.1:6969",
-        peer_server_address="127.0.0.1:9696",
+        http_server_address="127.0.0.1:6969",
+        remote_server_address="127.0.0.1:9696",
 ):
     """start vfl data worker"""
+    file_num = 4 if role == "leader" else 2
     worker = FLDataWorker(
         role=role,
-        worker_config_path="temp/{}.yaml".format(role),
+        main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(file_num)],
+        output_dir="temp/{}/".format(role),
         data_schema_path="temp/{}_schema.yaml".format(role),
-        server_address=server_address,
-        peer_server_address=peer_server_address,
+        http_server_address=http_server_address,
+        remote_server_address=remote_server_address,
     )
     worker.export()
 
@@ -327,20 +262,10 @@ def worker_process_fun(
 @vfl_data_test
 def test_case_data_join_demo():
     """
-    Feature: Test data join: bucket_num is too big
+    Feature: Test data join: whole flow.
     Description: Input constructed through generate_random_data
     Expectation: ERROR log is right and success.
     """
-    generate_worker_config(
-        role="leader",
-        file_num=4,
-        primary_key="oaid",
-        bucket_num=5,
-        store_type="csv",
-        shard_num=1,
-        join_type="psi",
-        thread_num=0,
-    )
     generate_schema(
         yaml_path="temp/leader_schema.yaml",
         oaid="string",
@@ -354,20 +279,6 @@ def test_case_data_join_demo():
         feature7="float32",
         feature8="float32",
         feature9="float32",
-    )
-
-    leader_process = Process(target=worker_process_fun, args=("leader", "127.0.0.1:6969", "127.0.0.1:9696"))
-    leader_process.start()
-
-    generate_worker_config(
-        role="follower",
-        file_num=2,
-        primary_key="oaid",
-        bucket_num=5,
-        store_type="csv",
-        shard_num=1,
-        join_type="psi",
-        thread_num=0,
     )
     generate_schema(
         yaml_path="temp/follower_schema.yaml",
@@ -383,6 +294,9 @@ def test_case_data_join_demo():
         feature18="float32",
         feature19="float32",
     )
+
+    leader_process = Process(target=worker_process_fun, args=("leader", "127.0.0.1:6969", "127.0.0.1:9696"))
+    leader_process.start()
     follower_process = Process(target=worker_process_fun, args=("follower", "127.0.0.1:9696", "127.0.0.1:6969"))
     follower_process.start()
 

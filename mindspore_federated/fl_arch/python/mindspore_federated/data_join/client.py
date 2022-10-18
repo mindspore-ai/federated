@@ -25,30 +25,6 @@ class _SimplifiedWorkerConfig:
         self.shard_num = worker_config_dict["shard_num"]
 
 
-def request_params():
-    """
-    fake communication
-    """
-    import yaml
-    import os
-    while True:
-        if os.path.exists("server_psi_yaml.yaml"):
-            break
-    with open("server_psi_yaml.yaml", "r") as f:
-        worker_config_dict = yaml.safe_load(stream=f)
-    worker_config = _SimplifiedWorkerConfig(worker_config_dict)
-    os.remove("server_psi_yaml.yaml")
-    return worker_config
-
-
-def wait_util_server_psi_is_ready(bucket_id):
-    import os
-    while True:
-        if os.path.exists("server_psi_{}.txt".format(bucket_id)):
-            os.remove("server_psi_{}.txt".format(bucket_id))
-            break
-
-
 class _DataJoinClient:
     """
     Data join client.
@@ -111,7 +87,6 @@ class _DataJoinClient:
             ValueError: If the join type is not supported.
             :param target_server_name:
         """
-        wait_util_server_psi_is_ready(bucket_id)
         if self._worker_config.join_type == "psi":
             thread_num = self._worker_config.thread_num
             intersection_keys = RunPSI(input_vct, "client", self._target_server_name, bucket_id, thread_num)

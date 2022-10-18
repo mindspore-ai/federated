@@ -1,6 +1,0 @@
-main_table_files: ["vfl/datasets/follower_data_0.csv", "vfl/datasets/follower_data_1.csv"]
-output_dir: "vfl/output/follower/"
-store_type: "csv"
-
-# psi config
-thread_num: 0
