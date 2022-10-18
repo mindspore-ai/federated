@@ -1,0 +1,34 @@
+role: follower
+model: # define the net of vFL party
+  train_net:
+    name: follower_loss_net
+    inputs:
+      - name: x
+        source: local
+    outputs:
+      - name: embedding
+        destination: remote
+  eval_net:
+    name: leader_eval_net
+    inputs:
+      - name: x
+        source: local
+    outputs:
+      - name: embedding
+        destination: remote
+opts: # define ms optimizer
+  - type: Adam
+    grads: # define ms grad operations
+      - inputs:
+          - name: x
+        output:
+          name: embedding
+        sens: loss_value
+    hyper_parameters:
+      learning_rate: 3.5e-4
+      eps: 1.e-8
+      loss_scale: 1024.0
+hyper_parameters:
+  epochs: 20
+  batch_size: 16000
+  is_eval: True
