@@ -41,6 +41,17 @@ std::vector<std::string> PlainIntersection(const std::vector<std::string> &input
   });
 
   if (comm_role == "server") {
+    MS_LOG(INFO) << "-------------------------- 0.2. server receive clientPsiInit -----------------------";
+    ClientPSIInit client_psi_init_recv;
+    verticalServer.Receive(target_server_name, &client_psi_init_recv);
+    MS_LOG(INFO) << "-------------------------- 0.3. server send serverPsiInit -----------------------";
+    ServerPSIInit server_psi_init(psi_ctx.bin_id, psi_ctx.self_num, psi_ctx.role);
+    verticalServer.Send(target_server_name, server_psi_init);
+    if (client_psi_init_recv.bin_id() != psi_ctx.bin_id) {
+      MS_LOG(ERROR) << "The bin_id is not same, please check bin_id: " << client_psi_init_recv.bin_id();
+      return ret;
+    }
+
     MS_LOG(INFO) << "-------------------------- 2. server receive clientPlain -----------------------";
     PlainData clientPlain;
     verticalServer.Receive(target_server_name, &clientPlain);
@@ -54,6 +65,17 @@ std::vector<std::string> PlainIntersection(const std::vector<std::string> &input
   }
 
   if (comm_role == "client") {
+    MS_LOG(INFO) << "-------------------------- 0.1. client send clientPsiInit -----------------------";
+    ClientPSIInit client_psi_init(psi_ctx.bin_id, psi_ctx.psi_type, psi_ctx.self_num);
+    verticalServer.Send(target_server_name, client_psi_init);
+    MS_LOG(INFO) << "-------------------------- 0.4. client receive serverPsiInit -----------------------";
+    ServerPSIInit server_psi_init_recv;
+    verticalServer.Receive(target_server_name, &server_psi_init_recv);
+    if (server_psi_init_recv.bin_id() != psi_ctx.bin_id) {
+      MS_LOG(ERROR) << "The bin_id is not same, please check bin_id: " << server_psi_init_recv.bin_id();
+      return ret;
+    }
+
     MS_LOG(INFO) << "-------------------------- 1. client send clientPlain -----------------------";
     PlainData clientPlain(psi_ctx.bin_id, input_hash_vct, "clientPlain");
     verticalServer.Send(target_server_name, clientPlain);

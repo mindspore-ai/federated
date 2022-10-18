@@ -235,21 +235,12 @@ std::vector<std::string> RunPSIDemo(const std::vector<std::string> &alice_input,
   MS_LOG(INFO) << "Start RunEcdhPsi, init config...";
   PsiCtx psi_ctx_alice;
   psi_ctx_alice.thread_num = thread_num;
-  psi_ctx_alice.compress_length = LENGTH_32;  // if use filter-ecdh, compress length must be 32byte.
-  psi_ctx_alice.compare_length = 12;          // should be no more than 32byte.
-  psi_ctx_alice.curve_name = "p256";
-  psi_ctx_alice.chunk_size = 1;
   psi_ctx_alice.ecc =
     std::make_unique<ECC>(psi_ctx_alice.curve_name, psi_ctx_alice.thread_num, psi_ctx_alice.chunk_size);
-  psi_ctx_alice.psi_type = "filter_ecdh";
-  psi_ctx_alice.neg_log_fp_rate = 40;
   psi_ctx_alice.input_vct = alice_input;
   psi_ctx_alice.self_num = psi_ctx_alice.input_vct.size();
   psi_ctx_alice.peer_num = bob_input.size();
-  psi_ctx_alice.need_check = true;
-  if (psi_ctx_alice.psi_type == "filter_ecdh") {
-    psi_ctx_alice.compare_length = LENGTH_32;
-  }
+  psi_ctx_alice.compare_length = LENGTH_32;
 
   if (!psi_ctx_alice.CheckPsiCtxOK()) {
     MS_LOG(ERROR) << "Set PSI CTX ERROR!";
@@ -265,24 +256,11 @@ std::vector<std::string> RunPSIDemo(const std::vector<std::string> &alice_input,
 
   PsiCtx psi_ctx_bob;
   psi_ctx_bob.thread_num = thread_num;
-  psi_ctx_bob.compress_length = LENGTH_32;  // if use filter-ecdh, compress length must be 32byte.
-  psi_ctx_bob.compare_length = 12;          // should be no more than 32byte.
-  psi_ctx_bob.curve_name = "p256";
-  psi_ctx_bob.chunk_size = 1;
   psi_ctx_bob.ecc = std::make_unique<ECC>(psi_ctx_bob.curve_name, psi_ctx_bob.thread_num, psi_ctx_bob.chunk_size);
-  psi_ctx_bob.psi_type = "filter_ecdh";
-  if (psi_ctx_bob.psi_type != client_psi_init_recv.psi_type()) {
-    MS_LOG(WARNING) << "Context psi_type is not same! use " << client_psi_init_recv.psi_type();
-    psi_ctx_bob.psi_type = client_psi_init_recv.psi_type();
-  }
-  psi_ctx_bob.neg_log_fp_rate = 40;
   psi_ctx_bob.input_vct = bob_input;
   psi_ctx_bob.self_num = psi_ctx_bob.input_vct.size();
   psi_ctx_bob.peer_num = alice_input.size();
-  psi_ctx_bob.need_check = true;
-  if (psi_ctx_bob.psi_type == "filter_ecdh") {
-    psi_ctx_bob.compare_length = LENGTH_32;
-  }
+  psi_ctx_bob.compare_length = LENGTH_32;
   psi_ctx_bob.SetRole(client_psi_init_recv.self_size());
 
   if (!psi_ctx_bob.CheckPsiCtxOK()) {
@@ -406,19 +384,23 @@ std::vector<std::string> RunPSI(const std::vector<std::string> &input_vct, const
     MS_LOG(INFO) << "-------------------------- 4. client receive serverPsiInit -----------------------";
     ServerPSIInit server_psi_init_recv;
     verticalServer.Receive(target_server_name, &server_psi_init_recv);
+    if (server_psi_init_recv.bin_id() != psi_ctx.bin_id) {
+      MS_LOG(ERROR) << "The bin_id is not same, please check bin_id: " << server_psi_init_recv.bin_id();
+      return ret;
+    }
     psi_ctx.SetRole(server_psi_init_recv.self_role(), server_psi_init_recv.self_size());
   } else if (comm_role == "server") {
     MS_LOG(INFO) << "-------------------------- 2. server receive clientPsiInit -----------------------";
     ClientPSIInit client_psi_init_recv;
     verticalServer.Receive(target_server_name, &client_psi_init_recv);
-    if (client_psi_init_recv.bin_id() != psi_ctx.bin_id) {
-      MS_LOG(ERROR) << "The bin_id is not same, please check bin_id: " << client_psi_init_recv.bin_id();
-      return ret;
-    }
     psi_ctx.SetRole(client_psi_init_recv.self_size());
     MS_LOG(INFO) << "-------------------------- 3. server send serverPsiInit -----------------------";
     ServerPSIInit server_psi_init(psi_ctx.bin_id, psi_ctx.self_num, psi_ctx.role);
     verticalServer.Send(target_server_name, server_psi_init);
+    if (client_psi_init_recv.bin_id() != psi_ctx.bin_id) {
+      MS_LOG(ERROR) << "The bin_id is not same, please check bin_id: " << client_psi_init_recv.bin_id();
+      return ret;
+    }
   } else {
     MS_LOG(ERROR) << "Unknown communication role, wrong input role is " << comm_role;
     return ret;
@@ -427,9 +409,9 @@ std::vector<std::string> RunPSI(const std::vector<std::string> &input_vct, const
   if (!psi_ctx.CheckPsiCtxOK()) {
     MS_LOG(ERROR) << "Set PSI CTX ERROR!";
     return ret;
-  } else {
-    MS_LOG(INFO) << "Set PSI_CTX over, start computing...";
   }
+  MS_LOG(INFO) << "Set PSI_CTX over, start computing...";
+
   if (psi_ctx.psi_type == "filter_ecdh") {
     ret = RunInverseFilterEcdhPsi(target_server_name, psi_ctx);
   } else {

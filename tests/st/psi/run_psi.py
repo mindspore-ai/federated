@@ -26,7 +26,7 @@ def get_parser():
     parser = argparse.ArgumentParser(description="Run PSI with Communication")
 
     parser.add_argument("--comm_role", type=str, default="server")
-    parser.add_argument("--peer_comm_role", type=str, default="client")
+    parser.add_argument("--peer_comm_role", type=str, default="null")
     parser.add_argument("--server_address", type=str, default="127.0.0.1:8004")
     parser.add_argument("--peer_server_address", type=str, default="127.0.0.1:8005")
     parser.add_argument("--input_begin", type=int, default=1)
@@ -89,6 +89,10 @@ def generate_input_data(input_begin_, input_end_, read_file_, file_name_):
 
 
 if __name__ == "__main__":
+    if peer_comm_role == "null":
+        role = ["server", "client"]
+        peer_comm_role = role[1 - role.index(comm_role)]
+
     http_server_config = ServerConfig(server_name=comm_role, server_address=server_address)
     remote_server_config = ServerConfig(server_name=peer_comm_role, server_address=peer_server_address)
     vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
@@ -102,7 +106,7 @@ if __name__ == "__main__":
         else:
             intersection_type = "PSI"
             intersection_result = RunPSI(input_data, comm_role, peer_comm_role, bucket_id, thread_num)
-        print("{} result:{} (display limit:20)".format(intersection_type, intersection_result[:20]))
+        print("{} result: {} (display limit: 20)".format(intersection_type, intersection_result[:20]))
         if need_check:
             peer_input_data = generate_input_data(peer_input_begin, peer_input_end, peer_read_file, peer_file_name)
             actual_result = compute_right_result(input_data, peer_input_data)

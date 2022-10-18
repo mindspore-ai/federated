@@ -32,24 +32,9 @@
 namespace mindspore {
 namespace fl {
 namespace psi {
-std::vector<std::string> ReadFile(const std::string &csv_path);
-
-void WriteFile(const std::string &csv_path, const std::vector<std::string> &in_data);
-
-std::vector<std::string> ReadFileAndDeserialize(const std::string &csv_path, const size_t &input_num,
-                                                const size_t &item_length);
-
-void FlattenAndWriteFile(const std::string &out_path, const std::vector<std::string> &in_data);
-
-BloomFilter ReadFileAndBuildFilter(const std::string &csv_path, const size_t &input_num, const int &neg_log_fp_rate);
-
 std::string ReadBinFile(const std::string &csv_path);
 
-void FilterWriteFile(const std::string &out_path, const std::string &ret);
-
-std::vector<std::string> CreateFakeDataset(size_t begin, size_t size);
-
-void GenDataSet();
+void WriteFile(const std::string &out_path, const std::string &ret);
 
 struct ClientPSIInit {
  public:
