@@ -242,23 +242,32 @@ def load_train_net(args_opt):
     return loss, config
 
 
-def construct_local_dataset(args_opt, rank_id, device_num):
+def construct_local_dataset(args_opt, rank_id, device_num, is_training=True):
     """create dataset object according to config info."""
     model_parallel_num = args_opt.op_level_model_parallel_num
     data_parallel_num = int(device_num / model_parallel_num)
     batch_size = args_opt.per_batch_size * data_parallel_num
     micro_batch_interleaved = args_opt.micro_batch_interleaved
-    ds = create_dataset(batch_size * micro_batch_interleaved,
-                        data_path=args_opt.data_url,
-                        data_start_index=0,  # max(0, epoch_idx-1),
-                        eod_reset=args_opt.eod_reset,
-                        full_batch=bool(args_opt.full_batch),
-                        eod_id=args_opt.eod_id,
-                        device_num=device_num,
-                        rank=rank_id,
-                        column_name=args_opt.data_column_name,
-                        epoch=1)
-    print("===dataset size: ", int(ds.get_dataset_size()), flush=True)
+    if is_training:
+        ds = create_dataset(batch_size * micro_batch_interleaved,
+                            data_path=args_opt.data_url,
+                            data_start_index=0,  # max(0, epoch_idx-1),
+                            eod_reset=args_opt.eod_reset,
+                            full_batch=bool(args_opt.full_batch),
+                            eod_id=args_opt.eod_id,
+                            device_num=device_num,
+                            rank=rank_id,
+                            column_name=args_opt.data_column_name,
+                            epoch=1)
+        print("===train dataset size: ", int(ds.get_dataset_size()), flush=True)
+    else:
+        ds = create_dataset(batch_size * micro_batch_interleaved, data_path=args_opt.eval_data_url, data_start_index=0,
+                            eod_reset=args_opt.eod_reset, full_batch=bool(args_opt.full_batch), eod_id=args_opt.eod_id,
+                            device_num=device_num,
+                            rank=rank_id,
+                            column_name=args_opt.data_column_name,
+                            epoch=1)
+        print("===test dataset size: ", int(ds.get_dataset_size()), flush=True)
     return ds
 
 

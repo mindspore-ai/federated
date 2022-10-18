@@ -19,20 +19,20 @@ model: # define the net of vFL party
   eval_net:
     name: leader_eval_net
     inputs:
-      - name: encoder_output
-        source: remote
-      - name: top_query_hidden_states
-        source: remote
-      - name: encoder_masks
+      - name: hidden_states
         source: remote
       - name: input_ids
-        source: local
+        source: remote
       - name: word_table
+        source: remote
+      - name: position_id
+        source: remote
+      - name: attention_mask
         source: remote
     outputs:
       - name: log_probs
         destination: local
-    gt: label
+    gt: input_ids
 opts: # define ms optimizer
   - type: CustomizedAdam
     grads:
@@ -72,3 +72,4 @@ hyper_parameters:
   epochs: 20
   batch_size: 2
   is_eval: False
+ckpt_path: ./checkpoints

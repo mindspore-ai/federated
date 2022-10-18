@@ -13,9 +13,14 @@
 # limitations under the License.
 # ============================================================================
 """Classes and methods for modeling network of vfl parties in the scenario of splitnn."""
-
+import os
+import glob
 from collections import OrderedDict
 
+import mindspore
+from mindspore import save_checkpoint
+from mindspore import load_checkpoint, load_param_into_net
+from mindspore import Tensor, Parameter
 from mindspore import nn, context
 from mindspore.ops import PrimitiveWithInfer, prim_attr_register
 from mindspore.context import ParallelMode
@@ -116,6 +121,8 @@ class FLModel:
         self._yaml_data = yaml_data
         self._train_net_yaml = self._yaml_data.train_net
         self._eval_net_yaml = self._yaml_data.eval_net
+        self._ckpoint_path = self._yaml_data.ckpt_path
+        self.global_step = 0
 
         if hasattr(self._yaml_data, 'privacy'):
             label_dp_eps = self._yaml_data.privacy_eps
@@ -311,6 +318,9 @@ class FLModel:
         if self._role == 'leader' and self._label_dp is not None:
             local_data_batch[self._yaml_data.eval_net_gt] = label
 
+        # increase the global step
+        self.global_step += 1
+
         return scales
 
     def save_ckpt(self, path: str = None):
@@ -321,7 +331,19 @@ class FLModel:
             path (str): Path to save the checkpoint. If not specified, using the ckpt_path specified in the
                 yaml file. Default: None.
         """
-        print('save_ckpt to %s', path)
+        if path is not None:
+            abs_path = os.path.abspath(path)
+            self._ckpoint_path = abs_path
+
+        if not os.path.exists(self._ckpoint_path):
+            os.makedirs(self._ckpoint_path, exist_ok=True)
+
+        prefix = self._yaml_data.train_net['name']
+        cur_ckpoint_file = prefix + "_step_" + str(self.global_step) + ".ckpt"
+        cur_file = os.path.join(self._ckpoint_path, cur_ckpoint_file)
+        append_dict = {}
+        append_dict['global_step'] = self.global_step
+        save_checkpoint(self._train_network, cur_file, append_dict=append_dict)
 
     def load_ckpt(self, phrase: str = 'eval', path: str = None):
         """
@@ -333,4 +355,42 @@ class FLModel:
             path (str): Path to load the checkpoint. If not specified, using the ckpt_path specified in the
                 yaml file. Default: None.
         """
-        print('load_ckpt to %s, %s', (phrase, path))
+        need_load_ckpt = None
+        if path is None:
+            if not os.path.exists(self._ckpoint_path):
+                raise AttributeError(
+                    'FLModel: path and self._ckpoint_path can not empty at same time, please check it!')
+            last_file_path = self._get_last_file(self._ckpoint_path)
+            need_load_ckpt = last_file_path
+        else:
+            file_path = os.path.abspath(path)
+            if os.path.isfile(file_path):
+                need_load_ckpt = file_path
+            if os.path.isdir(file_path):
+                last_file_path = self._get_last_file(file_path)
+                need_load_ckpt = last_file_path
+            if not os.path.exists(path):
+                raise AttributeError('FLModel: ckpt_path do not exits, please check it!')
+
+        param_dict = load_checkpoint(need_load_ckpt)
+        if phrase == 'train':
+            _ = load_param_into_net(self._train_network, param_dict, strict_load=True)
+            cur_global_step = param_dict['global_step'].asnumpy().tolist()
+            self.global_step = cur_global_step
+            for opt in self._optimizers:
+                opt.optimizer.global_step = Parameter(Tensor((self.global_step,), mindspore.int32))
+        elif phrase == 'eval':
+            _ = load_param_into_net(self._eval_network, param_dict, strict_load=True)
+        else:
+            raise AttributeError('FLModel: phase val must be train or eval, please check it!')
+
+    def _get_last_file(self, path: str):
+        file_lists = os.listdir(path)
+        if not file_lists:
+            raise AttributeError('FLModel: {} is empty, please check it!'.format(path))
+        file_lists = glob.glob(path + "/" + str(self._yaml_data.train_net['name']) + "*")
+        if not file_lists:
+            raise AttributeError(
+                'FLModel: {} start with {} is empty, please check it!'.format(path, self._yaml_data.train_net['name']))
+        file_need = max(file_lists, key=os.path.getctime)
+        return file_need
