@@ -21,6 +21,13 @@ from ..common import check_type
 
 
 class ServerConfig:
+    """
+    Define the vertical server configuration.
+
+    Args:
+        server_name (str): Name of server.
+        server_address (list[Tensor]): Address of server.
+    """
     def __init__(self, server_name, server_address):
         check_type.check_str("server_name", server_name)
         check_type.check_str("server_address", server_address)
@@ -29,7 +36,13 @@ class ServerConfig:
 
 
 def init_server_config(http_server_config, remote_server_config):
-    """Init the server config for http server"""
+    """
+    Initialize local server configuration and remote server configuration.
+
+    Args:
+        http_server_config (ServerConfig): Configuration of local http server.
+        remote_server_config (ServerConfig): Configuration of remote http server.
+    """
     ctx = VFLContext.get_instance()
     check_type.check_str("http_server_config.server_name", http_server_config.server_name)
     check_type.check_str("http_server_config.server_address", http_server_config.server_address)

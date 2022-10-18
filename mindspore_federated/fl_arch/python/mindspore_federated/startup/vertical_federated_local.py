@@ -20,7 +20,11 @@ from .server_config import ServerConfig, init_server_config
 
 class VerticalFederatedCommunicator:
     """
-    Define the vertical communicator
+    Define the vertical federated communicator.
+
+    Args:
+        http_server_config (ServerConfig): Configuration of local http server.
+        remote_server_config (ServerConfig): Configuration of remote http server.
     """
 
     def __init__(self, http_server_config: ServerConfig, remote_server_config: ServerConfig,
@@ -45,22 +49,54 @@ class VerticalFederatedCommunicator:
         init_server_config(self._http_server_config, self._remote_server_config)
 
     def launch(self):
+        """
+        Start vertical federated learning communicator.
+        """
         VerticalFederated_.start_vertical_communicator()
 
     def send_tensors(self, target_server_name: str, tensor_list_item_py: TensorListItem_):
+        """
+        Send distributed training sensor data.
+
+        Args:
+            target_server_name (str): Specifies the name of the remote server.
+            tensor_list_item_py (list[Tensor]): The collection of Tensors to be sent.
+        """
         return VerticalFederated_.send_tensor_list(target_server_name, tensor_list_item_py)
 
     def send_register(self, target_server_name: str, worker_register_item_py: WorkerRegisterItemPy_):
+        r"""
+        Send worker registration message.
+
+        Args:
+            target_server_name (str): Specifies the name of the remote server.
+            worker_register_item_py (WorkerRegisterItemPy\_): The worker registration information to be sent.
+        """
         return VerticalFederated_.send_worker_register(target_server_name, worker_register_item_py)
 
     def receive(self, target_server_name: str):
+        """
+        Get the sensor data sent by the remote server.
+
+        Args:
+            target_server_name (str): Specifies the name of the remote server.
+        """
         return VerticalFederated_.receive(target_server_name)
 
     def data_join_wait_for_start(self):
+        """
+        Block and wait for the registration information of the client worker.
+        """
         return VerticalFederated_.data_join_wait_for_start()
 
     def http_server_config(self):
+        """
+        Returns the local server configuration.
+        """
         return self._http_server_config
 
     def remote_server_config(self):
+        """
+        Returns the remote server configuration.
+        """
         return self._remote_server_config

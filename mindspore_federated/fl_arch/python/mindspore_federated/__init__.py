@@ -16,6 +16,7 @@
 
 from .startup.federated_local import FLServerJob, FlSchedulerJob
 from .startup.federated_local import Callback, CallbackContext
+from .startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig
 from .startup.feature_map import FeatureMap
 from .startup.ssl_config import SSLConfig
 from .trainer._fl_manager import FederatedLearningManager, PushMetrics
@@ -40,5 +41,7 @@ __all__ = [
     "PartyGradScaler",
     "vfl_utils",
     "tensor_utils",
-    "privacy"
+    "privacy",
+    "VerticalFederatedCommunicator",
+    "ServerConfig"
 ]
