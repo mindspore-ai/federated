@@ -14,8 +14,8 @@ mindspore_federated.data_join
           第一级字典的key值为列名，value值为第二级字典。
           第二级字典的key值为字符串类型的”type“，value值为字段对应数据被导出时所保存的类型。
           当前支持的类型包括：["int32", "int64", "float32", "float64", "string", "bytes"]。
-        - **http_server_address** (str) - 本机IP和端口地址，必须在leader和follower上都设置。
-        - **remote_server_address** (str) - 对端IP和端口地址，必须在leader和follower上都设置。
+        - **http_server_address** (str) - 本机IP和端口地址，必须在leader和follower上都设置。默认值：127.0.0.1:1086。
+        - **remote_server_address** (str) - 对端IP和端口地址，必须在leader和follower上都设置。默认值：127.0.0.1:1087。
         - **primary_key** (str) - 主键名称。leader侧设置的值被使用，follower设置的值无效。默认值：oaid。
         - **bucket_num** (int) - 桶的数目。leader侧设置的值被使用，follower设置的值无效。默认值：1。
         - **store_type** (str) - 数据的存储类型。默认值：csv。

@@ -1,0 +1,78 @@
+feat_ids_10:
+  type: int32
+feat_ids_11:
+  type: int32
+feat_ids_12:
+  type: int32
+feat_ids_26:
+  type: int32
+feat_ids_27:
+  type: int32
+feat_ids_28:
+  type: int32
+feat_ids_29:
+  type: int32
+feat_ids_30:
+  type: int32
+feat_ids_31:
+  type: int32
+feat_ids_32:
+  type: int32
+feat_ids_33:
+  type: int32
+feat_ids_34:
+  type: int32
+feat_ids_35:
+  type: int32
+feat_ids_36:
+  type: int32
+feat_ids_37:
+  type: int32
+feat_ids_38:
+  type: int32
+feat_ids_7:
+  type: int32
+feat_ids_8:
+  type: int32
+feat_ids_9:
+  type: int32
+feat_vals_10:
+  type: float32
+feat_vals_11:
+  type: float32
+feat_vals_12:
+  type: float32
+feat_vals_26:
+  type: float32
+feat_vals_27:
+  type: float32
+feat_vals_28:
+  type: float32
+feat_vals_29:
+  type: float32
+feat_vals_30:
+  type: float32
+feat_vals_31:
+  type: float32
+feat_vals_32:
+  type: float32
+feat_vals_33:
+  type: float32
+feat_vals_34:
+  type: float32
+feat_vals_35:
+  type: float32
+feat_vals_36:
+  type: float32
+feat_vals_37:
+  type: float32
+feat_vals_38:
+  type: float32
+feat_vals_7:
+  type: float32
+feat_vals_8:
+  type: float32
+feat_vals_9:
+  type: float32
+oaid:
+  type: string
