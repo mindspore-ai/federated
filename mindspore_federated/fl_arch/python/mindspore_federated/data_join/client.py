@@ -14,7 +14,6 @@
 # ============================================================================
 """Communicator client in data join."""
 from mindspore_federated._mindspore_federated import RunPSI
-from mindspore_federated.common import data_join_utils
 
 
 class _SimplifiedWorkerConfig:
@@ -59,12 +58,10 @@ class _DataJoinClient:
         """
         Register to server worker.
         """
-        worker_register_item_py = data_join_utils.worker_register_to_pybind_obj(self._worker_register)
-        worker_config_item_py = self._vertical_communicator.send_register(
+        primary_key, bucket_num, shard_num, join_type = self._vertical_communicator.send_register(
             self._target_server_name,
-            worker_register_item_py=worker_register_item_py)
-        primary_key, bucket_num, shard_num, join_type = \
-            data_join_utils.pybind_obj_to_worker_config(worker_config_item_py)
+            worker_register=self._worker_register)
+
         self._worker_config.primary_key = primary_key
         self._worker_config.bucket_num = bucket_num
         self._worker_config.shard_num = shard_num

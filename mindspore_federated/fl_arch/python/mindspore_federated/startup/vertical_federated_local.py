@@ -13,7 +13,11 @@
 # limitations under the License.
 # ============================================================================
 """Interface for start up single core servable"""
-from mindspore_federated._mindspore_federated import VerticalFederated_, TensorListItem_, WorkerRegisterItemPy_
+from collections import OrderedDict
+
+from mindspore_federated._mindspore_federated import VerticalFederated_
+from mindspore_federated.common import tensor_utils, data_join_utils
+from mindspore_federated.data_join.context import _WorkerRegister
 from .ssl_config import init_ssl_config, SSLConfig
 from .server_config import ServerConfig, init_server_config
 
@@ -54,25 +58,28 @@ class VerticalFederatedCommunicator:
         """
         VerticalFederated_.start_vertical_communicator()
 
-    def send_tensors(self, target_server_name: str, tensor_list_item_py: TensorListItem_):
+    def send_tensors(self, target_server_name: str, tensor_dict: OrderedDict):
         """
         Send distributed training sensor data.
 
         Args:
             target_server_name (str): Specifies the name of the remote server.
-            tensor_list_item_py (list[Tensor]): The collection of Tensors to be sent.
+            tensor_dict (OrderedDict): The dict of Tensors to be sent.
         """
+        tensor_list_item_py = tensor_utils.tensor_dict_to_tensor_list_pybind_obj(tensor_dict)
         return VerticalFederated_.send_tensor_list(target_server_name, tensor_list_item_py)
 
-    def send_register(self, target_server_name: str, worker_register_item_py: WorkerRegisterItemPy_):
+    def send_register(self, target_server_name: str, worker_register: _WorkerRegister):
         r"""
         Send worker registration message.
 
         Args:
             target_server_name (str): Specifies the name of the remote server.
-            worker_register_item_py (WorkerRegisterItemPy\_): The worker registration information to be sent.
+            worker_register (_\WorkerRegister): The worker registration information to be sent.
         """
-        return VerticalFederated_.send_worker_register(target_server_name, worker_register_item_py)
+        worker_register_item_py = data_join_utils.worker_register_to_pybind_obj(worker_register)
+        worker_config_item_py = VerticalFederated_.send_worker_register(target_server_name, worker_register_item_py)
+        return data_join_utils.pybind_obj_to_worker_config(worker_config_item_py)
 
     def receive(self, target_server_name: str):
         """
@@ -81,7 +88,9 @@ class VerticalFederatedCommunicator:
         Args:
             target_server_name (str): Specifies the name of the remote server.
         """
-        return VerticalFederated_.receive(target_server_name)
+        tensor_list_item_py = VerticalFederated_.receive(target_server_name)
+        _, tensor_dict = tensor_utils.tensor_list_pybind_obj_to_tensor_dict(tensor_list_item_py)
+        return tensor_dict
 
     def data_join_wait_for_start(self):
         """

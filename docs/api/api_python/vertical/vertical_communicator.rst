@@ -13,21 +13,21 @@
 
         启动纵向联邦学习通信器。
 
-    .. py:method:: send_tensors(target_server_name, tensor_list_item_py)
+    .. py:method:: send_tensors(target_server_name, tensor_dict)
 
         发送分布式训练Tensor数据。
 
         参数：
             - **target_server_name** (str) - 指定远程服务器名字。
-            - **tensor_list_item_py** (list[Tensor]) - 需要发送的Tensor集合。
+            - **tensor_dict** (OrderedDict) - 需要发送的Tensor字典。
 
-    .. py:method:: send_register(target_server_name, worker_register_item_py)
+    .. py:method:: send_register(target_server_name, worker_register)
 
         发送worker注册消息。
 
         参数：
             - **target_server_name** (str) - 指定远程服务器名字。
-            - **worker_register_item_py** (str) - 需要发送的worker注册信息。
+            - **worker_register** (_WorkerRegister) - 需要发送的worker注册信息。
 
     .. py:method:: receive(target_server_name)
 
