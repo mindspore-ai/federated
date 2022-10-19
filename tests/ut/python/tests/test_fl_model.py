@@ -94,19 +94,17 @@ def test_fl_model_basic():
     leader_train_net = leader_eval_net = LeaderTrainEvalNet(leader_base_net)
     leader_yaml = FLYamlData(os.path.join(os.getcwd(), 'yaml_files/leader.yaml'))
 
-    follower_train_net = follower_eval_net = follower_base_net = FollowerNet(1)
+    follower_train_net = follower_eval_net = FollowerNet(1)
     follower_yaml = FLYamlData(os.path.join(os.getcwd(), 'yaml_files/follower.yaml'))
 
     eval_metric = nn.Accuracy()
 
     leader_fl_model = FLModel(yaml_data=leader_yaml,
-                              network=leader_base_net,
-                              train_network=leader_train_net,
+                              network=leader_train_net,
                               eval_network=leader_eval_net,
                               metrics=eval_metric)
     follower_fl_model = FLModel(yaml_data=follower_yaml,
-                                network=follower_base_net,
-                                train_network=follower_train_net,
+                                network=follower_train_net,
                                 eval_network=follower_eval_net)
     # construct random data
     feature = ms.Tensor(shape=(1, 1, 32, 32), dtype=ms.float32, init=Normal())
@@ -121,21 +119,6 @@ def test_fl_model_basic():
     follower_fl_model.backward_one_step(follower_local_data, sens=scale)
 
 
-def test_invalid_basic_network():
-    """
-    Feature: Raise ValueError when the developer inputs invalid basic networks
-    Description: Construct a simple vertical FL system, then input invalid basic networks.
-    Expectation: Raise TypeError.
-    """
-    context.set_context(mode=context.GRAPH_MODE)
-    # test case #1: invalid basic network
-    base_net = [1, 2, 3, 4]
-    train_net = eval_net = LeaderTrainEvalNet(LeaderNet(10))
-    yaml_data = FLYamlData(os.path.join(os.getcwd(), 'yaml_files/leader.yaml'))
-    with pytest.raises(TypeError):
-        FLModel(yaml_data, base_net, train_network=train_net, eval_network=eval_net)
-
-
 def test_invalid_train_network():
     """
     Feature: Raise ValueError when the developer inputs invalid train networks
@@ -148,7 +131,7 @@ def test_invalid_train_network():
     eval_net = LeaderTrainEvalNet(base_net)
     yaml_data = FLYamlData(os.path.join(os.getcwd(), 'yaml_files/leader.yaml'))
     with pytest.raises(TypeError):
-        FLModel(yaml_data, base_net, train_network=train_net, eval_network=eval_net)
+        FLModel(yaml_data, train_net, eval_network=eval_net)
 
 
 def test_invalid_eval_network():
@@ -162,7 +145,7 @@ def test_invalid_eval_network():
     eval_net = {'x': ms.Tensor([[1, 2], [3, 4]], dtype=ms.float32)}
     yaml_data = FLYamlData(os.path.join(os.getcwd(), 'yaml_files/leader.yaml'))
     with pytest.raises(TypeError):
-        FLModel(yaml_data, base_net, train_network=train_net, eval_network=eval_net)
+        FLModel(yaml_data, train_net, eval_network=eval_net)
 
 
 @pytest.mark.skipif(ms.__version__ < '1.8.1', reason='rely on mindspore >= 1.8.1')
@@ -178,11 +161,10 @@ def test_loss_fn():
     loss_fn = nn.SoftmaxCrossEntropyWithLogits(sparse=False)
     leader_fl_model = FLModel(leader_yaml, leader_base_net, loss_fn=loss_fn)
 
-    follower_train_net = follower_eval_net = follower_base_net = FollowerNet(1)
+    follower_train_net = follower_eval_net = FollowerNet(1)
     follower_yaml = FLYamlData(os.path.join(os.getcwd(), 'yaml_files/follower.yaml'))
     follower_fl_model = FLModel(yaml_data=follower_yaml,
-                                network=follower_base_net,
-                                train_network=follower_train_net,
+                                network=follower_train_net,
                                 eval_network=follower_eval_net)
 
     feature = ms.Tensor(shape=(1, 1, 32, 32), dtype=ms.float32, init=Normal())
@@ -193,19 +175,6 @@ def test_loss_fn():
     leader_fl_model.forward_one_step(leader_local_data, follower_out)
     scale = leader_fl_model.backward_one_step(leader_local_data, follower_out)
     follower_fl_model.backward_one_step(follower_local_data, sens=scale)
-
-
-def test_no_optim():
-    """
-    Feature: Raise AttributeError when not specify training network nor loss_fn.
-    Description: Input no training network nor loss_fn.
-    Expectation: Raise AttributeError
-    """
-    context.set_context(mode=context.GRAPH_MODE)
-    leader_base_net = LeaderNet(10)
-    leader_yaml = FLYamlData(os.path.join(os.getcwd(), 'yaml_files/leader.yaml'))
-    with pytest.raises(AttributeError):
-        FLModel(leader_yaml, leader_base_net)
 
 
 def test_customized_opts():
@@ -230,8 +199,7 @@ def test_customized_opts():
 
     optim = CustomizedOptim()
     leader_fl_model = FLModel(yaml_data=leader_yaml,
-                              network=leader_base_net,
-                              train_network=leader_train_net,
+                              network=leader_train_net,
                               optimizers=optim)
     label = ms.Tensor([[0, 1, 0, 0, 0, 0, 0, 0, 0, 0]], dtype=ms.float32)
     leader_local_data = {'label': label}

@@ -193,7 +193,7 @@ class PartyGradOperation:
                 sens_value = sens[self._sens]
                 sens_value = sens_value[self._output_name]
             else:
-                raise ValueError('Not input meaningful sens value')
+                raise ValueError('Input a meaningless sens to %s' % self._name)
             grad_value = self._grad_op(*input_data_batch, sens_value)
         else:
             grad_value = self._grad_op(*input_data_batch)
@@ -252,7 +252,7 @@ class PartyGradScaler:
             grad_scale_value = self._grad_op(self._loss_net)(*input_data_batch, self._sens_value)
         elif isinstance(self._sens, str):
             if self._sens not in sens:
-                raise ValueError('Input sens of PartyGradScaler not containing ', self._sens)
+                raise ValueError('Input sens of %s not containing %s' % (self._name, self._sens))
             sens_value = sens[self._sens][self._output_name]
             grad_scale_value = self._grad_op(self._loss_net)(*input_data_batch, sens_value)
         remote_data_names = remote_data_batch.keys()

@@ -91,19 +91,16 @@ if __name__ == '__main__':
 
     # FLModel definition
     head_fl_model = FLModel(yaml_data=head_yaml,
-                            network=head_base_net,
-                            train_network=head_train_net,
+                            network=head_train_net,
                             eval_network=head_eval_net,
                             optimizers=head_optim,
                             metrics=eval_metric)
     backbone_fl_model = FLModel(yaml_data=backbone_yaml,
-                                network=backbone_base_net,
-                                train_network=backbone_train_net,
+                                network=backbone_train_net,
                                 eval_network=backbone_eval_net,
                                 optimizers=backbone_optim)
     embedding_fl_model = FLModel(yaml_data=embedding_yaml,
-                                 network=embedding_base_net,
-                                 train_network=embedding_train_net,
+                                 network=embedding_train_net,
                                  eval_network=embedding_eval_net,
                                  optimizers=embedding_optim)
 

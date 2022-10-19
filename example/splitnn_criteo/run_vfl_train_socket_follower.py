@@ -45,8 +45,7 @@ class FollowerTrainer:
         follower_eval_net = follower_base_net = FollowerNet(config)
         follower_train_net = FollowerLossNet(follower_base_net, config)
         self.follower_fl_model = FLModel(yaml_data=follower_yaml_data,
-                                         network=follower_base_net,
-                                         train_network=follower_train_net,
+                                         network=follower_train_net,
                                          eval_network=follower_eval_net)
         logging.info('Init follower trainer finish.')
 
