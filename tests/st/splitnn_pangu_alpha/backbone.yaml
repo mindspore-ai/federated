@@ -45,7 +45,6 @@ opts: # define ms optimizer
           - name: attention_mask
         output:
           name: hidden_states
-          index: 0
         sens: output
     params:
       - name: backbone
@@ -61,7 +60,6 @@ grad_scalers: # define the grad scale calculator
       - name: attention_mask
     output:
       name: hidden_states
-      output_index: 0
     sens: output
   - inputs:
       - name: embedding_table
@@ -70,7 +68,6 @@ grad_scalers: # define the grad scale calculator
       - name: attention_mask
     output:
       name: word_table
-      output_index: 1
     sens: output
 dataset:
   name: wiki

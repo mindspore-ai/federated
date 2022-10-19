@@ -44,7 +44,6 @@ opts: # define ms optimizer
           - name: attention_mask
         output:
           name: output
-          index: 0
         sens: 1024.0
     params:
       - name: top_query_layer

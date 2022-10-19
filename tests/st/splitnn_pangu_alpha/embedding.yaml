@@ -39,7 +39,6 @@ opts: # define ms optimizer
           - name: attention_mask
         output:
           name: embedding_table
-          index: 0
         sens: hidden_states
       - inputs:
           - name: input_ids
@@ -47,7 +46,6 @@ opts: # define ms optimizer
           - name: attention_mask
         output:
           name: word_table
-          index: 1
         sens: word_table
     params:
       - name: word_embedding
