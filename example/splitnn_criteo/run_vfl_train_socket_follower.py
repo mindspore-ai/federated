@@ -21,7 +21,7 @@ import itertools
 import logging
 
 from mindspore import context
-from mindspore_federated import FLModel, tensor_utils, FLYamlData
+from mindspore_federated import FLModel, FLYamlData
 from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
 from wide_and_deep import FollowerNet, FollowerLossNet
 
@@ -55,10 +55,8 @@ class FollowerTrainer:
         for _, item in itertools.product(range(config.epochs), train_iter):
             current_item = item
             follower_out = self.follower_fl_model.forward_one_step(item)
-            embedding_data = tensor_utils.tensor_dict_to_tensor_list_pybind_obj(follower_out)
-            self.vertical_communicator.send_tensors("serverB", embedding_data)
-            receive_msg = self.vertical_communicator.receive("serverB")
-            _, scale = tensor_utils.tensor_list_pybind_obj_to_tensor_dict(receive_msg)
+            self.vertical_communicator.send_tensors("serverB", follower_out)
+            scale = self.vertical_communicator.receive("serverB")
             self.follower_fl_model.backward_one_step(item, sens=scale)
 
 

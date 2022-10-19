@@ -21,7 +21,8 @@ from mindspore._checkparam import Validator, Rel
 from mindspore_federated.data_join.server import _DataJoinServer
 from mindspore_federated.data_join.client import _DataJoinClient
 from mindspore_federated.data_join.context import _WorkerRegister, _WorkerConfig
-from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
+from ..startup.vertical_federated_local import VerticalFederatedCommunicator
+from ..startup.server_config import ServerConfig
 from .io import export_mindrecord
 
 SUPPORT_JOIN_TYPES = ("psi",)

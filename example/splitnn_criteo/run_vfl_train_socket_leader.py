@@ -24,7 +24,7 @@ import itertools
 import logging
 
 from mindspore import context
-from mindspore_federated import FLModel, FLYamlData, tensor_utils
+from mindspore_federated import FLModel, FLYamlData
 from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
 from wide_and_deep import LeaderNet, LeaderLossNet, LeaderEvalNet, AUCMetric
 
@@ -63,12 +63,10 @@ class LeaderTrainer:
             logging.info('Begin leader trainer')
             for _, item in itertools.product(range(config.epochs), train_iter):
                 current_item = item
-                msg = self.vertical_communicator.receive("serverA")
-                _, follower_out = tensor_utils.tensor_list_pybind_obj_to_tensor_dict(msg)
+                follower_out = self.vertical_communicator.receive("serverA")
                 leader_out = self.leader_fl_model.forward_one_step(current_item, follower_out)
                 scale = self.leader_fl_model.backward_one_step(current_item, follower_out)
-                grad_scale = tensor_utils.tensor_dict_to_tensor_list_pybind_obj(scale)
-                self.vertical_communicator.send_tensors("serverA", grad_scale)
+                self.vertical_communicator.send_tensors("serverA", scale)
                 # if step % 10 == 0:
                 logging.info('epoch %d step %d/%d wide_loss: %f deep_loss: %f',
                              1, 1, train_size, leader_out['wide_loss'], leader_out['deep_loss'])
