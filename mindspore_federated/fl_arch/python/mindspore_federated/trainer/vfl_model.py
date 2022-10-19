@@ -262,7 +262,8 @@ class FLModel:
                 raise ValueError("FLModel: missing input data \'%s\'" % input_data['name'])
         input_data_batch = tuple(input_data_batch.values())
         out_tuple = self._train_network(*input_data_batch)
-        if len(self._yaml_data.train_net_outs) != len(out_tuple):
+        out_length = len(out_tuple) if isinstance(out_tuple, tuple) else 1
+        if out_length != len(self._yaml_data.train_net_outs):
             raise ValueError('FLModel: output of %s do not match the description of yaml'
                              % self._train_network.__name__)
 
