@@ -87,10 +87,9 @@ class FLModel:
         yaml_data (class): Data class containing information on the vertical federated learning process, including
             optimizers, gradient calculators, etc. The information mentioned above is parsed from the yaml file
             provided by the developer.
-        network (Cell): Backbone network of the party, weights of which will be shared by the training network
-            and the evaluation network.
-        train_network (Cell): Training network of the party, which outputs the loss. If not specified, FLModel
-            will construct the training network using the input network and loss_fn. Default: None.
+        network (Cell): Training network of the party, which outputs the loss. If loss_fn is not specified, the
+            the network will be used as the training network directly. If loss_fn is specified, the training
+            network will be constructed on the basis of network and loss_fn.
         loss_fn (Cell): Loss function to construct the training network on the basis of the input network. If a
             train_network has been specified, it will not work even has been provided. Default: None.
         optimizer (Cell): Customized optimizer for training the train_network. If not specified, FLModel will try
@@ -104,46 +103,28 @@ class FLModel:
     def __init__(self,
                  yaml_data,
                  network,
-                 train_network=None,
                  loss_fn=None,
                  optimizers=None,
                  metrics=None,
                  eval_network=None,
                  grad_network=None):
-        self._role = yaml_data.role
-        if not isinstance(network, nn.Cell):
-            raise TypeError('FLModel: type of \'network\' is not nn.Cell')
-        self._backbone_net = network
-        self._loss_fn = loss_fn
-        self._grad_network = grad_network
-        self._metrics = metrics
-        if eval_network and not isinstance(eval_network, nn.Cell):
-            raise TypeError('FLModel: type of \'eval_network\' is not nn.Cell')
-        self._eval_network = eval_network
-        self._label_dp = None
-
         self._yaml_data = yaml_data
+        self._role = self._yaml_data.role
         self._train_net_yaml = self._yaml_data.train_net
         self._eval_net_yaml = self._yaml_data.eval_net
         self._ckpoint_path = self._yaml_data.ckpt_path
-        self.global_step = 0
 
-        if hasattr(self._yaml_data, 'privacy_eps'):
-            label_dp_eps = self._yaml_data.privacy_eps
-            self._label_dp = LabelDP(eps=label_dp_eps)
-
-        if self._label_dp is not None and self._role != 'leader':
-            raise AttributeError('FLModel: only a leader party can employ the label dp strategy')
-        if train_network is None and self._loss_fn is None:
-            raise AttributeError('FLModel: the attribute train_network and loss_fn shall be selected only one')
-        if train_network is None and self._loss_fn is not None:
+        if not isinstance(network, nn.Cell):
+            raise TypeError('FLModel: type of \'network\' is not nn.Cell')
+        self._train_network = network
+        self._loss_fn = loss_fn
+        if  self._loss_fn is not None:
             self._train_network = self._build_train_network()
-        elif train_network is not None and self._loss_fn is None:
-            if not isinstance(train_network, nn.Cell):
-                raise TypeError('FLModel: type of \'train_network\' is not nn.Cell')
-            self._train_network = train_network
-        else:
-            self._train_network = network
+
+        if eval_network and not isinstance(eval_network, nn.Cell):
+            raise TypeError('FLModel: type of \'eval_network\' is not nn.Cell')
+        self._eval_network = eval_network
+
         parallel_mode = context.get_auto_parallel_context("parallel_mode")
         if parallel_mode in (ParallelMode.SEMI_AUTO_PARALLEL, ParallelMode.AUTO_PARALLEL):
             self._train_network = _VirtualDatasetCell(self._train_network)
@@ -154,6 +135,19 @@ class FLModel:
         if parallel_mode == ParallelMode.DATA_PARALLEL:
             self._train_network.set_broadcast_flag()
         self._train_network.set_train(mode=True)
+
+        self._grad_network = grad_network
+        self._metrics = metrics
+
+        self.global_step = 0
+
+        self._label_dp = None
+        if hasattr(self._yaml_data, 'privacy_eps'):
+            label_dp_eps = self._yaml_data.privacy_eps
+            self._label_dp = LabelDP(eps=label_dp_eps)
+
+        if self._label_dp is not None and self._role != 'leader':
+            raise AttributeError('FLModel: only a leader party can employ the label dp strategy')
 
         if self._grad_network is None:
             if optimizers is None:
@@ -170,8 +164,8 @@ class FLModel:
         """
         Build the network object using the input loss_fn and network.
         """
-        network = nn.WithLossCell(self._backbone_net, self._loss_fn)
-        net_inputs = self._backbone_net.get_inputs()
+        network = nn.WithLossCell(self._train_network, self._loss_fn)
+        net_inputs = self._train_network.get_inputs()
         loss_inputs = [None]
         if self._loss_fn:
             if self._loss_fn.get_inputs():
@@ -187,8 +181,6 @@ class FLModel:
         """
         Build the optimizer object using the information parsed from the yaml file.
         """
-        if self._yaml_data is None:
-            raise AttributeError("yaml_data is required to build GrapOperation and Optimizer")
         for optim_data in self._yaml_data.opts:
             optim_inst = PartyOptimizer(optim_data, self._train_network, self._train_net_yaml)
             self._optimizers.append(optim_inst)
@@ -204,7 +196,7 @@ class FLModel:
 
     def eval_one_step(self, local_data_batch: dict = None, remote_data_batch: dict = None):
         """
-        Evaluate the evaluation network using a data batch.
+        Execute the evaluation network using a data batch.
 
         Args:
             local_data_batch (dict): Data batch read from local server. key is the name of the data item, value
@@ -226,14 +218,15 @@ class FLModel:
             if input_data['name'] in data_batch:
                 input_data_batch[input_data['name']] = data_batch[input_data['name']]
             else:
-                raise ValueError('missing input data \'%s\'' % input_data['name'])
+                raise ValueError('FLModel: missing input data \'%s\'' % input_data['name'])
         out_tuple = self._eval_network(**input_data_batch)
         if len(self._yaml_data.eval_net_outs) != len(out_tuple):
-            raise ValueError('output of %s do not match the description of yaml' % self._eval_network.__name__)
+            raise ValueError('FLModel: output of %s do not match the description of yaml' % self._eval_network.__name__)
         if self._yaml_data.eval_net_gt not in data_batch:
-            raise ValueError('the label \'%s\'descripped in the yaml do not exist' % self._yaml_data.eval_net_gt)
+            raise ValueError('FLModel: the label \'%s\'descripped in the yaml do not exist'
+                             % self._yaml_data.eval_net_gt)
         if self._metrics is None:
-            raise ValueError('not specify eval_metric')
+            raise AttributeError('FLModel: try to execute eval_one_step but not specify eval_metric')
         self._metrics.update(*out_tuple, data_batch[self._yaml_data.eval_net_gt])
         out = OrderedDict()
         idx = 0
@@ -266,11 +259,12 @@ class FLModel:
             if input_data['name'] in data_batch:
                 input_data_batch[input_data['name']] = data_batch[input_data['name']]
             else:
-                raise ValueError("missing input data \'%s\'" % input_data['name'])
+                raise ValueError("FLModel: missing input data \'%s\'" % input_data['name'])
         input_data_batch = tuple(input_data_batch.values())
         out_tuple = self._train_network(*input_data_batch)
         if len(self._yaml_data.train_net_outs) != len(out_tuple):
-            raise ValueError(f'output of {self._train_network.__name__} do not match the description of yaml')
+            raise ValueError('FLModel: output of %s do not match the description of yaml'
+                             % self._train_network.__name__)
 
         out = OrderedDict()
         for idx, output_data in enumerate(self._yaml_data.train_net_outs):
@@ -369,7 +363,7 @@ class FLModel:
         if path is None:
             if not os.path.exists(self._ckpoint_path):
                 raise AttributeError(
-                    'FLModel: path and self._ckpoint_path can not empty at same time, please check it!')
+                    'FLModel: not specify path and \'ckpt_path\' in the yaml do not exist, please check it!')
             last_file_path = self._get_last_file(self._ckpoint_path)
             need_load_ckpt = last_file_path
         else:
@@ -380,7 +374,7 @@ class FLModel:
                 last_file_path = self._get_last_file(file_path)
                 need_load_ckpt = last_file_path
             if not os.path.exists(path):
-                raise AttributeError('FLModel: ckpt_path do not exits, please check it!')
+                raise AttributeError('FLModel: {} do not exits, please check it!'.format(path))
 
         param_dict = load_checkpoint(need_load_ckpt)
         if phrase == 'train':
@@ -392,7 +386,7 @@ class FLModel:
         elif phrase == 'eval':
             _ = load_param_into_net(self._eval_network, param_dict, strict_load=True)
         else:
-            raise AttributeError('FLModel: phase val must be train or eval, please check it!')
+            raise AttributeError('FLModel: phase must be \'train\' or \'eval\', please check it!')
 
     def _get_last_file(self, path: str):
         file_lists = os.listdir(path)
@@ -400,7 +394,7 @@ class FLModel:
             raise AttributeError('FLModel: {} is empty, please check it!'.format(path))
         file_lists = glob.glob(path + "/" + str(self._yaml_data.train_net['name']) + "*")
         if not file_lists:
-            raise AttributeError(
-                'FLModel: {} start with {} is empty, please check it!'.format(path, self._yaml_data.train_net['name']))
+            raise AttributeError('FLModel: in folder {}, no file starts with the name of training network ({}), \
+                please check it!'.format(path, self._yaml_data.train_net['name']))
         file_need = max(file_lists, key=os.path.getctime)
         return file_need

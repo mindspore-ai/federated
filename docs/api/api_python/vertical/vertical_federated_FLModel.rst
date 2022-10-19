@@ -7,8 +7,7 @@
 
     参数：
         - **yaml_data** (class) - 包含纵向联邦学习流程相关信息的数据类，包括优化器、梯度计算器等模块信息。该数据类从开发者配置的yaml文件解析得到。
-        - **network** (Cell) - 参与方用于纵向联邦学习的基础网络，其参数被训练网络和评估网络共享。
-        - **train_network** (Cell) - 参与方训练网络，输出损失值。若初始化阶段未指定train_network，则FLModel将使用network和loss_fn构造训练网络。默认值：None。
+        - **network** (Cell) - 参与方训练网络，输出loss值。如果未输入loss_fn，则直接采用该网络作为训练网络。如果输入了有效的loss_fn，则将基于network和loss_fn构建训练网络。
         - **loss_fn** (Cell) - 用于构建参与方训练网络的损失函数。如果train_network已被指定，则即使指定了loss_fn也不会被使用。默认值：None。
         - **optimizer** (Cell) - 用于训练训练网络的自定义优化器。若初始化阶段未指定optimizer，FLModel将根据yaml文件配置信息，使用MindSpore提供的标准优化器训练训练网络。默认值：None。
         - **metrics** (Metric) - 用于计算评估网络评测指标的类。默认值：None。
@@ -17,7 +16,7 @@
 
     .. py:method:: eval_one_step(local_data_batch=None, remote_data_batch=None)
 
-        采用一个数据batch，执行评估网络前向推理。
+        采用一个数据batch，执行评估网络计算。
 
         参数：
             - **local_data_batch** (dict) - 从本地服务器读取的数据batch。key为数据项名称，value为对应的Tensor张量。

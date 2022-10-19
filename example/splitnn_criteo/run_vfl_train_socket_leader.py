@@ -50,8 +50,7 @@ class LeaderTrainer:
         leader_eval_net = LeaderEvalNet(leader_base_net)
         self.eval_metric = AUCMetric()
         self.leader_fl_model = FLModel(yaml_data=leader_yaml_data,
-                                       network=leader_base_net,
-                                       train_network=leader_train_net,
+                                       network=leader_train_net,
                                        metrics=self.eval_metric,
                                        eval_network=leader_eval_net)
 

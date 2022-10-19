@@ -46,8 +46,7 @@ class LeaderThread(threading.Thread):
         leader_eval_net = LeaderEvalNet(leader_base_net)
         self.eval_metric = AUCMetric()
         self.leader_fl_model = FLModel(yaml_data=leader_yaml_data,
-                                       network=leader_base_net,
-                                       train_network=leader_train_net,
+                                       network=leader_train_net,
                                        metrics=self.eval_metric,
                                        eval_network=leader_eval_net)
         self.embedding_proto = vfl_utils.TensorListProto()
@@ -86,8 +85,7 @@ class FollowerThread(threading.Thread):
         follower_eval_net = follower_base_net = FollowerNet(config)
         follower_train_net = FollowerLossNet(follower_base_net, config)
         self.follower_fl_model = FLModel(yaml_data=follower_yaml_data,
-                                         network=follower_base_net,
-                                         train_network=follower_train_net,
+                                         network=follower_train_net,
                                          eval_network=follower_eval_net)
         self.embedding_proto = vfl_utils.TensorListProto()
         self.grad_scale_proto = vfl_utils.TensorListProto()

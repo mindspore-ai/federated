@@ -524,11 +524,11 @@ def get_args(inference=False):
                         help="predict file path.")
     parser.add_argument('--data_url',
                         required=False,
-                        default='/home/psw/code/eval/federated/tests/st/wiki/train/',
-                        help='Location of data.')
+                        default='./wiki/train/',
+                        help='Location of train data.')
     parser.add_argument('--eval_data_url',
                         required=False,
-                        default=None,
+                        default='./wiki/test/',
                         help='Location of eval data.')
     parser.add_argument('--train_url',
                         required=False,
