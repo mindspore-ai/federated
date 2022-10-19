@@ -28,7 +28,6 @@ MindSpore-Federated纵向联邦学习框架采用yaml配置文件，配置纵向
 |                  | grads.inputs.name             | str                    |                             | 是    |
 |                  | grads.output                  | dict                   |                             | 是    |
 |                  | grads.output.name             | str                    |                             | 是    |
-|                  | grads.output.index            | int                    |                             | 否    |
 |                  | grads.params                  | list                   |                             | 否    |
 |                  | grads.params.name             | str                    |                             | 否    |
 |                  | grads.sens                    | union(float, int, str) |                             | 否    |
@@ -76,7 +75,6 @@ MindSpore-Federated纵向联邦学习框架采用yaml配置文件，配置纵向
 - **grads.inputs.name** (str) - GradOperation算子的输入张量名称。默认值：""。
 - **grads.output** (dict) - 描述GradOperation算子对应的网络输出张量的字典。默认值：{}。
 - **grads.output.name** (str) - GradOperation算子对应的网络输出张量名称。默认值：""。
-- **grads.output.index** (int) - GradOperation算子对应的网络输出张量序号，如未指定，则将根据grads.output.name，从train_net.outputs中解析。默认值：""。
 - **grads.params** (list) - GradOperation算子计算梯度值的训练网络参数列表，每个元素对应一个网络参数名称。如果为空，则将计算关联优化器所更新参数的梯度值。默认值：[]。
 - **grads.params.name** (str) - GradOperation算子计算梯度值的训练网络参数名称。默认值：""。
 - **grads.sens** (union(float, int, str)) - GradOperation算子计算网络参数梯度的加权系数，对应GradOperation算子的"灵敏度"（参考[mindspore.ops.GradOperation](https://mindspore.cn/docs/zh-CN/master/api_python/ops/mindspore.ops.GradOperation.html?highlight=gradoperation)）。如果是float或int类型，则采用常量作为加权系数；如果是str类型，则从其它参与方经网络传输的加权系数中，解析名称与其对应的张量作为加权系数。默认值：""。

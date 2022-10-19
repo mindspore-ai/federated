@@ -28,7 +28,6 @@ MindSpore-Federated adopts a yaml file to configure the training and predicting 
 |                  | grads.inputs.name             | str                    |                                           | Required          |
 |                  | grads.output                  | dict                   |                                           | Required          |
 |                  | grads.output.name             | str                    |                                           | Required          |
-|                  | grads.output.index            | int                    |                                           | Optional          |
 |                  | grads.params                  | list                   |                                           | Optional          |
 |                  | grads.params.name             | str                    |                                           | Optional          |
 |                  | grads.sens                    | union(float, int, str) |                                           | Optional          |
@@ -76,7 +75,6 @@ Parameters:
 - **grads.inputs.name** (str) - Name of an input tensor related to the GradOperation operator. Default: "".
 - **grads.output** (dict) - Output tensor related to the GradOperation operator. Default: {}.
 - **grads.output.name** (str) - Name of the output tensor related to the GradOperation operator. Default: "".
-- **grads.output.index** (int) - Index of the output tensor related to the GradOperation operator. If not specified, the index value will be parsed from train_net.outputs using grads.output.name. Default: "".
 - **grads.params** (list) - List of weights of the training network, gradients of which will be calculated by the GradOperation operator. Each item is a name of weights. If the list is empty, gradients of weights defined in opts.params will be calculated. Default: [].
 - **grads.params.name** (str) - Name of weights of the training network, gradients of which will be calculated by the GradOperation operator. Default: "".
 - **grads.sens** (union(float, int, str)) - Sensitivity (gradient with respect to output) of the GradOperation operator used for calculating the gradients of weights of the training network. (Please refer to [mindspore.ops.GradOperation](https://mindspore.cn/docs/en/master/api_python/ops/mindspore.ops.GradOperation.html)). If it is a float or int value, the sensitivity will be set to a constant tensor. If it is a str value, the sensitivity will be parsed from variable data received from other parties. Default: "".
