@@ -1,3 +1,22 @@
+# communicator
+http_server_address: "127.0.0.1:1086"
+remote_server_address: "127.0.0.1:1087"
+
+# ==============================================================================
+# data join
+raw_dataset_dir: "./datasets/input/leader/"
+raw_eval_dataset_dir: "./datasets/input/leader/"
+dataset_dir: "./datasets/output/leader/"
+eval_dataset_dir: "./datasets/output/leader/"
+data_schema_path: "./yaml_files/leader_schema.yaml"
+primary_key: "oaid"
+bucket_num: 5
+store_type: "csv"
+shard_num: 1
+join_type: "psi"
+thread_num: 0
+
+# ==============================================================================
 data_path: "./mindrecord/"
 device_target: GPU
 leader_yaml_path: "./yaml_files/leader.yaml"
