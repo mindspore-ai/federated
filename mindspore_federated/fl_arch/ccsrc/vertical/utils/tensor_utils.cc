@@ -30,14 +30,8 @@ TensorListItemPy ParseTensorListProto(const TensorListProto &tensorListProto) {
     TensorItemPy tensor;
     tensor.set_name(item.name());
     tensor.set_ref_key(item.ref_key());
-    tensor.set_dtype("float");
-
-    int float_data_size = item.float_data_size();
-    std::vector<float> data;
-    for (int i = 0; i < float_data_size; i++) {
-      data.push_back(item.float_data(i));
-    }
-    tensor.set_data(data);
+    tensor.set_dtype(item.data_type());
+    tensor.set_raw_data(item.raw_data());
     std::vector<size_t> shape;
     int dims_size = item.dims_size();
     for (int i = 0; i < dims_size; i++) {
@@ -65,15 +59,12 @@ void CreateTensorProto(TensorProto *tensor_proto, const TensorItemPy &tensor, st
   if (data_type.empty()) {
     MS_LOG_EXCEPTION << "CreateTensorProto: input a Tensor with unsupported value type";
   }
-  tensor_proto->set_data_type(DataType::FLOAT);
+  tensor_proto->set_data_type(data_type);
 
   for (size_t dim : tensor.shape()) {
     tensor_proto->add_dims(dim);
   }
-
-  for (float ts_data : tensor.data()) {
-    tensor_proto->add_float_data(ts_data);
-  }
+  tensor_proto->set_raw_data(tensor.raw_data());
 }
 
 void CreateTensorListProto(TensorListProto *tensor_list_proto, const TensorListItemPy &tensorListItemPy) {

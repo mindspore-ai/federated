@@ -118,12 +118,12 @@ void InitTensorItemPy(const py::module &m) {
     .def("set_ref_key", &TensorItemPy::set_ref_key, "Get tensors.")
     .def("set_shape", &TensorItemPy::set_shape, "Set shape.")
     .def("set_dtype", &TensorItemPy::set_dtype, "Set dtype.")
-    .def("set_data", &TensorItemPy::set_data, "Set data.")
+    .def("set_raw_data", &TensorItemPy::set_raw_data, "Set tensor raw data.")
     .def("name", &TensorItemPy::name, "Get name.")
     .def("ref_key", &TensorItemPy::ref_key, "Get ref_key.")
     .def("shape", &TensorItemPy::shape, "Get shape.")
     .def("dtype", &TensorItemPy::dtype, "Get dtype.")
-    .def("data", &TensorItemPy::data, "Get data.");
+    .def("raw_data", &TensorItemPy::raw_data, "Get tensor raw data.");
 }
 
 void InitTensorListItemPy(const py::module &m) {

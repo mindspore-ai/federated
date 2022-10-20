@@ -44,15 +44,15 @@ class MS_EXPORT TensorItemPy {
   void set_dtype(const std::string &dtype);
   std::string dtype() const;
 
-  void set_data(const std::vector<float> &data);
-  std::vector<float> data() const;
+  void set_raw_data(const std::string &raw_data);
+  std::string raw_data() const;
 
  private:
   std::string name_;
   std::string ref_key_;
   std::vector<size_t> shape_;
   std::string dtype_;
-  std::vector<float> data_;
+  std::string raw_data_;
 };
 }  // namespace fl
 }  // namespace mindspore

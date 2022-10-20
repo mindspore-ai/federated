@@ -14,12 +14,28 @@
 # ============================================================================
 """Essential tools to modeling the split-learning process."""
 
-import logging
+import base64
 from typing import OrderedDict
+import numpy as np
 
-from mindspore import dtype as mstype
 from mindspore import ops, Tensor
 from mindspore_federated._mindspore_federated import TensorListItem_, TensorItem_
+
+DATATYPE_STRING_NPTYPE_DICT = {
+    "float32": np.float32,
+    "uint8": np.uint8,
+    "int8": np.int8,
+    "uint16": np.uint16,
+    "int16": np.int16,
+    "int32": np.int32,
+    "int64": np.int64,
+    "bool": np.bool_,
+    "float16": np.float16,
+    "double": np.double,
+    "uint32": np.uint32,
+    "uint64": np.uint64,
+    "float64": np.float64
+}
 
 
 def tensor_to_tensor_pybind_obj(ts: Tensor, ref_key: str = None):
@@ -34,13 +50,13 @@ def tensor_to_tensor_pybind_obj(ts: Tensor, ref_key: str = None):
     tensor = TensorItem_()
     if ref_key:
         tensor.set_ref_key(ref_key)
-    data_type = "float32"
-    if data_type is None:
-        raise TypeError('tensor_to_tensor_pybind_obj: input a Tensor with unsupported value type ', ts.dtype)
-    tensor.set_dtype(data_type)
+    if ts.dtype is None:
+        raise TypeError('tensor_to_tensor_pybind_obj: input a Tensor with unsupported value type.')
     tensor.set_shape(ts.shape)
-    ts_values = ts.reshape(ts.size,).asnumpy()
-    tensor.set_data(ts_values)
+    np_data = ts.reshape(ts.size,).asnumpy()
+    np_data_b64 = base64.b64encode(np_data.tobytes())
+    tensor.set_raw_data(np_data_b64)
+    tensor.set_dtype(str(np_data.dtype))
     return tensor
 
 
@@ -73,14 +89,16 @@ def tensor_pybind_obj_to_tensor(tensor_item: TensorItem_):
         tensor_item (class): the pybind object of the Tensor.
     """
     ref_key = tensor_item.ref_key()
-    ts_type = mstype.float32
-    if ts_type is None:
-        logging.warning('tensor_pybind_obj_to_tensor: not specify data_type in TensorProto, using float32 by default')
-        ts_type = mstype.float32
-    values = tensor_item.data()
-    ts = Tensor(list(values), dtype=ts_type)
+    dtype_str = tensor_item.dtype()
+    shape = tensor_item.shape()
+    if dtype_str is None or dtype_str == "":
+        raise ValueError('tensor_pybind_obj_to_tensor: Tensor with unsupported value type.')
+    dtype = DATATYPE_STRING_NPTYPE_DICT.get(dtype_str)
+    values = base64.b64decode(tensor_item.raw_data())
+    np_data = np.frombuffer(values, dtype=dtype).reshape(shape)
 
-    ts = ops.reshape(ts, tuple(tensor_item.shape()))
+    ts = Tensor(np_data)
+    ts = ops.reshape(ts, tuple(shape))
     return ref_key, ts
 
 
