@@ -13,20 +13,23 @@
 # limitations under the License.
 # ============================================================================
 """
-Local splitnn of wide and deep on criteo dataset.
-The embeddings and grad-scales are transmitted through socket.
+Execute Wide&Deep split nn demo follower training on Criteo dataset with type of MindRecord.
+The embeddings and grad scales are transmitted through http.
 """
 
-import itertools
 import logging
 
+from mindspore import set_seed
 from mindspore import context
 from mindspore_federated import FLModel, FLYamlData
-from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
+from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig
 from wide_and_deep import FollowerNet, FollowerLossNet
 
 from network_config import config
 from run_vfl_train_local import construct_local_dataset
+
+
+set_seed(0)
 
 
 class FollowerTrainer:
@@ -34,9 +37,8 @@ class FollowerTrainer:
 
     def __init__(self):
         super(FollowerTrainer, self).__init__()
-        self.content = None
-        http_server_config = ServerConfig(server_name='serverA', server_address='10.113.216.44:6666')
-        remote_server_config = ServerConfig(server_name='serverB', server_address='10.113.216.44:6667')
+        http_server_config = ServerConfig(server_name='follower', server_address=config.http_server_address)
+        remote_server_config = ServerConfig(server_name='leader', server_address=config.remote_server_address)
         self.vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
                                                                    remote_server_config=remote_server_config)
         self.vertical_communicator.launch()
@@ -49,26 +51,36 @@ class FollowerTrainer:
                                          eval_network=follower_eval_net)
         logging.info('Init follower trainer finish.')
 
-    def Start(self):
-        global current_item, train_iter
-        for _, item in itertools.product(range(config.epochs), train_iter):
-            current_item = item
-            follower_out = self.follower_fl_model.forward_one_step(item)
-            self.vertical_communicator.send_tensors("serverB", follower_out)
-            scale = self.vertical_communicator.receive("serverB")
-            self.follower_fl_model.backward_one_step(item, sens=scale)
+    def start(self):
+        """
+        Run follower trainer
+        """
+        logging.info('Begin follower trainer')
+        if config.resume:
+            self.follower_fl_model.load_ckpt()
+        for _ in range(config.epochs):
+            for _, item in enumerate(train_iter):
+                follower_out = self.follower_fl_model.forward_one_step(item)
+                self.vertical_communicator.send_tensors("leader", follower_out)
+                scale = self.vertical_communicator.receive("leader")
+                self.follower_fl_model.backward_one_step(item, sens=scale)
+            self.follower_fl_model.save_ckpt()
+            for eval_item in eval_iter:
+                follower_out = self.follower_fl_model.forward_one_step(eval_item)
+                self.vertical_communicator.send_tensors("leader", follower_out)
 
 
-logging.basicConfig(filename='log_mult_follower_process_socket.txt', level=logging.INFO)
+logging.basicConfig(filename='follower_train.log', level=logging.INFO)
 context.set_context(mode=context.GRAPH_MODE, device_target=config.device_target)
 ds_train, ds_eval = construct_local_dataset()
-# Global variable transmitting joined data, which will be replaced with data joining module
 train_iter = ds_train.create_dict_iterator()
 eval_iter = ds_eval.create_dict_iterator()
 train_size = ds_train.get_dataset_size()
 eval_size = ds_eval.get_dataset_size()
-current_item = None
+logging.info("train_size is: %d", train_size)
+logging.info("eval_size is: %d", eval_size)
+
 
 if __name__ == '__main__':
     follower_trainer = FollowerTrainer()
-    follower_trainer.Start()
+    follower_trainer.start()

@@ -14,8 +14,8 @@
 # limitations under the License.
 # ============================================================================
 
-# Execute Wide&Deep splitnn demo locally training on criteo dataset. Unlike run_vfl_train_local.sh,
-# the embeddings and grad scales are encapsulated using protobuf and are transmitted through socket.
+# Execute Wide&Deep split nn demo leader training on Criteo dataset with type of MindRecord.
+# The embeddings and grad scales are transmitted through http.
 
 set -e
 
@@ -23,7 +23,20 @@ WORKPATH=$(
   cd "$(dirname $0)" || exit
   pwd
 )
+HTTP_SERVER_ADDRESS=$1
+REMOTE_SERVER_ADDRESS=$2
+DATA_PATH=$3
+RESUME=$4
 
+export GLOG_v=1
 export PYTHONPATH="${PYTHONPATH}:${WORKPATH}/../"
-echo "Start executing Wide&Deep splitnn demo."
-python run_vfl_train_socket.py
+
+pid=`ps -ef|grep http_server_address=$HTTP_SERVER_ADDRESS |grep -v "grep" |awk '{print $2}'` && for id in $pid; do kill -9 $id && echo "killed $id"; done
+
+echo "run_vfl_train_leader.py is started."
+rm -rf $WORKPATH/vfl_train_leader.log
+nohup python run_vfl_train_leader.py \
+  --data_path=$DATA_PATH \
+  --resume=$RESUME \
+  --http_server_address=$HTTP_SERVER_ADDRESS \
+  --remote_server_address=$REMOTE_SERVER_ADDRESS >> $WORKPATH/vfl_train_leader.log 2>&1 &

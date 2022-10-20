@@ -26,7 +26,7 @@ class ServerConfig:
 
     Args:
         server_name (str): Name of server.
-        server_address (list[Tensor]): Address of server.
+        server_address (str): Address of server.
     """
     def __init__(self, server_name, server_address):
         check_type.check_str("server_name", server_name)

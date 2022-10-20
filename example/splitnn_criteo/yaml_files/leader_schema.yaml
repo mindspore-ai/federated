@@ -1,0 +1,84 @@
+feat_ids_0:
+  type: int32
+feat_ids_1:
+  type: int32
+feat_ids_13:
+  type: int32
+feat_ids_14:
+  type: int32
+feat_ids_15:
+  type: int32
+feat_ids_16:
+  type: int32
+feat_ids_17:
+  type: int32
+feat_ids_18:
+  type: int32
+feat_ids_19:
+  type: int32
+feat_ids_2:
+  type: int32
+feat_ids_20:
+  type: int32
+feat_ids_21:
+  type: int32
+feat_ids_22:
+  type: int32
+feat_ids_23:
+  type: int32
+feat_ids_24:
+  type: int32
+feat_ids_25:
+  type: int32
+feat_ids_3:
+  type: int32
+feat_ids_4:
+  type: int32
+feat_ids_5:
+  type: int32
+feat_ids_6:
+  type: int32
+feat_vals_0:
+  type: float32
+feat_vals_1:
+  type: float32
+feat_vals_13:
+  type: float32
+feat_vals_14:
+  type: float32
+feat_vals_15:
+  type: float32
+feat_vals_16:
+  type: float32
+feat_vals_17:
+  type: float32
+feat_vals_18:
+  type: float32
+feat_vals_19:
+  type: float32
+feat_vals_2:
+  type: float32
+feat_vals_20:
+  type: float32
+feat_vals_21:
+  type: float32
+feat_vals_22:
+  type: float32
+feat_vals_23:
+  type: float32
+feat_vals_24:
+  type: float32
+feat_vals_25:
+  type: float32
+feat_vals_3:
+  type: float32
+feat_vals_4:
+  type: float32
+feat_vals_5:
+  type: float32
+feat_vals_6:
+  type: float32
+label:
+  type: float32
+oaid:
+  type: string

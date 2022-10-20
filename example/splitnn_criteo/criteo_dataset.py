@@ -15,17 +15,17 @@
 """This module provides methods and classes reading the preprocessed criteo dataset."""
 
 import os
-import math
 from enum import Enum
 
 import numpy as np
-import pandas as pd
 
 from mindspore import context
 from mindspore.context import ParallelMode
 from mindspore.communication import get_rank, get_group_size
 import mindspore.dataset as ds
 import mindspore.common.dtype as mstype
+
+from mindspore_federated.data_join import load_mindrecord
 
 
 class DataType(Enum):
@@ -35,148 +35,6 @@ class DataType(Enum):
     MINDRECORD = 1
     TFRECORD = 2
     H5 = 3
-
-
-class H5Dataset:
-    """
-    H5DataSet
-
-    Args:
-        data_path (str): dataset directory.
-        train_mode (bool): whether dataset is use for train or eval (default=True).
-        train_file_num (int): num of files for training (default=21).
-        test_file_num (int): num of files for testing (default=3).
-    """
-    input_length = 39
-
-    def __init__(self, data_path, train_mode=True, train_file_num=21, test_file_num=3):
-        self._hdf_data_dir = data_path
-        self._is_training = train_mode
-
-        if self._is_training:
-            self._file_prefix = 'train'
-            self._num_of_parts = train_file_num
-        else:
-            self._file_prefix = 'test'
-            self._num_of_parts = test_file_num
-
-        self.data_size = self._bin_count(self._hdf_data_dir, self._file_prefix, self._num_of_parts)
-
-    def _bin_count(self, hdf_data_dir, file_prefix, num_of_parts):
-        size = 0
-        for part in range(num_of_parts):
-            y = pd.read_hdf(os.path.join(hdf_data_dir,
-                                         file_prefix + '_output_part_' + str(part) + '.h5'))
-            size += y.shape[0]
-        return size
-
-    def _iterate_hdf_files_(self, file_num=None, shuffle_block=False):
-        """
-        iterate among hdf files(blocks). when the whole data set is finished, the iterator restarts
-            from the beginning, thus the data stream will never stop
-
-        Args:
-            num_of_parts (int): number of files (default=None)
-            shuffle_block (bool): shuffle block files at every round (default=False)
-
-        Return:
-            input_hdf_file_name, output_hdf_file_name, finish_flag
-        """
-        parts = np.arange(file_num)
-        while True:
-            if shuffle_block:
-                for _ in range(int(shuffle_block)):
-                    np.random.shuffle(parts)
-            for i, p in enumerate(parts):
-                yield os.path.join(self._hdf_data_dir,
-                                   self._file_prefix + '_input_part_' + str(p) + '.h5'), \
-                      os.path.join(self._hdf_data_dir,
-                                   self._file_prefix + '_output_part_' + str(p) + '.h5'), \
-                      i + 1 == len(parts)
-
-    def _generator(self, x, y, batch_size, shuffle=True):
-        """
-        generator of x & y, should be accessed only in private
-
-        Args:
-            x (Union[tuple, list]): feature list
-            y (Union[tuple, list]): label list
-            batch_size (int): batch size
-            shuffle (bool): whether shuffle the data
-        """
-        number_of_batches = np.ceil(1. * x.shape[0] / batch_size)
-        counter = 0
-        finished = False
-        sample_index = np.arange(x.shape[0])
-        if shuffle:
-            for _ in range(int(shuffle)):
-                np.random.shuffle(sample_index)
-        assert x.shape[0] > 0
-        while True:
-            batch_index = sample_index[batch_size * counter: batch_size * (counter + 1)]
-            x_batch = x[batch_index]
-            y_batch = y[batch_index]
-            counter += 1
-            yield x_batch, y_batch, finished
-            if counter == number_of_batches:
-                counter = 0
-                finished = True
-
-    def batch_generator(self, batch_size=1000,
-                        random_sample=False, shuffle_block=False):
-        """
-        method of batch generator
-
-        Args:
-            batch_size (int): batch size
-            random_sample: if True, will shuffle
-            shuffle_block: shuffle file blocks at every round
-        """
-
-        for hdf_in, hdf_out, _ in self._iterate_hdf_files_(self._num_of_parts,
-                                                           shuffle_block):
-            start = stop = None
-            x_all = pd.read_hdf(hdf_in, start=start, stop=stop).values
-            y_all = pd.read_hdf(hdf_out, start=start, stop=stop).values
-            data_gen = self._generator(x_all, y_all, batch_size, shuffle=random_sample)
-            finished = False
-
-            while not finished:
-                x, y, finished = data_gen.__next__()
-                x_id = x[:, 0:self.input_length]
-                x_va = x[:, self.input_length:]
-                yield np.array(x_id.astype(dtype=np.int32)), \
-                    np.array(x_va.astype(dtype=np.float32)), \
-                    np.array(y.astype(dtype=np.float32))
-
-
-def _get_h5_dataset(data_dir, train_mode=True, batch_size=1000):
-    """
-    construct GeneratorDataset object of specified data files
-
-    Args:
-        data_dir (str): dictionary of data files
-        train_mode (bool): whether to train (default=True)
-        batch_size (int): batch size (default=1000)
-
-    Return:
-        GeneratorDataset object
-    """
-    data_para = {'batch_size': batch_size}
-    if train_mode:
-        data_para['random_sample'] = True
-        data_para['shuffle_block'] = True
-
-    h5_dataset = H5Dataset(data_path=data_dir, train_mode=train_mode)
-    numbers_of_batch = math.ceil(h5_dataset.data_size / batch_size)
-
-    def _iter_h5_data():
-        train_eval_gen = h5_dataset.batch_generator(**data_para)
-        for _ in range(0, numbers_of_batch, 1):
-            yield train_eval_gen.__next__()
-
-    data_set = ds.GeneratorDataset(_iter_h5_data(), ["ids", "weights", "labels"])
-    return data_set
 
 
 def _padding_func(batch_size, manual_shape, target_column, cut_point, field_size=39):
@@ -254,7 +112,6 @@ def _get_mindrecord_dataset(directory, train_mode=True, batch_size=1000,
     Args:
         directory (str): Dataset directory.
         train_mode (bool): Whether dataset is use for train or eval (default=True).
-        epochs (int): Dataset epoch size (default=1).
         batch_size (int): Dataset batch size (default=1000).
         line_per_sample (int): The number of sample per line (default=1000).
         rank_size (int): The number of device, not necessary for single device (default=None).
@@ -316,6 +173,142 @@ def create_dataset(data_dir, train_mode=True, batch_size=1000,
         return _get_mindrecord_dataset(data_dir, train_mode, batch_size,
                                        line_per_sample, rank_size=rank_size, rank_id=rank_id,
                                        manual_shape=manual_shape, target_column=target_column)
-    if rank_size > 1:
-        raise RuntimeError("Please use TFRECORD or MINDRECORD dataset in parallel mode.")
-    return _get_h5_dataset(data_dir, train_mode, batch_size)
+    raise RuntimeError("Please use TFRECORD or MINDRECORD dataset in parallel mode.")
+
+
+def combine_leader(
+        x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, x18, x19,
+        y0, y1, y2, y3, y4, y5, y6, y7, y8, y9, y10, y11, y12, y13, y14, y15, y16, y17, y18, y19,
+        label
+):
+    """combine leader data"""
+    x = x0.flatten()
+    x = np.append(x, x1.flatten())
+    x = np.append(x, x2.flatten())
+    x = np.append(x, x3.flatten())
+    x = np.append(x, x4.flatten())
+    x = np.append(x, x5.flatten())
+    x = np.append(x, x6.flatten())
+    x = np.append(x, x7.flatten())
+    x = np.append(x, x8.flatten())
+    x = np.append(x, x9.flatten())
+    x = np.append(x, x10.flatten())
+    x = np.append(x, x11.flatten())
+    x = np.append(x, x12.flatten())
+    x = np.append(x, x13.flatten())
+    x = np.append(x, x14.flatten())
+    x = np.append(x, x15.flatten())
+    x = np.append(x, x16.flatten())
+    x = np.append(x, x17.flatten())
+    x = np.append(x, x18.flatten())
+    x = np.append(x, x19.flatten())
+
+    y = y0.flatten()
+    y = np.append(y, y1.flatten())
+    y = np.append(y, y2.flatten())
+    y = np.append(y, y3.flatten())
+    y = np.append(y, y4.flatten())
+    y = np.append(y, y5.flatten())
+    y = np.append(y, y6.flatten())
+    y = np.append(y, y7.flatten())
+    y = np.append(y, y8.flatten())
+    y = np.append(y, y9.flatten())
+    y = np.append(y, y10.flatten())
+    y = np.append(y, y11.flatten())
+    y = np.append(y, y12.flatten())
+    y = np.append(y, y13.flatten())
+    y = np.append(y, y14.flatten())
+    y = np.append(y, y15.flatten())
+    y = np.append(y, y16.flatten())
+    y = np.append(y, y17.flatten())
+    y = np.append(y, y18.flatten())
+    y = np.append(y, y19.flatten())
+    return x, y, label.reshape((-1,))
+
+
+def combine_follower(
+        x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15, x16, x17, x18,
+        y0, y1, y2, y3, y4, y5, y6, y7, y8, y9, y10, y11, y12, y13, y14, y15, y16, y17, y18,
+):
+    """combine follower data"""
+    x = x0.flatten()
+    x = np.append(x, x1.flatten())
+    x = np.append(x, x2.flatten())
+    x = np.append(x, x3.flatten())
+    x = np.append(x, x4.flatten())
+    x = np.append(x, x5.flatten())
+    x = np.append(x, x6.flatten())
+    x = np.append(x, x7.flatten())
+    x = np.append(x, x8.flatten())
+    x = np.append(x, x9.flatten())
+    x = np.append(x, x10.flatten())
+    x = np.append(x, x11.flatten())
+    x = np.append(x, x12.flatten())
+    x = np.append(x, x13.flatten())
+    x = np.append(x, x14.flatten())
+    x = np.append(x, x15.flatten())
+    x = np.append(x, x16.flatten())
+    x = np.append(x, x17.flatten())
+    x = np.append(x, x18.flatten())
+
+    y = y0.flatten()
+    y = np.append(y, y1.flatten())
+    y = np.append(y, y2.flatten())
+    y = np.append(y, y3.flatten())
+    y = np.append(y, y4.flatten())
+    y = np.append(y, y5.flatten())
+    y = np.append(y, y6.flatten())
+    y = np.append(y, y7.flatten())
+    y = np.append(y, y8.flatten())
+    y = np.append(y, y9.flatten())
+    y = np.append(y, y10.flatten())
+    y = np.append(y, y11.flatten())
+    y = np.append(y, y12.flatten())
+    y = np.append(y, y13.flatten())
+    y = np.append(y, y14.flatten())
+    y = np.append(y, y15.flatten())
+    y = np.append(y, y16.flatten())
+    y = np.append(y, y17.flatten())
+    y = np.append(y, y18.flatten())
+    return x, y
+
+
+def create_joined_dataset(dataset_dir, train_mode=True, batch_size=1000, seed=0, drop_remainder=True, role="leader"):
+    """
+    create dataset object from file folder
+
+    Args:
+        dataset_dir (str): data file dictionary
+        train_mode (bool): whether dataset is use for train or eval (default=True).
+        batch_size (int): dataset batch size (default=1000).
+        seed (int): random shuffle seed (default=0).
+        drop_remainder (bool): drop or not (default=True).
+        role (str): role of current data (default="leader").
+
+    Return:
+        Dataset object
+    """
+    dataset = load_mindrecord(input_dir=dataset_dir, shuffle=train_mode, seed=seed, num_parallel_workers=8)
+
+    if role == "leader":
+        names = list(str(_) for _ in range(7)) + list(str(_) for _ in range(13, 26))
+        ids_name = "id_hldr"
+        vals_name = "wt_hldr"
+        input_columns = ["feat_ids_" + name for name in names] + ["feat_vals_" + name for name in names] + ["label"]
+        output_columns = [ids_name, vals_name, "label"]
+        combine = combine_leader
+    else:
+        names = list(str(_) for _ in range(7, 13)) + list(str(_) for _ in range(26, 39))
+        ids_name = "id_hldr0"
+        vals_name = "wt_hldr0"
+        input_columns = ["feat_ids_" + name for name in names] + ["feat_vals_" + name for name in names]
+        output_columns = [ids_name, vals_name]
+        combine = combine_follower
+    dataset = dataset.map(
+        operations=combine,
+        input_columns=input_columns,
+        column_order=output_columns,
+        output_columns=output_columns
+    )
+    dataset = dataset.batch(batch_size, drop_remainder=drop_remainder)
+    return dataset
