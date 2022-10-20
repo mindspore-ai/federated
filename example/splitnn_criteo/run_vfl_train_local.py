@@ -13,7 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """Local splitnn of wide and deep on criteo dataset."""
-
+import os
 import logging
 
 from mindspore import context, Tensor
@@ -71,9 +71,13 @@ if __name__ == '__main__':
     follower_fl_model = FLModel(yaml_data=follower_yaml_data,
                                 network=follower_train_net,
                                 eval_network=follower_eval_net)
-    # resume if you have checkpoint file or dir
-    follower_fl_model.load_ckpt()
-    leader_fl_model.load_ckpt()
+
+    # resume if you have pretrained checkpoint file
+    if config.resume:
+        if os.path.exists(config.pre_trained_follower):
+            follower_fl_model.load_ckpt(path=config.pre_trained_follower)
+        if os.path.exists(config.pre_trained_leader):
+            leader_fl_model.load_ckpt(path=config.pre_trained_leader)
 
     # forward/backward batch by batch
     steps_per_epoch = ds_train.get_dataset_size()

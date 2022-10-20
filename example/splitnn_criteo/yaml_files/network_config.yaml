@@ -33,3 +33,9 @@ emb_init: "normal"
 init_args: [-0.01, 0.01]
 l2_coef: 8.e-5
 manual_shape: None
+
+# retrain
+resume: False
+pre_trained_follower: ""
+pre_trained_leader: ""
+
