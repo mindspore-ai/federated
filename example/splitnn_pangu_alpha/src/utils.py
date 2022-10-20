@@ -354,6 +354,12 @@ def add_inference_params(opt):
 
 def add_training_params(opt):
     """Add training params"""
+    opt.add_argument("--http_server_address",
+                     type=str, default="127.0.0.1:5555",
+                     help="the address of local training server")
+    opt.add_argument("--remote_server_address",
+                     type=str, default="127.0.0.1:7777",
+                     help="the address of remote training server")
     opt.add_argument("--seq_length",
                      type=int, default=1024,
                      help="sequence length, default is 1024.")
@@ -366,12 +372,8 @@ def add_training_params(opt):
     opt.add_argument("--num_layers",
                      type=int, default=64,
                      help="total layers, default is 64.")
-    opt.add_argument("--num_heads",
-                     type=int, default=128,
-                     help="head size, default is 128.")
-    opt.add_argument("--stage_num",
-                     type=int, default=1,
-                     help="Pipeline stage num, default is 1.")
+    opt.add_argument("--num_heads", type=int, default=128, help="head size, default is 128.")
+    opt.add_argument("--stage_num", type=int, default=1, help="Pipeline stage num, default is 1.")
     opt.add_argument("--micro_size",
                      type=int, default=1,
                      help="Pipeline micro_size, default is 1.")
@@ -605,10 +607,7 @@ def get_args(inference=False):
                         type=int,
                         default=6000,
                         help="Set the hccl build time out, only effective on Ascend. Default 6000")
-    parser.add_argument("--ng_port",
-                        type=str,
-                        default='33222',
-                        help="grpc client  port")
+    parser.add_argument("--ng_port", type=str, default='33222', help="grpc client  port")
     add_context_args_mode(parser)
     add_training_params(parser)
     add_retrain_params(parser)
