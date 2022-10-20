@@ -34,8 +34,8 @@ class LeaderTrainer:
 
     def __init__(self):
         super(LeaderTrainer, self).__init__()
-        http_server_config = ServerConfig(server_name='leader', server_address=config.http_server_address)
-        remote_server_config = ServerConfig(server_name='follower', server_address=config.remote_server_address)
+        http_server_config = ServerConfig(server_name='server', server_address=config.http_server_address)
+        remote_server_config = ServerConfig(server_name='client', server_address=config.remote_server_address)
         self.vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
                                                                    remote_server_config=remote_server_config)
         self.vertical_communicator.launch()
@@ -60,15 +60,15 @@ class LeaderTrainer:
             self.leader_fl_model.load_ckpt()
         for epoch in range(config.epochs):
             for step, item in enumerate(train_iter):
-                follower_out = self.vertical_communicator.receive("follower")
+                follower_out = self.vertical_communicator.receive("client")
                 leader_out = self.leader_fl_model.forward_one_step(item, follower_out)
                 grad_scale = self.leader_fl_model.backward_one_step(item, follower_out)
-                self.vertical_communicator.send_tensors("follower", grad_scale)
+                self.vertical_communicator.send_tensors("client", grad_scale)
                 logging.info('epoch %d step %d wide_loss: %f deep_loss: %f',
                              epoch, step, leader_out['wide_loss'], leader_out['deep_loss'])
             self.leader_fl_model.save_ckpt()
             for eval_item in eval_iter:
-                follower_out = self.vertical_communicator.receive("follower")
+                follower_out = self.vertical_communicator.receive("client")
                 _ = self.leader_fl_model.eval_one_step(eval_item, follower_out)
             auc = self.eval_metric.eval()
             self.eval_metric.clear()

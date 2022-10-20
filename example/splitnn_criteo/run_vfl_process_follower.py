@@ -35,8 +35,8 @@ class FollowerTrainer:
     def __init__(self):
         super(FollowerTrainer, self).__init__()
         self.content = None
-        http_server_config = ServerConfig(server_name='follower', server_address=config.http_server_address)
-        remote_server_config = ServerConfig(server_name='leader', server_address=config.remote_server_address)
+        http_server_config = ServerConfig(server_name='client', server_address=config.http_server_address)
+        remote_server_config = ServerConfig(server_name='server', server_address=config.remote_server_address)
         self.vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
                                                                    remote_server_config=remote_server_config)
         self.vertical_communicator.launch()
@@ -59,13 +59,13 @@ class FollowerTrainer:
         for _ in range(config.epochs):
             for _, item in enumerate(train_iter):
                 follower_out = self.follower_fl_model.forward_one_step(item)
-                self.vertical_communicator.send_tensors("leader", follower_out)
-                scale = self.vertical_communicator.receive("leader")
+                self.vertical_communicator.send_tensors("server", follower_out)
+                scale = self.vertical_communicator.receive("server")
                 self.follower_fl_model.backward_one_step(item, sens=scale)
             self.follower_fl_model.save_ckpt()
             for eval_item in eval_iter:
                 follower_out = self.follower_fl_model.forward_one_step(eval_item)
-                self.vertical_communicator.send_tensors("leader", follower_out)
+                self.vertical_communicator.send_tensors("server", follower_out)
 
 
 logging.basicConfig(filename='follower_process.log', level=logging.INFO)
