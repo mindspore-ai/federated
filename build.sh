@@ -7,14 +7,15 @@ export BUILD_PATH="${PROJECTPATH}/build/"
 usage()
 {
   echo "Usage:"
-  echo "    bash build.sh [-j[n]] [-d] [-S on|off] "
-  echo "    bash build.sh -t on [-j[n]] [-d] [-S on|off] "
+  echo "    bash build.sh [-j[n]] [-d] [-S on|off]  [-s on|off]"
+  echo "    bash build.sh -t on [-j[n]] [-d] [-S on|off]  [-s on|off]"
   echo ""
   echo "Options:"
   echo "    -j[n] Set the threads when building (Default: -j8)"
   echo "    -d Debug model"
   echo "    -t Build testcases."
   echo "    -S Enable enable download cmake compile dependency from gitee instead of github, default off"
+  echo "    -s Enable Intel SGX"
 }
 
 # check value of input is 'on' or 'off'
@@ -41,9 +42,10 @@ checkopts()
   MS_VERSION=""
   RUN_TESTCASES="off"
   ENABLE_GITEE="off"
+  ENABLE_SGX="off"
 
   # Process the options
-  while getopts 'dvc:j:a:p:e:V:t:S:' opt
+  while getopts 'dvc:j:a:p:e:V:t:S:s:' opt
   do
     LOW_OPTARG=$(echo ${OPTARG} | tr '[A-Z]' '[a-z]')
 
@@ -76,6 +78,11 @@ checkopts()
         check_on_off $OPTARG S
         ENABLE_GITEE="$OPTARG"
         echo "enable download from gitee"
+        ;;
+      s)
+        check_on_off $OPTARG s
+        ENABLE_SGX="$OPTARG"
+        echo "enable intel sgx"
         ;;
       *)
         echo "Unknown option ${opt}!"
@@ -115,6 +122,9 @@ build_mindspore_federated()
   fi
   if [[ "X$ENABLE_GITEE" = "Xon" ]]; then
     CMAKE_ARGS="${CMAKE_ARGS} -DENABLE_GITEE=ON"
+  fi
+  if [[ "X$ENABLE_SGX" = "Xon" ]]; then
+    CMAKE_ARGS="${CMAKE_ARGS} -DENABLE_SGX=ON"
   fi
   echo "${CMAKE_ARGS}"
   cmake ${CMAKE_ARGS} ../..

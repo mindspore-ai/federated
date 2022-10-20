@@ -29,6 +29,11 @@ install(FILES ${glog_LIBPATH}/libmindspore_federated_glog.so.0.4.0
 install(FILES ${hiredis_LIBPATH}/libhiredis.so.1.0.0 DESTINATION ${INSTALL_LIB_DIR} COMPONENT mindspore_federated)
 install(FILES ${hiredis_LIBPATH}/libhiredis_ssl.so.1.0.0 DESTINATION ${INSTALL_LIB_DIR} COMPONENT mindspore_federated)
 
+if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "x86_64" AND ENABLE_SGX)
+        install(FILES ${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/ccsrc/armour/lib/libsgx_0.so
+                DESTINATION ${INSTALL_LIB_DIR} COMPONENT mindspore_federated)
+endif()
+
 # process proto files
 set(protoc_abs_path ${protobuf_ROOT}/bin/protoc)
 message(find_protoc_path: ${protoc_abs_path})

@@ -21,6 +21,7 @@
 #include "common/utils/python_adapter.h"
 #include "common/fl_context.h"
 #include "armour/secure_protocol/psi.h"
+#include "armour/secure_protocol/tee_cutlayer.h"
 #include "armour/secure_protocol/plain_intersection.h"
 #include "python/federated_job.h"
 #include "python/feature_py.h"
@@ -166,6 +167,13 @@ PYBIND11_MODULE(_mindspore_federated, m) {
   m.def("PlainIntersection", &mindspore::fl::psi::PlainIntersection, "plain intersection with communication",
         py::arg("input_list"), py::arg("comm_role"), py::arg("peer_comm_role"), py::arg("bucket_id"),
         py::arg("thread_num"));
+  m.def("init_tee_cut_layer", &mindspore::fl::TEE::init_tee_cut_layer, "init tee cutlayer");
+  m.def("forward_tee_cut_layer", &mindspore::fl::TEE::forward_tee_cut_layer, "forward tee cutlayer");
+  m.def("backward_tee_cut_layer", &mindspore::fl::TEE::backward_tee_cut_layer, "backward tee cutlayer");
+  m.def("encrypt_client_data", &mindspore::fl::TEE::encrypt_client_data, "encrypt client data");
+  m.def("secure_forward_tee_cut_layer", &mindspore::fl::TEE::secure_forward_tee_cut_layer,
+        "secure forward tee cutlayer");
+  m.def("free_tee_cut_layer", &mindspore::fl::TEE::free_tee_cut_layer, "free tee cutlayer");
 
   (void)py::class_<FederatedJob, std::shared_ptr<FederatedJob>>(m, "Federated_")
     .def_static("start_federated_server", &FederatedJob::StartFederatedServer)
