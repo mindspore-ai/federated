@@ -21,28 +21,6 @@ enum Role {
   VFL_FOLLOWER = 1;
 }
 
-enum DataType {
-  UNDEFINED = 0;
-  // Basic types.
-  FLOAT = 1;   // float
-  UINT8 = 2;   // uint8_t
-  INT8 = 3;    // int8_t
-  UINT16 = 4;  // uint16_t
-  INT16 = 5;   // int16_t
-  INT32 = 6;   // int32_t
-  INT64 = 7;   // int64_t
-  STRING = 8;  // string
-  BOOL = 9;    // bool
-  FLOAT16 = 10;
-  DOUBLE = 11;
-  UINT32 = 12;
-  UINT64 = 13;
-  COMPLEX64 = 14;
-  COMPLEX128 = 15;
-  BFLOAT16 = 16;
-  FLOAT64 = 17;
-}
-
 message ExternalDataProto {
   string location = 1;
   int64 offset = 2;
@@ -54,23 +32,14 @@ message TensorProto {
   string name = 1;
   string ref_key = 2;
   string doc_string = 3;
+  bytes raw_data = 4;
+  string data_type = 5;
 
-  DataType data_type = 4;
+  repeated int64 dims = 6;
+  repeated int64 min_dims = 7;
+  repeated int64 max_dims = 8;
 
-  repeated int64 dims = 5;
-  repeated int64 min_dims = 6;
-  repeated int64 max_dims = 7;
-  bytes raw_data = 8;
-  repeated bool bool_data = 9;
-  repeated bytes string_data = 10;
-  repeated int32 int32_data = 11;
-  repeated int64 int64_data = 12;
-  repeated uint32 uint32_data = 13; 
-  repeated uint64 uint64_data = 14;
-  repeated float float_data = 15;
-  repeated double double_data = 16;
-
-  ExternalDataProto external_data = 17;
+  ExternalDataProto external_data = 9;
 }
 
 //encapsulate embeddings and grad-scales

@@ -31,7 +31,7 @@ std::vector<size_t> TensorItemPy::shape() const { return shape_; }
 void TensorItemPy::set_dtype(const std::string &dtype) { dtype_ = dtype; }
 std::string TensorItemPy::dtype() const { return dtype_; }
 
-void TensorItemPy::set_data(const std::vector<float> &data) { data_ = data; }
-std::vector<float> TensorItemPy::data() const { return data_; }
+void TensorItemPy::set_raw_data(const std::string &raw_data) { raw_data_ = raw_data; }
+std::string TensorItemPy::raw_data() const { return raw_data_; }
 }  // namespace fl
 }  // namespace mindspore
