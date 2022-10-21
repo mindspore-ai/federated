@@ -21,8 +21,6 @@ from mindspore._checkparam import Validator, Rel
 from mindspore_federated.data_join.server import _DataJoinServer
 from mindspore_federated.data_join.client import _DataJoinClient
 from mindspore_federated.data_join.context import _WorkerRegister, _WorkerConfig
-from ..startup.vertical_federated_local import VerticalFederatedCommunicator
-from ..startup.server_config import ServerConfig
 from .io import export_mindrecord
 
 SUPPORT_JOIN_TYPES = ("psi",)
@@ -82,8 +80,7 @@ class FLDataWorker:
             The key of the second-level dictionary must be a string: "type", and the value is the type of the
             exported data.
             Currently, the types support ["int32", "int64", "float32", "float64", "string", "bytes"].
-        http_server_address (str): Local IP and Port Address, which must be set in both leader and follower.
-        remote_server_address (str): Peer IP and Port Address, which must be set in both leader and follower.
+        communicator (VerticalFederatedCommunicator): Http and Https communicator which used in vertical.
         primary_key (str): The primary key. The value set by leader is used, and the value set by follower is invalid.
             Default: "oaid".
         bucket_num (int): The number of buckets. The value set by leader is used, and the value set by follower is
@@ -96,12 +93,17 @@ class FLDataWorker:
         thread_num (int): The thread number of psi. Default: 0.
 
     Examples:
+        >>> http_server_config = ServerConfig(server_name='server', server_address="127.0.0.1:1086")
+        ... remote_server_config = ServerConfig(server_name='client', server_address="127.0.0.1:1087")
+        ... vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+        ...                                                       remote_server_config=remote_server_config)
+        >>> vertical_communicator.launch()
+
         >>> worker = FLDataWorker(role="leader",
         ...                       main_table_files=["input/leader_data_0.csv", "input/leader_data_1.csv"],
         ...                       output_dir="output/leader/",
         ...                       data_schema_path="leader_schema.yaml",
-        ...                       http_server_address="127.0.0.1:1086",
-        ...                       remote_server_address="127.0.0.1:1087",
+        ...                       communicator=vertical_communicator,
         ...                       primary_key="oaid",
         ...                       bucket_num=5,
         ...                       store_type="csv",
@@ -117,8 +119,7 @@ class FLDataWorker:
                  main_table_files,
                  output_dir,
                  data_schema_path,
-                 http_server_address,
-                 remote_server_address,
+                 communicator,
                  primary_key="oaid",
                  bucket_num=5,
                  store_type="csv",
@@ -138,30 +139,22 @@ class FLDataWorker:
             thread_num=thread_num,
         )
         self._data_schema_path = data_schema_path
-        if self._role == "leader":
-            server_name = "server"
-            peer_server_name = "client"
-        elif self._role == "follower":
-            server_name = "client"
-            peer_server_name = "server"
-        else:
+        if self._role != "leader" and self._role != "follower":
             raise ValueError("role must be \"leader\" or \"follower\"")
         with open(self._data_schema_path, "r") as f:
             self._schema = yaml.load(f, yaml.Loader)
         self._verify()
 
-        http_server_config = ServerConfig(server_name=server_name, server_address=http_server_address)
-        remote_server_config = ServerConfig(server_name=peer_server_name, server_address=remote_server_address)
-        vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
-                                                              remote_server_config=remote_server_config)
-        self._vertical_communicator = vertical_communicator
-        vertical_communicator.launch()
+        self._communicator = communicator
+        if self._communicator is None:
+            raise ValueError("Communicator must not be None.")
+
         if role == "leader":
-            self.data_join_obj = _DataJoinServer(self._worker_config, self._vertical_communicator)
+            self.data_join_obj = _DataJoinServer(self._worker_config, self._communicator)
             self.data_join_obj.launch()
         elif role == "follower":
             worker_register = _WorkerRegister(self._role)
-            self.data_join_obj = _DataJoinClient(self._worker_config, self._vertical_communicator, worker_register)
+            self.data_join_obj = _DataJoinClient(self._worker_config, self._communicator, worker_register)
             self._worker_config = self.data_join_obj.launch()
         else:
             raise ValueError("role must be \"leader\" or \"follower\"")
