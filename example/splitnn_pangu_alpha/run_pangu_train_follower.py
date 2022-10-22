@@ -87,7 +87,7 @@ class FollowerTrainer:
             for key in head_scale['output']:
                 head_scale['output'][key] = head_scale['output'][key].astype(mindspore.float16)
             backbone_scale = self.backbone_fl_model.backward_one_step(remote_data_batch=embedding_out, sens=head_scale)
-
+            backbone_scale['hidden_states'].pop('attention_mask')
             self.vertical_communicator.send_tensors("leader", backbone_scale)
 
             step += 1

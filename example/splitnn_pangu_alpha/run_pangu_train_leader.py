@@ -15,7 +15,6 @@
 """Local splitnn of pangu_alpha on wiki dataset."""
 import os
 import logging
-import copy
 
 from mindspore import context
 from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
@@ -115,17 +114,18 @@ class LeaderTrainer:
                         step = epoch * self.train_size + step
                         embedding_out = self.embedding_fl_model.forward_one_step(item)
 
-                        embedding_out_send = copy.deepcopy(embedding_out)
-                        embedding_out_send.pop('word_table')
-                        self.vertical_communicator.send_tensors("follower", embedding_out_send)
+                        word_table_ts = embedding_out.pop('word_table')
+                        self.vertical_communicator.send_tensors("follower", embedding_out)
                         backbone_out = self.vertical_communicator.receive("follower")
-                        backbone_out['word_table'] = embedding_out['word_table']
+                        backbone_out['word_table'] = word_table_ts
                         logit_out = self.head_fl_model.forward_one_step(item, backbone_out)
 
                         # backward process
                         head_scale = self.head_fl_model.backward_one_step(item, backbone_out)
+                        word_table_scale_ts = head_scale['output'].pop('word_table')
                         self.vertical_communicator.send_tensors("follower", head_scale)
                         backbone_scale = self.vertical_communicator.receive("follower")
+                        head_scale['output']['word_table'] = word_table_scale_ts
                         backbone_scale.update(head_scale)
                         self.embedding_fl_model.backward_one_step(item, sens=backbone_scale)
                         if step % 10 == 0:
