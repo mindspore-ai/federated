@@ -18,6 +18,7 @@
 #define MINDSPORE_CCSRC_FL_COMMON_COMMON_H_
 
 #include <map>
+#include <set>
 #include <string>
 #include <numeric>
 #include <climits>
@@ -101,6 +102,10 @@ struct RoundConfig {
   // Use the total count of all valid servers as the final count, used for updateModel.
   bool per_server_count = false;
 };
+
+const std::set<std::string> DataRateKernels = {
+  "startFLJob",   "updateModel", "getModel",      "exchangeKeys",       "getKeys",
+  "shareSecrets", "getSecrets",  "getClientList", "reconstructSecrets", "pushListSign"};
 
 using FBBuilder = flatbuffers::FlatBufferBuilder;
 using TimeOutCb = std::function<void(bool, const std::string &)>;

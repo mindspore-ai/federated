@@ -522,6 +522,7 @@ void Iteration::StartThreadToRecordDataRate() {
           continue;
         }
         auto send_data = round->GetSendData();
+        MS_LOG(INFO) << "send_data---size----k--" << send_data.size();
         for (const auto &it : send_data) {
           if (send_datas.find(it.first) != send_datas.end()) {
             send_datas[it.first] = send_datas[it.first] + it.second;
