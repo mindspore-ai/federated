@@ -18,9 +18,14 @@ import pytest
 import pandas as pd
 from mindspore_federated.data_join import FLDataWorker
 from mindspore_federated.data_join import load_mindrecord
+from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
 from common import vfl_data_test
 from common_data import generate_schema
 
+http_server_config = ServerConfig(server_name='server', server_address="127.0.0.1:6969")
+remote_server_config = ServerConfig(server_name='client', server_address="127.0.0.1:9696")
+vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+                                                      remote_server_config=remote_server_config)
 
 @vfl_data_test
 def test_case_data_join_role():
@@ -50,8 +55,7 @@ def test_case_data_join_role():
             main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(4)],
             output_dir="temp/{}/".format(role),
             data_schema_path="temp/schema.yaml",
-            http_server_address="127.0.0.1:6969",
-            remote_server_address="127.0.0.1:9696",
+            communicator=vertical_communicator
         )
     assert "role must be \"leader\" or \"follower\"" in str(err.value)
 
@@ -85,8 +89,7 @@ def test_case_data_join_join_type():
             output_dir="temp/{}/".format(role),
             join_type="wtc",
             data_schema_path="temp/schema.yaml",
-            http_server_address="127.0.0.1:6969",
-            remote_server_address="127.0.0.1:9696",
+            communicator=vertical_communicator
         )
     err_str = str(err.value)
     assert_msg = "join_type" in err_str and "str" in err_str
@@ -122,8 +125,7 @@ def test_case_data_join_small_bucket_num():
             output_dir="temp/{}/".format(role),
             bucket_num=0,
             data_schema_path="temp/schema.yaml",
-            http_server_address="127.0.0.1:6969",
-            remote_server_address="127.0.0.1:9696",
+            communicator=vertical_communicator
         )
     err_str = str(err.value)
     assert_msg = "bucket_num" in err_str and "[1, 1000000]" in err_str
@@ -159,8 +161,7 @@ def test_case_data_join_big_bucket_num():
             output_dir="temp/{}/".format(role),
             bucket_num=1000001,
             data_schema_path="temp/schema.yaml",
-            http_server_address="127.0.0.1:6969",
-            remote_server_address="127.0.0.1:9696",
+            communicator=vertical_communicator
         )
     err_str = str(err.value)
     assert_msg = "bucket_num" in err_str and "[1, 1000000]" in err_str
@@ -196,8 +197,7 @@ def test_case_data_join_small_shard_num():
             output_dir="temp/{}/".format(role),
             shard_num=0,
             data_schema_path="temp/schema.yaml",
-            http_server_address="127.0.0.1:6969",
-            remote_server_address="127.0.0.1:9696",
+            communicator=vertical_communicator
         )
     err_str = str(err.value)
     assert_msg = "shard_num" in err_str and "[1, 1000]" in err_str
@@ -233,8 +233,7 @@ def test_case_data_join_big_shard_num():
             output_dir="temp/{}/".format(role),
             shard_num=1001,
             data_schema_path="temp/schema.yaml",
-            http_server_address="127.0.0.1:6969",
-            remote_server_address="127.0.0.1:9696",
+            communicator=vertical_communicator
         )
     err_str = str(err.value)
     assert_msg = "shard_num" in err_str and "[1, 1000]" in err_str
@@ -243,18 +242,24 @@ def test_case_data_join_big_shard_num():
 
 def worker_process_fun(
         role="leader",
+        server_name="server",
+        target_server_name="client",
         http_server_address="127.0.0.1:6969",
-        remote_server_address="127.0.0.1:9696",
+        remote_server_address="127.0.0.1:9696"
 ):
     """start vfl data worker"""
     file_num = 4 if role == "leader" else 2
+    config1 = ServerConfig(server_name=server_name, server_address=http_server_address)
+    config2 = ServerConfig(server_name=target_server_name, server_address=remote_server_address)
+    communicator = VerticalFederatedCommunicator(http_server_config=config1,
+                                                 remote_server_config=config2)
+    communicator.launch()
     worker = FLDataWorker(
         role=role,
         main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(file_num)],
         output_dir="temp/{}/".format(role),
         data_schema_path="temp/{}_schema.yaml".format(role),
-        http_server_address=http_server_address,
-        remote_server_address=remote_server_address,
+        communicator=communicator
     )
     worker.export()
 
@@ -295,9 +300,11 @@ def test_case_data_join_demo():
         feature19="float32",
     )
 
-    leader_process = Process(target=worker_process_fun, args=("leader", "127.0.0.1:6969", "127.0.0.1:9696"))
+    leader_process = Process(target=worker_process_fun, args=("leader", "server", "client", "127.0.0.1:6969",
+                                                              "127.0.0.1:9696"))
     leader_process.start()
-    follower_process = Process(target=worker_process_fun, args=("follower", "127.0.0.1:9696", "127.0.0.1:6969"))
+    follower_process = Process(target=worker_process_fun, args=("follower", "client", "server", "127.0.0.1:9696",
+                                                                "127.0.0.1:6969"))
     follower_process.start()
 
     leader_process.join(timeout=30)

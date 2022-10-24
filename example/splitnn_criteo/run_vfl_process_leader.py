@@ -34,11 +34,6 @@ class LeaderTrainer:
 
     def __init__(self):
         super(LeaderTrainer, self).__init__()
-        http_server_config = ServerConfig(server_name='server', server_address=config.http_server_address)
-        remote_server_config = ServerConfig(server_name='client', server_address=config.remote_server_address)
-        self.vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
-                                                                   remote_server_config=remote_server_config)
-        self.vertical_communicator.launch()
         logging.info('start vfl trainer success')
         leader_yaml_data = FLYamlData(config.leader_yaml_path)
         leader_base_net = LeaderNet(config)
@@ -60,15 +55,15 @@ class LeaderTrainer:
             self.leader_fl_model.load_ckpt()
         for epoch in range(config.epochs):
             for step, item in enumerate(train_iter):
-                follower_out = self.vertical_communicator.receive("client")
+                follower_out = vertical_communicator.receive("client")
                 leader_out = self.leader_fl_model.forward_one_step(item, follower_out)
                 grad_scale = self.leader_fl_model.backward_one_step(item, follower_out)
-                self.vertical_communicator.send_tensors("client", grad_scale)
+                vertical_communicator.send_tensors("client", grad_scale)
                 logging.info('epoch %d step %d wide_loss: %f deep_loss: %f',
                              epoch, step, leader_out['wide_loss'], leader_out['deep_loss'])
             self.leader_fl_model.save_ckpt()
             for eval_item in eval_iter:
-                follower_out = self.vertical_communicator.receive("client")
+                follower_out = vertical_communicator.receive("client")
                 _ = self.leader_fl_model.eval_one_step(eval_item, follower_out)
             auc = self.eval_metric.eval()
             self.eval_metric.clear()
@@ -81,6 +76,11 @@ context.set_context(mode=context.GRAPH_MODE, device_target=config.device_target)
 logging.info("config is:")
 logging.info(config)
 
+http_server_config = ServerConfig(server_name='server', server_address=config.http_server_address)
+remote_server_config = ServerConfig(server_name='client', server_address=config.remote_server_address)
+vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+                                                      remote_server_config=remote_server_config)
+vertical_communicator.launch()
 worker = FLDataWorker(role="leader",
                       main_table_files=config.raw_dataset_dir,
                       output_dir=config.dataset_dir,
@@ -93,6 +93,7 @@ worker = FLDataWorker(role="leader",
                       shard_num=config.shard_num,
                       join_type=config.join_type,
                       thread_num=config.thread_num,
+                      communicator=vertical_communicator
                       )
 worker.export()
 logging.info('train dataset export is done')
@@ -114,6 +115,7 @@ worker = FLDataWorker(role="leader",
                       shard_num=config.shard_num,
                       join_type=config.join_type,
                       thread_num=config.thread_num,
+                      communicator=vertical_communicator
                       )
 worker.export()
 logging.info('eval dataset export is done')

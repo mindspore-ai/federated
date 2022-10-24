@@ -16,6 +16,7 @@
 import argparse
 import os
 from mindspore_federated.data_join import FLDataWorker
+from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
 
 
 def mkdir(directory):
@@ -45,6 +46,10 @@ def get_parser():
                              "the second-level dictionary must be a string: type, and the value is the type of the"
                              "exported data. Currently, the types support [int32, int64, float32, float64, string,"
                              "bytes].")
+    parser.add_argument("--server_name", type=str, default="leader_node",
+                        help="Local http server name.")
+    parser.add_argument("--remote_server_name", type=str, default="follower_node",
+                        help="Remote http server name.")
     parser.add_argument("--http_server_address", type=str, default="127.0.0.1:1086",
                         help="Local IP and Port Address, which must be set in both leader and follower.")
     parser.add_argument("--remote_server_address", type=str, default="127.0.0.1:1087",
@@ -78,6 +83,8 @@ if __name__ == '__main__':
     main_table_files = args.main_table_files
     output_dir = args.output_dir
     data_schema_path = args.data_schema_path
+    server_name = args.server_name
+    remote_server_name = args.remote_server_name
     http_server_address = args.http_server_address
     remote_server_address = args.remote_server_address
     primary_key = args.primary_key
@@ -86,17 +93,22 @@ if __name__ == '__main__':
     shard_num = args.shard_num
     join_type = args.join_type
     thread_num = args.thread_num
+    http_server_config = ServerConfig(server_name=server_name, server_address=http_server_address)
+    remote_server_config = ServerConfig(server_name=remote_server_name, server_address=remote_server_address)
+    vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+                                                          remote_server_config=remote_server_config)
+    vertical_communicator.launch()
+
     worker = FLDataWorker(role=role,
                           main_table_files=main_table_files,
                           output_dir=output_dir,
                           data_schema_path=data_schema_path,
-                          http_server_address=http_server_address,
-                          remote_server_address=remote_server_address,
                           primary_key=primary_key,
                           bucket_num=bucket_num,
                           store_type=store_type,
                           shard_num=shard_num,
                           join_type=join_type,
                           thread_num=thread_num,
+                          communicator=vertical_communicator
                           )
     worker.export()
