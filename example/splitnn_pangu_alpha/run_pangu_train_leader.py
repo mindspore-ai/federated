@@ -23,9 +23,7 @@ from mindspore.train.summary import SummaryRecord
 from mindspore_federated import FLModel, FLYamlData
 from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig
 
-from src.split_pangu_alpha_https import PanGuHead, HeadLossNet, EmbeddingLayer, \
-    EmbeddingLossNet, PPLMetric
-
+from src.split_pangu_alpha import PanGuHead, HeadLossNet, EmbeddingLayer, EmbeddingNecessaryLossNet, PPLMetric
 from src.utils import LearningRate, get_args, construct_local_dataset, load_train_net, set_weight_decay, \
     set_embedding_weight_decay
 from src.pangu_optim import PanguAlphaAdam, FP32StateAdamWeightDecay
@@ -70,7 +68,7 @@ class LeaderTrainer:
 
         # Embedding/Tail Part
         embedding_base_net = EmbeddingLayer(config)
-        embedding_eval_net = embedding_train_net = EmbeddingLossNet(embedding_base_net, config)
+        embedding_eval_net = embedding_train_net = EmbeddingNecessaryLossNet(embedding_base_net, config)
         embedding_with_loss = _VirtualDatasetCell(embedding_eval_net)
         embedding_params = embedding_with_loss.trainable_params()
         embedding_group_params = set_embedding_weight_decay(embedding_params)
