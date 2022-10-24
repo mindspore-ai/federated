@@ -351,6 +351,21 @@ class BackboneLossNet(nn.Cell):
         return hidden_states, word_table, position_id, attention_mask
 
 
+class BackboneNecessrayLossNet(nn.Cell):
+    """
+    Net of the backbone party, which is the 2nd sub-network and is deployed on the server B.
+    Args:
+        net (Cell): PanguAlphaModel, which is the 2nd sub-network.
+    """
+
+    def __init__(self, net: PanguAlphaModel):
+        super(BackboneNecessrayLossNet, self).__init__(auto_prefix=False)
+        self.net = net
+
+    def construct(self, embedding_table, attention_mask):
+        hidden_states = self.net(embedding_table, attention_mask)
+        return hidden_states
+
 class BackboneEvalNet(nn.Cell):
     """
     Eval net of the backbone party, which warps PanguAlphaModel.
@@ -414,6 +429,34 @@ class EmbeddingLossNet(nn.Cell):
         tokens = self.slice(input_ids, (0, 0), (self.batch_size, -1), (1, 1))
         embedding_table, word_table = self.net(tokens, position_id, batch_valid_length=None)
         return embedding_table, word_table, position_id, attention_mask
+
+class EmbeddingNecessaryLossNet(nn.Cell):
+    """
+    Train net of the embedding party, or the tail sub-network.
+    Args:
+        net (class): EmbeddingLayer, which is the 1st sub-network.
+        config (class): default config info.
+    """
+
+    def __init__(self, net: EmbeddingLayer, config):
+        super(EmbeddingNecessaryLossNet, self).__init__(auto_prefix=False)
+
+        self.batch_size = config.batch_size
+        self.seq_length = config.seq_length
+        dp = config.parallel_config.data_parallel
+        self.eod_token = config.eod_token
+        self.net = net
+        self.slice = P.StridedSlice().shard(((dp, 1),))
+        self.not_equal = P.NotEqual().shard(((dp, 1), ()))
+        self.batch_size = config.batch_size
+        self.len = config.seq_length
+        self.slice2 = P.StridedSlice().shard(((dp, 1, 1),))
+
+    def construct(self, input_ids, position_id, attention_mask):
+        """forward process of FollowerLossNet"""
+        tokens = self.slice(input_ids, (0, 0), (self.batch_size, -1), (1, 1))
+        embedding_table, word_table = self.net(tokens, position_id, batch_valid_length=None)
+        return embedding_table, word_table, attention_mask
 
 
 class HeadLossNet(nn.Cell):

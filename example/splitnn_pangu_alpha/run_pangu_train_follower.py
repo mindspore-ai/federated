@@ -16,14 +16,13 @@
 import os
 import logging
 
-import mindspore
 from mindspore import context
 from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
 from mindspore.nn.wrap.cell_wrapper import _VirtualDatasetCell
 from mindspore_federated import FLModel, FLYamlData
 from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig
 
-from src.split_pangu_alpha_https import PanguAlphaModel, BackboneLossNet
+from src.split_pangu_alpha import PanguAlphaModel, BackboneNecessrayLossNet
 
 from src.utils import LearningRate, get_args, load_train_net, set_weight_decay
 from src.pangu_optim import PanguAlphaAdam, FP32StateAdamWeightDecay
@@ -58,7 +57,7 @@ class FollowerTrainer:
 
         # Backbone Part
         backbone_eval_net = backbone_base_net = PanguAlphaModel(config)
-        backbone_train_net = BackboneLossNet(backbone_base_net)
+        backbone_train_net = BackboneNecessrayLossNet(backbone_base_net)
         backbone_with_loss = _VirtualDatasetCell(backbone_train_net)
         backbone_params = backbone_with_loss.trainable_params()
         backbone_group_params = set_weight_decay(backbone_params)
@@ -84,8 +83,6 @@ class FollowerTrainer:
             self.vertical_communicator.send_tensors("leader", backbone_out)
             head_scale = self.vertical_communicator.receive("leader")
 
-            for key in head_scale['output']:
-                head_scale['output'][key] = head_scale['output'][key].astype(mindspore.float16)
             backbone_scale = self.backbone_fl_model.backward_one_step(remote_data_batch=embedding_out, sens=head_scale)
             backbone_scale['hidden_states'].pop('attention_mask')
             self.vertical_communicator.send_tensors("leader", backbone_scale)
