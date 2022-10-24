@@ -32,7 +32,7 @@ class TestAlbertTrain(BaseCase):
     train_dataset = os.path.join(BaseCase.fl_resource_path, "client/data/albert/train/0.txt")
     test_dataset = os.path.join(BaseCase.fl_resource_path, "client/data/albert/eval/eval.txt")
     origin_ckpt_path = os.path.join(BaseCase.fl_resource_path, "server/models/albert/fl_ckpt/")
-    cur_ckpt_path = os.path.join(BaseCase.fl_resource_path, "server/models/albert/cur_fl_ckpt/")
+    cur_ckpt_path = os.path.join(BaseCase.script_path, "albert_cur_fl_ckpt/")
     vocal_file = os.path.join(BaseCase.fl_resource_path, "client/data/albert/vocab.txt")
     ids_file = os.path.join(BaseCase.fl_resource_path, "client/data/albert/vocab_map_ids.txt")
 

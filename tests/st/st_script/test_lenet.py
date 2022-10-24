@@ -32,7 +32,7 @@ class TestLenetTrain(BaseCase):
     train_dataset = os.path.join(BaseCase.fl_resource_path, "client/data/lenet")
     test_dataset = os.path.join(BaseCase.fl_resource_path, "client/data/lenet")
     origin_ckpt_path = os.path.join(BaseCase.fl_resource_path, "server/models/lenet/fl_ckpt/")
-    cur_ckpt_path = os.path.join(BaseCase.fl_resource_path, "server/models/lenet/cur_fl_ckpt/")
+    cur_ckpt_path = os.path.join(BaseCase.script_path, "lenet_cur_fl_ckpt/")
 
     def setup_method(self):
         """
