@@ -34,7 +34,7 @@ class TestAdsTagTrain(BaseCase):
     train_dataset = os.path.join(BaseCase.fl_resource_path, "client/data/adstag/n_samples_42_id_1535.csv")
     test_dataset = os.path.join(BaseCase.fl_resource_path, "client/data/adstag/n_samples_42_id_1691.csv")
     origin_ckpt_path = os.path.join(BaseCase.fl_resource_path, "server/models/adstag/fl_ckpt/")
-    cur_ckpt_path = os.path.join(BaseCase.fl_resource_path, "server/models/adstag/cur_fl_ckpt/")
+    cur_ckpt_path = os.path.join(BaseCase.script_path, "adstag_cur_fl_ckpt/")
 
     def setup_method(self):
         """

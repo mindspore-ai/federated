@@ -34,7 +34,7 @@ class TestVaeTrain(BaseCase):
     train_model_path = os.path.join(BaseCase.fl_resource_path, "client/ms/vae_train_2022.0411.ms")
     infer_model_path = os.path.join(BaseCase.fl_resource_path, "client/ms/vae_train_2022.0411.ms")
     origin_ckpt_path = os.path.join(BaseCase.fl_resource_path, "server/models/vae/fl_ckpt/")
-    cur_ckpt_path = os.path.join(BaseCase.fl_resource_path, "server/models/vae/cur_fl_ckpt/")
+    cur_ckpt_path = os.path.join(BaseCase.script_path, "vae_cur_fl_ckpt/")
 
     def setup_method(self):
         """
@@ -113,7 +113,7 @@ class TestVaeTrain(BaseCase):
         self.start_server("yamls/vae/nc_ne_config.yaml", self.cur_ckpt_path)
         self.wait_cluster_ready(out_time=30)
         self.start_client()
-        self.check_client_result(out_time=60)
+        self.check_client_result(out_time=90)
 
     def test_train_vae_compress_ne(self):
         """
@@ -127,7 +127,7 @@ class TestVaeTrain(BaseCase):
         self.start_server("yamls/vae/compress_ne_config.yaml", self.cur_ckpt_path)
         self.wait_cluster_ready(out_time=30)
         self.start_client()
-        self.check_client_result(out_time=60)
+        self.check_client_result(out_time=90)
 
     def test_train_vae_nc_dp(self):
         """
@@ -234,4 +234,4 @@ class TestVaeInference(BaseCase):
         :return:
         """
         self.start_client()
-        self.check_client_result(out_time=30)
+        self.check_client_result(out_time=60)
