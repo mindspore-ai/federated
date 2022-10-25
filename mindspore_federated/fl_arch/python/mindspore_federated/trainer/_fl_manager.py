@@ -169,9 +169,6 @@ class FederatedLearningManager(Callback):
                                before unchanged_round rounds.
                                Value range: greater than or equal to 0. Default: 0.
 
-    Note:
-        This is an experimental prototype that is subject to change.
-
     """
 
     def __init__(self, yaml_config, model, sync_frequency, http_server_address="", data_size=1, sync_type='fixed',
