@@ -29,11 +29,8 @@
           取值范围：大于0。默认值：5。
         - **frequency_increase_ratio** (int) - 频率提升幅度，该值越大频率提升幅度越大。
           取值范围：大于0。默认值：2。
-        - **unchanged_round** (int) - 频率不发生变化的轮数，在前unchanged_round个轮次，频率不会发生变化。
+        - **unchanged_round** (int) - 频率不发生变化的轮数，在前`unchanged_round`个轮次，频率不会发生变化。
           取值范围：大于等于0。默认值：0。
-
-    .. note::
-        这是一个实验原型，可能会有变化。
 
     .. py:method:: start_pull_weight()
 
