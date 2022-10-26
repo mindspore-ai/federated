@@ -42,7 +42,7 @@ class DataJoinCommunicator : public AbstractCommunicator {
 
   void InitCommunicator(const std::shared_ptr<HttpCommunicator> &http_communicator) override;
 
-  bool waitForRegister(const uint32_t &timeout = 900);
+  bool waitForRegister(const uint32_t &timeout);
 
   void notifyForRegister();
 

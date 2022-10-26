@@ -108,7 +108,7 @@ TensorListItemPy TrainerCommunicator::Receive(const std::string &target_server_n
   }
   auto queue = message_queues_[target_server_name];
   MS_EXCEPTION_IF_NULL(queue);
-  return queue->pop();
+  return queue->pop(kTrainerWaitSecondTimes);
 }
 }  // namespace fl
 }  // namespace mindspore

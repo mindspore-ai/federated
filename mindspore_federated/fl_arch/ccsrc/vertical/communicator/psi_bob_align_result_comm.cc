@@ -99,7 +99,7 @@ psi::BobAlignResult BobAlignResultCommunicator::Receive(const std::string &targe
   }
   auto queue = message_queues_[target_server_name];
   MS_EXCEPTION_IF_NULL(queue);
-  return queue->pop();
+  return queue->pop(kPsiWaitSecondTimes);
 }
 }  // namespace fl
 }  // namespace mindspore

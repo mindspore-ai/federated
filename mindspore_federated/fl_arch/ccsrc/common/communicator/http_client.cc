@@ -159,8 +159,8 @@ void HttpClient::ReadCallback(struct evhttp_request *http_req, void *const arg) 
   const auto &response_track = http_client->response_track();
 
   if (rsp_message_id != http_client->message_id()) {
-    MS_LOG(WARNING) << "Response message id is different from the expect message id, rsp message id is "
-                    << rsp_message_id << ", expect message id is " << expect_message_id;
+    MS_LOG(DEBUG) << "Response message id is different from the expect message id, rsp message id is "
+                  << rsp_message_id << ", expect message id is " << expect_message_id;
     http_client->OnReadHandler(response_track, target_msg_type);
     event_base_loopbreak(base);
     return;

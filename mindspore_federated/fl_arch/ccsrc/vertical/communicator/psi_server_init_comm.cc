@@ -98,7 +98,7 @@ psi::ServerPSIInit ServerPSIInitCommunicator::Receive(const std::string &target_
   }
   auto queue = message_queues_[target_server_name];
   MS_EXCEPTION_IF_NULL(queue);
-  return queue->pop();
+  return queue->pop(kCommunicateWaitTimes);
 }
 }  // namespace fl
 }  // namespace mindspore

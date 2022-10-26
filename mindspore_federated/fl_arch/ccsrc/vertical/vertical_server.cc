@@ -195,9 +195,9 @@ void VerticalServer::Receive(const std::string &target_server_name, psi::PlainDa
 bool VerticalServer::DataJoinWaitForStart() {
   auto communicator_ptr = reinterpret_cast<DataJoinCommunicator *>(communicators_[KDataJoin].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
-  bool res = communicator_ptr->waitForRegister();
+  bool res = communicator_ptr->waitForRegister(kCommunicateWaitTimes);
   if (!res) {
-    MS_LOG(EXCEPTION) << "Data join for starting is time out.";
+    MS_LOG(EXCEPTION) << "Starting for data join is time out.";
   }
   return true;
 }

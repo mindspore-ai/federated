@@ -23,7 +23,11 @@
 
 namespace mindspore {
 namespace fl {
-void VerticalFederatedJob::StartVerticalCommunicator() { VerticalServer::GetInstance().StartVerticalCommunicator(); }
+void VerticalFederatedJob::StartVerticalCommunicator() {
+  if (!VerticalServer::GetInstance().StartVerticalCommunicator()) {
+    MS_LOG(EXCEPTION) << "Start vertical communicator failed";
+  }
+}
 
 void VerticalFederatedJob::SendTensorList(const std::string &target_server_name,
                                           const TensorListItemPy &tensorListItemPy) {
