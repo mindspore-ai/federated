@@ -56,8 +56,12 @@ constexpr auto KAliceCheckMsgType = "/aliceCheck";
 constexpr auto KPlainDataMsgType = "/plainData";
 constexpr auto KDataJoinMsgType = "/dataJoin";
 
-constexpr size_t kRetryCommunicateTimes = 900;
-constexpr size_t kSleepSecondsOfCommunicate = 1;
+constexpr uint32_t kRetryCommunicateTimes = 900;
+constexpr uint32_t kSleepSecondsOfCommunicate = 1;
+
+constexpr uint32_t kCommunicateWaitTimes = 900;
+constexpr uint32_t kTrainerWaitSecondTimes = 3600 * 3;
+constexpr uint32_t kPsiWaitSecondTimes = 3600 * 3;
 }  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_FL_ARCH_CCSRC_VERTICAL_COMMON_H_

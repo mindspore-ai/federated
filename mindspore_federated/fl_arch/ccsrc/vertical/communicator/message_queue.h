@@ -41,14 +41,14 @@ class MessageQueue {
   void push(T data) {
     std::unique_lock<std::mutex> lock(msg_mutex_);
     if (queue_.size() >= kMaxQueueSize) {
-      MS_LOG(WARNING) << "Reject the message because of over ther queue size.";
+      MS_LOG(WARNING) << "Reject the message because of over the queue size.";
       return;
     }
     queue_.push_back(data);
     message_received_cond_.notify_all();
   }
 
-  T pop(const uint32_t &timeout = 100000) {
+  T pop(const uint32_t &timeout) {
     std::unique_lock<std::mutex> lock(msg_mutex_);
     T ret;
     if (queue_.size() > 0) {
@@ -56,13 +56,17 @@ class MessageQueue {
       queue_.pop_front();
       return ret;
     }
+    bool res = false;
     for (uint32_t i = 0; i < timeout; i++) {
-      bool res = message_received_cond_.wait_for(lock, std::chrono::seconds(1), [this] { return queue_.size() > 0; });
+      res = message_received_cond_.wait_for(lock, std::chrono::seconds(1), [this] { return queue_.size() > 0; });
       if (res) {
         ret = std::move(queue_.front());
         queue_.pop_front();
         return ret;
       }
+    }
+    if (!res) {
+      MS_LOG(EXCEPTION) << "Wait for getting message timeout after " << timeout << "seconds.";
     }
     return ret;
   }

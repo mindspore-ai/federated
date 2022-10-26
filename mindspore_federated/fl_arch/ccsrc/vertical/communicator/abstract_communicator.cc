@@ -102,19 +102,18 @@ std::shared_ptr<std::vector<unsigned char>> AbstractCommunicator::SendMessage(co
   auto request_track = AddMessageTrack(1, nullptr);
   auto http_server_name = VFLContext::instance()->http_server_name();
   std::shared_ptr<std::vector<unsigned char>> response_msg;
-  for (size_t i = 0; i < kRetryCommunicateTimes; i++) {
+  for (uint32_t i = 0; i < kRetryCommunicateTimes; i++) {
     if (!http_client->SendMessage(data, data_size, request_track, target_msg_type, http_server_name,
                                   HTTP_CONTENT_TYPE_URL_ENCODED)) {
       MS_LOG(WARNING) << "Sending request failed.";
     }
     if (!Wait(request_track)) {
-      MS_LOG(WARNING) << "Sending http message timeout.";
+      MS_LOG(WARNING) << "Sending http message timeout, now retry time is " << i;
       http_client->BreakLoopEvent();
     }
     response_msg = http_client->response_msg();
     if (!response_msg) {
-      MS_LOG(WARNING) << "Sending request for target msg type:" << target_msg_type << " to server "
-                      << target_server_name << " failed, now retry time is " << i;
+      MS_LOG(WARNING) << "The http response message is invalid, now retry time is " << i;
     } else {
       break;
     }
