@@ -57,15 +57,14 @@ public class LossCallback extends Callback {
             return Status.NULLPTR;
         }
         Map.Entry<String, float[]> first = outputs.entrySet().iterator().next();
-        if (first.getValue().length < 1 || Float.isNaN(first.getValue()[0])) {
-            logger.severe("loss is nan");
+        if (first.getValue().length < 1) {
             return Status.FAILED;
         }
         float loss = first.getValue()[0];
         logger.info("batch:" + steps + ",loss:" + loss);
         lossSum += loss;
         steps++;
-        return Status.SUCCESS;
+        return Float.isNaN(first.getValue()[0]) ? Status.FAILED : Status.SUCCESS;
     }
 
     @Override
