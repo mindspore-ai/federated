@@ -24,7 +24,7 @@ from mindspore.context import ParallelMode
 from mindspore.communication import get_rank, get_group_size
 import mindspore.dataset as ds
 import mindspore.common.dtype as mstype
-
+from mindspore import version
 from mindspore_federated.data_join import load_mindrecord
 
 
@@ -97,9 +97,17 @@ def _get_tf_dataset(data_dir, train_mode=True, batch_size=1000,
                                       shuffle=shuffle, schema=schema, num_parallel_workers=8)
     data_set = data_set.batch(int(batch_size / line_per_sample), drop_remainder=True)
 
-    data_set = data_set.map(operations=_padding_func(batch_size, manual_shape, target_column, cut_point=[7, 13, 26]),
-                            input_columns=['feat_ids', 'feat_vals', 'label'],
-                            column_order=['feat_ids', 'feat_vals', 'label'], num_parallel_workers=8)
+    if version.__version__.startswith("2."):
+        data_set = data_set.map(
+            operations=_padding_func(batch_size, manual_shape, target_column, cut_point=[7, 13, 26]),
+            input_columns=['feat_ids', 'feat_vals', 'label'],
+            num_parallel_workers=8)
+        data_set = data_set.project(['feat_ids', 'feat_vals', 'label'])
+    else:
+        data_set = data_set.map(
+            operations=_padding_func(batch_size, manual_shape, target_column, cut_point=[7, 13, 26]),
+            input_columns=['feat_ids', 'feat_vals', 'label'],
+            column_order=['feat_ids', 'feat_vals', 'label'], num_parallel_workers=8)
     return data_set
 
 
@@ -134,11 +142,18 @@ def _get_mindrecord_dataset(directory, train_mode=True, batch_size=1000,
                                   columns_list=['feat_ids', 'feat_vals', 'label'],
                                   shuffle=shuffle, num_parallel_workers=8)
     data_set = data_set.batch(int(batch_size / line_per_sample), drop_remainder=True)
-    data_set = data_set.map(_padding_func(batch_size, manual_shape, target_column, cut_point=[7, 13, 26]),
-                            input_columns=['feat_ids', 'feat_vals', 'label'],
-                            output_columns=['id_hldr', 'id_hldr0', 'wt_hldr', 'wt_hldr0', 'label'],
-                            column_order=['id_hldr', 'id_hldr0', 'wt_hldr', 'wt_hldr0', 'label'],
-                            num_parallel_workers=8)
+    if version.__version__.startswith("2."):
+        data_set = data_set.map(_padding_func(batch_size, manual_shape, target_column, cut_point=[7, 13, 26]),
+                                input_columns=['feat_ids', 'feat_vals', 'label'],
+                                output_columns=['id_hldr', 'id_hldr0', 'wt_hldr', 'wt_hldr0', 'label'],
+                                num_parallel_workers=8)
+        data_set = data_set.project(['id_hldr', 'id_hldr0', 'wt_hldr', 'wt_hldr0', 'label'])
+    else:
+        data_set = data_set.map(_padding_func(batch_size, manual_shape, target_column, cut_point=[7, 13, 26]),
+                                input_columns=['feat_ids', 'feat_vals', 'label'],
+                                output_columns=['id_hldr', 'id_hldr0', 'wt_hldr', 'wt_hldr0', 'label'],
+                                column_order=['id_hldr', 'id_hldr0', 'wt_hldr', 'wt_hldr0', 'label'],
+                                num_parallel_workers=8)
     return data_set
 
 
@@ -304,11 +319,19 @@ def create_joined_dataset(dataset_dir, train_mode=True, batch_size=1000, seed=0,
         input_columns = ["feat_ids_" + name for name in names] + ["feat_vals_" + name for name in names]
         output_columns = [ids_name, vals_name]
         combine = combine_follower
-    dataset = dataset.map(
-        operations=combine,
-        input_columns=input_columns,
-        column_order=output_columns,
-        output_columns=output_columns
-    )
+    if version.__version__.startswith("2."):
+        dataset = dataset.map(
+            operations=combine,
+            input_columns=input_columns,
+            output_columns=output_columns
+        )
+        dataset = dataset.project(output_columns)
+    else:
+        dataset = dataset.map(
+            operations=combine,
+            input_columns=input_columns,
+            column_order=output_columns,
+            output_columns=output_columns
+        )
     dataset = dataset.batch(batch_size, drop_remainder=drop_remainder)
     return dataset
