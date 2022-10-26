@@ -15,6 +15,7 @@
 """Worker in data join."""
 
 import os
+import logging
 import yaml
 import mmh3
 from mindspore._checkparam import Validator, Rel
@@ -182,6 +183,10 @@ class FLDataWorker:
         _check_str(self._worker_config.primary_key, arg_name="primary_key")
         Validator.check_non_negative_int(self._worker_config.thread_num, arg_name="thread_num")
         Validator.check_int_range(self._worker_config.shard_num, 1, 1000, Rel.INC_BOTH, arg_name="shard_num")
+        if self._worker_config.shard_num * self._worker_config.bucket_num > 4096:
+            logging.warning('The maximum number of files read by MindData is 4096. It is recommended that the value of '
+                            'shard_num * bucket_num be smaller than 4096. Actually, the value is: %d',
+                            self._worker_config.shard_num * self._worker_config.bucket_num)
         self._verify_schema()
 
     def _verify_main_table_files(self):

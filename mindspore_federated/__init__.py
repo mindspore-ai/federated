@@ -25,9 +25,9 @@ from .fl_arch.python.mindspore_federated.startup.federated_local import FLServer
 
 def _mindspore_version_check():
     """
-    Do the MindSpore version check for MindSpore Reinforcement. If the
+    Do the MindSpore version check for MindSpore Federated. If the
     MindSpore can not be imported, it will raise ImportError. If its
-    version is not compatibale with current MindSpore Reinforcement verision,
+    version is not compatible with current MindSpore Federated version,
     it will print a warning.
 
     Raise:
@@ -39,22 +39,22 @@ def _mindspore_version_check():
         from mindspore import log as logger
     except (ImportError, ModuleNotFoundError):
         print("Can not find MindSpore in current environment. Please install "
-              "MindSpore before using MindSpore Reinforcement, by following "
+              "MindSpore before using MindSpore Federated, by following "
               "the instruction at https://www.mindspore.cn/install")
         raise
 
-    ms_msrl_version_match = {'0.1.0': ['1.7.0', '1.8.0', '1.9.0']}
+    ms_fl_version_match = {'0.1.0': ['1.7', '1.8', '1.9']}
 
-    ms_version = ms.__version__
-    required_mindspore_verision = ms_msrl_version_match[version]
+    ms_version = ms.__version__[:3]
+    required_mindspore_version = ms_fl_version_match[__version__]
 
-    if ms_version not in required_mindspore_verision:
+    if ms_version not in required_mindspore_version:
         logger.warning("Current version of MindSpore is not compatible with MindSpore Federated. "
                        "Some functions might not work or even raise error. Please install MindSpore "
                        "version == {}. For more details about dependency setting, please check "
                        "the instructions at MindSpore official website https://www.mindspore.cn/install "
                        "or check the README.md at https://gitee.com/mindspore/federated"
-                       .format(required_mindspore_verision))
+                       .format(required_mindspore_version))
         warning_countdown = 3
         for i in range(warning_countdown, 0, -1):
             logger.warning(
@@ -67,5 +67,7 @@ _mindspore_version_check()
 __all__ = [
     'FederatedLearningManager',
     'FlSchedulerJob',
-    'FLServerJob'
+    'FLServerJob',
+    'VerticalFederatedCommunicator',
+    'ServerConfig',
 ]
