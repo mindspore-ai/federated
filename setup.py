@@ -103,6 +103,7 @@ required_package = [
     'flatbuffers >= 2.0',
     'PyYaml',
     'mmh3',
+    'pandas',
 ]
 
 package_data = {

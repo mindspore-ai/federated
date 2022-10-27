@@ -15,6 +15,7 @@
 """Worker in data join."""
 
 import os
+import logging
 import yaml
 import mmh3
 from mindspore._checkparam import Validator, Rel
@@ -93,12 +94,12 @@ class FLDataWorker:
         thread_num (int): The thread number of psi. Default: 0.
 
     Examples:
+        >>> from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
         >>> http_server_config = ServerConfig(server_name='server', server_address="127.0.0.1:1086")
         ... remote_server_config = ServerConfig(server_name='client', server_address="127.0.0.1:1087")
         ... vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
         ...                                                       remote_server_config=remote_server_config)
         >>> vertical_communicator.launch()
-
         >>> worker = FLDataWorker(role="leader",
         ...                       main_table_files=["input/leader_data_0.csv", "input/leader_data_1.csv"],
         ...                       output_dir="output/leader/",
@@ -139,7 +140,7 @@ class FLDataWorker:
             thread_num=thread_num,
         )
         self._data_schema_path = data_schema_path
-        if self._role != "leader" and self._role != "follower":
+        if self._role not in ("leader", "follower"):
             raise ValueError("role must be \"leader\" or \"follower\"")
         with open(self._data_schema_path, "r") as f:
             self._schema = yaml.load(f, yaml.Loader)
@@ -175,6 +176,10 @@ class FLDataWorker:
         _check_str(self._worker_config.primary_key, arg_name="primary_key")
         Validator.check_non_negative_int(self._worker_config.thread_num, arg_name="thread_num")
         Validator.check_int_range(self._worker_config.shard_num, 1, 1000, Rel.INC_BOTH, arg_name="shard_num")
+        if self._worker_config.shard_num * self._worker_config.bucket_num > 4096:
+            logging.warning('The maximum number of files read by MindData is 4096. It is recommended that the value of '
+                            'shard_num * bucket_num be smaller than 4096. Actually, the value is: %d',
+                            self._worker_config.shard_num * self._worker_config.bucket_num)
         self._verify_schema()
 
     def _verify_main_table_files(self):

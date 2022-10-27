@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 import mindspore.dataset as ds
 import mindspore.common.dtype as mstype
+from mindspore import version
 from .model_utils.config import config
 
 
@@ -64,8 +65,8 @@ class H5Dataset():
     def _bin_count(self, hdf_data_dir, file_prefix, num_of_parts):
         size = 0
         for part in range(num_of_parts):
-            _y = pd.read_hdf(os.path.join(hdf_data_dir, f'{file_prefix}_output_part_{str(part)}.h5'))
-            size += _y.shape[0]
+            y_ = pd.read_hdf(os.path.join(hdf_data_dir, f'{file_prefix}_output_part_{str(part)}.h5'))
+            size += y_.shape[0]
         return size
 
     def _iterate_hdf_files_(self, num_of_parts=None,
@@ -89,29 +90,29 @@ class H5Dataset():
                       os.path.join(self._hdf_data_dir, f'{self._file_prefix}_output_part_{str(p)}.h5'), \
                       i + 1 == len(parts)
 
-    def _generator(self, X, y, batch_size, shuffle=True):
+    def _generator(self, x, y, batch_size, shuffle=True):
         """
         should be accessed only in private
-        :param X:
+        :param x:
         :param y:
         :param batch_size:
         :param shuffle:
         :return:
         """
-        number_of_batches = np.ceil(1. * X.shape[0] / batch_size)
+        number_of_batches = np.ceil(1. * x.shape[0] / batch_size)
         counter = 0
         finished = False
-        sample_index = np.arange(X.shape[0])
+        sample_index = np.arange(x.shape[0])
         if shuffle:
             for _ in range(int(shuffle)):
                 np.random.shuffle(sample_index)
-        assert X.shape[0] > 0
+        assert x.shape[0] > 0
         while True:
             batch_index = sample_index[batch_size * counter: batch_size * (counter + 1)]
-            X_batch = X[batch_index]
+            x_batch = x[batch_index]
             y_batch = y[batch_index]
             counter += 1
-            yield X_batch, y_batch, finished
+            yield x_batch, y_batch, finished
             if counter == number_of_batches:
                 counter = 0
                 finished = True
@@ -130,18 +131,18 @@ class H5Dataset():
         for hdf_in, hdf_out, _ in self._iterate_hdf_files_(self._num_of_parts,
                                                            shuffle_block):
             start = stop = None
-            X_all = pd.read_hdf(hdf_in, start=start, stop=stop).values
+            x_all = pd.read_hdf(hdf_in, start=start, stop=stop).values
             y_all = pd.read_hdf(hdf_out, start=start, stop=stop).values
-            data_gen = self._generator(X_all, y_all, batch_size,
+            data_gen = self._generator(x_all, y_all, batch_size,
                                        shuffle=random_sample)
             finished = False
 
             while not finished:
-                X, y, finished = data_gen.__next__()
-                X_id = X[:, 0:self.max_length]
-                X_va = X[:, self.max_length:]
-                yield np.array(X_id.astype(dtype=np.int32)), \
-                      np.array(X_va.astype(dtype=np.float32)), \
+                x, y, finished = data_gen.__next__()
+                x_id = x[:, 0:self.max_length]
+                x_va = x[:, self.max_length:]
+                yield np.array(x_id.astype(dtype=np.int32)), \
+                      np.array(x_va.astype(dtype=np.float32)), \
                       np.array(y.astype(dtype=np.float32))
 
 
@@ -176,7 +177,7 @@ def _get_h5_dataset(directory, train_mode=True, epochs=1, batch_size=1000):
     return data_set
 
 
-def _get_mindrecord_dataset(directory, train_mode=True, epochs=1, batch_size=1000,
+def _get_mindrecord_dataset(directory, train_mode=True, batch_size=1000,
                             line_per_sample=1000, rank_size=None, rank_id=None, indexes=None):
     """
     Get dataset with mindrecord format.
@@ -184,7 +185,6 @@ def _get_mindrecord_dataset(directory, train_mode=True, epochs=1, batch_size=100
     Args:
         directory (str): Dataset directory.
         train_mode (bool): Whether dataset is use for train or eval (default=True).
-        epochs (int): Dataset epoch size (default=1).
         batch_size (int): Dataset batch size (default=1000).
         line_per_sample (int): The number of sample per line (default=1000).
         rank_size (int): The number of device, not necessary for single device (default=None).
@@ -212,15 +212,21 @@ def _get_mindrecord_dataset(directory, train_mode=True, epochs=1, batch_size=100
         data_set = ds.MindDataset(os.path.join(directory, file_prefix_name + file_suffix_name),
                                   columns_list=['feat_ids', 'feat_vals', 'label'], sampler=sampler,
                                   shuffle=shuffle, num_parallel_workers=8)
-    # dataszie = data_set.dataset_size
     data_set = data_set.batch(int(batch_size / line_per_sample), drop_remainder=True)
-    data_set = data_set.map(operations=(lambda x, y, z: (np.array(x).flatten().reshape(batch_size, 39),
-                                                         np.array(y).flatten().reshape(batch_size, 39),
-                                                         np.array(z).flatten().reshape(batch_size, 1))),
-                            input_columns=['feat_ids', 'feat_vals', 'label'],
-                            column_order=['feat_ids', 'feat_vals', 'label'],
-                            num_parallel_workers=8)
-    # data_set = data_set.repeat(epochs)
+    if version.__version__.startswith("2."):
+        data_set = data_set.map(operations=(lambda x, y, z: (np.array(x).flatten().reshape(batch_size, 39),
+                                                             np.array(y).flatten().reshape(batch_size, 39),
+                                                             np.array(z).flatten().reshape(batch_size, 1))),
+                                input_columns=['feat_ids', 'feat_vals', 'label'],
+                                num_parallel_workers=8)
+        data_set = data_set.project(['feat_ids', 'feat_vals', 'label'])
+    else:
+        data_set = data_set.map(operations=(lambda x, y, z: (np.array(x).flatten().reshape(batch_size, 39),
+                                                             np.array(y).flatten().reshape(batch_size, 39),
+                                                             np.array(z).flatten().reshape(batch_size, 1))),
+                                input_columns=['feat_ids', 'feat_vals', 'label'],
+                                column_order=['feat_ids', 'feat_vals', 'label'],
+                                num_parallel_workers=8)
     return data_set
 
 
@@ -261,13 +267,22 @@ def _get_tf_dataset(directory, train_mode=True, epochs=1, batch_size=1000,
         data_set = ds.TFRecordDataset(dataset_files=dataset_files, shuffle=shuffle,
                                       schema=schema, num_parallel_workers=8)
     data_set = data_set.batch(int(batch_size / line_per_sample), drop_remainder=True)
-    data_set = data_set.map(operations=(lambda x, y, z: (
-        np.array(x).flatten().reshape(batch_size, 39),
-        np.array(y).flatten().reshape(batch_size, 39),
-        np.array(z).flatten().reshape(batch_size, 1))),
-                            input_columns=['feat_ids', 'feat_vals', 'label'],
-                            column_order=['feat_ids', 'feat_vals', 'label'],
-                            num_parallel_workers=8)
+    if version.__version__.startswith("2."):
+        data_set = data_set.map(operations=(lambda x, y, z: (
+            np.array(x).flatten().reshape(batch_size, 39),
+            np.array(y).flatten().reshape(batch_size, 39),
+            np.array(z).flatten().reshape(batch_size, 1))),
+                                input_columns=['feat_ids', 'feat_vals', 'label'],
+                                num_parallel_workers=8)
+        data_set = data_set.project(['feat_ids', 'feat_vals', 'label'])
+    else:
+        data_set = data_set.map(operations=(lambda x, y, z: (
+            np.array(x).flatten().reshape(batch_size, 39),
+            np.array(y).flatten().reshape(batch_size, 39),
+            np.array(z).flatten().reshape(batch_size, 1))),
+                                input_columns=['feat_ids', 'feat_vals', 'label'],
+                                column_order=['feat_ids', 'feat_vals', 'label'],
+                                num_parallel_workers=8)
     data_set = data_set.repeat(epochs)
     return data_set
 
@@ -292,7 +307,7 @@ def create_dataset(directory, train_mode=True, epochs=1, batch_size=1000,
         Dataset.
     """
     if data_type == DataType.MINDRECORD:
-        return _get_mindrecord_dataset(directory, train_mode, epochs,
+        return _get_mindrecord_dataset(directory, train_mode,
                                        batch_size, line_per_sample,
                                        rank_size, rank_id, indexes)
     if data_type == DataType.TFRECORD:
