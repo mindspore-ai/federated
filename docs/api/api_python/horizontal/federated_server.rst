@@ -37,8 +37,8 @@ Federated-Server
         运行云侧任务。
 
         参数：
-            - **feature_map** (Union(dict, FeatureMap, str)) - 特征集。
-            - **callback** (Union(None, Callback)) - 回调函数。
+            - **feature_map** (Union(dict, FeatureMap, str)) - 特征集。默认值：None。
+            - **callback** (Union(None, Callback)) - 回调函数。默认值：None。
 
 .. py:class:: mindspore_federated.FlSchedulerJob(yaml_config, manage_address, ssl_config=None)
 
