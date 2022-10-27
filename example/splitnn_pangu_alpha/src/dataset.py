@@ -21,7 +21,7 @@ import numpy as np
 import mindspore.dataset as ds
 import mindspore.dataset.transforms.c_transforms as C
 import mindspore.common.dtype as mstype
-
+from mindspore import version
 from mindspore import context
 
 
@@ -125,9 +125,14 @@ def create_dataset(batch_size, data_path, device_num=1, rank=0, drop=True, full_
     # If eod_reset enabled, another two inputs will be generated through input_ids
     if eod_reset:
         dataset = dataset.batch(batch_size, drop_remainder=drop)
-        dataset = dataset.map(operations=map_func, input_columns=[column_name],
-                              output_columns=[column_name, "position_id", "attention_mask"],
-                              column_order=[column_name, "position_id", "attention_mask"])
+        if version.__version__.startswith("2."):
+            dataset = dataset.map(operations=map_func, input_columns=[column_name],
+                                  output_columns=[column_name, "position_id", "attention_mask"])
+            dataset = dataset.project([column_name, "position_id", "attention_mask"])
+        else:
+            dataset = dataset.map(operations=map_func, input_columns=[column_name],
+                                  output_columns=[column_name, "position_id", "attention_mask"],
+                                  column_order=[column_name, "position_id", "attention_mask"])
         dataset = dataset.map(input_columns="position_id", operations=type_cast_op)
         dataset = dataset.map(input_columns="attention_mask", operations=type_cast_op_float)
     else:
