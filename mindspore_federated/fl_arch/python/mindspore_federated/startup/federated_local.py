@@ -154,8 +154,8 @@ class FLServerJob:
         Run fl server job.
 
         Args:
-            feature_map (Union(dict, FeatureMap, str)): Feature map.
-            callback (Union(None, Callback)): Callback function.
+            feature_map (Union(dict, FeatureMap, str)): Feature map. Default: None.
+            callback (Union(None, Callback)): Callback function. Default: None.
         """
         if callback is not None and not isinstance(callback, Callback):
             raise RuntimeError("Parameter 'callback' is expected to be instance of Callback when it's not None, but"
