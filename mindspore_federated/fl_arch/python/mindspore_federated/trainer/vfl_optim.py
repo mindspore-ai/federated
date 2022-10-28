@@ -102,6 +102,10 @@ class PartyOptimizer:
         local_data_batch (dict): data batch from local data sources.
         remote_data_batch (dict): data batch from remote data sources.
         sens_dict (dict): sens params for optimizer.
+
+    Examples:
+        >>> net = Net()
+        >>> optim = PartyOptimizer(optim_yaml_data, net, net_yaml_data)
     """
     def __init__(self, optim_yaml: dict, net: nn.Cell, net_yaml: dict):
         self.type = optim_yaml['type']
@@ -142,6 +146,12 @@ class PartyGradOperation:
         net_yaml (dict): data describing on the training network, parsed from the yaml file.
         optim_params (dict): parameters of the network need to be optimized. If no params specified inside
                              the grad, PartyGradOperation will try to calculate grads of the input params.
+
+    Examples:
+        >>> net = Net()
+        >>> params = net.trainable_params()
+        >>> params = ParameterTuple(params)
+        >>> grad = PartyGradOperation(grad_yaml_data, net, net_yaml_data, params)
     """
     def __init__(self, grad_yaml: dict, net: nn.Cell, net_yaml: dict, optim_params: tuple):
         self._name = 'PartyGradOperation_'.join(net_yaml['name'])
@@ -211,6 +221,10 @@ class PartyGradScaler:
         grad_scale_yaml (dict): data describing on the grad scale calculating, parsed from the yaml file.
         net (nn.Cell): loss net of the party, which input features and output loss values.
         net_yaml (dict): data describing on the training network, parsed from the yaml file.
+
+    Examples:
+        >>> net = Net()
+        >>> grad_scaler = PartyGradScaler(scaler_yaml_data, net, net_yaml_data)
     """
     def __init__(self, grad_scale_yaml: dict, net: nn.Cell, net_yaml: dict):
         self._name = 'PartyGradScaler_'.join(net_yaml['name'])
