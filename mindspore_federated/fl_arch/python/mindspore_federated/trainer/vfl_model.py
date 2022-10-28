@@ -98,6 +98,17 @@ class FLModel:
         eval_network (nn.Cell): Evaluation network of the party, which outputs the predict value. Default: None.
         grad_network (nn.Cell): Network running on the trusted execution environment(TEE) environment for protect
             the data privacy. Default: None.
+
+    Examples:
+        >>> from mindspore_federated import FLModel, FLYamlData
+        >>> import mindspore.nn as nn
+        >>> yaml_data = FLYamlData(os.path.join(os.getcwd(), 'net.yaml'))
+        >>> # define the training network
+        >>> train_net = TrainNet()
+        >>> # define the evaluation network
+        >>> eval_net = EvalNet()
+        >>> eval_metric = nn.Accuracy()
+        >>> party_fl_model = FLModel(yaml_data, train_net, metrics=eval_metric, eval_network=eval_net)
     """
 
     def __init__(self,
