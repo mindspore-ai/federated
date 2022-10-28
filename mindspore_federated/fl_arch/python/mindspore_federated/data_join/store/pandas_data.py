@@ -52,7 +52,7 @@ class PandasData(BaseData):
                         raise ValueError("The column: [{}] and the key: [{}] is null.".format(column_name, key))
                 else:
                     single_value = ""
-                feature[column_name] = single_value
+                feature[column_name] = single_value.astype(self._pd_schema[column_name])
             yield feature
 
     def merge(self, store):
