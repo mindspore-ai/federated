@@ -56,14 +56,15 @@ bool TrainerCommunicator::LaunchMsgHandler(const std::shared_ptr<MessageHandler>
       SendResponseMsg(message, reason.c_str(), reason.size());
       return false;
     }
+    std::string message_source = message->message_source();
     std::string message_type = message->message_type();
-    if (message_type.empty() || message_queues_.count(message_type) == 0) {
-      std::string reason = "Request message type is invalid.";
+    if (message_queues_.count(message_source) == 0) {
+      std::string reason = "Request message source server name " + message_source + " is invalid.";
       MS_LOG(WARNING) << reason;
       SendResponseMsg(message, reason.c_str(), reason.size());
       return false;
     }
-    MS_LOG(INFO) << "Request message type is " << message_type;
+    MS_LOG(INFO) << "Request source server name is " << message_source << ", message type is " << message_type;
     TensorListProto tensorListProto;
     if (!tensorListProto.ParseFromArray(message->data(), message->len())) {
       MS_LOG(WARNING) << "Tensor list proto parse from array failed.";
@@ -77,10 +78,10 @@ bool TrainerCommunicator::LaunchMsgHandler(const std::shared_ptr<MessageHandler>
       return false;
     }
 
-    auto queue = message_queues_[message_type];
+    auto queue = message_queues_[message_source];
     MS_EXCEPTION_IF_NULL(queue);
     queue->push(tensorListItemPy);
-    std::string res = std::to_string(ResponseElem::SUCCESS);
+    std::string res = toString(ResponseElem::SUCCESS);
     SendResponseMsg(message, res.c_str(), res.size());
     MS_LOG(INFO) << "Launching vertical trainer message handler successful.";
   } catch (const std::exception &e) {
@@ -95,9 +96,9 @@ bool TrainerCommunicator::Send(const std::string &target_server_name, const Tens
   CreateTensorListProto(tensor_list_proto_ptr.get(), tensorListItemPy);
   std::string data = tensor_list_proto_ptr->SerializeAsString();
   size_t data_size = data.size();
-  auto response_msg = SendMessage(target_server_name, data.c_str(), data_size, KTrainerMsgType);
+  auto response_msg = SendMessage(target_server_name, data.c_str(), data_size, KTrainerUri, KTrainer);
   std::string response_data = response_msg == nullptr ? "" : reinterpret_cast<char *>(response_msg->data());
-  return response_data == std::to_string(ResponseElem::SUCCESS);
+  return response_data == toString(ResponseElem::SUCCESS);
 }
 
 TensorListItemPy TrainerCommunicator::Receive(const std::string &target_server_name, const uint32_t &timeout) {

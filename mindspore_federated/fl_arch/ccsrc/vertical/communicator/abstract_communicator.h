@@ -23,6 +23,7 @@
 #include <vector>
 #include <map>
 #include "vertical/vfl_context.h"
+#include "vertical/common.h"
 #include "common/communicator/http_communicator.h"
 #include "common/communicator/http_server.h"
 #include "common/utils/log_adapter.h"
@@ -56,10 +57,13 @@ class AbstractCommunicator : public AbstractNode {
 
   void InitHttpClient();
 
-  std::shared_ptr<std::vector<unsigned char>> SendMessage(const std::string &target_server_name, const void *data,
-                                                          size_t data_size, const std::string &msg_type);
+  std::shared_ptr<std::vector<uint8_t>> SendMessage(const std::string &target_server_name, const void *data,
+                                                    size_t data_size, const std::string &http_uri_path,
+                                                    const std::string &msg_type);
 
   std::string name() const;
+
+  std::string toString(ResponseElem elem);
 
  private:
   std::map<std::string, std::string> remote_server_address_;

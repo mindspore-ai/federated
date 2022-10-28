@@ -17,7 +17,6 @@
 #include "vertical/communicator/abstract_communicator.h"
 #include "common/communicator/communicator_base.h"
 #include "common/communicator/message_handler.h"
-#include "vertical/common.h"
 
 namespace mindspore {
 namespace fl {
@@ -87,6 +86,7 @@ void AbstractCommunicator::InitHttpClient() {
 
 std::shared_ptr<std::vector<unsigned char>> AbstractCommunicator::SendMessage(const std::string &target_server_name,
                                                                               const void *data, size_t data_size,
+                                                                              const std::string &http_uri_path,
                                                                               const std::string &target_msg_type) {
   if (data == nullptr) {
     MS_LOG(EXCEPTION) << "Data for sending request is nullptr.";
@@ -103,7 +103,7 @@ std::shared_ptr<std::vector<unsigned char>> AbstractCommunicator::SendMessage(co
   auto http_server_name = VFLContext::instance()->http_server_name();
   std::shared_ptr<std::vector<unsigned char>> response_msg;
   for (uint32_t i = 0; i < kRetryCommunicateTimes; i++) {
-    if (!http_client->SendMessage(data, data_size, request_track, target_msg_type, http_server_name,
+    if (!http_client->SendMessage(data, data_size, request_track, http_uri_path, target_msg_type, http_server_name,
                                   HTTP_CONTENT_TYPE_URL_ENCODED)) {
       MS_LOG(WARNING) << "Sending request failed.";
     }
@@ -151,6 +151,18 @@ bool AbstractCommunicator::verifyResponse(const std::shared_ptr<MessageHandler> 
     return false;
   }
   return true;
+}
+
+std::string AbstractCommunicator::toString(ResponseElem elem) {
+  switch (elem) {
+    case ResponseElem::SUCCESS:
+      return "SUCCESS";
+    case ResponseElem::FAILED:
+      return "FAILED";
+    default:
+      return "";
+  }
+  return "";
 }
 }  // namespace fl
 }  // namespace mindspore

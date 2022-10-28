@@ -66,7 +66,7 @@ class MessageQueue {
       }
     }
     if (!res) {
-      MS_LOG(EXCEPTION) << "Wait for getting message timeout after " << timeout << "seconds.";
+      MS_LOG(EXCEPTION) << "Wait for getting message timeout after " << timeout << " seconds.";
     }
     return ret;
   }

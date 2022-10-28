@@ -50,9 +50,11 @@ bool TcpMsgHandler::SendResponse(const void *data, const size_t &len) {
   return true;
 }
 
-std::string TcpMsgHandler::message_type() const { return message_type_; }
+std::string TcpMsgHandler::message_type() const { return ""; }
 
-std::string TcpMsgHandler::message_id() const { return message_type_; }
+std::string TcpMsgHandler::message_id() const { return ""; }
+
+std::string TcpMsgHandler::message_source() const { return ""; }
 
 bool TcpMsgHandler::SendResponse(const void *data, const size_t &len, const std::string &message_id) { return true; }
 }  // namespace fl

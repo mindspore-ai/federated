@@ -72,7 +72,7 @@ WorkerConfigItemPy DataJoinCommunicator::Send(const std::string &target_server_n
   MS_LOG(INFO) << "Send WorkerRegisterProto size is " << data_size;
 
   WorkerConfigItemPy workerConfigItemPy;
-  auto response_msg = SendMessage(target_server_name, data.c_str(), data_size, KDataJoinMsgType);
+  auto response_msg = SendMessage(target_server_name, data.c_str(), data_size, KDataJoinUri, KDataJoin);
   if (response_msg == nullptr) {
     return workerConfigItemPy;
   }

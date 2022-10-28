@@ -30,6 +30,7 @@ file(GLOB_RECURSE MINDSPORE_FEDERATED_SRC_LIST RELATIVE ${CMAKE_CURRENT_SOURCE_D
 
 file(GLOB_RECURSE UT_SRCS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
         ./common/*.cc
+        ./communicator/*.cc
         ./psi/*.cc
         )
 

@@ -38,7 +38,7 @@ HttpClient::HttpClient(const std::string &remote_server_address)
       buffer_event_(nullptr),
       http_req_(nullptr),
       evhttp_conn_(nullptr),
-      uri(nullptr),
+      uri_(nullptr),
       response_track_(nullptr) {}
 
 HttpClient::~HttpClient() {
@@ -89,8 +89,8 @@ void HttpClient::Init() {
     MS_LOG(EXCEPTION) << "Buffer event enable read and write failed!";
   }
 
-  uri = evhttp_uri_parse(remote_server_address_.c_str());
-  int port = evhttp_uri_get_port(uri);
+  uri_ = evhttp_uri_parse(remote_server_address_.c_str());
+  int port = evhttp_uri_get_port(uri_);
   if (port == -1) {
     MS_LOG(EXCEPTION) << "Http uri port is invalid.";
   }
@@ -101,8 +101,8 @@ void HttpClient::Init() {
   }
 
   evhttp_conn_ =
-    evhttp_connection_base_bufferevent_new(event_base_, nullptr, buffer_event_, evhttp_uri_get_host(uri), port);
-  MS_LOG(INFO) << "Host is:" << evhttp_uri_get_host(uri) << ", port is:" << port;
+    evhttp_connection_base_bufferevent_new(event_base_, nullptr, buffer_event_, evhttp_uri_get_host(uri_), port);
+  MS_LOG(INFO) << "Host is:" << evhttp_uri_get_host(uri_) << ", port is:" << port;
 }
 
 bool HttpClient::Stop() {
@@ -159,8 +159,8 @@ void HttpClient::ReadCallback(struct evhttp_request *http_req, void *const arg) 
   const auto &response_track = http_client->response_track();
 
   if (rsp_message_id != http_client->message_id()) {
-    MS_LOG(DEBUG) << "Response message id is different from the expect message id, rsp message id is "
-                  << rsp_message_id << ", expect message id is " << expect_message_id;
+    MS_LOG(DEBUG) << "Response message id is different from the expect message id, rsp message id is " << rsp_message_id
+                  << ", expect message id is " << expect_message_id;
     http_client->OnReadHandler(response_track, target_msg_type);
     event_base_loopbreak(base);
     return;
@@ -175,7 +175,7 @@ void HttpClient::ReadCallback(struct evhttp_request *http_req, void *const arg) 
       size_t length = evbuffer_get_length(evbuf);
       MS_LOG(INFO) << "response message data length is:" << length;
 
-      auto response_msg = std::make_shared<std::vector<unsigned char>>(length);
+      auto response_msg = std::make_shared<std::vector<uint8_t>>(length);
       int ret = memcpy_s(response_msg->data(), length, evbuffer_pullup(evbuf, -1), length);
       if (ret != 0) {
         MS_LOG(ERROR) << "memcpy_s error, errorno(" << ret << ")";
@@ -219,20 +219,20 @@ void HttpClient::set_message_id(const std::string message_id) { message_id_ = me
 
 std::string HttpClient::message_id() const { return message_id_; }
 
-void HttpClient::set_response_msg(const std::shared_ptr<std::vector<unsigned char>> &response_msg) {
+void HttpClient::set_response_msg(const std::shared_ptr<std::vector<uint8_t>> &response_msg) {
   response_msg_ = response_msg;
 }
 
-const std::shared_ptr<std::vector<unsigned char>> HttpClient::response_msg() const { return response_msg_; }
+const std::shared_ptr<std::vector<uint8_t>> HttpClient::response_msg() const { return response_msg_; }
 
 bool HttpClient::SendMessage(const void *data, size_t data_size, const std::shared_ptr<ResponseTrack> &response_track,
-                             const std::string &target_msg_type, const std::string &request_msg_type,
-                             const std::string &content_type) {
+                             const std::string &http_uri_path, const std::string &target_msg_type,
+                             const std::string &message_source, const std::string &content_type) {
   std::lock_guard<std::mutex> lock(connection_mutex_);
-  std::string message_id = CreateMessageId(response_track, target_msg_type, request_msg_type);
-  MS_LOG(INFO) << "target_msg_type is:" << target_msg_type << ", request_msg_type is " << request_msg_type
-               << ", data_size is:" << data_size << ", request id:" << response_track->request_id()
-               << ", remote_server_address is " << remote_server_address_ << ", message_id is " << message_id;
+  std::string message_id = CreateMessageId(response_track, target_msg_type, message_source);
+  MS_LOG(INFO) << "target msg type is:" << target_msg_type << ", message source is " << message_source
+               << ", data size is:" << data_size << ", request id:" << response_track->request_id()
+               << ", remote server address is " << remote_server_address_ << ", message id is " << message_id;
 
   set_response_track(response_track);
   set_target_msg_type(target_msg_type);
@@ -243,10 +243,11 @@ bool HttpClient::SendMessage(const void *data, size_t data_size, const std::shar
   /** Set the post data */
   evbuffer_add(http_req_->output_buffer, data, data_size);
   evhttp_add_header(http_req_->output_headers, "Content-Type", content_type.c_str());
-  evhttp_add_header(http_req_->output_headers, "Host", evhttp_uri_get_host(uri));
-  evhttp_add_header(http_req_->output_headers, "Message-Type", request_msg_type.c_str());
+  evhttp_add_header(http_req_->output_headers, "Host", evhttp_uri_get_host(uri_));
+  evhttp_add_header(http_req_->output_headers, "Message-Type", target_msg_type.c_str());
+  evhttp_add_header(http_req_->output_headers, "Message-Source", message_source.c_str());
   evhttp_add_header(http_req_->output_headers, "Message-Id", message_id.c_str());
-  evhttp_make_request(evhttp_conn_, http_req_, EVHTTP_REQ_POST, target_msg_type.c_str());
+  evhttp_make_request(evhttp_conn_, http_req_, EVHTTP_REQ_POST, http_uri_path.c_str());
 
   int ret = event_base_dispatch(event_base_);
   if (ret != 0) {
@@ -259,8 +260,8 @@ bool HttpClient::SendMessage(const void *data, size_t data_size, const std::shar
 bool HttpClient::SendMessage(const void *data, size_t data_size, const std::shared_ptr<ResponseTrack> &response_track,
                              const std::string &target_msg_type, const std::string &content_type) {
   std::lock_guard<std::mutex> lock(connection_mutex_);
-  MS_LOG(INFO) << "target_msg_type is:" << target_msg_type << ", data_size is:" << data_size
-               << ", request id:" << response_track->request_id() << ", remote_server_address is "
+  MS_LOG(INFO) << "target msg type is:" << target_msg_type << ", data size is:" << data_size
+               << ", request id:" << response_track->request_id() << ", remote server address is "
                << remote_server_address_;
   set_response_track(response_track);
   set_target_msg_type(target_msg_type);
@@ -269,7 +270,7 @@ bool HttpClient::SendMessage(const void *data, size_t data_size, const std::shar
   /** Set the post data */
   evbuffer_add(http_req_->output_buffer, data, data_size);
   evhttp_add_header(http_req_->output_headers, "Content-Type", content_type.c_str());
-  evhttp_add_header(http_req_->output_headers, "Host", evhttp_uri_get_host(uri));
+  evhttp_add_header(http_req_->output_headers, "Host", evhttp_uri_get_host(uri_));
   evhttp_make_request(evhttp_conn_, http_req_, EVHTTP_REQ_POST, target_msg_type.c_str());
 
   int ret = event_base_dispatch(event_base_);
@@ -281,8 +282,8 @@ bool HttpClient::SendMessage(const void *data, size_t data_size, const std::shar
 }
 
 std::string HttpClient::CreateMessageId(const std::shared_ptr<ResponseTrack> &response_track,
-                                        const std::string &target_msg_type, const std::string &request_msg_type) {
-  return request_msg_type + ":" + target_msg_type + ":" + std::to_string(response_track->request_id());
+                                        const std::string &target_msg_type, const std::string &message_source) {
+  return message_source + ":" + target_msg_type + ":" + std::to_string(response_track->request_id());
 }
 }  // namespace fl
 }  // namespace mindspore

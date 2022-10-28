@@ -26,6 +26,7 @@
 #include <iomanip>
 #include <vector>
 #include "common/common.h"
+#include "vertical/communicator/message_queue.h"
 
 namespace mindspore {
 namespace fl {
@@ -36,7 +37,10 @@ struct VerticalConfig {
 
 enum ResponseElem { SUCCESS, FAILED };
 
+using MessageQueuePtr = std::shared_ptr<MessageQueue<std::vector<uint8_t>>>;
+
 constexpr auto KTrainer = "trainer";
+constexpr auto KPsi = "psi";
 constexpr auto KBobPb = "bobPb";
 constexpr auto KClientPSIInit = "clientPSIInit";
 constexpr auto KServerPSIInit = "serverPsiInit";
@@ -46,15 +50,9 @@ constexpr auto KAliceCheck = "aliceCheck";
 constexpr auto KPlainData = "plainData";
 constexpr auto KDataJoin = "dataJoin";
 
-constexpr auto KTrainerMsgType = "/trainer";
-constexpr auto KBobPbMsgType = "/bobPb";
-constexpr auto KClientPSIInitMsgType = "/clientPSIInit";
-constexpr auto KServerPSIInitMsgType = "/serverPsiInit";
-constexpr auto KAlicePbaAndBFMsgType = "/alicePbaAndBF";
-constexpr auto KBobAlignResultMsgType = "/bobAlignResult";
-constexpr auto KAliceCheckMsgType = "/aliceCheck";
-constexpr auto KPlainDataMsgType = "/plainData";
-constexpr auto KDataJoinMsgType = "/dataJoin";
+constexpr auto KTrainerUri = "/trainer";
+constexpr auto KPsiUri = "/psi";
+constexpr auto KDataJoinUri = "/dataJoin";
 
 constexpr uint32_t kRetryCommunicateTimes = 900;
 constexpr uint32_t kSleepSecondsOfCommunicate = 1;
