@@ -45,6 +45,10 @@ class FLYamlData:
 
     Args:
         yaml_path: Path of the yaml file
+
+    Examples:
+        >>> from mindspore_federated import FLYamlData
+        >>> yaml_data = FLYamlData(os.path.join(os.getcwd(), 'net.yaml'))
     """
     def __init__(self, yaml_path: str):
         yaml_path = os.path.abspath(yaml_path)
