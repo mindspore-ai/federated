@@ -169,6 +169,22 @@ class FederatedLearningManager(Callback):
                                before unchanged_round rounds.
                                Value range: greater than or equal to 0. Default: 0.
 
+    Examples:
+        >>> from mindspore_federated import FederatedLearningManager
+        >>> from mindspore import nn, Model
+        >>> from network.lenet import LeNet5, create_dataset_from_folder
+        >>> network = LeNet5(62, 3)
+        >>> federated_learning_manager = FederatedLearningManager(
+        ...     yaml_config="default_yaml_config.yaml",
+        ...     model=network,
+        ...     sync_frequency=100,
+        ...     http_server_address="127.0.0.1:10086",
+        ... )
+        >>> net_loss = nn.SoftmaxCrossEntropyWithLogits(sparse=True, reduction='mean')
+        >>> net_opt = nn.Momentum(network.trainable_params(), 0.001, 0.9)
+        >>> model = Model(network, net_loss, net_opt)
+        >>> dataset = create_dataset_from_folder("0/train/", 32, 16, 1)
+        >>> model.train(100, dataset, callbacks=[federated_learning_manager], dataset_sink_mode=False)
     """
 
     def __init__(self, yaml_config, model, sync_frequency, http_server_address="", data_size=1, sync_type='fixed',
@@ -321,12 +337,12 @@ class FederatedLearningManager(Callback):
         self._last_param = {_.name: deepcopy(_.asnumpy()) for _ in self._model.trainable_params()
                             if self._as_prefix not in _.name}
 
-    def start_pull_weight(self):
+    def _start_pull_weight(self):
         """
         Pull weight from server in hybrid training mode.
         """
         logger.info("Try to pull weights. Local step number: {}".format(self._global_step))
-        # The worker has to train kWorkerTrainStepNum standalone iterations before it communicates with server.
+        # The worker has to train self._sync_frequency standalone iterations before it communicates with server.
         if self._global_step % self._sync_frequency != TRAIN_BEGIN_STEP_NUM:
             return
 
@@ -356,7 +372,7 @@ class FederatedLearningManager(Callback):
             parameter_dict[key] = Parameter(Tensor(param_data), name=key)
         load_param_into_net(self._model, parameter_dict)
 
-    def start_push_weight(self):
+    def _start_push_weight(self):
         """
         Push weight to server in hybrid training mode.
         """
@@ -386,7 +402,7 @@ class FederatedLearningManager(Callback):
             run_context (RunContext): Include some information of the model.
         """
         self._global_step += 1
-        if self._server_mode == "FEDERATED_LEARNING":
+        if self._server_mode == _fl_context.SERVER_MODE_FL:
             cb_params = run_context.original_args()
             self._data_size += cb_params.batch_num
             if self._global_step == self._next_sync_iter_id:
@@ -395,7 +411,7 @@ class FederatedLearningManager(Callback):
                 self._data_size = 0
                 if self._is_adaptive_sync():
                     self._as_set_grads()
-                if self._encrypt_type == "STABLE_PW_ENCRYPT":
+                if self._encrypt_type == _fl_context.ENCRYPT_STABLE_PW:
                     exchange_keys = _ExchangeKeys()
                     exchange_keys.construct()
                     get_keys = _GetKeys()
@@ -421,12 +437,12 @@ class FederatedLearningManager(Callback):
                     param_data = np.reshape(value, shape).astype(dtype)
                     parameter_dict[key] = Parameter(Tensor(param_data), name=key)
                 load_param_into_net(self._model, parameter_dict)
-                logger.info("Load param from get model into net, global step is {}.".format(self._global_step))
+                logger.info("Load params from getting model into net, global step is {}.".format(self._global_step))
                 self._next_sync_iter_id = self._global_step + self._sync_frequency
                 if self._is_adaptive_sync():
                     self._as_analyze_gradient()
                     self._round_id += 1
                     self._as_set_last_param()
         elif self._server_mode == "HYBRID_TRAINING":
-            self.start_pull_weight()
-            self.start_push_weight()
+            self._start_pull_weight()
+            self._start_push_weight()
