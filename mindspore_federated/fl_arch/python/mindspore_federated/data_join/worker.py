@@ -96,8 +96,8 @@ class FLDataWorker:
     Examples:
         >>> from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
         >>> http_server_config = ServerConfig(server_name='server', server_address="127.0.0.1:1086")
-        ... remote_server_config = ServerConfig(server_name='client', server_address="127.0.0.1:1087")
-        ... vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+        >>> remote_server_config = ServerConfig(server_name='client', server_address="127.0.0.1:1087")
+        >>> vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
         ...                                                       remote_server_config=remote_server_config)
         >>> vertical_communicator.launch()
         >>> worker = FLDataWorker(role="leader",
