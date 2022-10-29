@@ -28,13 +28,14 @@ constexpr int kHttpSuccess = 200;
 class HttpMsgHandler : public MessageHandler {
  public:
   HttpMsgHandler(const std::shared_ptr<HttpMessageHandler> &http_msg, void *data, size_t len, std::string message_type,
-                 std::string message_id);
+                 std::string message_id, std::string message_source);
   ~HttpMsgHandler() override = default;
 
   const void *data() const override;
   size_t len() const override;
   std::string message_type() const override;
   std::string message_id() const override;
+  std::string message_source() const override;
 
   bool SendResponse(const void *data, const size_t &len) override;
   bool SendResponse(const void *data, const size_t &len, const std::string &message_id) override;
@@ -44,10 +45,12 @@ class HttpMsgHandler : public MessageHandler {
   std::shared_ptr<HttpMessageHandler> http_msg_;
   void *data_;
   size_t len_;
-  // We use message type to make sure which server sends the message
+  // We use message type to make sure the message pattern
   std::string message_type_;
   // We use message id to track message request and response
   std::string message_id_;
+  // We use message source to make sure which server sends the message
+  std::string message_source_;
 };
 }  // namespace fl
 }  // namespace mindspore

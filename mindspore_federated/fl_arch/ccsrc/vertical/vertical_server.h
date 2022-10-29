@@ -27,14 +27,8 @@
 #include "vertical/common.h"
 #include "common/protos/data_join.pb.h"
 #include "vertical/communicator/trainer_communicator.h"
-#include "vertical/communicator/psi_bob_pb_comm.h"
-#include "vertical/communicator/psi_alice_check_comm.h"
-#include "vertical/communicator/psi_alice_pba_bf_comm.h"
-#include "vertical/communicator/psi_bob_align_result_comm.h"
-#include "vertical/communicator/psi_client_init_comm.h"
-#include "vertical/communicator/psi_server_init_comm.h"
-#include "vertical/communicator/psi_plain_comm.h"
 #include "vertical/communicator/data_join_communicator.h"
+#include "vertical/communicator/psi_communicator.h"
 
 namespace mindspore {
 namespace fl {

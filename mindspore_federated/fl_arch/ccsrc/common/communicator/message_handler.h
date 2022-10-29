@@ -39,6 +39,9 @@ class MessageHandler {
   // string message type of this message.
   virtual std::string message_type() const = 0;
 
+  // src server name of this message.
+  virtual std::string message_source() const = 0;
+
   // string message id of this message.
   virtual std::string message_id() const = 0;
 

@@ -65,7 +65,7 @@ class HttpClient {
   bool SendMessage(const void *data, size_t data_size, const std::shared_ptr<ResponseTrack> &response_track,
                    const std::string &target_msg_type, const std::string &content_type);
   bool SendMessage(const void *data, size_t data_size, const std::shared_ptr<ResponseTrack> &response_track,
-                   const std::string &target_msg_type, const std::string &request_msg_type,
+                   const std::string &http_uri_path, const std::string &message_type, const std::string &message_source,
                    const std::string &content_type);
   event_base *get_event_base() const;
   bool BreakLoopEvent();
@@ -73,14 +73,14 @@ class HttpClient {
   std::shared_ptr<ResponseTrack> response_track() const;
   void set_target_msg_type(const std::string target_msg_type);
   std::string target_msg_type() const;
-  void set_response_msg(const std::shared_ptr<std::vector<unsigned char>> &response_msg);
-  const std::shared_ptr<std::vector<unsigned char>> response_msg() const;
+  void set_response_msg(const std::shared_ptr<std::vector<uint8_t>> &response_msg);
+  const std::shared_ptr<std::vector<uint8_t>> response_msg() const;
 
   void set_message_id(const std::string message_id);
   std::string message_id() const;
 
   std::string CreateMessageId(const std::shared_ptr<ResponseTrack> &response_track, const std::string &target_msg_type,
-                              const std::string &request_msg_type);
+                              const std::string &message_source);
 
  protected:
   static void ReadCallback(struct evhttp_request *http_req, void *message_callback);
@@ -107,9 +107,9 @@ class HttpClient {
   std::uint16_t server_port_;
   evhttp_request *http_req_;
   evhttp_connection *evhttp_conn_;
-  evhttp_uri *uri;
+  evhttp_uri *uri_;
   std::shared_ptr<ResponseTrack> response_track_;
-  std::shared_ptr<std::vector<unsigned char>> response_msg_;
+  std::shared_ptr<std::vector<uint8_t>> response_msg_;
   std::string message_id_;
 };
 }  // namespace fl
