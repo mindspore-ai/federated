@@ -337,25 +337,23 @@ bool UpdateModelKernel::VerifyUploadCompressFeatureMap(const schema::RequestUpda
     if (compress_data_size == 0) {
       continue;
     }
-
     if (compress_data_size < 0) {
       MS_LOG(WARNING) << "Compress data size must be >= 0.";
       return false;
     }
-
     float min_val = fbs_compress_feature_map->Get(i)->min_val();
     float max_val = fbs_compress_feature_map->Get(i)->max_val();
-    if (min_val > max_val) {
-      MS_LOG(WARNING) << "Compress mode min val must be <= max val.";
-      return false;
-    }
-
     if (std::isnan(min_val) || std::isinf(min_val)) {
       MS_LOG(WARNING) << "The compress min val is nan or inf.";
       return false;
     }
     if (std::isnan(max_val) || std::isinf(max_val)) {
       MS_LOG(WARNING) << "The compress max val is nan or inf.";
+      return false;
+    }
+    if (min_val > max_val) {
+      MS_LOG(WARNING) << "Compress mode min val must be less then max val, min val is " << min_val
+                      << ", max val is " << max_val;
       return false;
     }
   }
