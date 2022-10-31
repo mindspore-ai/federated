@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""Interface for start up single core servable"""
+"""Interface for start up vertical federated communicator"""
 from collections import OrderedDict
 
 from mindspore_federated._mindspore_federated import VerticalFederated_
@@ -29,6 +29,14 @@ class VerticalFederatedCommunicator:
     Args:
         http_server_config (ServerConfig): Configuration of local http server.
         remote_server_config (ServerConfig): Configuration of remote http server.
+    Examples:
+        >>> from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
+        >>> http_server_config = ServerConfig(server_name='server', server_address="127.0.0.1:1086")
+        >>> remote_server_config = ServerConfig(server_name='client', server_address="127.0.0.1:1087")
+        >>> vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+        ...                                                       remote_server_config=remote_server_config)
+        >>> vertical_communicator.launch()
+        >>> vertical_communicator.data_join_wait_for_start()
     """
 
     def __init__(self, http_server_config: ServerConfig, remote_server_config: ServerConfig,
