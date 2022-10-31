@@ -104,6 +104,7 @@ required_package = [
     'PyYaml',
     'mmh3',
     'pandas',
+    'joblib',
 ]
 
 package_data = {
