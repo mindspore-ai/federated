@@ -24,6 +24,17 @@
         - **TypeError** - 输入 `bucket_id` 不是大于等于0的整数类型，如负数或小数。
         - **TypeError** - 输入 `thread_num` 不是大于等于0的整数类型，如负数或小数。
 
+    样例：
+        >>> from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
+        >>> from mindspore_federated._mindspore_federated import RunPSI
+        >>> http_server_config = ServerConfig(server_name='server', server_address="127.0.0.1:1086")
+        >>> remote_server_config = ServerConfig(server_name='client', server_address="127.0.0.1:1087")
+        >>> vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+        ...                                                       remote_server_config=remote_server_config)
+        >>> vertical_communicator.launch()
+        >>> result = RunPSI(['1', '2', '3'], 'server', 'client', 0, 0)
+        >>> print(result)
+
 
 .. py:function:: PlainIntersection(input_data, comm_role, peer_comm_role, bucket_id, thread_num)
 
@@ -47,3 +58,14 @@
         - **TypeError** - 输入 `input_data` 不是 list[string] 类型。
         - **TypeError** - 输入 `bucket_id` 不是大于等于0的整数类型，如负数或小数。
         - **TypeError** - 输入 `thread_num` 不是大于等于0的整数类型，如负数或小数。
+
+    样例：
+        >>> from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
+        >>> from mindspore_federated._mindspore_federated import PlainIntersection
+        >>> http_server_config = ServerConfig(server_name='server', server_address="127.0.0.1:1086")
+        >>> remote_server_config = ServerConfig(server_name='client', server_address="127.0.0.1:1087")
+        >>> vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+        ...                                                       remote_server_config=remote_server_config)
+        >>> vertical_communicator.launch()
+        >>> result = PlainIntersection(['1', '2', '3'], 'server', 'client', 0, 0)
+        >>> print(result)
