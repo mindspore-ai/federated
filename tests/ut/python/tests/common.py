@@ -125,13 +125,30 @@ def vfl_data_test(func):
 
 
 def stop_data_join():
-    cmd = f"pid=`ps aux | grep data_join | grep :6969"
-    cmd += " | grep -v \"grep\" |awk '{print $2}'` && "
-    cmd += "for id in $pid; do kill -9 $id && echo \"killed $id\"; done"
+    """kill data join related processes by ip and port"""
+    cmd = "pid=`netstat -anp | grep 127.0.0.1:6969 | grep -v grep | awk '{print $7}'` &&"
+    cmd += " for id in $pid;"
+    cmd += " do"
+    cmd += "   array=($id//// });"
+    cmd += "   for a in $array;"
+    cmd += "   do"
+    cmd += "     echo $a;"
+    cmd += "     kill -9 $a;"
+    cmd += "     break;"
+    cmd += "   done;"
+    cmd += " done"
     subprocess.call(['bash', '-c', cmd])
-    cmd = f"pid=`ps aux | grep data_join | grep :9696"
-    cmd += " | grep -v \"grep\" |awk '{print $2}'` && "
-    cmd += "for id in $pid; do kill -9 $id && echo \"killed $id\"; done"
+    cmd = "pid=`netstat -anp | grep 127.0.0.1:9696 | grep -v grep | awk '{print $7}'` &&"
+    cmd += " for id in $pid;"
+    cmd += " do"
+    cmd += "   array=($id//// });"
+    cmd += "   for a in $array;"
+    cmd += "   do"
+    cmd += "     echo $a;"
+    cmd += "     kill -9 $a;"
+    cmd += "     break;"
+    cmd += "   done;"
+    cmd += " done"
     subprocess.call(['bash', '-c', cmd])
 
 

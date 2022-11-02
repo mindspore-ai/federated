@@ -259,7 +259,8 @@ def worker_process_fun(
         main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(file_num)],
         output_dir="temp/{}/".format(role),
         data_schema_path="temp/{}_schema.yaml".format(role),
-        communicator=communicator
+        communicator=communicator,
+        shard_num=2,
     )
     worker.export()
 
@@ -274,29 +275,29 @@ def test_case_data_join_demo():
     generate_schema(
         yaml_path="temp/leader_schema.yaml",
         oaid="string",
-        feature0="float32",
+        feature0="int32",
         feature1="float32",
-        feature2="float32",
-        feature3="float32",
-        feature4="float32",
-        feature5="float32",
-        feature6="float32",
+        feature2="bytes",
+        feature3="int64",
+        feature4="float64",
+        feature5="string",
+        feature6="int32",
         feature7="float32",
-        feature8="float32",
-        feature9="float32",
+        feature8="bytes",
+        feature9="int64",
     )
     generate_schema(
         yaml_path="temp/follower_schema.yaml",
         oaid="string",
-        feature10="float32",
-        feature11="float32",
-        feature12="float32",
+        feature10="float64",
+        feature11="string",
+        feature12="int32",
         feature13="float32",
-        feature14="float32",
-        feature15="float32",
-        feature16="float32",
-        feature17="float32",
-        feature18="float32",
+        feature14="bytes",
+        feature15="int64",
+        feature16="float64",
+        feature17="string",
+        feature18="int32",
         feature19="float32",
     )
 
@@ -307,8 +308,12 @@ def test_case_data_join_demo():
                                                                 "127.0.0.1:6969"))
     follower_process.start()
 
-    leader_process.join(timeout=30)
-    follower_process.join(timeout=30)
+    leader_process.join(timeout=10)
+    follower_process.join(timeout=10)
+    leader_process.terminate()
+    follower_process.terminate()
+    leader_process.kill()
+    follower_process.kill()
 
     # verify joined data with real intersection data
     leader_oaid_list = list()
