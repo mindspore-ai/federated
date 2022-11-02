@@ -36,7 +36,7 @@ def generate_random_data(seed=0,
 
     output = list()
     oaid_list = list()
-
+    type_list = ["int", "float", "string"] * (feature_num // 3 + 1)
     for i in range(leader_data_num + follower_data_num - overlap_num):
         while True:
             random_str = ""
@@ -46,8 +46,15 @@ def generate_random_data(seed=0,
             if random_str not in oaid_list:
                 break
         oaid_list.append(random_str)
-        for _ in range(feature_num):
-            random_str += ",{}".format(np.random.randn())
+        for j in range(feature_num):
+            if type_list[j] == "int":
+                random_str += ",{}".format(np.random.randint(-100, 100))
+            elif type_list[j] == "float":
+                random_str += ",{}".format(np.random.randn())
+            elif type_list[j] == "string":
+                random_str += ",{}".format(oaid_list[-1])
+            else:
+                random_str += ","
         output.append(random_str)
 
     leader_output_list = [list() for _ in range(leader_file_num)]
