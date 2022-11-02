@@ -293,9 +293,9 @@ class FLModel:
             remote_data_batch (dict): Data batch read from remote server of other parties. key is the name of
                 the data item, value is the corresponding tensor.
             sens (dict): Sense parameters or scale values to calculate the gradient values of the traning network.
-            key is the label name specified in the yaml file. value is the dict of sense parameters or gradient scale
-            values. the key of the value dict is the name of the output of the training network, and the value of the
-            value dict is the sense tensor of corresponding output.
+                key is the label name specified in the yaml file. value is the dict of sense parameters
+                or gradient scale values. the key of the value dict is the name of the output of
+                the training network, and the value of the value dict is the sense tensor of corresponding output.
 
         Returns:
             Dict, sense parameters or gradient scale values sending to other parties. key is the label name specified
