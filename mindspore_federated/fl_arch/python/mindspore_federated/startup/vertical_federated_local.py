@@ -29,6 +29,7 @@ class VerticalFederatedCommunicator:
     Args:
         http_server_config (ServerConfig): Configuration of local http server.
         remote_server_config (ServerConfig): Configuration of remote http server.
+
     Examples:
         >>> from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
         >>> http_server_config = ServerConfig(server_name='server', server_address="127.0.0.1:1086")
