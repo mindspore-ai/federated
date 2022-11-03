@@ -84,7 +84,7 @@ def load_mindrecord(input_dir, seed=0, **kwargs):
         seed (int): The seed of loading dataset. Default: 0.
 
     Returns:
-        dataset (MindDataset): Order-preserving datasets.
+        MindDataset, Order-preserving datasets.
 
     Note:
         This API transparently transfers the `kwargs` to MindDataset.
