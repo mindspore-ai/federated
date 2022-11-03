@@ -34,6 +34,7 @@ class PandasData(BaseData):
 
     def load_raw_data(self, data_path):
         df = pd.read_csv(data_path, index_col=self._primary_key, usecols=self._usecols, dtype=self._pd_schema)
+        df.index = df.index.fillna("")
         self.merge(df)
 
     def keys(self):
@@ -41,18 +42,21 @@ class PandasData(BaseData):
 
     def values(self, keys=None):
         if keys is None:
-            values = self._store.values
+            df = self._store
         else:
-            values = self._store.loc[keys].values
-        for key, value in zip(keys, values):
-            feature = {self._primary_key: key}
-            for single_value, column_name in zip(value, self._store):
-                if self._pd_schema[column_name] != "string":
-                    if pd.isna(single_value):
-                        raise ValueError("The column: [{}] and the key: [{}] is null.".format(column_name, key))
-                else:
+            df = self._store.loc[keys]
+        column_names = df.columns.tolist()
+        column_names.insert(0, self._primary_key)
+        for value in df.itertuples():
+            feature = dict()
+            for single_value, column_name in zip(value, column_names):
+                if pd.isna(single_value):
+                    if self._pd_schema[column_name] != "string":
+                        raise ValueError("The column: '{}' has a null number.".format(column_name))
                     single_value = ""
-                feature[column_name] = single_value.astype(self._pd_schema[column_name])
+                if self._pd_schema[column_name] == "bytes":
+                    single_value = bytes(single_value, encoding="utf-8")
+                feature[column_name] = single_value
             yield feature
 
     def merge(self, store):
