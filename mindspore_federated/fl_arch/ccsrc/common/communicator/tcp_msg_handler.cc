@@ -56,6 +56,8 @@ std::string TcpMsgHandler::message_id() const { return ""; }
 
 std::string TcpMsgHandler::message_source() const { return ""; }
 
+std::string TcpMsgHandler::message_offset() const { return ""; }
+
 bool TcpMsgHandler::SendResponse(const void *data, const size_t &len, const std::string &message_id) { return true; }
 }  // namespace fl
 }  // namespace mindspore

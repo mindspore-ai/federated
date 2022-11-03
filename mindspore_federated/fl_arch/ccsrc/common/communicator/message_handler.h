@@ -45,6 +45,9 @@ class MessageHandler {
   // string message id of this message.
   virtual std::string message_id() const = 0;
 
+  // string offset of this message.
+  virtual std::string message_offset() const = 0;
+
   bool HasSentResponse() { return has_sent_response_; }
   virtual bool SendResponse(const void *data, const size_t &len) = 0;
   virtual bool SendResponse(const void *data, const size_t &len, const std::string &message_id) = 0;

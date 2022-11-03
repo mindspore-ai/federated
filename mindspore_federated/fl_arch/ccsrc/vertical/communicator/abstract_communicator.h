@@ -59,7 +59,7 @@ class AbstractCommunicator : public AbstractNode {
 
   std::shared_ptr<std::vector<uint8_t>> SendMessage(const std::string &target_server_name, const void *data,
                                                     size_t data_size, const std::string &http_uri_path,
-                                                    const std::string &msg_type);
+                                                    const std::string &target_msg_type, const std::string &offset = "");
 
   std::string name() const;
 

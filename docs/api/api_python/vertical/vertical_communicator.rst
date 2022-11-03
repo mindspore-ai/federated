@@ -1,13 +1,14 @@
 纵向联邦学习通信器
 ======================
 
-.. py:class:: mindspore_federated.VerticalFederatedCommunicator(http_server_config, remote_server_config)
+.. py:class:: mindspore_federated.VerticalFederatedCommunicator(http_server_config, remote_server_config, ssl_config)
 
     定义纵向联邦学习通信器。
 
     参数：
         - **http_server_config** (ServerConfig) - 本地服务器配置。
         - **remote_server_config** (ServerConfig) - 远程服务器配置。
+        - **ssl_config** (SSLConfig) - SSL加密通信配置。
 
     .. py:method:: launch()
 

@@ -25,6 +25,7 @@
 #include <functional>
 #include <iomanip>
 #include <vector>
+#include <sstream>
 #include "common/common.h"
 #include "vertical/communicator/message_queue.h"
 
@@ -35,9 +36,14 @@ struct VerticalConfig {
   std::string name;
 };
 
+struct SliceProto {
+  std::vector<uint8_t> slice_data;
+  std::string offset;
+};
+
 enum ResponseElem { SUCCESS, FAILED };
 
-using MessageQueuePtr = std::shared_ptr<MessageQueue<std::vector<uint8_t>>>;
+using MessageQueuePtr = std::shared_ptr<MessageQueue<SliceProto>>;
 
 constexpr auto KTrainer = "trainer";
 constexpr auto KPsi = "psi";
@@ -53,6 +59,10 @@ constexpr auto KDataJoin = "dataJoin";
 constexpr auto KTrainerUri = "/trainer";
 constexpr auto KPsiUri = "/psi";
 constexpr auto KDataJoinUri = "/dataJoin";
+
+constexpr auto KProtoSplitSign = ',';
+
+constexpr size_t kPsiSliceSize = 0.6 * 1024 * 1024 * 1024 / 32;
 
 constexpr uint32_t kRetryCommunicateTimes = 900;
 constexpr uint32_t kSleepSecondsOfCommunicate = 1;

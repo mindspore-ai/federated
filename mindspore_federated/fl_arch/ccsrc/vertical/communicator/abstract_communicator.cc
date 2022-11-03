@@ -87,7 +87,8 @@ void AbstractCommunicator::InitHttpClient() {
 std::shared_ptr<std::vector<unsigned char>> AbstractCommunicator::SendMessage(const std::string &target_server_name,
                                                                               const void *data, size_t data_size,
                                                                               const std::string &http_uri_path,
-                                                                              const std::string &target_msg_type) {
+                                                                              const std::string &target_msg_type,
+                                                                              const std::string &offset) {
   if (data == nullptr) {
     MS_LOG(EXCEPTION) << "Data for sending request is nullptr.";
   }
@@ -104,7 +105,7 @@ std::shared_ptr<std::vector<unsigned char>> AbstractCommunicator::SendMessage(co
   std::shared_ptr<std::vector<unsigned char>> response_msg;
   for (uint32_t i = 0; i < kRetryCommunicateTimes; i++) {
     if (!http_client->SendMessage(data, data_size, request_track, http_uri_path, target_msg_type, http_server_name,
-                                  HTTP_CONTENT_TYPE_URL_ENCODED)) {
+                                  offset, HTTP_CONTENT_TYPE_URL_ENCODED)) {
       MS_LOG(WARNING) << "Sending request failed.";
     }
     if (!Wait(request_track)) {

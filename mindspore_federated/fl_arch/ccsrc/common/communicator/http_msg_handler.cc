@@ -21,13 +21,15 @@
 namespace mindspore {
 namespace fl {
 HttpMsgHandler::HttpMsgHandler(const std::shared_ptr<HttpMessageHandler> &http_msg, void *data, size_t len,
-                               std::string message_type, std::string message_id, std::string message_source)
+                               std::string message_type, std::string message_id, std::string message_source,
+                               std::string message_offset)
     : http_msg_(http_msg),
       data_(data),
       len_(len),
       message_type_(message_type),
       message_id_(message_id),
-      message_source_(message_source) {}
+      message_source_(message_source),
+      message_offset_(message_offset) {}
 
 const void *HttpMsgHandler::data() const {
   MS_ERROR_IF_NULL_W_RET_VAL(data_, nullptr);
@@ -41,6 +43,8 @@ std::string HttpMsgHandler::message_type() const { return message_type_; }
 std::string HttpMsgHandler::message_id() const { return message_id_; }
 
 std::string HttpMsgHandler::message_source() const { return message_source_; }
+
+std::string HttpMsgHandler::message_offset() const { return message_offset_; }
 
 bool HttpMsgHandler::SendResponse(const void *data, const size_t &len) {
   MS_ERROR_IF_NULL_W_RET_VAL(data, false);

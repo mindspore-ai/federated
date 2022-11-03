@@ -19,6 +19,7 @@
 #include <vector>
 #include <string>
 #include "armour/util/io_util.h"
+#include "vertical/common.h"
 
 namespace mindspore {
 namespace fl {
@@ -50,6 +51,35 @@ psi::BobAlignResult ParseBobAlignResultProto(const datajoin::BobAlignResultProto
 psi::AliceCheck ParseAliceCheckProto(const datajoin::AliceCheckProto &aliceCheckProto);
 
 psi::PlainData ParsePlainDataProto(const datajoin::PlainDataProto &plainDataProto);
+
+std::vector<std::string> StringSplit(const std::string &str, char sign);
+
+std::vector<std::string> GetSplitData(std::string *begin_ptr, size_t index, size_t data_size, const size_t slice_size);
+
+size_t CalSliceCount(size_t data_size, const size_t slice_size);
+
+void UpdateSliceData(std::string *proto_data, std::vector<uint8_t> *slice_data, size_t *index, std::string *offset,
+                     const char &sign);
+
+SliceProto CreateProtoWithSlices(const psi::AlicePbaAndBF &alice_pba_bf);
+
+SliceProto CreateProtoWithSlices(const psi::AliceCheck &alice_check);
+
+SliceProto CreateProtoWithSlices(const psi::BobPb &bob_pb);
+
+SliceProto CreateProtoWithSlices(const psi::BobAlignResult &bob_align_result);
+
+SliceProto CreateProtoWithSlices(const psi::PlainData &plain_data);
+
+psi::AlicePbaAndBF ParseProtoWithSlices(const std::vector<datajoin::AlicePbaAndBFProto> &protos);
+
+psi::AliceCheck ParseProtoWithSlices(const std::vector<datajoin::AliceCheckProto> &protos);
+
+psi::BobPb ParseProtoWithSlices(const std::vector<datajoin::BobPbProto> &protos);
+
+psi::BobAlignResult ParseProtoWithSlices(const std::vector<datajoin::BobAlignResultProto> &protos);
+
+psi::PlainData ParseProtoWithSlices(const std::vector<datajoin::PlainDataProto> &protos);
 }  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_FL_ARCH_CCSRC_VERTICAL_UTILS_PSI_UTILS_H_
