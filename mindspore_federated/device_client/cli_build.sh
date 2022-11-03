@@ -151,8 +151,8 @@ build_mindspore_federated_client()
   ${gradle_command} clean
   ${gradle_command} createFlatBuffers
   ${gradle_command} build -x test
-  ${gradle_command} flReleaseJarAAR --rerun-tasks
-  ${gradle_command} flReleaseJarX86 --rerun-tasks
+  ${gradle_command} packFLJarAAR --rerun-tasks
+  ${gradle_command} packFLJarX86 --rerun-tasks
 }
 
 build_mindspore_federated_client
