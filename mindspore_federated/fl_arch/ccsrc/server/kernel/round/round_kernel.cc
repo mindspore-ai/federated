@@ -58,7 +58,7 @@ void RoundKernel::SendResponseMsg(const std::shared_ptr<MessageHandler> &message
     MS_LOG(WARNING) << "Sending response failed.";
     return;
   }
-  if (DataRateKernels.count(name_)) {
+  if (DataRateKernels.find(name_) != DataRateKernels.end()) {
     CalculateSendData(len);
   }
 }
@@ -73,7 +73,7 @@ void RoundKernel::SendResponseMsgInference(const std::shared_ptr<MessageHandler>
     MS_LOG(WARNING) << "Sending response failed.";
     return;
   }
-  if (DataRateKernels.count(name_)) {
+  if (DataRateKernels.find(name_) != DataRateKernels.end()) {
     CalculateSendData(len);
   }
 }

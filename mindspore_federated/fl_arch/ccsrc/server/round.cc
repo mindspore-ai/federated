@@ -136,7 +136,7 @@ void Round::LaunchRoundKernel(const std::shared_ptr<MessageHandler> &message) {
     }
   }
   Iteration::GetInstance().OnRoundLaunchEnd();
-  if (DataRateKernels.count(name_)) {
+  if (DataRateKernels.find(name_) != DataRateKernels.end()) {
     kernel_->CalculateReceiveData(message->len());
   }
 }

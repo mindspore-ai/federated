@@ -18,7 +18,7 @@
 #define MINDSPORE_CCSRC_FL_COMMON_COMMON_H_
 
 #include <map>
-#include <set>
+#include <unordered_set>
 #include <string>
 #include <numeric>
 #include <climits>
@@ -103,7 +103,7 @@ struct RoundConfig {
   bool per_server_count = false;
 };
 
-const std::set<std::string> DataRateKernels = {
+const std::unordered_set<std::string> DataRateKernels = {
   "startFLJob",   "updateModel", "getModel",      "exchangeKeys",       "getKeys",
   "shareSecrets", "getSecrets",  "getClientList", "reconstructSecrets", "pushListSign"};
 
