@@ -57,11 +57,10 @@ dependencies {
     testCompile('com.alibaba:fastjson:1.2.58')
     testCompile('commons-io:commons-io:2.0.1')
     // the module jar for open source model test, need compile example quick_start_flclient
-    testCompile files('libs/quick_start_flclient.jar')
+//    testCompile files('libs/quick_start_flclient.jar')
     // the module jar for inner test
-    testCompile files('libs/flclient_models.jar')
+//    testCompile files('libs/flclient_models.jar')
 }
-
 
 test {
     // need add the frame lib path to LD_LIBRARY_PATH
@@ -141,14 +140,10 @@ version = '0.1.0'
 archivesBaseName = 'mindspore-lite-java-flclient'
 def commitID = getCommitID()
 
-task clearJar(type: Delete) {
-    delete('build/libs/jarAAR/' + archivesBaseName + '-' + version + '.jar')
-    delete('build/libs/jarX86/' + archivesBaseName + '-' + version + '.jar')
-    delete('build/libs/' + archivesBaseName + '-' + version + '.jar')
-}
-
-
-task flReleaseJarAAR(type: Jar, dependsOn: ['compileJava']) {
+task packFLJarAAR(type: Jar, dependsOn: ['compileJava']) {
+    doFirst {
+        delete('build/libs/jarAAR/' + archivesBaseName + '-' + version + '.jar')
+    }
     manifest {
         attributes(
                 "Main-Class": "com.mindspore.flclient.SyncFLJob",
@@ -158,9 +153,17 @@ task flReleaseJarAAR(type: Jar, dependsOn: ['compileJava']) {
     }
     from('build/classes/java/main')
     destinationDirectory = file('build/libs/jarAAR')
+    doLast {
+        ant.checksum file: "./build/libs/jarAAR/" + archivesBaseName + '-' + version + '.jar',
+                algorithm: "sha-256", fileext: ".sha256"
+    }
 }
 
+
 task packFLJarX86(type: Jar, dependsOn: ['compileJava']) {
+    doFirst {
+        delete('build/libs/jarX86/' + archivesBaseName + '-' + version + '.jar')
+    }
     println("packFLJarX86 used commit_id: " + getCommitID())
     manifest {
         attributes(
@@ -176,7 +179,16 @@ task packFLJarX86(type: Jar, dependsOn: ['compileJava']) {
         }
     }
     destinationDirectory = file('build/libs/jarX86')
+    doLast {
+        exec {
+            commandLine "zip", "-d", "./build/libs/jarX86/" + archivesBaseName + '-' + version + '.jar',
+                    'META-INF/.SF', 'META-INF/.RSA', 'META-INF/*SF'
+        }
+        ant.checksum file: "./build/libs/jarX86/" + archivesBaseName + '-' + version + '.jar',
+                algorithm: "sha-256", fileext: ".sha256"
+    }
 }
+
 
 task packFLJarX86UT(type: Jar, dependsOn: ['compileTestJava']) {
     manifest {
@@ -201,12 +213,11 @@ task packFLJarX86UT(type: Jar, dependsOn: ['compileTestJava']) {
         }
     }
     destinationDirectory = file('build/libs/jarX86UT')
-}
 
-task flUTJarX86(dependsOn: ['packFLJarX86UT']) {
     doLast {
         exec {
-            commandLine "zip", "-d", "./build/libs/jarX86UT/" + archivesBaseName + '-' + version + '.jar', 'META-INF/.SF', 'META-INF/.RSA', 'META-INF/*SF'
+            commandLine "zip", "-d", "./build/libs/jarX86UT/" + archivesBaseName + '-' + version + '.jar',
+                    'META-INF/.SF', 'META-INF/.RSA', 'META-INF/*SF'
         }
         exec {
             // Need do -javaagent so we copy the jmockit jar to the release path
@@ -216,6 +227,3 @@ task flUTJarX86(dependsOn: ['packFLJarX86UT']) {
     }
 }
 
-task flReleaseJarX86(type: Exec, dependsOn: ['packFLJarX86']) {
-    commandLine "zip", "-d", "./build/libs/jarX86/" + archivesBaseName + '-' + version + '.jar', 'META-INF/.SF', 'META-INF/.RSA', 'META-INF/*SF'
-}
