@@ -28,7 +28,7 @@ constexpr int kHttpSuccess = 200;
 class HttpMsgHandler : public MessageHandler {
  public:
   HttpMsgHandler(const std::shared_ptr<HttpMessageHandler> &http_msg, void *data, size_t len, std::string message_type,
-                 std::string message_id, std::string message_source);
+                 std::string message_id, std::string message_source, std::string message_offset);
   ~HttpMsgHandler() override = default;
 
   const void *data() const override;
@@ -36,6 +36,7 @@ class HttpMsgHandler : public MessageHandler {
   std::string message_type() const override;
   std::string message_id() const override;
   std::string message_source() const override;
+  std::string message_offset() const override;
 
   bool SendResponse(const void *data, const size_t &len) override;
   bool SendResponse(const void *data, const size_t &len, const std::string &message_id) override;
@@ -51,6 +52,8 @@ class HttpMsgHandler : public MessageHandler {
   std::string message_id_;
   // We use message source to make sure which server sends the message
   std::string message_source_;
+  // We use message offset to realize the slices of the message
+  std::string message_offset_;
 };
 }  // namespace fl
 }  // namespace mindspore

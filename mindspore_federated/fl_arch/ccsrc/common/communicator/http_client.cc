@@ -227,7 +227,8 @@ const std::shared_ptr<std::vector<uint8_t>> HttpClient::response_msg() const { r
 
 bool HttpClient::SendMessage(const void *data, size_t data_size, const std::shared_ptr<ResponseTrack> &response_track,
                              const std::string &http_uri_path, const std::string &target_msg_type,
-                             const std::string &message_source, const std::string &content_type) {
+                             const std::string &message_source, const std::string &message_offset,
+                             const std::string &content_type) {
   std::lock_guard<std::mutex> lock(connection_mutex_);
   std::string message_id = CreateMessageId(response_track, target_msg_type, message_source);
   MS_LOG(INFO) << "target msg type is:" << target_msg_type << ", message source is " << message_source
@@ -247,6 +248,7 @@ bool HttpClient::SendMessage(const void *data, size_t data_size, const std::shar
   evhttp_add_header(http_req_->output_headers, "Message-Type", target_msg_type.c_str());
   evhttp_add_header(http_req_->output_headers, "Message-Source", message_source.c_str());
   evhttp_add_header(http_req_->output_headers, "Message-Id", message_id.c_str());
+  evhttp_add_header(http_req_->output_headers, "Message-Offset", message_offset.c_str());
   evhttp_make_request(evhttp_conn_, http_req_, EVHTTP_REQ_POST, http_uri_path.c_str());
 
   int ret = event_base_dispatch(event_base_);

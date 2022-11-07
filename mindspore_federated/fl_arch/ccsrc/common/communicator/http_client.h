@@ -66,7 +66,7 @@ class HttpClient {
                    const std::string &target_msg_type, const std::string &content_type);
   bool SendMessage(const void *data, size_t data_size, const std::shared_ptr<ResponseTrack> &response_track,
                    const std::string &http_uri_path, const std::string &message_type, const std::string &message_source,
-                   const std::string &content_type);
+                   const std::string &message_offset, const std::string &content_type);
   event_base *get_event_base() const;
   bool BreakLoopEvent();
   void set_response_track(const std::shared_ptr<ResponseTrack> &response_track);

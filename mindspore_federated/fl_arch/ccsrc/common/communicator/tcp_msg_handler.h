@@ -36,6 +36,7 @@ class TcpMsgHandler : public MessageHandler {
   std::string message_type() const override;
   std::string message_id() const override;
   std::string message_source() const override;
+  std::string message_offset() const override;
 
  private:
   std::shared_ptr<TcpConnection> tcp_conn_;

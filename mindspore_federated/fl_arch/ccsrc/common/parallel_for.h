@@ -41,7 +41,7 @@ struct ParallelSync {
     } else if (thread_num_input == 0) {
       thread_num_ = available_thread_num;
     } else {
-      MS_LOG(ERROR) << "Input thread num is non-available, use default: " << available_thread_num;
+      MS_LOG(WARNING) << "Input thread num is non-available, use default: " << available_thread_num;
       thread_num_ = available_thread_num;
     }
     executor_ = std::make_shared<TaskExecutor>(thread_num_);
