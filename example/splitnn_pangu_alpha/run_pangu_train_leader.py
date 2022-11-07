@@ -129,8 +129,8 @@ class LeaderTrainer:
                         if step % 10 == 0:
                             summary_record.add_value('scalar', 'output', logit_out['output'])
                             summary_record.record(step)
-                            logging.info('epoch %d step %d/%d loss: %f', epoch, step, self.train_size,
-                                         logit_out['output'])
+                            logging.info('epoch %d step %d/%d loss: %f', epoch, step - epoch*self.train_size,
+                                         self.train_size, logit_out['output'])
 
                         if step % 1000 == 0:
                             # save checkpoint
