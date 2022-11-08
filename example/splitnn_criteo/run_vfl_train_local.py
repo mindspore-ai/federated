@@ -94,16 +94,17 @@ if __name__ == '__main__':
                     summary_record.add_value('scalar', 'deep_loss', leader_out['deep_loss'])
                     summary_record.record(step)
                     logging.info('epoch %d step %d/%d wide_loss: %f deep_loss: %f',
-                                 epoch, step, train_size, leader_out['wide_loss'], leader_out['deep_loss'])
+                                 epoch, step - steps_per_epoch*epoch, train_size,
+                                 leader_out['wide_loss'], leader_out['deep_loss'])
 
                     # save checkpoint
                     leader_fl_model.save_ckpt()
                     follower_fl_model.save_ckpt()
 
-                    for eval_item in eval_iter:
-                        follower_out = follower_fl_model.forward_one_step(eval_item)
-                        leader_eval_out = leader_fl_model.eval_one_step(eval_item, follower_out)
-                    auc = eval_metric.eval()
-                    eval_metric.clear()
-                    summary_record.add_value('scalar', 'auc', Tensor(auc))
-                    logging.info('----evaluation---- epoch %d auc %f', epoch, auc)
+            for eval_item in eval_iter:
+                follower_out = follower_fl_model.forward_one_step(eval_item)
+                leader_eval_out = leader_fl_model.eval_one_step(eval_item, follower_out)
+            auc = eval_metric.eval()
+            eval_metric.clear()
+            summary_record.add_value('scalar', 'auc', Tensor(auc))
+            logging.info('----evaluation---- epoch %d auc %f', epoch, auc)

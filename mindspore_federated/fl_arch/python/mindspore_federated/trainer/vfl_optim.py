@@ -269,15 +269,12 @@ class PartyGradScaler:
                 raise ValueError('Input sens of %s not containing %s' % (self._name, self._sens))
             sens_value = sens[self._sens][self._output_name]
             grad_scale_value = self._grad_op(self._loss_net)(*input_data_batch, sens_value)
-        remote_data_names = remote_data_batch.keys()
-        remote_grad_scale_keys = []
-        remote_grad_scale_values = []
-        for remote_data_name in remote_data_names:
-            if remote_data_name in self._net_input_names:
-                idx = self._net_input_names.index(remote_data_name)
-                remote_grad_scale_keys.append(remote_data_name)
-                remote_grad_scale_values.append(grad_scale_value[idx])
-        return OrderedDict(zip(remote_grad_scale_keys, remote_grad_scale_values))
+        grad_scale_dict = OrderedDict()
+        for input_name in self._input_names:
+            if input_name in self._net_input_names:
+                idx = self._net_input_names.index(input_name)
+                grad_scale_dict[input_name] = grad_scale_value[idx]
+        return grad_scale_dict
 
     def _fill_sens(self, loss):
         """

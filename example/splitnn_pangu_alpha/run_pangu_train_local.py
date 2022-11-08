@@ -126,8 +126,10 @@ if __name__ == '__main__':
                 if step % 10 == 0:
                     summary_record.add_value('scalar', 'output', logit_out['output'])
                     summary_record.record(step)
-                    logging.info('epoch %d step %d/%d loss: %f', epoch, step, train_size, logit_out['output'])
+                    logging.info('epoch %d step %d/%d loss: %f', epoch, step - epoch*train_size,
+                                 train_size, logit_out['output'])
 
+                if step % 1000 == 0:
                     # save checkpoint
                     embedding_fl_model.save_ckpt()
                     backbone_fl_model.save_ckpt()
@@ -135,9 +137,9 @@ if __name__ == '__main__':
 
                     for eval_item in eval_iter:
                         # forward process
-                        embedding_out = embedding_fl_model.forward_one_step(item)
-                        backbone_out = backbone_fl_model.forward_one_step(item, embedding_out)
-                        logit_out = head_fl_model.eval_one_step(item, backbone_out)
+                        embedding_out = embedding_fl_model.forward_one_step(eval_item)
+                        backbone_out = backbone_fl_model.forward_one_step(eval_item, embedding_out)
+                        logit_out = head_fl_model.eval_one_step(eval_item, backbone_out)
 
                     ppl = eval_metric.eval()
                     eval_metric.clear()
