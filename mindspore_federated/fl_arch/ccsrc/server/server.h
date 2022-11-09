@@ -65,7 +65,8 @@ class MS_EXPORT Server {
 
   // Getting Model Size relies on ModelStorage Initialization which relies on Executor Initialization:
   // InitCipher---->InitExecutor
-  void Run(const std::vector<InputWeight> &feature_map, const FlCallback &fl_callback);
+  void Run(const std::vector<InputWeight> &feature_map, const uint64_t &recovery_iteration,
+           const FlCallback &fl_callback);
 
   void BroadcastModelWeight(const std::string &proto_model,
                             const std::map<std::string, std::string> &broadcast_server_map = {});
@@ -104,7 +105,7 @@ class MS_EXPORT Server {
   // Initialize cipher according to the public param.
   void InitCipher();
 
-  void InitAndLoadDistributedCache();
+  void InitAndLoadDistributedCache(uint64_t recovery_iteration);
 
   // The communicators should be started after all initializations are completed.
   void StartCommunicator();

@@ -71,9 +71,9 @@ InstanceState GetInstanceState(const std::string &instance_state) {
 
 InstanceContext::InstanceContext() = default;
 
-CacheStatus InstanceContext::InitAndSync(const std::string &fl_name) {
+CacheStatus InstanceContext::InitAndSync(const std::string &fl_name, const uint64_t &recovery_iteration) {
   fl_name_ = fl_name;
-  iteration_num_ = 1;
+  iteration_num_ = recovery_iteration;
   new_iteration_num_ = iteration_num_;
   instance_name_ = CreateNewInstanceName();
   new_instance_name_ = instance_name_;

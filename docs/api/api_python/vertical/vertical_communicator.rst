@@ -54,8 +54,8 @@
     定义纵向联邦服务器配置。
 
     参数：
-        - **server_name** (str) - 服务器名字。
-        - **server_address** (str) - 服务器地址。
+        - **server_name** (str) - 服务器名字，比如leader_server，用户可自定义。
+        - **server_address** (str) - 服务器地址，比如'127.0.0.1:1086'，用户可自定义。
 
     .. py:method:: init_server_config(http_server_config, remote_server_config)
 

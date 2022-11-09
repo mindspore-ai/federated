@@ -161,13 +161,15 @@ class FLServerJob:
             raise RuntimeError("Parameter 'callback' is expected to be instance of Callback when it's not None, but"
                                f" got {type(callback)}.")
         self.callback = callback
-        feature_map = self._load_feature_map(feature_map)
+        recovery_ckpt_files = self._get_current_recovery_ckpt_files()
+        feature_map = self._load_feature_map(feature_map, recovery_ckpt_files)
+        recovery_iteration = self._get_current_recovery_iteration(recovery_ckpt_files)
         feature_list_cxx = []
         for _, feature in feature_map.feature_map().items():
             feature_cxx = FeatureItem_(feature.feature_name, feature.data, feature.shape, "fp32",
                                        feature.require_aggr)
             feature_list_cxx.append(feature_cxx)
-        Federated_.start_federated_server(feature_list_cxx, self.after_started_callback,
+        Federated_.start_federated_server(feature_list_cxx, recovery_iteration, self.after_started_callback,
                                           self.before_stopped_callback, self.on_iteration_end_callback)
 
     def after_started_callback(self):
@@ -225,18 +227,18 @@ class FLServerJob:
         """
         save feature map.
         """
-        recovery_ckpt_file = self._get_current_recovery_ckpt_file()
+        recovery_ckpt_files = self._get_current_recovery_ckpt_files()
         import datetime
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         file_name = f"{self.fl_name}_recovery_iteration_{iteration_num}_{timestamp}.ckpt"
         new_ckpt_file_path = os.path.join(self.checkpoint_dir, file_name)
         save_ms_checkpoint(new_ckpt_file_path, feature_map)
-        if len(recovery_ckpt_file) >= 3:
-            for _, _, file in recovery_ckpt_file[2:]:
+        if len(recovery_ckpt_files) >= 3:
+            for _, _, file in recovery_ckpt_files[2:]:
                 os.remove(file)
         return new_ckpt_file_path
 
-    def _load_feature_map(self, feature_map):
+    def _load_feature_map(self, feature_map, recovery_ckpt_files):
         """
         load feature map.
         """
@@ -247,10 +249,9 @@ class FLServerJob:
             feature_map = new_feature_map
 
         # load checkpoint file in self.checkpoint_dir
-        recovery_ckpt_file = self._get_current_recovery_ckpt_file()
-        if recovery_ckpt_file:
+        if recovery_ckpt_files:
             feature_map_ckpt = None
-            for _, _, ckpt_file in recovery_ckpt_file:
+            for _, _, ckpt_file in recovery_ckpt_files:
                 try:
                     feature_map_ckpt = load_ms_checkpoint(ckpt_file)
                     logger.info(f"Load recovery checkpoint file {ckpt_file} successfully.")
@@ -281,7 +282,7 @@ class FLServerJob:
             f"The parameter 'feature_map' is expected to be instance of dict(feature_name, feature_val), FeatureMap, "
             f"or a checkpoint or mindir file path, but got '{type(feature_map)}'.")
 
-    def _get_current_recovery_ckpt_file(self):
+    def _get_current_recovery_ckpt_files(self):
         """
         get current recovery ckpt file.
         """
@@ -304,10 +305,22 @@ class FLServerJob:
                 iteration_num = int(strs[0])
                 timestamp = strs[1] + strs[2]
                 recovery_ckpt_files.append((iteration_num, timestamp, file_path))
-        recovery_ckpt_files.sort(key=lambda elem: elem[1], reverse=True)
+        recovery_ckpt_files.sort(key=lambda elem: elem[0], reverse=True)
         logger.info(f"Recovery ckpt files is: {recovery_ckpt_files}.")
         return recovery_ckpt_files
 
+    def _get_current_recovery_iteration(self, recovery_ckpt_files):
+        """
+        get current recovery iteration.
+        """
+        recovery_iteration = 1
+        if not recovery_ckpt_files:
+            return recovery_iteration
+        for iteration_num, _, _ in recovery_ckpt_files:
+            recovery_iteration = int(iteration_num) + 1
+            break
+        logger.info(f"Recovery iteration num is: {recovery_iteration}.")
+        return recovery_iteration
 
 class FlSchedulerJob:
     """
