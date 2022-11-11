@@ -15,6 +15,7 @@
 """Local splitnn of wide and deep on criteo dataset."""
 import os
 import logging
+from collections import OrderedDict
 
 from mindspore import context, Tensor
 from mindspore.train.summary import SummaryRecord
@@ -23,8 +24,8 @@ from mindspore_federated import FLModel, FLYamlData
 
 from criteo_dataset import create_dataset, DataType
 from network_config import config
-from wide_and_deep import LeaderNet, LeaderLossNet, LeaderEvalNet, \
-    FollowerNet, FollowerLossNet, AUCMetric
+from wide_and_deep import LeaderTopNet, LeaderTopLossNet, LeaderTopEvalNet, LeaderBottomNet, LeaderBottomLossNet, \
+    FollowerBottomNet, FollowerBottomLossNet, AUCMetric
 
 
 def construct_local_dataset():
@@ -47,37 +48,46 @@ def construct_local_dataset():
 if __name__ == '__main__':
     logging.basicConfig(filename='log_local_{}.txt'.format(config.device_target), level=logging.INFO)
     context.set_context(mode=context.GRAPH_MODE, device_target=config.device_target)
-    leader_yaml_data = FLYamlData(config.leader_yaml_path)
-    follower_yaml_data = FLYamlData(config.follower_yaml_path)
+    leader_top_yaml_data = FLYamlData(config.leader_top_yaml_path)
+    leader_bottom_yaml_data = FLYamlData(config.leader_bottom_yaml_path)
+    follower_bottom_yaml_data = FLYamlData(config.follower_bottom_yaml_path)
     # local data iteration for experiment
     ds_train, ds_eval = construct_local_dataset()
     train_iter = ds_train.create_dict_iterator()
     eval_iter = ds_eval.create_dict_iterator()
     train_size = ds_train.get_dataset_size()
     eval_size = ds_eval.get_dataset_size()
-    # Leader Part
-    leader_base_net = LeaderNet(config)
-    leader_train_net = LeaderLossNet(leader_base_net, config)
-    leader_eval_net = LeaderEvalNet(leader_base_net)
+    # Leader Bottom Net
+    leader_bottom_eval_net = leader_bottom_base_net = LeaderBottomNet(config)
+    leader_bottom_train_net = LeaderBottomLossNet(leader_bottom_base_net, config)
+    leader_bottom_fl_model = FLModel(yaml_data=leader_bottom_yaml_data,
+                                     network=leader_bottom_train_net,
+                                     eval_network=leader_bottom_eval_net)
+    # Leader Top Net
+    leader_top_base_net = LeaderTopNet(config)
+    leader_top_train_net = LeaderTopLossNet(leader_top_base_net, config)
+    leader_top_eval_net = LeaderTopEvalNet(leader_top_base_net)
     eval_metric = AUCMetric()
-    leader_fl_model = FLModel(yaml_data=leader_yaml_data,
-                              network=leader_train_net,
-                              metrics=eval_metric,
-                              eval_network=leader_eval_net)
+    leader_top_fl_model = FLModel(yaml_data=leader_top_yaml_data,
+                                  network=leader_top_train_net,
+                                  metrics=eval_metric,
+                                  eval_network=leader_top_eval_net)
 
-    # Follower Part
-    follower_eval_net = follower_base_net = FollowerNet(config)
-    follower_train_net = FollowerLossNet(follower_base_net, config)
-    follower_fl_model = FLModel(yaml_data=follower_yaml_data,
-                                network=follower_train_net,
-                                eval_network=follower_eval_net)
+    # Follower Bottom Net
+    follower_bottom_eval_net = follower_bottom_base_net = FollowerBottomNet(config)
+    follower_bottom_train_net = FollowerBottomLossNet(follower_bottom_base_net, config)
+    follower_bottom_fl_model = FLModel(yaml_data=follower_bottom_yaml_data,
+                                       network=follower_bottom_train_net,
+                                       eval_network=follower_bottom_eval_net)
 
     # resume if you have pretrained checkpoint file
     if config.resume:
-        if os.path.exists(config.pre_trained_follower):
-            follower_fl_model.load_ckpt(path=config.pre_trained_follower)
-        if os.path.exists(config.pre_trained_leader):
-            leader_fl_model.load_ckpt(path=config.pre_trained_leader)
+        if os.path.exists(config.pre_trained_follower_bottom):
+            follower_bottom_fl_model.load_ckpt(path=config.pre_trained_follower_bottom)
+        if os.path.exists(config.pre_trained_leader_bottom):
+            leader_bottom_fl_model.load_ckpt(path=config.pre_trained_leader_bottom)
+        if os.path.exists(config.pre_trained_leader_top):
+            leader_top_fl_model.load_ckpt(path=config.pre_trained_leader_top)
 
     # forward/backward batch by batch
     steps_per_epoch = ds_train.get_dataset_size()
@@ -85,25 +95,32 @@ if __name__ == '__main__':
         for epoch in range(config.epochs):
             for step, item in enumerate(train_iter, start=1):
                 step = steps_per_epoch * epoch + step
-                follower_out = follower_fl_model.forward_one_step(item)
-                leader_out = leader_fl_model.forward_one_step(item, follower_out)
-                scale = leader_fl_model.backward_one_step(item, follower_out)
-                follower_fl_model.backward_one_step(item, sens=scale)
+                follower_embedding = follower_bottom_fl_model.forward_one_step(item)
+                leader_embedding = leader_bottom_fl_model.forward_one_step(item)
+                item.update(leader_embedding)
+                leader_out = leader_top_fl_model.forward_one_step(item, follower_embedding)
+                scale = leader_top_fl_model.backward_one_step(item, follower_embedding)
+                leader_scale = {'loss': OrderedDict(list(scale['loss'].items())[:2])}
+                follower_scale = {'loss': OrderedDict(list(scale['loss'].items())[2:])}
+                leader_bottom_fl_model.backward_one_step(item, sens=leader_scale)
+                follower_bottom_fl_model.backward_one_step(item, sens=follower_scale)
                 if step % 100 == 0:
-                    summary_record.add_value('scalar', 'wide_loss', leader_out['wide_loss'])
-                    summary_record.add_value('scalar', 'deep_loss', leader_out['deep_loss'])
+                    summary_record.add_value('scalar', 'loss', leader_out['loss'])
                     summary_record.record(step)
-                    logging.info('epoch %d step %d/%d wide_loss: %f deep_loss: %f',
-                                 epoch, step - steps_per_epoch*epoch, train_size,
-                                 leader_out['wide_loss'], leader_out['deep_loss'])
+                    logging.info('epoch %d step %d/%d loss: %f',
+                                 epoch, step, train_size, leader_out['loss'])
 
                     # save checkpoint
-                    leader_fl_model.save_ckpt()
-                    follower_fl_model.save_ckpt()
+                    leader_top_fl_model.save_ckpt()
+                    leader_bottom_fl_model.save_ckpt()
+                    follower_bottom_fl_model.save_ckpt()
 
             for eval_item in eval_iter:
-                follower_out = follower_fl_model.forward_one_step(eval_item)
-                leader_eval_out = leader_fl_model.eval_one_step(eval_item, follower_out)
+                follower_embedding = follower_bottom_fl_model.forward_one_step(eval_item)
+                leader_embedding = leader_bottom_fl_model.forward_one_step(eval_item)
+                embedding = follower_embedding
+                embedding.update(leader_embedding)
+                leader_eval_out = leader_top_fl_model.eval_one_step(eval_item, embedding)
             auc = eval_metric.eval()
             eval_metric.clear()
             summary_record.add_value('scalar', 'auc', Tensor(auc))
