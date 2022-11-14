@@ -30,7 +30,8 @@ namespace fl {
 class MS_EXPORT FederatedJob {
  public:
   static void StartFederatedServer(const std::vector<std::shared_ptr<FeatureItemPy>> &feature_list,
-                                   const py::object &after_stated_callback, const py::object &before_stopped_callback,
+                                   const uint64_t &recovery_iteration, const py::object &after_stated_callback,
+                                   const py::object &before_stopped_callback,
                                    const py::object &on_iteration_end_callback);
   static void StartFederatedScheduler();
   static void InitFederatedWorker();

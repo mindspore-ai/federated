@@ -50,12 +50,13 @@ Server &Server::GetInstance() {
 
 Server::~Server() = default;
 
-void Server::Run(const std::vector<InputWeight> &feature_map, const FlCallback &fl_callback) {
+void Server::Run(const std::vector<InputWeight> &feature_map, const uint64_t &recovery_iteration,
+                 const FlCallback &fl_callback) {
   ExitHandler::Instance().InitSignalHandle();
   fl_callback_ = fl_callback;
   try {
     InitServer();
-    InitAndLoadDistributedCache();
+    InitAndLoadDistributedCache(recovery_iteration);
     // Lock to prevent multiple servers from registering at the same time
     LockCache();
     // Visit all other servers, and ensure that the servers are reachable to each other.
@@ -356,7 +357,7 @@ void Server::InitPkiCertificate() {
 
 void Server::InitServerContext() { FLContext::instance()->GenerateResetterRound(); }
 
-void Server::InitAndLoadDistributedCache() {
+void Server::InitAndLoadDistributedCache(uint64_t recovery_iteration) {
   MS_EXCEPTION_IF_NULL(server_node_);
   auto config = FLContext::instance()->distributed_cache_config();
   if (config.address.empty()) {
@@ -367,7 +368,7 @@ void Server::InitAndLoadDistributedCache() {
                       << ", enable ssl: " << FLContext::instance()->enable_ssl();
   }
   auto fl_name = FLContext::instance()->fl_name();
-  auto cache_ret = cache::InstanceContext::Instance().InitAndSync(fl_name);
+  auto cache_ret = cache::InstanceContext::Instance().InitAndSync(fl_name, recovery_iteration);
   if (!cache_ret.IsSuccess()) {
     MS_LOG(EXCEPTION) << "Sync instance info with distributed cache failed, distributed_cache_address: "
                       << config.address;

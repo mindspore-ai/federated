@@ -1,5 +1,5 @@
 fl_name: Lenet
-fl_iteration_num: 2
+fl_iteration_num: 3
 server_mode: FEDERATED_LEARNING
 enable_ssl: false
 

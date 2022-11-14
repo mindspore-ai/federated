@@ -76,7 +76,7 @@ class TestLenetTrain(BaseCase):
 
     def check_client_log(self):
         # check client result
-        query_success_cmd = "grep 'the total response of 1: SUCCESS' {}/../client_script/client_train0/* |wc -l" \
+        query_success_cmd = "grep -E 'the total response of .: SUCCESS' {}/../client_script/client_train0/* |wc -l" \
             .format(self.server_path)
         print("query_success_cmd:" + query_success_cmd)
         result = os.popen(query_success_cmd)

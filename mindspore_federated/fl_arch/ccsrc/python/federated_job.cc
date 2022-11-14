@@ -62,7 +62,7 @@ void OnIterationEnd(const py::object &on_iteration_end_callback) {
 }
 
 void FederatedJob::StartFederatedServer(const std::vector<std::shared_ptr<FeatureItemPy>> &feature_list,
-                                        const py::object &after_stated_callback,
+                                        const uint64_t &recovery_iteration, const py::object &after_stated_callback,
                                         const py::object &before_stopped_callback,
                                         const py::object &on_iteration_end_callback) {
   FLContext::instance()->set_ms_role(kEnvRoleOfServer);
@@ -76,7 +76,7 @@ void FederatedJob::StartFederatedServer(const std::vector<std::shared_ptr<Featur
   callback.after_started = [after_stated_callback]() { after_stated_callback(); };
   callback.before_stopped = [before_stopped_callback]() { before_stopped_callback(); };
   callback.on_iteration_end = [on_iteration_end_callback]() { OnIterationEnd(on_iteration_end_callback); };
-  server::Server::GetInstance().Run(feature_list_inner, callback);
+  server::Server::GetInstance().Run(feature_list_inner, recovery_iteration, callback);
 }
 
 void FederatedJob::StartFederatedScheduler() {

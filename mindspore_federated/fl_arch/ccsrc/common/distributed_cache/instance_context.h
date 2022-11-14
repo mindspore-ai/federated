@@ -60,7 +60,7 @@ class MS_EXPORT InstanceContext {
   void ClearCache();
   void ClearInstance();
 
-  CacheStatus InitAndSync(const std::string &fl_name);
+  CacheStatus InitAndSync(const std::string &fl_name, const uint64_t &recovery_iteration);
 
   std::string fl_name() const { return fl_name_; }
   std::string instance_name() const { return instance_name_; }
