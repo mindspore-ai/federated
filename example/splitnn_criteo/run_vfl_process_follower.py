@@ -24,7 +24,7 @@ from mindspore_federated import FLModel, FLYamlData
 from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig
 from mindspore_federated.data_join import FLDataWorker
 
-from wide_and_deep import FollowerNet, FollowerLossNet
+from wide_and_deep import FollowerBottomNet, FollowerBottomLossNet
 from network_config import config
 from criteo_dataset import create_joined_dataset
 
@@ -36,12 +36,12 @@ class FollowerTrainer:
         super(FollowerTrainer, self).__init__()
         self.content = None
         logging.info('start vfl trainer success')
-        follower_yaml_data = FLYamlData(config.follower_yaml_path)
-        follower_eval_net = follower_base_net = FollowerNet(config)
-        follower_train_net = FollowerLossNet(follower_base_net, config)
-        self.follower_fl_model = FLModel(yaml_data=follower_yaml_data,
-                                         network=follower_train_net,
-                                         eval_network=follower_eval_net)
+        follower_bottom_yaml_data = FLYamlData(config.follower_bottom_yaml_path)
+        follower_bottom_eval_net = follower_base_net = FollowerBottomNet(config)
+        follower_bottom_train_net = FollowerBottomLossNet(follower_base_net, config)
+        self.follower_bottom_fl_model = FLModel(yaml_data=follower_bottom_yaml_data,
+                                                network=follower_bottom_train_net,
+                                                eval_network=follower_bottom_eval_net)
         logging.info('Init follower trainer finish.')
 
     def start(self):
@@ -50,17 +50,17 @@ class FollowerTrainer:
         """
         logging.info('Begin follower trainer')
         if config.resume:
-            self.follower_fl_model.load_ckpt()
+            self.follower_bottom_fl_model.load_ckpt()
         for _ in range(config.epochs):
             for _, item in enumerate(train_iter):
-                follower_out = self.follower_fl_model.forward_one_step(item)
-                vertical_communicator.send_tensors("server", follower_out)
+                follower_embedding = self.follower_bottom_fl_model.forward_one_step(item)
+                vertical_communicator.send_tensors("server", follower_embedding)
                 scale = vertical_communicator.receive("server")
-                self.follower_fl_model.backward_one_step(item, sens=scale)
-            self.follower_fl_model.save_ckpt()
+                self.follower_bottom_fl_model.backward_one_step(item, sens=scale)
+            self.follower_bottom_fl_model.save_ckpt()
             for eval_item in eval_iter:
-                follower_out = self.follower_fl_model.forward_one_step(eval_item)
-                vertical_communicator.send_tensors("server", follower_out)
+                follower_embedding = self.follower_bottom_fl_model.forward_one_step(eval_item)
+                vertical_communicator.send_tensors("server", follower_embedding)
 
 
 logging.basicConfig(filename='follower_process.log', level=logging.INFO)
