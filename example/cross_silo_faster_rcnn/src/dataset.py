@@ -13,19 +13,22 @@
 # limitations under the License.
 # ============================================================================
 
+# pylint: disable=invalid-name
+# pylint: disable=missing-docstring
+
 """FasterRcnn dataset"""
 from __future__ import division
 
 import os
+
+import cv2
 import numpy as np
 from numpy import random
 
-import cv2
-import mmcv
 import mindspore.dataset as de
 import mindspore.dataset.vision as C
-from mindspore.mindrecord import FileWriter
 from mindspore import version
+from mindspore.mindrecord import FileWriter
 
 
 def bbox_overlaps(bboxes1, bboxes2, mode='iou'):
@@ -76,6 +79,7 @@ def bbox_overlaps(bboxes1, bboxes2, mode='iou'):
 
 class PhotoMetricDistortion:
     """Photo Metric Distortion"""
+
     def __init__(self,
                  brightness_delta=32,
                  contrast_range=(0.5, 1.5),
@@ -105,7 +109,7 @@ class PhotoMetricDistortion:
                 img *= alpha
 
         # convert color from BGR to HSV
-        img = mmcv.bgr2hsv(img)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
         # random saturation
         if random.randint(2):
@@ -119,7 +123,7 @@ class PhotoMetricDistortion:
             img[..., 0][img[..., 0] < 0] += 360
 
         # convert color from HSV to BGR
-        img = mmcv.hsv2bgr(img)
+        img = cv2.cvtColor(img, cv2.COLOR_HSV2BGR)
 
         # random contrast
         if mode == 0:
@@ -137,6 +141,7 @@ class PhotoMetricDistortion:
 
 class Expand:
     """expand image"""
+
     def __init__(self, mean=(0, 0, 0), to_rgb=True, ratio_range=(1, 4)):
         if to_rgb:
             self.mean = mean[::-1]
@@ -160,12 +165,27 @@ class Expand:
         return img, boxes, labels
 
 
+def rescale_with_tuple(img, scale):
+    h, w = img.shape[:2]
+    scale_factor = min(max(scale) / max(h, w), min(scale) / min(h, w))
+    new_size = int(w * float(scale_factor) + 0.5), int(h * float(scale_factor) + 0.5)
+    rescaled_img = cv2.resize(img, new_size, interpolation=cv2.INTER_LINEAR)
+
+    return rescaled_img, scale_factor
+
+
+def rescale_with_factor(img, scale_factor):
+    h, w = img.shape[:2]
+    new_size = int(w * float(scale_factor) + 0.5), int(h * float(scale_factor) + 0.5)
+    return cv2.resize(img, new_size, interpolation=cv2.INTER_NEAREST)
+
+
 def rescale_column(img, img_shape, gt_bboxes, gt_label, gt_num, config):
     """rescale operation for image"""
-    img_data, scale_factor = mmcv.imrescale(img, (config.img_width, config.img_height), return_scale=True)
+    img_data, scale_factor = rescale_with_tuple(img, (config.img_width, config.img_height))
     if img_data.shape[0] > config.img_height:
-        img_data, scale_factor2 = mmcv.imrescale(img_data, (config.img_height, config.img_height), return_scale=True)
-        scale_factor = scale_factor*scale_factor2
+        img_data, scale_factor2 = rescale_with_tuple(img_data, (config.img_height, config.img_height))
+        scale_factor = scale_factor * scale_factor2
 
     gt_bboxes = gt_bboxes * scale_factor
     gt_bboxes[:, 0::2] = np.clip(gt_bboxes[:, 0::2], 0, img_data.shape[1] - 1)
@@ -181,14 +201,15 @@ def rescale_column(img, img_shape, gt_bboxes, gt_label, gt_num, config):
     img_shape = (config.img_height, config.img_width, 1.0)
     img_shape = np.asarray(img_shape, dtype=np.float32)
 
-    return  (pad_img_data, img_shape, gt_bboxes, gt_label, gt_num)
+    return (pad_img_data, img_shape, gt_bboxes, gt_label, gt_num)
+
 
 def rescale_column_test(img, img_shape, gt_bboxes, gt_label, gt_num, config):
     """rescale operation for image of eval"""
-    img_data, scale_factor = mmcv.imrescale(img, (config.img_width, config.img_height), return_scale=True)
+    img_data, scale_factor = rescale_with_tuple(img, (config.img_width, config.img_height))
     if img_data.shape[0] > config.img_height:
-        img_data, scale_factor2 = mmcv.imrescale(img_data, (config.img_height, config.img_height), return_scale=True)
-        scale_factor = scale_factor*scale_factor2
+        img_data, scale_factor2 = rescale_with_tuple(img_data, (config.img_height, config.img_height))
+        scale_factor = scale_factor * scale_factor2
 
     pad_h = config.img_height - img_data.shape[0]
     pad_w = config.img_width - img_data.shape[1]
@@ -200,14 +221,18 @@ def rescale_column_test(img, img_shape, gt_bboxes, gt_label, gt_num, config):
     img_shape = np.append(img_shape, (scale_factor, scale_factor))
     img_shape = np.asarray(img_shape, dtype=np.float32)
 
-    return  (pad_img_data, img_shape, gt_bboxes, gt_label, gt_num)
+    return (pad_img_data, img_shape, gt_bboxes, gt_label, gt_num)
 
 
 def resize_column(img, img_shape, gt_bboxes, gt_label, gt_num, config):
     """resize operation for image"""
     img_data = img
-    img_data, w_scale, h_scale = mmcv.imresize(
-        img_data, (config.img_width, config.img_height), return_scale=True)
+    h, w = img_data.shape[:2]
+    img_data = cv2.resize(
+        img_data, (config.img_width, config.img_height), interpolation=cv2.INTER_LINEAR)
+    h_scale = config.img_height / h
+    w_scale = config.img_width / w
+
     scale_factor = np.array(
         [w_scale, h_scale, w_scale, h_scale], dtype=np.float32)
     img_shape = (config.img_height, config.img_width, 1.0)
@@ -224,8 +249,12 @@ def resize_column(img, img_shape, gt_bboxes, gt_label, gt_num, config):
 def resize_column_test(img, img_shape, gt_bboxes, gt_label, gt_num, config):
     """resize operation for image of eval"""
     img_data = img
-    img_data, w_scale, h_scale = mmcv.imresize(
-        img_data, (config.img_width, config.img_height), return_scale=True)
+    h, w = img_data.shape[:2]
+    img_data = cv2.resize(
+        img_data, (config.img_width, config.img_height), interpolation=cv2.INTER_LINEAR)
+    h_scale = config.img_height / h
+    w_scale = config.img_width / w
+
     scale_factor = np.array(
         [w_scale, h_scale, w_scale, h_scale], dtype=np.float32)
     img_shape = np.append(img_shape, (h_scale, w_scale))
@@ -241,14 +270,24 @@ def resize_column_test(img, img_shape, gt_bboxes, gt_label, gt_num, config):
 
 def impad_to_multiple_column(img, img_shape, gt_bboxes, gt_label, gt_num, config):
     """impad operation for image"""
-    img_data = mmcv.impad(img, (config.img_height, config.img_width))
+    img_data = cv2.copyMakeBorder(img,
+                                  0, config.img_height - img.shape[0], 0, config.img_width - img.shape[1],
+                                  cv2.BORDER_CONSTANT,
+                                  value=0)
     img_data = img_data.astype(np.float32)
     return (img_data, img_shape, gt_bboxes, gt_label, gt_num)
 
 
 def imnormalize_column(img, img_shape, gt_bboxes, gt_label, gt_num):
     """imnormalize operation for image"""
-    img_data = mmcv.imnormalize(img, np.array([123.675, 116.28, 103.53]), np.array([58.395, 57.12, 57.375]), True)
+    # Computed from random subset of ImageNet training images
+    mean = np.asarray([123.675, 116.28, 103.53])
+    std = np.asarray([58.395, 57.12, 57.375])
+    img_data = img.copy().astype(np.float32)
+    cv2.cvtColor(img_data, cv2.COLOR_BGR2RGB, img_data)  # inplace
+    cv2.subtract(img_data, np.float64(mean.reshape(1, -1)), img_data)  # inplace
+    cv2.multiply(img_data, 1 / np.float64(std.reshape(1, -1)), img_data)  # inplace
+
     img_data = img_data.astype(np.float32)
     return (img_data, img_shape, gt_bboxes, gt_label, gt_num)
 
@@ -256,7 +295,7 @@ def imnormalize_column(img, img_shape, gt_bboxes, gt_label, gt_num):
 def flip_column(img, img_shape, gt_bboxes, gt_label, gt_num):
     """flip operation for image"""
     img_data = img
-    img_data = mmcv.imflip(img_data)
+    img_data = np.flip(img_data, axis=1)
     flipped = gt_bboxes.copy()
     _, w, _ = img_data.shape
 
@@ -296,6 +335,7 @@ def expand_column(img, img_shape, gt_bboxes, gt_label, gt_num):
 
 def preprocess_fn(image, box, is_training, config):
     """Preprocess function for dataset."""
+
     def _infer_data(image_bgr, image_shape, gt_box_new, gt_label_new, gt_iscrowd_new_revert):
         image_shape = image_shape[:2]
         input_data = image_bgr, image_shape, gt_box_new, gt_label_new, gt_iscrowd_new_revert
@@ -311,6 +351,9 @@ def preprocess_fn(image, box, is_training, config):
 
     def _data_aug(image, box, is_training):
         """Data augmentation function."""
+        pad_max_number = config.num_gts
+        if pad_max_number < box.shape[0]:
+            box = box[:pad_max_number, :]
         image_bgr = image.copy()
         image_bgr[:, :, 0] = image[:, :, 2]
         image_bgr[:, :, 1] = image[:, :, 1]
@@ -320,7 +363,6 @@ def preprocess_fn(image, box, is_training, config):
         gt_label = box[:, 4]
         gt_iscrowd = box[:, 5]
 
-        pad_max_number = 128
         gt_box_new = np.pad(gt_box, ((0, pad_max_number - box.shape[0]), (0, 0)), mode="constant", constant_values=0)
         gt_label_new = np.pad(gt_label, ((0, pad_max_number - box.shape[0])), mode="constant", constant_values=-1)
         gt_iscrowd_new = np.pad(gt_iscrowd, ((0, pad_max_number - box.shape[0])), mode="constant", constant_values=1)
@@ -365,7 +407,10 @@ def create_coco_label(is_training, config):
         train_cls_dict[cls] = i
 
     anno_json = os.path.join(coco_root, config.instance_set.format(data_type))
-
+    if hasattr(config, 'train_set') and is_training:
+        anno_json = os.path.join(coco_root, config.train_set)
+    if hasattr(config, 'val_set') and not is_training:
+        anno_json = os.path.join(coco_root, config.val_set)
     coco = COCO(anno_json)
     classs_dict = {}
     cat_ids = coco.loadCats(coco.getCatIds())
@@ -381,8 +426,7 @@ def create_coco_label(is_training, config):
         file_name = image_info[0]["file_name"]
         anno_ids = coco.getAnnIds(imgIds=img_id, iscrowd=None)
         anno = coco.loadAnns(anno_ids)
-        # image_path = os.path.join(coco_root, data_type, file_name)
-        image_path = os.path.join(coco_root, file_name)
+        image_path = os.path.join(coco_root, data_type, file_name)
         annos = []
         for label in anno:
             bbox = label["bbox"]
@@ -401,17 +445,67 @@ def create_coco_label(is_training, config):
     return image_files, image_anno_dict
 
 
-def anno_parser(annos_str):
-    """Parse annotation from string to list."""
-    annos = []
-    for anno_str in annos_str:
-        anno = list(map(int, anno_str.strip().split(',')))
-        annos.append(anno)
+def parse_json_annos_from_txt(anno_file, config):
+    """for user defined annotations text file, parse it to json format data"""
+    if not os.path.isfile(anno_file):
+        raise RuntimeError("Evaluation annotation file {} is not valid.".format(anno_file))
+
+    annos = {
+        "images": [],
+        "annotations": [],
+        "categories": []
+    }
+
+    # set categories field
+    for i, cls_name in enumerate(config.coco_classes):
+        annos["categories"].append({"id": i, "name": cls_name})
+
+    with open(anno_file, "rb") as f:
+        lines = f.readlines()
+
+    img_id = 1
+    anno_id = 1
+    for line in lines:
+        line_str = line.decode("utf-8").strip()
+        line_split = str(line_str).split(' ')
+        # set image field
+        file_name = line_split[0]
+        annos["images"].append({"file_name": file_name, "id": img_id})
+        # set annotations field
+        for anno_info in line_split[1:]:
+            anno = anno_info.split(",")
+            x = float(anno[0])
+            y = float(anno[1])
+            w = float(anno[2]) - float(anno[0])
+            h = float(anno[3]) - float(anno[1])
+            category_id = int(anno[4])
+            iscrowd = int(anno[5])
+            annos["annotations"].append({"bbox": [x, y, w, h],
+                                         "area": w * h,
+                                         "category_id": category_id,
+                                         "iscrowd": iscrowd,
+                                         "image_id": img_id,
+                                         "id": anno_id})
+            anno_id += 1
+        img_id += 1
+
     return annos
 
 
-def filter_valid_data(image_dir, anno_path):
+def create_train_data_from_txt(image_dir, anno_path):
     """Filter valid image file, which both in image_dir and anno_path."""
+
+    def anno_parser(annos_str):
+        """Parse annotation from string to list."""
+        annos = []
+        for anno_str in annos_str:
+            anno = anno_str.strip().split(",")
+            xmin, ymin, xmax, ymax = list(map(float, anno[:4]))
+            cls_id = int(anno[4])
+            iscrowd = int(anno[5])
+            annos.append([xmin, ymin, xmax, ymax, cls_id, iscrowd])
+        return annos
+
     image_files = []
     image_anno_dict = {}
     if not os.path.isdir(image_dir):
@@ -440,7 +534,7 @@ def data_to_mindrecord_byte_image(config, dataset="coco", is_training=True, pref
     if dataset == "coco":
         image_files, image_anno_dict = create_coco_label(is_training, config=config)
     else:
-        image_files, image_anno_dict = filter_valid_data(config.IMAGE_DIR, config.ANNO_PATH)
+        image_files, image_anno_dict = create_train_data_from_txt(config.image_dir, config.anno_path)
 
     fasterrcnn_json = {
         "image": {"type": "bytes"},

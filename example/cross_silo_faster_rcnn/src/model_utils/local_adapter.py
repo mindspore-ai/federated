@@ -18,7 +18,7 @@
 import os
 
 def get_device_id():
-    device_id = os.getenv('DEVICE_ID', '5')
+    device_id = os.getenv('DEVICE_ID', '0')
     return int(device_id)
 
 
