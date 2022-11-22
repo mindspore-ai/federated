@@ -89,7 +89,7 @@ def parse_yaml(yaml_path):
                 cfg, cfg_helper, cfg_choices = cfgs
             else:
                 raise ValueError("At most 3 docs (config, description for help, choices) are supported in config yaml")
-            print(cfg_helper)
+            # print(cfg_helper)
         except:
             raise ValueError("Failed to parse yaml")
     return cfg, cfg_helper, cfg_choices
@@ -117,11 +117,50 @@ def get_config():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     parser.add_argument("--config_path", type=str, default=os.path.join(current_dir, "../../default_config.yaml"),
                         help="Config file path")
+    parser.add_argument("--ms_role", type=str, default="MS_WORKER")
+    # common
+    parser.add_argument("--yaml_config", type=str, default="default_yaml_config.yaml")
+    # for server
+    parser.add_argument("--http_server_address", type=str, default="127.0.0.1:5555")
+    parser.add_argument("--tcp_server_ip", type=str, default="127.0.0.1")
+    parser.add_argument("--checkpoint_dir", type=str, default="./fl_ckpt/")
+
+    # for scheduler
+    parser.add_argument("--scheduler_manage_address", type=str, default="127.0.0.1:11202")
+
+    # for worker
+    parser.add_argument("--device_target", type=str, default="GPU")
+    parser.add_argument("--dataset_path", type=str, default="")
+    # The user_id is used to set each worker's dataset path.
+    parser.add_argument("--user_id", type=str, default="0")
+    parser.add_argument("--sync_type", type=str, default="fixed", choices=["fixed", "adaptive"])
+
+    parser.add_argument('--img_size', type=int, default=(32, 32, 1), help='the image size of (h,w,c)')
+    parser.add_argument('--repeat_size', type=int, default=1, help='the repeat size when create the dataLoader')
+
+    # client_batch_size is also used as the batch size of each mini-batch for Worker.
+    parser.add_argument("--client_batch_size", type=int, default=32)
+    parser.add_argument("--client_epoch_num", type=int, default=10)
+    parser.add_argument("--client_learning_rate", type=float, default=0.01)
+    parser.add_argument("--fl_iteration_num", type=int, default=5000)
+    parser.add_argument("--device_id", type=int, default=0)
+    parser.add_argument("--pre_trained", type=str, default="")
     path_args, _ = parser.parse_known_args()
     default, helper, choices = parse_yaml(path_args.config_path)
-    pprint(default)
     args = parse_cli_to_yaml(parser=parser, cfg=default, helper=helper, choices=choices, cfg_path=path_args.config_path)
-    final_config = merge(args, default)
-    return Config(final_config)
+    default = Config(merge(args, default))
+    if not hasattr(default, "feature_shapes"):
+        default.feature_shapes = [
+            [default.img_height // 4, default.img_width // 4],
+            [default.img_height // 8, default.img_width // 8],
+            [default.img_height // 16, default.img_width // 16],
+            [default.img_height // 32, default.img_width // 32],
+            [default.img_height // 64, default.img_width // 64],
+        ]
+    default.num_bboxes = default.num_anchors * sum([lst[0] * lst[1] for lst in default.feature_shapes])
+    pprint(default)
+    print("Please check the above information for the configurations", flush=True)
+
+    return default
 
 config = get_config()

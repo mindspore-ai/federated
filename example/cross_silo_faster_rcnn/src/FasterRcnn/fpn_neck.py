@@ -1,3 +1,4 @@
+# pylint: disable=missing-docstring
 # Copyright 2020-2021 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,11 +16,11 @@
 """FasterRcnn feature pyramid network."""
 
 import numpy as np
+import mindspore as ms
+import mindspore.ops as ops
 import mindspore.nn as nn
-from mindspore.ops import operations as P
 from mindspore.common.tensor import Tensor
-from mindspore.common import dtype as mstype
-from mindspore.common.initializer import initializer
+from src.model_utils.config import config
 
 
 def bias_init_zeros(shape):
@@ -30,7 +31,7 @@ def bias_init_zeros(shape):
 def _conv(in_channels, out_channels, kernel_size=3, stride=1, padding=0, pad_mode='pad'):
     """Conv2D wrapper."""
     shape = (out_channels, in_channels, kernel_size, kernel_size)
-    weights = initializer("XavierUniform", shape=shape, dtype=mstype.float32).to_tensor()
+    weights = ms.common.initializer.initializer("XavierUniform", shape=shape, dtype=ms.float32).init_data()
     shape_bias = (out_channels,)
     biass = bias_init_zeros(shape_bias)
     return nn.Conv2d(in_channels, out_channels,
@@ -84,10 +85,10 @@ class FeatPyramidNeck(nn.Cell):
             self.fpn_convs_.append(fpn_conv)
         self.lateral_convs_list = nn.layer.CellList(self.lateral_convs_list_)
         self.fpn_convs_list = nn.layer.CellList(self.fpn_convs_)
-        self.interpolate1 = P.ResizeNearestNeighbor((48, 80))
-        self.interpolate2 = P.ResizeNearestNeighbor((96, 160))
-        self.interpolate3 = P.ResizeNearestNeighbor((192, 320))
-        self.maxpool = P.MaxPool(kernel_size=1, strides=2, pad_mode="same")
+        self.interpolate1 = ops.ResizeNearestNeighbor(config.feature_shapes[2])
+        self.interpolate2 = ops.ResizeNearestNeighbor(config.feature_shapes[1])
+        self.interpolate3 = ops.ResizeNearestNeighbor(config.feature_shapes[0])
+        self.maxpool = ops.MaxPool(kernel_size=1, strides=2, pad_mode="same")
 
     def construct(self, inputs):
         x = ()
