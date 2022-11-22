@@ -52,7 +52,7 @@ const void LocalMetaStore::put_aggregation_feature_map(ModelItemPtr modelItemPtr
 ModelItemPtr &LocalMetaStore::aggregation_feature_map() { return aggregation_feature_map_; }
 
 bool LocalMetaStore::verifyAggregationFeatureMap(const ModelItemPtr &modelItemPtr) {
-  // feature map size in Hybrid training is not equal with upload model size
+  // feature map size may be not equal with upload model size in hybrid training mode and cloud mode
   if (modelItemPtr->weight_items.size() > aggregation_feature_map_->weight_items.size()) {
     return false;
   }

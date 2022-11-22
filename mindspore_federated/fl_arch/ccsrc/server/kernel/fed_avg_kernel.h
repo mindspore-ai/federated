@@ -57,6 +57,7 @@ class FedAvgKernel {
     }
     auto data_size = info->data_size;
     if (data_size == 0) {
+      *info->require_aggr = false;
       MS_LOG(INFO) << "Parameter:" << info->name << " data size is 0, do not need to run fed avg.";
       return false;
     }

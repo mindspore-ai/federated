@@ -48,17 +48,14 @@ FlStatus Executor::CheckUpdatedModel(const std::map<std::string, Address> &featu
   for (auto &param_item : param_aggregation_info_) {
     auto &param_name = param_item.first;
     auto &param_aggr = param_item.second;
-    if (!param_aggr.require_aggr) {
+    if (!(*param_aggr.require_aggr)) {
       continue;
     }
     auto it = feature_map.find(param_name);
     if (it == feature_map.end()) {
-      if (FLContext::instance()->server_mode() == kServerModeHybrid) {
-        continue;
-      }
       auto reason = "The updated weight of parameter " + param_name + " is missing, fl id: " + update_model_fl_id;
       MS_LOG_WARNING << reason;
-      return {kFlFailed, reason};
+      continue;
     }
     auto upload_data = it->second;
     if (param_aggr.weight_size != upload_data.size) {
@@ -76,7 +73,7 @@ void Executor::HandleModelUpdate(const std::map<std::string, Address> &feature_m
   for (auto &param_item : param_aggregation_info_) {
     auto &param_name = param_item.first;
     auto &param_aggr = param_item.second;
-    if (!param_aggr.require_aggr) {
+    if (!*(param_aggr.require_aggr)) {
       continue;
     }
     auto it = feature_map.find(param_name);
@@ -396,15 +393,11 @@ bool Executor::RunWeightAggregationInner(const std::map<std::string, std::string
   std::unique_lock<std::mutex> lock(parameter_mutex_);
   for (auto &item : param_aggregation_info_) {
     auto &param_aggr = item.second;
-    if (!param_aggr.require_aggr) {
+    if (!(*param_aggr.require_aggr)) {
       continue;
     }
     if (!kernel::FedAvgKernel<float, size_t>::AllReduce(server_map, &param_aggr)) {
-      if (FLContext::instance()->server_mode() == kServerModeHybrid) {
-        continue;
-      }
-      MS_LOG(WARNING) << "Failed to run aggregation for " << param_aggr.name;
-      return false;
+      continue;
     }
   }
   is_aggregation_done_ = true;
@@ -437,7 +430,7 @@ bool Executor::ResetAggregationStatus() {
     info.weight_data = weight_data + weight_item.offset;
     info.weight_size = weight_item.size;
     info.data_size = 0;
-    info.require_aggr = weight_item.require_aggr;
+    info.require_aggr = &weight_item.require_aggr;
     param_aggregation_info_[info.name] = info;
   }
   return true;

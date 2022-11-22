@@ -100,7 +100,8 @@ def test_redis_server_one_server_restart_redis_success():
     update_model_expect_success(http_server_address, fl_name, fl_id2, iteration, update_feature_map2, upload_loss=loss1)
 
     client_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
-    expect_feature_map = {"feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
+    # expect_feature_map = {"feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
+    expect_feature_map = {}  # require_aggr = False
     for key in ["feature_conv", "feature_bn", "feature_bn2"]:
         expect_feature_map[key] = (update_feature_map[key] + update_feature_map2[key]) / (data_size + data_size2)
     check_feature_map(expect_feature_map, client_feature_map)
@@ -219,7 +220,8 @@ def test_redis_server_start_with_ssl():
     update_feature_map2 = create_default_feature_map()
     update_model_expect_success(http_server_address3, fl_name, fl_id2, iteration, update_feature_map2, enable_ssl=True)
 
-    expect_feature_map = {"feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
+    # expect_feature_map = {"feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
+    expect_feature_map = {}
     for key in ["feature_conv", "feature_bn", "feature_bn2"]:
         expect_feature_map[key] = (update_feature_map[key] + update_feature_map2[key]) / (data_size + data_size2)
     # get model from sever1
@@ -310,7 +312,8 @@ def test_redis_server_start_with_ssl_restart_redis_with_ssl():
     update_feature_map2 = create_default_feature_map()
     update_model_expect_success(http_server_address2, fl_name, fl_id2, iteration, update_feature_map2, enable_ssl=True)
 
-    expect_feature_map = {"feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
+    # expect_feature_map = {"feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
+    expect_feature_map = {}
     for key in ["feature_conv", "feature_bn", "feature_bn2"]:
         expect_feature_map[key] = (update_feature_map[key] + update_feature_map2[key]) / (data_size + data_size2)
     # get model from sever1

@@ -21,11 +21,12 @@ import subprocess
 parser = argparse.ArgumentParser(description="Run test_cross_silo_femnist.py case")
 parser.add_argument("--yaml_config", type=str, default="default_yaml_config.yaml")
 
-parser.add_argument("--device_target", type=str, default="CPU")
+parser.add_argument("--device_target", type=str, default="GPU")
 parser.add_argument("--fl_iteration_num", type=int, default=25)
 parser.add_argument("--client_batch_size", type=int, default=32)
 parser.add_argument("--client_learning_rate", type=float, default=0.01)
 parser.add_argument("--local_worker_num", type=int, default=4)
+parser.add_argument("--device_id", type=int, default=0)
 parser.add_argument("--dataset_path", type=str, default="")
 parser.add_argument("--sync_type", type=str, default="fixed", choices=["fixed", "adaptive"])
 parser.add_argument("--http_server_address", type=str, default="127.0.0.1:5555")
@@ -40,6 +41,7 @@ local_worker_num = args.local_worker_num
 dataset_path = args.dataset_path
 sync_type = args.sync_type
 http_server_address = args.http_server_address
+device_id = args.device_id
 
 cur_dir = os.path.dirname(os.path.abspath(__file__))
 yaml_config = os.path.join(cur_dir, yaml_config)
@@ -50,7 +52,8 @@ for i in range(local_worker_num):
     cmd_worker = "execute_path=$(pwd) && self_path=$(dirname \"${script_self}\") && "
     cmd_worker += "rm -rf ${execute_path}/logs/worker_" + str(i) + "/ &&"
     cmd_worker += "mkdir -p ${execute_path}/logs/worker_" + str(i) + "/ &&"
-    cmd_worker += "cd ${execute_path}/logs/worker_" + str(i) + "/ || exit && export GLOG_v=1 &&"
+    cmd_worker += "cd ${execute_path}/logs/worker_" + str(i) + "/ || exit && export GLOG_v=1 && export DEVICE_ID=" +\
+                  str(i) + " && "
     cmd_worker += "python ${self_path}/../../test_cross_silo_femnist.py"
     cmd_worker += " --ms_role=MS_WORKER"
     cmd_worker += " --yaml_config=" + str(yaml_config)
@@ -61,6 +64,7 @@ for i in range(local_worker_num):
     cmd_worker += " --dataset_path=" + str(dataset_path)
     cmd_worker += " --user_id=" + str(i)
     cmd_worker += " --sync_type=" + sync_type
+    cmd_worker += " --device_id=" + str(device_id)
     cmd_worker += " --http_server_address=" + http_server_address
     cmd_worker += " > worker.log 2>&1 &"
 

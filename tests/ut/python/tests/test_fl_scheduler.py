@@ -12,24 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+
+# pylint: disable=indexing-exception
+
 """Test the functions of scheduler in server mode FEDERATED_LEARNING"""
 import time
 
 import numpy as np
-import psutil
-
-from common import fl_name_with_idx, make_yaml_config, g_redis_server_address, fl_test
-from common import start_fl_server, start_fl_scheduler, stop_processes
-from common import post_scheduler_new_instance_msg, post_scheduler_query_instance_msg, post_scheduler_state_msg
-from common import post_scheduler_enable_msg, post_scheduler_disable_msg
-from common_client import post_start_fl_job, post_get_model, post_update_model
-from common_client import server_safemode_rsp, server_disabled_finished_rsp
-from common_client import ResponseCode, ResponseFLJob, ResponseGetModel, ResponseUpdateModel
-from common import start_fl_job_expect_success, update_model_expect_success, get_model_expect_success
-from common import check_feature_map
-
-from mindspore_fl.schema import CompressType
 from mindspore_federated import FeatureMap
+
+from common import check_feature_map
+from common import fl_name_with_idx, make_yaml_config, fl_test
+from common import post_scheduler_enable_msg, post_scheduler_disable_msg
+from common import post_scheduler_new_instance_msg, post_scheduler_query_instance_msg, post_scheduler_state_msg
+from common import start_fl_job_expect_success, update_model_expect_success, get_model_expect_success
+from common import start_fl_server, start_fl_scheduler, stop_processes
+from common_client import ResponseFLJob
+from common_client import post_start_fl_job, post_get_model, post_update_model
+from common_client import server_disabled_finished_rsp
+from mindspore_fl.schema import CompressType
 
 start_fl_job_reach_threshold_rsp = "Current amount for startFLJob has reached the threshold"
 update_model_reach_threshold_rsp = "Current amount for updateModel is enough."
@@ -51,7 +52,6 @@ def test_fl_scheduler_invalid_scheduler_address():
     Expectation: Scheduler starts as expected
     """
     fl_name = fl_name_with_idx("FlTest")
-    http_server_address = "127.0.0.1:3001"
     yaml_config_file = f"temp/yaml_{fl_name}_config.yaml"
     fl_iteration_num = 5
     make_yaml_config(fl_name, {}, output_yaml_file=yaml_config_file, fl_iteration_num=fl_iteration_num)
@@ -281,8 +281,7 @@ def test_fl_scheduler_post_disable_enable_success():
     update_model_expect_success(http_server_address, fl_name, fl_id, iteration, update_feature_map)
     expect_feature_map = {"feature_conv": update_feature_map["feature_conv"] / data_size,
                           "feature_bn": update_feature_map["feature_bn"] / data_size,
-                          "feature_bn2": update_feature_map["feature_bn2"] / data_size,
-                          "feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
+                          "feature_bn2": update_feature_map["feature_bn2"] / data_size}
     # get model
     client_feature_map, get_model_rsp = get_model_expect_success(http_server_address, fl_name, iteration)
     check_feature_map(expect_feature_map, client_feature_map)
@@ -419,6 +418,7 @@ def test_fl_scheduler_post_new_instance_success():
     assert isinstance(fl_job_rsp, ResponseFLJob.ResponseFLJob)
     assert fl_job_rsp.Iteration() == 1
     assert abs(fl_job_rsp.FlPlanConfig().Lr() - 0.03) < 0.001
+    new_feature_map["feature_conv2"] = init_feature_map["feature_conv2"]
     check_feature_map(new_feature_map, client_feature_map)
 
     # update model
@@ -471,4 +471,5 @@ def test_fl_scheduler_post_new_instance_success():
     assert client_feature_map is not None
     assert isinstance(fl_job_rsp, ResponseFLJob.ResponseFLJob)
     assert fl_job_rsp.Iteration() == 1
+    new_feature_map["feature_conv2"] = init_feature_map["feature_conv2"]
     check_feature_map(new_feature_map, client_feature_map)

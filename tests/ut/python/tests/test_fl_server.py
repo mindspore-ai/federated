@@ -81,8 +81,7 @@ def test_fl_server_one_server_one_client_multi_iterations_success():
     update_model_expect_success(http_server_address, fl_name, fl_id, iteration, update_feature_map)
     expect_feature_map = {"feature_conv": update_feature_map["feature_conv"] / data_size,
                           "feature_bn": update_feature_map["feature_bn"] / data_size,
-                          "feature_bn2": update_feature_map["feature_bn2"] / data_size,
-                          "feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
+                          "feature_bn2": update_feature_map["feature_bn2"] / data_size}
     # get model
     client_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
     check_feature_map(expect_feature_map, client_feature_map)
@@ -103,6 +102,7 @@ def test_fl_server_one_server_one_client_multi_iterations_success():
         assert isinstance(fl_job_rsp, ResponseFLJob.ResponseFLJob)
         assert fl_job_rsp.Iteration() == iteration
         # check feature map
+        expect_feature_map["feature_conv2"] = init_feature_map["feature_conv2"]
         check_feature_map(expect_feature_map, client_feature_map)
 
         # update model
@@ -110,8 +110,8 @@ def test_fl_server_one_server_one_client_multi_iterations_success():
         update_model_expect_success(http_server_address, fl_name, fl_id, iteration, update_feature_map)
         expect_feature_map = {"feature_conv": update_feature_map["feature_conv"] / data_size,
                               "feature_bn": update_feature_map["feature_bn"] / data_size,
-                              "feature_bn2": update_feature_map["feature_bn2"] / data_size,
-                              "feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
+                              "feature_bn2": update_feature_map["feature_bn2"] / data_size}
+                              # "feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
         # get model
         client_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
         check_feature_map(expect_feature_map, client_feature_map)
@@ -219,19 +219,17 @@ def test_fl_server_one_server_two_client_update_model_invalid():
     # check feature map
     assert len(client_feature_map) == 4
 
-    # update model: missing param
-    invalid_feature_map = {"feature_bn": client_feature_map["feature_bn"] * 4,
-                           "feature_conv2": client_feature_map["feature_conv2"] * 6}
+    # update model: missing param success
+    invalid_feature_map = {"feature_bn": client_feature_map["feature_bn"] * 4}
     result, update_model_rsp = post_update_model(http_server_address, fl_name, fl_id, iteration, invalid_feature_map)
-    assert result is None
+    assert result
     assert isinstance(update_model_rsp, ResponseUpdateModel.ResponseUpdateModel)
-    assert "The updated weight of parameter feature_bn2 is missing" in update_model_rsp.Reason().decode()
+    assert "success not ready" in update_model_rsp.Reason().decode()
 
     # update model: param data size invalid
     invalid_feature_map = {"feature_conv": np.ones([2, 2], dtype=np.float32),  # data size invalid
                            "feature_bn": client_feature_map["feature_bn"] * 6,
-                           "feature_bn2": client_feature_map["feature_bn2"] * 6,
-                           "feature_conv2": client_feature_map["feature_conv2"] * 6}
+                           "feature_bn2": client_feature_map["feature_bn2"] * 6}
     result, update_model_rsp = post_update_model(http_server_address, fl_name, fl_id, iteration, invalid_feature_map)
     assert result is None
     assert isinstance(update_model_rsp, ResponseUpdateModel.ResponseUpdateModel)
@@ -257,7 +255,7 @@ def test_fl_server_one_server_two_client_update_model_invalid():
     # update model: success, first
     result, update_model_rsp = post_update_model(http_server_address, fl_name, fl_id, iteration,
                                                  valid_feature_map)
-    assert result is not None
+    assert result is None
 
     # reject update model: with an existing fl_id, store fl_id failed
     result, update_model_rsp = post_update_model(http_server_address, fl_name, fl_id, iteration,
@@ -329,7 +327,7 @@ def test_fl_server_one_server_two_client_all_reduce_success():
     update_model_expect_success(http_server_address, fl_name, fl_id2, iteration, update_feature_map2, upload_loss=loss1)
 
     client_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
-    expect_feature_map = {"feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
+    expect_feature_map = {}
     for key in ["feature_conv", "feature_bn", "feature_bn2"]:
         expect_feature_map[key] = (update_feature_map[key] + update_feature_map2[key]) / (data_size + data_size2)
     check_feature_map(expect_feature_map, client_feature_map)
@@ -387,7 +385,6 @@ def test_fl_server_two_server_two_client_multi_iterations_success():
     fl_id2 = "fl_id_xxxx2"
     client_feature_map, fl_job_rsp = start_fl_job_expect_success(http_server_address2, fl_name, fl_id2, data_size2)
     # expect feature equal of server2 with server1
-    expect_feature_map = init_feature_map
     check_feature_map(expect_feature_map, client_feature_map)
 
     # update model, server1, fl_id2
@@ -398,7 +395,7 @@ def test_fl_server_two_server_two_client_multi_iterations_success():
     update_feature_map2 = create_default_feature_map()
     update_model_expect_success(http_server_address2, fl_name, fl_id, iteration, update_feature_map2)
 
-    expect_feature_map = {"feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
+    expect_feature_map = {}
     for key in ["feature_conv", "feature_bn", "feature_bn2"]:
         expect_feature_map[key] = (update_feature_map[key] + update_feature_map2[key]) / (data_size + data_size2)
     # get model from sever1
@@ -419,14 +416,16 @@ def test_fl_server_two_server_two_client_multi_iterations_success():
         assert isinstance(fl_job_rsp, ResponseFLJob.ResponseFLJob)
         assert fl_job_rsp.Iteration() == iteration
         # check feature map
-        check_feature_map(expect_feature_map, client_feature_map)
+        start_fl_expect_feature_map = expect_feature_map.copy()
+        start_fl_expect_feature_map["feature_conv2"] = init_feature_map["feature_conv2"]
+        check_feature_map(start_fl_expect_feature_map, client_feature_map)
 
         # startFLJob, server2, fl_id2
         client_feature_map, fl_job_rsp = start_fl_job_expect_success(http_server_address2, fl_name, fl_id2, data_size2)
         assert isinstance(fl_job_rsp, ResponseFLJob.ResponseFLJob)
         assert fl_job_rsp.Iteration() == iteration
         # check feature map
-        check_feature_map(expect_feature_map, client_feature_map)
+        check_feature_map(start_fl_expect_feature_map, client_feature_map)
 
         # update model, server1, fl_id1
         update_feature_map = create_default_feature_map()
@@ -436,7 +435,7 @@ def test_fl_server_two_server_two_client_multi_iterations_success():
         update_feature_map2 = create_default_feature_map()
         update_model_expect_success(http_server_address2, fl_name, fl_id2, iteration, update_feature_map2)
 
-        expect_feature_map = {"feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
+        expect_feature_map = {}
         for key in ["feature_conv", "feature_bn", "feature_bn2"]:
             expect_feature_map[key] = (update_feature_map[key] + update_feature_map2[key]) / (data_size + data_size2)
 
@@ -526,7 +525,6 @@ def test_fl_server_three_server_two_client_one_iterations_success():
     fl_id2 = "fl_id_xxxx2"
     client_feature_map, fl_job_rsp = start_fl_job_expect_success(http_server_address2, fl_name, fl_id2, data_size2)
     # expect feature equal of server2 with server1
-    expect_feature_map = init_feature_map
     check_feature_map(expect_feature_map, client_feature_map)
 
     # start fl job third, but enough, visit server3
@@ -544,7 +542,7 @@ def test_fl_server_three_server_two_client_one_iterations_success():
     update_feature_map2 = create_default_feature_map()
     update_model_expect_success(http_server_address3, fl_name, fl_id2, iteration, update_feature_map2)
 
-    expect_feature_map = {"feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
+    expect_feature_map = {}  # require_aggr = False
     for key in ["feature_conv", "feature_bn", "feature_bn2"]:
         expect_feature_map[key] = (update_feature_map[key] + update_feature_map2[key]) / (data_size + data_size2)
     # get model from sever1
@@ -707,6 +705,7 @@ def test_fl_server_checkpoint_save_load_success():
     check_feature_map(expect_feature_map, client_feature_map)
     # expect feature map returned from getModel is ok after restart server
     client_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration - 1)
+    del expect_feature_map["feature_conv2"]
     check_feature_map(expect_feature_map, client_feature_map)
 
     # update model, when weight aggregation is done, checkpoint file will be saved in ./fl_ckpt/
@@ -723,8 +722,7 @@ def test_fl_server_checkpoint_save_load_success():
     client_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
     expect_feature_map = {"feature_conv": update_feature_map["feature_conv"] / data_size,
                           "feature_bn": update_feature_map["feature_bn"] / data_size,
-                          "feature_bn2": update_feature_map["feature_bn2"] / data_size,
-                          "feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
+                          "feature_bn2": update_feature_map["feature_bn2"] / data_size}
     check_feature_map(expect_feature_map, client_feature_map)
 
     # stop server, and expect terminate signal will stop server process
@@ -741,8 +739,7 @@ def test_fl_server_checkpoint_save_load_success():
     client_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
     expect_feature_map = {"feature_conv": update_feature_map["feature_conv"] / data_size,
                           "feature_bn": update_feature_map["feature_bn"] / data_size,
-                          "feature_bn2": update_feature_map["feature_bn2"] / data_size,
-                          "feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
+                          "feature_bn2": update_feature_map["feature_bn2"] / data_size}
     check_feature_map(expect_feature_map, client_feature_map)
 
 

@@ -12,68 +12,63 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
+"""start running lenet worker of cross silo mode"""
 
+import os
 import argparse
 import subprocess
 
-parser = argparse.ArgumentParser(description="Run test_cross_silo_fasterrcnn.py case")
+parser = argparse.ArgumentParser(description="Run run_cross_silo_fasterrcnn_worker..py case")
+parser.add_argument("--yaml_config", type=str, default="default_yaml_config.yaml")
+
 parser.add_argument("--device_target", type=str, default="GPU")
-parser.add_argument("--server_mode", type=str, default="FEDERATED_LEARNING")
-parser.add_argument("--worker_num", type=int, default=2)
-parser.add_argument("--server_num", type=int, default=2)
-parser.add_argument("--scheduler_ip", type=str, default="127.0.0.1")
-parser.add_argument("--scheduler_port", type=int, default=8113)
 parser.add_argument("--fl_iteration_num", type=int, default=25)
-parser.add_argument("--client_epoch_num", type=int, default=20)
-parser.add_argument("--worker_step_num_per_iteration", type=int, default=65)
-parser.add_argument("--local_worker_num", type=int, default=-1)
-parser.add_argument("--config_file_path", type=str, default="")
+parser.add_argument("--client_batch_size", type=int, default=32)
+parser.add_argument("--client_learning_rate", type=float, default=0.01)
+parser.add_argument("--local_worker_num", type=int, default=4)
 parser.add_argument("--dataset_path", type=str, default="")
-parser.add_argument("--encrypt_type", type=str, default="NOT_ENCRYPT")
 parser.add_argument("--sync_type", type=str, default="fixed", choices=["fixed", "adaptive"])
+parser.add_argument("--http_server_address", type=str, default="127.0.0.1:5555")
+parser.add_argument("--client_epoch_num", type=int, default=20)
+parser.add_argument("--device_id", type=int, default=0)
+parser.add_argument("--pre_trained", type=str, default="")
 
 args, _ = parser.parse_known_args()
+yaml_config = args.yaml_config
 device_target = args.device_target
-server_mode = args.server_mode
-worker_num = args.worker_num
-server_num = args.server_num
-scheduler_ip = args.scheduler_ip
-scheduler_port = args.scheduler_port
 fl_iteration_num = args.fl_iteration_num
-client_epoch_num = args.client_epoch_num
-worker_step_num_per_iteration = args.worker_step_num_per_iteration
+client_batch_size = args.client_batch_size
+client_learning_rate = args.client_learning_rate
 local_worker_num = args.local_worker_num
-config_file_path = args.config_file_path
 dataset_path = args.dataset_path
-encrypt_type = args.encrypt_type
 sync_type = args.sync_type
+http_server_address = args.http_server_address
+client_epoch_num = args.client_epoch_num
+pre_trained = args.pre_trained
 
-if local_worker_num == -1:
-    local_worker_num = worker_num
+cur_dir = os.path.dirname(os.path.abspath(__file__))
+yaml_config = os.path.join(cur_dir, yaml_config)
 
-assert local_worker_num <= worker_num, "The local worker number should not be bigger than total worker number."
+assert local_worker_num > 0, "The local worker number should not <= 0."
+
 for i in range(local_worker_num):
+    device_id = args.device_id + i
     cmd_worker = "execute_path=$(pwd) && self_path=$(dirname \"${script_self}\") && "
-    cmd_worker += "rm -rf ${execute_path}/worker_" + str(i) + "/ &&"
-    cmd_worker += "mkdir ${execute_path}/worker_" + str(i) + "/ &&"
-    cmd_worker += "cd ${execute_path}/worker_" + str(i) + "/ || exit && export GLOG_v=1 &&"
-    cmd_worker += "export CUDA_VISIBLE_DEVICES=" + str(i+4) + "&&"
-    cmd_worker += "python ${self_path}/../test_fl_fasterrcnn.py"
-    cmd_worker += " --device_target=" + device_target
-    cmd_worker += " --server_mode=" + server_mode
+    cmd_worker += "rm -rf ${execute_path}/logs/worker_" + str(i) + "/ &&"
+    cmd_worker += "mkdir -p ${execute_path}/logs/worker_" + str(i) + "/ &&"
+    cmd_worker += "cd ${execute_path}/logs/worker_" + str(i) + "/ || exit && export GLOG_v=1 && "
+    cmd_worker += "python ${self_path}/../../test_fl_fasterrcnn.py"
     cmd_worker += " --ms_role=MS_WORKER"
-    cmd_worker += " --worker_num=" + str(worker_num)
-    cmd_worker += " --server_num=" + str(server_num)
-    cmd_worker += " --scheduler_ip=" + scheduler_ip
-    cmd_worker += " --scheduler_port=" + str(scheduler_port)
-    cmd_worker += " --config_file_path=" + str(config_file_path)
+    cmd_worker += " --yaml_config=" + str(yaml_config)
+    cmd_worker += " --device_target=" + device_target
     cmd_worker += " --fl_iteration_num=" + str(fl_iteration_num)
-    cmd_worker += " --client_epoch_num=" + str(client_epoch_num)
-    cmd_worker += " --worker_step_num_per_iteration=" + str(worker_step_num_per_iteration)
     cmd_worker += " --dataset_path=" + str(dataset_path)
     cmd_worker += " --user_id=" + str(i)
-    cmd_worker += " --encrypt_type=" + str(encrypt_type)
     cmd_worker += " --sync_type=" + sync_type
+    cmd_worker += " --http_server_address=" + http_server_address
+    cmd_worker += " --pre_trained=" + pre_trained
+    cmd_worker += " --client_epoch_num=" + str(client_epoch_num)
+    cmd_worker += " --device_id=" + str(device_id)
     cmd_worker += " > worker.log 2>&1 &"
 
     subprocess.call(['bash', '-c', cmd_worker])
