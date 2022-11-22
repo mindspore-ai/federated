@@ -52,7 +52,7 @@ class StartFLJobKernelMod : public AbstractKernel {
       MS_LOG(EXCEPTION) << "Building request for StartFLJob failed.";
       return false;
     }
-
+    MS_LOG(INFO) << "Data size in start fl job is " << data_size;
     auto response_msg =
       fl::worker::CloudWorker::GetInstance().SendToServerSync(fbb.GetBufferPointer(), fbb.GetSize(), kernel_path_);
     if (response_msg == nullptr) {

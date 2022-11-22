@@ -352,8 +352,8 @@ bool UpdateModelKernel::VerifyUploadCompressFeatureMap(const schema::RequestUpda
       return false;
     }
     if (min_val > max_val) {
-      MS_LOG(WARNING) << "Compress mode min val must be less then max val, min val is " << min_val
-                      << ", max val is " << max_val;
+      MS_LOG(WARNING) << "Compress mode min val must be less then max val, min val is " << min_val << ", max val is "
+                      << max_val;
       return false;
     }
   }
@@ -470,6 +470,7 @@ ModelItemPtr UpdateModelKernel::ParseModelItemPtr(const schema::RequestUpdateMod
 std::map<std::string, Address> UpdateModelKernel::ParseFeatureMap(const schema::RequestUpdateModel *update_model_req) {
   std::map<std::string, Address> feature_map;
   auto fbs_feature_map = update_model_req->feature_map();
+
   for (uint32_t i = 0; i < fbs_feature_map->size(); i++) {
     auto feature = fbs_feature_map->Get(i);
     if (feature == nullptr || feature->weight_fullname() == nullptr || feature->data() == nullptr) {

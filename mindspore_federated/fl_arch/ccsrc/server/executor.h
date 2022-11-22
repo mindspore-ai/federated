@@ -38,7 +38,7 @@ struct ParamAggregationInfo {
   uint8_t *weight_data = nullptr;
   size_t weight_size = 0;  // bytes len of weight_data
   size_t data_size = 0;    // batch size
-  bool require_aggr = false;
+  bool *require_aggr;
 };
 // Executor is the entrance for server to handle aggregation, optimizing, model querying, etc. It handles
 // logics relevant to kernel launching.

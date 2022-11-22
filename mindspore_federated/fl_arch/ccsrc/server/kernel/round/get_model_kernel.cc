@@ -153,15 +153,20 @@ void GetModelKernel::BuildGetModelRsp(const std::shared_ptr<FBBuilder> &fbb, con
     MS_LOG(ERROR) << "Input fbb is nullptr.";
     return;
   }
+  auto server_mode = FLContext::instance()->server_mode();
   auto fbs_reason = fbb->CreateString(reason);
   auto fbs_timestamp = fbb->CreateString(timestamp);
   std::vector<flatbuffers::Offset<schema::FeatureMap>> fbs_feature_maps;
   if (model) {
     auto weight_data = model->weight_data.data();
     for (const auto &feature : model->weight_items) {
+      auto weight_item = feature.second;
+      if (!weight_item.require_aggr && server_mode == kServerModeFL) {
+        continue;
+      }
       auto fbs_weight_fullname = fbb->CreateString(feature.first);
-      auto fbs_weight_data = fbb->CreateVector(reinterpret_cast<float *>(weight_data + feature.second.offset),
-                                               feature.second.size / sizeof(float));
+      auto fbs_weight_data = fbb->CreateVector(reinterpret_cast<float *>(weight_data + weight_item.offset),
+                                               weight_item.size / sizeof(float));
       auto fbs_feature_map = schema::CreateFeatureMap(*(fbb.get()), fbs_weight_fullname, fbs_weight_data);
       fbs_feature_maps.push_back(fbs_feature_map);
     }

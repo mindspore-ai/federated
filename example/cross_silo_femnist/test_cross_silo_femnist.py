@@ -15,9 +15,11 @@
 """start running lenet network of cross silo mode"""
 
 import os
+import time
 import sys
 import argparse
 import numpy as np
+
 from mindspore_federated.startup.ssl_config import SSLConfig
 
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -37,7 +39,7 @@ parser.add_argument("--checkpoint_dir", type=str, default="./fl_ckpt/")
 parser.add_argument("--scheduler_manage_address", type=str, default="127.0.0.1:11202")
 
 # for worker
-parser.add_argument("--device_target", type=str, default="CPU")
+parser.add_argument("--device_target", type=str, default="GPU")
 parser.add_argument("--dataset_path", type=str, default="")
 # The user_id is used to set each worker's dataset path.
 parser.add_argument("--user_id", type=str, default="0")
@@ -50,6 +52,7 @@ parser.add_argument('--repeat_size', type=int, default=1, help='the repeat size 
 parser.add_argument("--client_batch_size", type=int, default=32)
 parser.add_argument("--client_learning_rate", type=float, default=0.01)
 parser.add_argument("--fl_iteration_num", type=int, default=25)
+parser.add_argument("--device_id", type=int, default=0)
 
 args, _ = parser.parse_known_args()
 
@@ -68,7 +71,7 @@ def get_trainable_params(network):
 
 def start_one_server():
     """start one server"""
-    from tests.st.network.lenet import LeNet5
+    from network.lenet import LeNet5
     from mindspore_federated import FLServerJob
 
     yaml_config = args.yaml_config
@@ -107,6 +110,7 @@ def start_one_worker():
     repeat_size = args.repeat_size
     device_target = args.device_target
     http_server_address = args.http_server_address
+    device_id = args.device_id
 
     from mindspore import nn, Model, save_checkpoint, context
     from mindspore_federated import FederatedLearningManager
@@ -114,8 +118,7 @@ def start_one_worker():
     epoch = 20
     network = LeNet5(62, 3)
     from mindspore.nn.metrics import Accuracy
-
-    context.set_context(mode=context.GRAPH_MODE, device_target=device_target)
+    context.set_context(mode=context.GRAPH_MODE, device_target=device_target, device_id=device_id)
 
     # construct dataset
     ds.config.set_seed(1)
@@ -131,15 +134,20 @@ def start_one_worker():
     # define the loss function
     net_loss = nn.SoftmaxCrossEntropyWithLogits(sparse=True, reduction='mean')
     # define fl manager
+
+    data_size = num_batches * client_batch_size
+    sync_frequency = epoch * num_batches
     federated_learning_manager = FederatedLearningManager(
         yaml_config=yaml_config,
         model=network,
-        sync_frequency=epoch * num_batches,
+        sync_frequency=sync_frequency,
         http_server_address=http_server_address,
-        data_size=num_batches,
+        data_size=data_size,
         sync_type=sync_type,
         ssl_config=ssl_config
     )
+    print('epoch: {}, num_batches: {}, data_size: {}'.format(epoch, num_batches, data_size),
+          flush=True)
     # define the optimizer
     net_opt = nn.Momentum(network.trainable_params(), client_learning_rate, 0.9)
     model = Model(network, net_loss, net_opt, metrics={"Accuracy": Accuracy(), 'Loss': nn.Loss()})
@@ -167,6 +175,7 @@ def start_one_worker():
 
 
 if __name__ == "__main__":
+    start = time.clock()
     ms_role = args.ms_role
     if ms_role == "MS_SERVER":
         start_one_server()
@@ -174,3 +183,5 @@ if __name__ == "__main__":
         start_one_scheduler()
     elif ms_role == "MS_WORKER":
         start_one_worker()
+    end = time.clock()
+    print("total run time is:", (end - start), flush=True)

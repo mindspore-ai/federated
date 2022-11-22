@@ -94,7 +94,7 @@ def test_ssl_config_three_server_two_client_one_iterations_success():
     update_model_expect_success(http_server_address3, fl_name, fl_id2, iteration, update_feature_map2,
                                 enable_ssl=True)
 
-    expect_feature_map = {"feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
+    expect_feature_map = {}
     for key in ["feature_conv", "feature_bn", "feature_bn2"]:
         expect_feature_map[key] = (update_feature_map[key] + update_feature_map2[key]) / (data_size + data_size2)
     # get model from sever1
