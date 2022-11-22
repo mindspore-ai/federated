@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""classes of privacy mechanisms for the federated learner."""
+"""classes of differential privacy mechanisms for the federated learner."""
 
 import numpy as np
 import mindspore as ms
@@ -47,7 +47,7 @@ class LabelDP:
         >>> from mindspore import Tensor
         >>> from mindspore_federated.privacy import LabelDP
         >>> label_dp = LabelDP(eps=0.0)
-        >>> label = Tensor(np.zero(5, 1), dtype=mindspore.float32)
+        >>> label = Tensor(np.zeros((5, 1)), dtype=mindspore.float32)
         >>> dp_label = label_dp(label)
         >>> print(dp_label)
         [[1.]
@@ -87,17 +87,21 @@ class LabelDP:
 
         if (len(label.shape) == 2 and label.shape[1] == 1) or len(label.shape) == 1:
             # binary label
+            if sum(label == 1) + sum(label == 0) != label.shape[0]:
+                raise ValueError('Unsupported labels. LabelDP currently only support binary or onehot labels.')
             flip_prob = 1 / (1 + np.exp(self.eps))
             flip = Tensor(np.random.binomial(1, flip_prob, size=label.shape), dtype=label.dtype)
             dp_label = mnp.abs(flip - label)
         elif len(label.shape) == 2:
             # onehot label
+            if mnp.sum(label == 1) != label.shape[0] or mnp.sum(label == 1) + mnp.sum(label == 0) != label.size:
+                raise ValueError('Unsupported labels. LabelDP currently only support binary or onehot labels.')
             dp_label = label * self.eps + Tensor(np.random.laplace(0, 1, label.shape), ms.float32)
             dp_label = ops.Argmax(output_type=ms.int32)(dp_label)
             dp_label = self._onehot(dp_label, label.shape[1], Tensor(1.0, ms.float32), Tensor(0.0, ms.float32))
             if dp_label.dtype != label.dtype:
                 dp_label = Tensor(dp_label, dtype=label.dtype)
         else:
-            raise ValueError('LabelDP currently only support binary or onehot labels, so the dim of the input labels'
-                             'is expected to be 1 or 2, but got {}'.format(len(label.shape)))
+            raise ValueError(f'''LabelDP currently only support binary or onehot labels, so the dim of the input labels
+                             is expected to be 1 or 2, but got {len(label.shape)}''')
         return dp_label

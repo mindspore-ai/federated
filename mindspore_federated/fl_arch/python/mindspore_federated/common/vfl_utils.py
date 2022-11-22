@@ -78,11 +78,13 @@ class FLYamlData:
 
             if 'privacy' in self.yaml_data:
                 privacy = self.yaml_data['privacy']
-                if 'label_dp' not in privacy:
-                    raise ValueError('FLYamlData init failed: missing field of \'label_dp\' under \'privacy\'')
-                if 'eps' not in privacy['label_dp']:
-                    raise ValueError('FLYamlData init failed: missing field of \'eps\' under \'label_dp\'')
-                self.privacy_eps = privacy['label_dp']['eps']
+                if 'label_dp' in privacy:
+                    if 'eps' not in privacy['label_dp']:
+                        raise ValueError('FLYamlData init failed: missing field of \'eps\' under \'label_dp\'')
+                    self.privacy_eps = privacy['label_dp']['eps']
+                for scheme in privacy.keys():
+                    if scheme not in ['label_dp']:
+                        raise ValueError(f'FLYamlData init failed: unknown privacy scheme {scheme}')
 
             if 'ckpt_path' in self.yaml_data:
                 self.ckpt_path = self.yaml_data['ckpt_path']
