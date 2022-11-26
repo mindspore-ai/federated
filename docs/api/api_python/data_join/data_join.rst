@@ -1,13 +1,13 @@
 mindspore_federated.data_join
 ================================
 
-.. py:class:: mindspore_federated.data_join.FLDataWorker(role, worker_config_path, data_schema_path, communicator)
+.. py:class:: mindspore_federated.data_join.FLDataWorker(role, main_table_files, output_dir, data_schema_path,communicator, primary_key="oaid", bucket_num=5, store_type="csv", shard_num=1, join_type="psi", thread_num=0)
 
     数据接入进程。
 
     参数：
         - **role** (str) - 进程的角色类型。支持["leader", "follower"]。
-        - **main_table_files** (str) - 原始文件路径，必须在leader和follower上都设置。
+        - **main_table_files** (Union(list(str), str) - 原始文件路径，必须在leader和follower上都设置。
         - **output_dir** (str) - 输出目录，必须在leader和follower上都设置。
         - **data_schema_path** (str) - 数据的schema的路径，必须在leader和follower上都设置。
           用户需要在schema中提供要导出的数据的列名和类型。schema需要被解析为key-value形式的双层字典。

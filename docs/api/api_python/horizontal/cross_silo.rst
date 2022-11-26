@@ -17,7 +17,7 @@
           支持["fixed", "adaptive"]。默认值："fixed"。
           - fixed：参数的同步频率是固定的。
           - adaptive：参数的同步频率是自适应变化的。
-        - **sl_config** (Union(None, SSLConfig)) - ssl配置项。默认值：None。
+        - **ssl_config** (Union(None, SSLConfig)) - ssl配置项。默认值：None。
         - **min_consistent_rate** (float) - 最小一致性比率阈值，该值越大同步频率提升难度越大。
           取值范围：大于等于0.0。默认值：1.1。
         - **min_consistent_rate_at_round** (int) - 最小一致性比率阈值的轮数，该值越大同步频率提升难度越大。
