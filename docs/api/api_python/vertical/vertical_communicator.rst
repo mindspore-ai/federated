@@ -1,7 +1,7 @@
 纵向联邦学习通信器
 ======================
 
-.. py:class:: mindspore_federated.VerticalFederatedCommunicator(http_server_config, remote_server_config, ssl_config)
+.. py:class:: mindspore_federated.VerticalFederatedCommunicator(http_server_config: ServerConfig, remote_server_config: ServerConfig, ssl_config=None)
 
     定义纵向联邦学习通信器。
 
@@ -22,7 +22,7 @@
 
         启动纵向联邦学习通信器。
 
-    .. py:method:: receive(target_server_name)
+    .. py:method:: receive(target_server_name: str)
 
         获取远程发送的Tensor数据。
 
@@ -33,7 +33,7 @@
 
        返回远端服务器配置。
 
-    .. py:method:: send_register(target_server_name, worker_register)
+    .. py:method:: send_register(target_server_name: str, worker_register: _WorkerRegister)
 
         发送worker注册消息。
 
@@ -41,7 +41,7 @@
             - **target_server_name** (str) - 指定远程服务器名字。
             - **worker_register** (_WorkerRegister) - 需要发送的worker注册信息。
 
-    .. py:method:: send_tensors(target_server_name, tensor_dict)
+    .. py:method:: send_tensors(target_server_name: str, tensor_dict: OrderedDict)
 
         发送分布式训练Tensor数据。
 
