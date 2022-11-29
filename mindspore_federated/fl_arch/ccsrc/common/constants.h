@@ -159,6 +159,7 @@ constexpr int64_t kSecurityLevel = 3;
 
 constexpr char kServerModeFL[] = "FEDERATED_LEARNING";
 constexpr char kServerModeHybrid[] = "HYBRID_TRAINING";
+constexpr char kServerModeCloud[] = "CLOUD_TRAINING";
 constexpr char kDPEncryptType[] = "DP_ENCRYPT";
 constexpr char kPWEncryptType[] = "PW_ENCRYPT";
 constexpr char kStablePWEncryptType[] = "STABLE_PW_ENCRYPT";

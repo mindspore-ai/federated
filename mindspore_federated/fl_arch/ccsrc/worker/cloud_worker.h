@@ -93,7 +93,7 @@ class MS_EXPORT CloudWorker : public AbstractNode {
   CloudWorker &operator=(const CloudWorker &) = delete;
   std::atomic_bool running_;
   std::string fl_id_;
-
+  std::string fl_name_;
   // The federated learning iteration number.
   std::atomic<uint64_t> iteration_num_;
 

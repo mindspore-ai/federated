@@ -22,14 +22,14 @@ parser = argparse.ArgumentParser(description="Run run_cross_silo_fasterrcnn_work
 parser.add_argument("--yaml_config", type=str, default="default_yaml_config.yaml")
 
 parser.add_argument("--device_target", type=str, default="GPU")
-parser.add_argument("--fl_iteration_num", type=int, default=25)
+parser.add_argument("--fl_iteration_num", type=int, default=30)
 parser.add_argument("--client_batch_size", type=int, default=32)
 parser.add_argument("--client_learning_rate", type=float, default=0.01)
 parser.add_argument("--local_worker_num", type=int, default=4)
 parser.add_argument("--dataset_path", type=str, default="")
 parser.add_argument("--sync_type", type=str, default="fixed", choices=["fixed", "adaptive"])
 parser.add_argument("--http_server_address", type=str, default="127.0.0.1:5555")
-parser.add_argument("--client_epoch_num", type=int, default=20)
+parser.add_argument("--client_epoch_num", type=int, default=1)
 parser.add_argument("--device_id", type=int, default=0)
 parser.add_argument("--pre_trained", type=str, default="")
 

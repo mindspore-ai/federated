@@ -44,6 +44,7 @@ void CloudWorker::Init() {
   if (!worker_node_->Start()) {
     MS_LOG(EXCEPTION) << "Starting worker node failed.";
   }
+  fl_name_ = FLContext::instance()->fl_name();
 
   http_server_address_ = FLContext::instance()->http_server_address();
   if (FLContext::instance()->enable_ssl()) {
@@ -118,7 +119,7 @@ std::vector<uint8_t> CloudWorker::pw_iv() const { return pw_iv_; }
 
 std::vector<EncryptPublicKeys> CloudWorker::public_keys_list() const { return public_keys_list_; }
 
-std::string CloudWorker::fl_name() const { return kServerModeFL; }
+std::string CloudWorker::fl_name() const { return fl_name_; }
 
 std::string CloudWorker::fl_id() const { return worker_node_->fl_id(); }
 }  // namespace worker

@@ -1,6 +1,6 @@
 fl_name: FasterRCNN
-fl_iteration_num: 25
-server_mode: FEDERATED_LEARNING
+fl_iteration_num: 30
+server_mode: CLOUD_TRAINING
 enable_ssl: False
 
 distributed_cache:

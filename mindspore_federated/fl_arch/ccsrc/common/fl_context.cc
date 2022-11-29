@@ -45,9 +45,9 @@ bool FLContext::is_server() const { return role_ == kEnvRoleOfServer; }
 bool FLContext::is_scheduler() const { return role_ == kEnvRoleOfScheduler; }
 
 void FLContext::set_server_mode(const std::string &server_mode) {
-  if (server_mode != kServerModeFL && server_mode != kServerModeHybrid) {
+  if (server_mode != kServerModeFL && server_mode != kServerModeHybrid && server_mode != kServerModeCloud) {
     MS_LOG(EXCEPTION) << server_mode << " is invalid. Server mode must be " << kServerModeFL << " or "
-                      << kServerModeHybrid;
+                      << kServerModeHybrid << " or " << kServerModeCloud;
     return;
   }
   MS_LOG(INFO) << "Server mode: " << server_mode << " is used for Server and Worker. Scheduler will ignore it.";
@@ -73,7 +73,7 @@ void FLContext::GenerateResetterRound() {
   bool is_mixed_training_mode = false;
   bool is_pairwise_encrypt = (encrypt_type() == kPWEncryptType);
 
-  if (server_mode_ == kServerModeFL) {
+  if (server_mode_ == kServerModeFL || server_mode_ == kServerModeCloud) {
     is_federated_learning_mode = true;
   } else if (server_mode_ == kServerModeHybrid) {
     is_mixed_training_mode = true;

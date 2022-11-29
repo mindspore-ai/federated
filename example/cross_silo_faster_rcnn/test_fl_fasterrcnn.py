@@ -150,10 +150,10 @@ def start_one_worker():
 
     loss = LossNet()
     lr = Tensor(dynamic_lr(config, num_batches), mstype.float32)
-
+    sink_size = 27
     epoch = config.client_epoch_num
     data_size = num_batches * config.batch_size
-    sync_frequency = epoch * num_batches
+    sync_frequency = epoch
     federated_learning_manager = FederatedLearningManager(
         yaml_config=config.yaml_config,
         model=net,
@@ -182,8 +182,7 @@ def start_one_worker():
     os.makedirs(ckpt_path1)
     print("====================", config.client_epoch_num, fl_iteration_num, flush=True)
     for iter_num in range(fl_iteration_num):
-        # dataset_sink_mode must be false
-        model.train(config.client_epoch_num, dataset, callbacks=cb, dataset_sink_mode=False)
+        model.train(config.client_epoch_num, dataset, callbacks=cb, dataset_sink_mode=True, sink_size=sink_size)
         ckpt_name = user + "-fast-rcnn-" + str(iter_num) + "-epoch.ckpt"
         ckpt_path = os.path.join(ckpt_path1, ckpt_name)
         save_checkpoint(net, ckpt_path)

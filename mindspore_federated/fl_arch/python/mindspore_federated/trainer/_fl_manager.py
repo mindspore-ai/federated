@@ -214,7 +214,7 @@ class FederatedLearningManager(Callback):
         self._encrypt_type = encrypt_type
         if self._encrypt_type not in (
                 _fl_context.ENCRYPT_NONE,
-                _fl_context.ENCRYPT_STABLE_PW) and self._server_mode == _fl_context.SERVER_MODE_FL:
+                _fl_context.ENCRYPT_STABLE_PW) and self._server_mode == _fl_context.SERVER_MODE_CLOUD:
             raise ValueError(
                 "encrypt_mode must be 'NOT_ENCRYPT' or 'STABLE_PW_ENCRYPT', but got {}.".format(self._encrypt_type))
         if self._is_adaptive_sync():
@@ -402,7 +402,7 @@ class FederatedLearningManager(Callback):
             run_context (RunContext): Include some information of the model.
         """
         self._global_step += 1
-        if self._server_mode == _fl_context.SERVER_MODE_FL:
+        if self._server_mode == _fl_context.SERVER_MODE_CLOUD:
             if self._global_step == self._next_sync_iter_id:
                 start_fl_job = _StartFLJob(self._data_size)
                 start_fl_job.construct()
@@ -441,8 +441,10 @@ class FederatedLearningManager(Callback):
                     self._round_id += 1
                     self._as_set_last_param()
                 cb_params = run_context.original_args()
-                logger.info("Current epoch num is: {}, Current step num is: {}".format(cb_params.cur_epoch_num,
-                                                                                       cb_params.cur_step_num))
-        elif self._server_mode == "HYBRID_TRAINING":
+                logger.info(
+                    "total epoch num:{}, batch num:{}, Current epoch num is: {}, Current step num is: {}".format(
+                        cb_params.epoch_num, cb_params.batch_num, cb_params.cur_epoch_num,
+                        cb_params.cur_step_num))
+        elif self._server_mode == _fl_context.SERVER_MODE_HYBRID:
             self._start_pull_weight()
             self._start_push_weight()

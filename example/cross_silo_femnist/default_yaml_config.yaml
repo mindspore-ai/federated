@@ -1,6 +1,6 @@
 fl_name: Lenet
 fl_iteration_num: 5000
-server_mode: FEDERATED_LEARNING
+server_mode: CLOUD_TRAINING
 enable_ssl: false
 
 distributed_cache:

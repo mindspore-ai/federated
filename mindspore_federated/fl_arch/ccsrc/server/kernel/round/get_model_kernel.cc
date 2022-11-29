@@ -161,7 +161,7 @@ void GetModelKernel::BuildGetModelRsp(const std::shared_ptr<FBBuilder> &fbb, con
     auto weight_data = model->weight_data.data();
     for (const auto &feature : model->weight_items) {
       auto weight_item = feature.second;
-      if (!weight_item.require_aggr && server_mode == kServerModeFL) {
+      if (!weight_item.require_aggr && server_mode != kServerModeHybrid) {
         continue;
       }
       auto fbs_weight_fullname = fbb->CreateString(feature.first);
