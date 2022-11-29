@@ -323,9 +323,10 @@ void StartFLJobKernel::BuildStartFLJobRsp(const std::shared_ptr<FBBuilder> &fbb,
     MS_LOG(WARNING) << "Input fbb is nullptr.";
     return;
   }
+  auto server_mode = FLContext::instance()->server_mode();
   auto fbs_reason = fbb->CreateString(reason);
   auto fbs_next_req_time = fbb->CreateString(next_req_time);
-  auto fbs_server_mode = fbb->CreateString(FLContext::instance()->server_mode());
+  auto fbs_server_mode = fbb->CreateString(server_mode);
   auto fbs_fl_name = fbb->CreateString(FLContext::instance()->fl_name());
 
   auto *param = armour::CipherInit::GetInstance().GetPublicParams();
@@ -368,7 +369,8 @@ void StartFLJobKernel::BuildStartFLJobRsp(const std::shared_ptr<FBBuilder> &fbb,
   auto fbs_fl_plan = fl_plan_builder.Finish();
 
   std::vector<flatbuffers::Offset<schema::FeatureMap>> fbs_feature_maps;
-  if (model_item) {
+  // No need to send weights in cross silo mode during start fl job stage
+  if (model_item && server_mode != kServerModeCloud) {
     auto weight_data_base = model_item->weight_data.data();
     for (auto &feature : model_item->weight_items) {
       auto fbs_weight_fullname = fbb->CreateString(feature.first);

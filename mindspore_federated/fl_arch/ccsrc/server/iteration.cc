@@ -224,7 +224,8 @@ void Iteration::GetAllSummaries() {
       metrics_accuracy = summary.metrics_accuracy();
     }
   }
-  if (FLContext::instance()->server_mode() == kServerModeFL) {
+  auto server_mode = FLContext::instance()->server_mode();
+  if (server_mode == kServerModeFL || server_mode == kServerModeCloud) {
     loss_ = upload_loss;
     accuracy_ = upload_accuracy;
     size_t train_data_size = LocalMetaStore::GetInstance().value<size_t>(kCtxFedAvgTotalDataSize);

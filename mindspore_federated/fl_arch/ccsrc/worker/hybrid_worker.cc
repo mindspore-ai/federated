@@ -184,7 +184,7 @@ void HybridWorker::set_data_size(int data_size) { data_size_ = data_size; }
 
 int HybridWorker::data_size() const { return data_size_; }
 
-std::string HybridWorker::fl_name() const { return kServerModeFL; }
+std::string HybridWorker::fl_name() const { return fl_name_; }
 
 std::string HybridWorker::fl_id() const {
   MS_EXCEPTION_IF_NULL(worker_node_);

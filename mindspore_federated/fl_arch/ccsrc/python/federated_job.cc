@@ -87,7 +87,7 @@ void FederatedJob::StartFederatedScheduler() {
 void FederatedJob::InitFederatedWorker() {
   FLContext::instance()->set_ms_role(kEnvRoleOfWorker);
   auto server_mode = FLContext::instance()->server_mode();
-  if (server_mode == kServerModeFL) {
+  if (server_mode == kServerModeCloud) {
     worker::CloudWorker::GetInstance().Init();
   } else if (server_mode == kServerModeHybrid) {
     worker::HybridWorker::GetInstance().Init();
