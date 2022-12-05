@@ -26,4 +26,4 @@ WORKPATH=$(
 
 export PYTHONPATH="${PYTHONPATH}:${WORKPATH}/../"
 echo "Start executing Wide&Deep splitnn demo."
-python run_vfl_train_local.py --leader_top_yaml_path "./yaml_files/leader_top_label_dp.yaml"
+python run_vfl_train_local.py --leader_top_yaml_path "./yaml_files/leader_top_label_dp.yaml" --epochs 1
