@@ -22,6 +22,8 @@ import numpy as np
 
 from mindspore_federated.startup.ssl_config import SSLConfig
 
+from mindspore_federated.trainer.hfl_model import HFLModel
+
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, parent_dir)
 
@@ -112,7 +114,7 @@ def start_one_worker():
     http_server_address = args.http_server_address
     device_id = args.device_id
 
-    from mindspore import nn, Model, save_checkpoint, context
+    from mindspore import nn, save_checkpoint, context
     from mindspore_federated import FederatedLearningManager
     from network.lenet import LeNet5, ds, create_dataset_from_folder, LossGet, evalute_process
     epoch = 20
@@ -150,7 +152,7 @@ def start_one_worker():
           flush=True)
     # define the optimizer
     net_opt = nn.Momentum(network.trainable_params(), client_learning_rate, 0.9)
-    model = Model(network, net_loss, net_opt, metrics={"Accuracy": Accuracy(), 'Loss': nn.Loss()})
+    model = HFLModel(network, net_loss, net_opt, metrics={"Accuracy": Accuracy(), 'Loss': nn.Loss()})
 
     loss_cb = LossGet(1, num_batches)
     cbs = list()

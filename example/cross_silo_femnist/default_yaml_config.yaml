@@ -3,6 +3,10 @@ fl_iteration_num: 5000
 server_mode: CLOUD_TRAINING
 enable_ssl: false
 
+aggregation:
+  aggregation_type: FedProx
+  iid_rate: 0.01
+
 distributed_cache:
   type: redis
   address: 127.0.0.1:2345

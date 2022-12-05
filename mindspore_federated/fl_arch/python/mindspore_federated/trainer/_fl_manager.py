@@ -20,8 +20,8 @@ import mindspore.ops as ops
 from mindspore import nn
 from mindspore import load_param_into_net
 from mindspore.communication.management import init, get_rank
-from mindspore import Tensor
-from mindspore.common.parameter import Parameter
+from mindspore.common.tensor import Tensor
+from mindspore.common.parameter import Parameter, ParameterTuple
 from mindspore.train.callback import Callback
 from mindspore._checkparam import Validator, Rel
 from mindspore_federated._mindspore_federated import Federated_, FLContext
@@ -199,6 +199,7 @@ class FederatedLearningManager(Callback):
 
         ctx = FLContext.get_instance()
         server_mode = ctx.server_mode()
+        aggregation_type = ctx.aggregation_type()
         encrypt_type = ctx.encrypt_type()
         ctx.set_http_server_address(http_server_address)
 
@@ -220,6 +221,20 @@ class FederatedLearningManager(Callback):
             self._rank_id = get_rank()
             logger.info(f"Rank id is {self._rank_id}")
         self._global_step = 0
+        self._aggregation_type = aggregation_type
+        self._global_prefix = "global_weights"
+        if self._aggregation_type not in (
+                _fl_context.FEDAVG,
+                _fl_context.FEDPROX) and self._server_mode == _fl_context.SERVER_MODE_CLOUD:
+            raise ValueError(
+                "_aggregation_type must be 'FedAvg' or 'FedProx', but got {}.".format(self._aggregation_type))
+
+        if self._aggregation_type == _fl_context.FEDPROX:
+            self._global_weights = ParameterTuple(self._model.trainable_params()).clone(prefix=self._global_prefix)
+            for param in self._global_weights:
+                param.requires_grad = False
+                self._model.insert_param_to_cell(param.name, param, False)
+
         self._encrypt_type = encrypt_type
         if self._encrypt_type not in (
                 _fl_context.ENCRYPT_NONE,
@@ -230,8 +245,8 @@ class FederatedLearningManager(Callback):
             self._as_set_init_state(kwargs)
             self._as_wrap_cell()
         logger.info(f"Step number needs to run per iteration {self._next_sync_iter_id},"
-                    f"server mode {self._server_mode}, encrypt type {self._encrypt_type},"
-                    f"http server address {http_server_address}")
+                    f"server mode {self._server_mode}, aggregation type {self._aggregation_type},"
+                    f"encrypt type {self._encrypt_type}, http server address {http_server_address}")
 
     def __del__(self):
         Federated_.stop_federated_worker()
@@ -429,13 +444,18 @@ class FederatedLearningManager(Callback):
             raise ValueError("Feature map from getting model is empty!")
 
         parameter_dict = {}
+        parameter_dict_global = {}
         for key, value in feature_map.items():
             if key not in weight_infos:
                 continue
             shape, dtype = weight_infos[key]
             param_data = np.reshape(value, shape).astype(dtype)
             parameter_dict[key] = Parameter(Tensor(param_data), name=key)
+            parameter_dict_global[self._global_prefix + "." + key] = \
+                Parameter(Tensor(param_data), name=self._global_prefix + "." + key)
         load_param_into_net(self._model, parameter_dict)
+        if self._aggregation_type == _fl_context.FEDPROX:
+            load_param_into_net(self._model, parameter_dict_global)
 
     def _start_push_weight(self):
         """
@@ -483,15 +503,17 @@ class FederatedLearningManager(Callback):
                 weights = {}
                 weight_infos = {}
                 for param in self._model.trainable_params():
-                    param_np = param.asnumpy()
-                    if param_np.dtype != np.float32:
-                        continue
-                    weight_infos[param.name] = (param_np.shape, param_np.dtype)
-                    weights[param.name] = param_np.reshape(-1).tolist()
+                    if self._global_prefix not in param.name:
+                        param_np = param.asnumpy()
+                        if param_np.dtype != np.float32:
+                            continue
+                        weight_infos[param.name] = (param_np.shape, param_np.dtype)
+                        weights[param.name] = param_np.reshape(-1).tolist()
                 if self._run_distribute:
                     self._update_model_with_distribute(weights, weight_infos)
                 else:
                     self._update_model(weights, weight_infos)
+
                 logger.info("Load params from getting model into net, global step is {}.".format(self._global_step))
                 self._next_sync_iter_id = self._global_step + self._sync_frequency
                 if self._is_adaptive_sync():

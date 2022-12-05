@@ -1,0 +1,4 @@
+"federated/tests/ut/python/tests/mindspore_fl/schema"                                   "invalid-name"
+"federated/tests/ut/python/tests/mindspore_fl/schema"                                   "trailing-newlines"
+"federated/tests/ut/python/tests/mindspore_fl/schema"                                   "missing-docstring"
+"federated/tests/ut/python/tests/mindspore_fl/schema"                                   "useless-object-inheritance"

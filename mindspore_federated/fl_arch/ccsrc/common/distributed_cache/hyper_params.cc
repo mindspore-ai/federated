@@ -39,6 +39,8 @@ DEFINE_HYPER_VAR(client_epoch_num)
 DEFINE_HYPER_VAR(client_batch_size)
 DEFINE_HYPER_VAR(client_learning_rate)
 DEFINE_HYPER_VAR(fl_iteration_num)
+DEFINE_HYPER_VAR(aggregation_type)
+DEFINE_HYPER_VAR(iid_rate)
 
 // cipher, for round
 DEFINE_HYPER_VAR(encrypt_type)
@@ -124,6 +126,11 @@ CacheStatus HyperParams::SyncLocal2Cache(const std::shared_ptr<RedisClientBase> 
   obj[HYPER_VAR(client_learning_rate)] = context->client_learning_rate();
   obj[HYPER_VAR(fl_iteration_num)] = context->fl_iteration_num();
 
+  // aggregation algorithm
+  auto &aggregation_config = context->aggregation_config();
+  obj[HYPER_VAR(aggregation_type)] = aggregation_config.aggregation_type;
+  obj[HYPER_VAR(iid_rate)] = aggregation_config.iid_rate;
+
   // cipher
   obj[HYPER_VAR(secure_aggregation)] = context->secure_aggregation();
 
@@ -187,6 +194,10 @@ CacheStatus HyperParams::SyncCache2Local(const std::shared_ptr<RedisClientBase> 
     context->set_client_batch_size(obj[HYPER_VAR(client_batch_size)]);
     context->set_client_learning_rate(obj[HYPER_VAR(client_learning_rate)]);
     context->set_fl_iteration_num(obj[HYPER_VAR(fl_iteration_num)]);
+
+    AggregationConfig aggregation_config;
+    aggregation_config.aggregation_type = obj[HYPER_VAR(aggregation_type)];
+    aggregation_config.iid_rate = obj[HYPER_VAR(iid_rate)];
 
     // cipher, for round
     EncryptConfig encrypt_config;

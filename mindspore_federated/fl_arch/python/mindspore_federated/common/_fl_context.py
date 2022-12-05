@@ -46,14 +46,6 @@ _check_positive_int_keys = ["server_num", "scheduler_port",
 
 _check_non_negative_int_keys = ["worker_num"]
 
-_check_positive_float_keys = ["update_model_ratio", "client_learning_rate"]
-
-_check_string_keys = {
-    "upload_compress_type": ["NO_COMPRESS", "DIFF_SPARSE_QUANT"],
-    "download_compress_type": ["NO_COMPRESS", "QUANT"],
-}
-
-
 def _check_conflict_value(kwargs):
     if "upload_compress_type" in kwargs and "encrypt_type" in kwargs:
         if kwargs["upload_compress_type"] != "NO_COMPRESS" and kwargs["encrypt_type"] in ("SIGNDS", "PW_ENCRYPT"):
@@ -68,6 +60,9 @@ def _check_conflict_value(kwargs):
 ROLE_OF_SERVER = "MS_SERVER"
 ROLE_OF_WORKER = "MS_WORKER"
 ROLE_OF_SCHEDULER = "MS_SCHED"
+
+FEDAVG = "FedAvg"
+FEDPROX = "FedProx"
 
 ENCRYPT_NONE = "NOT_ENCRYPT"
 ENCRYPT_SIGNDS = "SIGNDS"

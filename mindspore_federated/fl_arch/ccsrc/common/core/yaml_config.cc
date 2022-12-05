@@ -48,11 +48,21 @@ void YamlConfig::InitCommonConfig() {
   Get("fl_iteration_num", SET_INT_CXT(set_fl_iteration_num), true, CheckInt(1, UINT32_MAX, INC_BOTH));
   Get("server_mode", SET_STR_CXT(set_server_mode), true);
   Get("enable_ssl", SET_BOOL_CXT(set_enable_ssl), true);
+  // multi aggregation algorithm
+  InitAggregationConfig();
   // distributed cache
   InitDistributedCacheConfig();
   if (FLContext::instance()->enable_ssl()) {
     InitSslConfig();
   }
+}
+
+void YamlConfig::InitAggregationConfig() {
+  AggregationConfig aggregation_config;
+  Get("aggregation.aggregation_type", &aggregation_config.aggregation_type, false,
+      {kFedAvgAggregation, kFedProxAggregation});
+  Get("aggregation.iid_rate", &aggregation_config.iid_rate, false, CheckFloat(0, 1, INC_RIGHT));
+  FLContext::instance()->set_aggregation_config(aggregation_config);
 }
 
 void YamlConfig::InitDistributedCacheConfig() {

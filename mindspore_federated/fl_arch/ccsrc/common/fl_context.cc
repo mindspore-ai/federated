@@ -56,6 +56,14 @@ void FLContext::set_server_mode(const std::string &server_mode) {
 
 const std::string &FLContext::server_mode() const { return server_mode_; }
 
+void FLContext::set_aggregation_config(const AggregationConfig &config) { aggregation_config_ = config; }
+
+const AggregationConfig &FLContext::aggregation_config() const { return aggregation_config_; }
+
+const std::string &FLContext::aggregation_type() const { return aggregation_config_.aggregation_type; }
+
+const float &FLContext::iid_rate() const {return aggregation_config_.iid_rate; }
+
 const std::string &FLContext::encrypt_type() const { return encrypt_config_.encrypt_type; }
 
 void FLContext::set_ms_role(const std::string &role) {
