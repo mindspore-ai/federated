@@ -37,7 +37,7 @@ class FLYamlData:
     learning system. The class will verify the yaml file in the parsing process.
 
     Args:
-        yaml_path: Path of the yaml file
+        yaml_path: Path of the yaml file.
 
     Examples:
         >>> from mindspore_federated import FLYamlData

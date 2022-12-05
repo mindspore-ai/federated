@@ -95,8 +95,8 @@ class FLModel:
         optimizers (Cell): Customized optimizer for training the train_network. If not specified, FLModel will try
             to use standard optimizers of MindSpore specified in the yaml file. Default: None.
         metrics (Metric): Metrics to evaluate the evaluation network. Default: None.
-        eval_network (nn.Cell): Evaluation network of the party, which outputs the predict value. Default: None.
-        grad_network (nn.Cell): Network running on the trusted execution environment(TEE) environment for protect
+        eval_network (Cell): Evaluation network of the party, which outputs the predict value. Default: None.
+        grad_network (Cell): Network running on the trusted execution environment(TEE) environment for protect
             the data privacy. Default: None.
 
     Examples:
