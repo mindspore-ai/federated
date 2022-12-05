@@ -20,9 +20,7 @@ import com.mindspore.Graph;
 import com.mindspore.config.MSContext;
 import com.mindspore.config.ModelType;
 import com.mindspore.config.TrainCfg;
-import com.mindspore.flclient.FLParameter;
-import com.mindspore.flclient.LocalFLParameter;
-import com.mindspore.flclient.ServerMod;
+import com.mindspore.flclient.*;
 import com.mindspore.flclient.common.FLLoggerGenerater;
 import com.mindspore.MSTensor;
 import com.mindspore.Model;
@@ -36,6 +34,8 @@ import java.nio.file.Files;
 import java.util.*;
 import java.util.logging.Logger;
 import java.util.stream.IntStream;
+
+import static mindspore.fl.schema.CompressType.NO_COMPRESS;
 
 /**
  * Defining the client base class.
@@ -69,7 +69,8 @@ public abstract class Client {
     /**
      * feature map before train
      */
-    private Map<String, float[]> preFeatures = null;
+    private Map<String, float[]> preFeatures = new HashMap<>();
+
     /**
      * Get callback.
      *
@@ -191,6 +192,32 @@ public abstract class Client {
         return false;
     }
 
+    /***
+     * cache prev features for compress or encrypt.
+     * @param level encrypt level
+     * @param uploadCompressType compress type
+     * @param secureProtocol the secureProtocol instance.
+     * @return execute status.
+     */
+    public Status cachePreFeatures(EncryptLevel level, byte uploadCompressType, SecureProtocol secureProtocol) {
+        // no need cache preFeatures while NO_COMPRESS && NOT_ENCRYPT
+        if (uploadCompressType == NO_COMPRESS && level == EncryptLevel.NOT_ENCRYPT) {
+            return Status.SUCCESS;
+        }
+
+        ArrayList<String> featureNames = secureProtocol.getUpdateFeatureName();
+        preFeatures.clear();
+        for (String featureName : featureNames) {
+            float[] data = curProxy.getFeature(featureName);
+            if (data == null) {
+                throw new RuntimeException("Get feature value failed, feature name:" + featureName);
+            }
+            preFeatures.put(featureName, data);
+        }
+
+        return Status.SUCCESS;
+    }
+
     /**
      * Train model.
      *
@@ -203,7 +230,6 @@ public abstract class Client {
             return Status.INVALID;
         }
         // Backup the prev Features for encrypt/compress
-        preFeatures = curProxy.getFeatureMap();
         DataSet trainDataSet = dataSets.getOrDefault(RunType.TRAINMODE, null);
         if (trainDataSet == null) {
             logger.severe("not find train dataset");
@@ -275,6 +301,7 @@ public abstract class Client {
 
     /**
      * Save model.
+     *
      * @param flParameter
      * @param localFLParameter
      * @return save result
@@ -352,13 +379,13 @@ public abstract class Client {
      * @return update status.
      */
     public Status updateFeature(FeatureMap newFeature, boolean trainFlg) {
-        if(trainFlg && trainModelProxy != null){
-           return trainModelProxy.updateFeature(newFeature);
+        if (trainFlg && trainModelProxy != null) {
+            return trainModelProxy.updateFeature(newFeature);
         }
-        if(!trainFlg && inferModelProxy != null){
+        if (!trainFlg && inferModelProxy != null) {
             return inferModelProxy.updateFeature(newFeature);
         }
-        logger.severe("Can't get ModelProxy for " + (trainFlg?"trainModel":"inferModel"));
+        logger.severe("Can't get ModelProxy for " + (trainFlg ? "trainModel" : "inferModel"));
         return Status.FAILED;
     }
 

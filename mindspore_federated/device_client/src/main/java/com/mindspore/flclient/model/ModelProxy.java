@@ -229,19 +229,6 @@ public class ModelProxy {
     }
 
     /**
-     * Get model feature maps with float value.
-     *
-     * @return model weights.
-     */
-    public Map<String, float[]> getFeatureMap() {
-        Map<String, float[]> features = new HashMap<>(featureMap.size());
-        for (Map.Entry<String, MSTensor> entry : featureMap.entrySet()) {
-            features.put(entry.getKey(), entry.getValue().getFloatData());
-        }
-        return features;
-    }
-
-    /**
      * Get model feature with name.
      *
      * @return model weight.
@@ -251,44 +238,6 @@ public class ModelProxy {
             return featureMap.get(weightName).getFloatData();
         }
         return null;
-    }
-
-    /**
-     * update model feature maps.
-     *
-     * @param modelName model file name.
-     * @param featureMaps new weights.
-     * @return update status.
-     */
-    public Status updateFeatures(String modelName, List<FeatureMap> featureMaps) {
-        if (model == null || featureMaps == null || modelName == null || modelName.isEmpty()) {
-            logger.severe("trainSession,featureMaps modelName cannot be null");
-            return Status.NULLPTR;
-        }
-
-        List<MSTensor> tensors = new ArrayList<>(featureMaps.size());
-        for (FeatureMap newFeature : featureMaps) {
-            if (newFeature == null) {
-                logger.severe("newFeature cannot be null");
-                return Status.NULLPTR;
-            }
-
-            if (newFeature.weightFullname().isEmpty() || !featureMap.containsKey(newFeature.weightFullname())) {
-                logger.severe("Can't get feature for name:" + newFeature.weightFullname());
-                return Status.NULLPTR;
-            }
-            MSTensor tensor = featureMap.get(newFeature.weightFullname());
-            ByteBuffer by = newFeature.dataAsByteBuffer();
-            ByteBuffer newData = ByteBuffer.allocateDirect(by.remaining());
-            newData.order(ByteOrder.nativeOrder());
-            newData.put(by);
-            if (!tensor.setData(newData)) {
-                logger.severe("Set tensor value failed, name:" + tensor.tensorName());
-                return Status.FAILED;
-            }
-        }
-        model.export(modelName, 0, false, null);
-        return Status.SUCCESS;
     }
 
     /**

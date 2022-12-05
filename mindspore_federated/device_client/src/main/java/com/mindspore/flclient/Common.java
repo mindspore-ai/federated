@@ -71,6 +71,11 @@ public class Common {
     public static final String JOB_NOT_AVAILABLE = "The server's training job is disabled or finished.";
 
     /**
+     * Max description len that server returned while failure.
+     */
+    public static final int MAX_DESC_LEN = 512;
+
+    /**
      * use to stop job.
      */
     private static final Object STOP_OBJECT = new Object();
@@ -247,6 +252,11 @@ public class Common {
             LOGGER.severe("[isSeverReady] the input argument <message> is null, please check!");
             throw new IllegalArgumentException();
         }
+
+        if (message.length > MAX_DESC_LEN) {
+            return true;
+        }
+
         String messageStr = new String(message);
         if (messageStr.contains(SAFE_MOD)) {
             LOGGER.info("[isSeverReady] " + SAFE_MOD + ", need wait some time and request again");
@@ -274,6 +284,10 @@ public class Common {
         if (message == null) {
             LOGGER.severe("[isSeverJobFinished] the input argument <message> is null, please check!");
             throw new IllegalArgumentException();
+        }
+
+        if (message.length > MAX_DESC_LEN) {
+            return false;
         }
         String messageStr = new String(message);
         if (messageStr.contains(JOB_NOT_AVAILABLE)) {
