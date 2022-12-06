@@ -332,6 +332,14 @@ public class FLLiteClient {
             retCode = ResponseCode.RequestError;
             return FLClientStatus.FAILED;
         }
+
+        tag = client.cachePreFeatures(localFLParameter.getEncryptLevel(), localFLParameter.getUploadCompressType(), secureProtocol);
+        if (!Status.SUCCESS.equals(tag)) {
+            LOGGER.severe("[train] cachePreFeatures failed, return -1, please check");
+            retCode = ResponseCode.RequestError;
+            return FLClientStatus.FAILED;
+        }
+
         tag = client.trainModel(epochs);
         if (Float.isNaN(client.getUploadLoss()) || Float.isInfinite(client.getUploadLoss())) {
             client.restoreModelFile(flParameter.getTrainModelPath());
