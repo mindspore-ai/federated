@@ -18,6 +18,7 @@ import numpy as np
 import mindspore as ms
 from mindspore import Tensor, ops
 from mindspore import numpy as mnp
+from mindspore import log as logger
 
 class LabelDP:
     """
@@ -75,6 +76,10 @@ class LabelDP:
         self.eps = float(self.eps)
         if self.eps < 0:
             raise ValueError('LabelDP: eps must be greater than or equal to zero, but got {}'.format(self.eps))
+        if self.eps > 700:
+            logger.warning("Current eps {} is far too large and may cause overflow.".format(self.eps))
+            logger.warning("The training would use eps of value 700 instead.")
+            self.eps = 700
 
         self._onehot = ops.OneHot()
 
