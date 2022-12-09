@@ -534,38 +534,114 @@ public class SecureProtocol {
     }
 
     /**
-     * select num indexes from inputList, and put them into outputList.
+     * elect num indexes from inputList, and put them into outputList.
      *
      * @param secureRandom cryptographically strong random number generator.
      * @param inputList    select index from inputList.
+     * @param inStartPos   the start pos of inputList
+     * @param inRang       the select range of inputList
      * @param selectNums   the number of select indexes.
      * @param outputList   put random index into outputList.
      * @param outStartPos  the start pos of outputList
      */
-    private static void randomSelect(SecureRandom secureRandom, int[] inputList, int selectNums,
+    private static void randomSelect(SecureRandom secureRandom, int[] inputList, int inStartPos, int inRang, int selectNums,
                                      int[] outputList, int outStartPos) {
         if (selectNums <= 0) {
             LOGGER.severe("[SignDS] The number to be selected is set incorrectly!");
             return;
         }
-        if (inputList.length < selectNums) {
-            LOGGER.severe("[SignDS] The size of inputList is small than num!");
+        if (inputList.length < inStartPos + selectNums ||
+                inputList.length < inStartPos + inRang || inRang < selectNums) {
+            LOGGER.severe("[SignDS] The size of inputList is too small! inputList size:" +
+                    inputList.length + " inStartPos:" + inStartPos + " inRang:" + inRang + " selectNums:" + selectNums);
             return;
         }
-        for (int i = inputList.length; i > inputList.length - selectNums; i--) {
+
+        for (int i = inRang; i > inRang - selectNums; i--) {
             int randomIndex = secureRandom.nextInt(i);
-            int randomSelectTopkIndex = inputList[randomIndex];
-            inputList[randomIndex] = inputList[i - 1];
-            inputList[i - 1] = randomSelectTopkIndex;
-            outputList[outStartPos + inputList.length - i] = randomSelectTopkIndex;
+            int randomSelectTopkIndex = inputList[randomIndex + inStartPos];
+            inputList[randomIndex + inStartPos] = inputList[i - 1 + inStartPos];
+            inputList[i - 1 + inStartPos] = randomSelectTopkIndex;
+            outputList[outStartPos + inRang - i] = randomSelectTopkIndex;
         }
+    }
+
+
+    private interface CompareOp {
+        boolean operation(float l, float r);
+    }
+
+    private void merge(float[] data, int[] origIdx, int[] dstIdx,
+                       int lPos, int lLen, int rPos, int rLen, CompareOp op) {
+        int lIdx = 0;
+        int rIdx = 0;
+
+        while (lIdx < lLen && rIdx < rLen) {
+            if (op.operation(data[origIdx[lPos + lIdx]], data[origIdx[rPos + rIdx]])) {
+                dstIdx[lPos + lIdx + rIdx] = origIdx[lPos + lIdx];
+                lIdx++;
+            } else {
+                dstIdx[lPos + lIdx + rIdx] = origIdx[rPos + rIdx];
+                rIdx++;
+            }
+        }
+        while (lIdx < lLen) {
+            dstIdx[lPos + lIdx + rIdx] = origIdx[lPos + lIdx];
+            lIdx++;
+        }
+        while (rIdx < rLen) {
+            dstIdx[lPos + lIdx + rIdx] = origIdx[rPos + rIdx];
+            rIdx++;
+        }
+    }
+
+    private int[] mergeShort(float[] data, boolean sign) {
+        CompareOp cmpAsc = (float l, float r) -> {
+            return l < r;
+        };
+        CompareOp cmpDesc = (float l, float r) -> {
+            return l > r;
+        };
+        CompareOp cmpOp = sign ? cmpDesc : cmpAsc;
+
+        int dataSize = data.length;
+        int dstIdx[] = new int[dataSize];
+        int cacheIdx[] = new int[dataSize];
+        for (int i = 0; i < dataSize; i++) {
+            dstIdx[i] = i;
+        }
+        int sorted_len = 1;
+        while (sorted_len < dataSize) {
+            int i = 0;
+            while (i < dataSize) {
+                int lPos = i;
+                int lLen = sorted_len;
+                if (dataSize - i <= sorted_len) {
+                    break;
+                }
+                i += sorted_len;
+                int rPos = i;
+                int rLen = sorted_len;
+                if (dataSize - i <= sorted_len) {
+                    rLen = dataSize - i;
+                }
+                merge(data, dstIdx, cacheIdx, lPos, lLen, rPos, rLen, cmpOp);
+                i += rLen;
+            }
+            int[] tmp = dstIdx;
+            dstIdx = cacheIdx;
+            cacheIdx = tmp;
+            sorted_len += sorted_len;
+        }
+
+        return dstIdx;
     }
 
     /**
      * SignDS alg.
      *
-     * @param trainedMap trained model.
-     * @param sign       random sign value.
+     * @param client fl client
+     * @param sign   random sign value.
      * @return index list.
      */
     public int[] signDSModel(Client client, boolean sign) {
@@ -602,7 +678,6 @@ public class SecureProtocol {
         }
 
         float[] originData = new float[inputDim];
-        Integer[] originIndex = new Integer[inputDim];
         int index = 0;
         for (int i = 0; i < layerNum; i++) {
             String key = updateFeatureName.get(i);
@@ -611,32 +686,16 @@ public class SecureProtocol {
             for (int j = 0; j < dataAfterTrain.length; j++) {
                 float updateData = dataAfterTrain[j] - dataBeforeTrain[j];
                 originData[index] = updateData;
-                originIndex[index] = index;
                 index++;
             }
         }
 
-        if (sign) {
-            Arrays.sort(originIndex, (l, r) -> {
-                return Float.compare(originData[r], originData[l]);
-            });
-        } else {
-            Arrays.sort(originIndex, (l, r) -> {
-                return Float.compare(originData[l], originData[r]);
-            });
-        }
-        int[] nonTopkKeyList = new int[inputDim - topkDim];
-        int[] topkKeyList = new int[topkDim];
-        for (int i = 0; i < topkDim; i++) {
-            topkKeyList[i] = originIndex[i];
-        }
-        for (int i = topkDim; i < inputDim; i++) {
-            nonTopkKeyList[i - topkDim] = originIndex[i];
-        }
+        int[] sortedIdx = mergeShort(originData, sign);
         int[] outputDimensionIndexList = new int[numInter + numOuter];
         SecureRandom secureRandom = Common.getSecureRandom();
-        randomSelect(secureRandom, topkKeyList, numInter, outputDimensionIndexList, 0);
-        randomSelect(secureRandom, nonTopkKeyList, numOuter, outputDimensionIndexList, numInter);
+        randomSelect(secureRandom, sortedIdx, 0, topkDim, numInter, outputDimensionIndexList, 0);
+        randomSelect(secureRandom, sortedIdx, topkDim, inputDim - topkDim,
+                numOuter, outputDimensionIndexList, numInter);
         Arrays.sort(outputDimensionIndexList);
         LOGGER.info("[SignDS] outputDimension size is " + outputDimensionIndexList.length);
         return outputDimensionIndexList;
