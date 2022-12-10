@@ -16,9 +16,11 @@
 
 from copy import deepcopy
 import numpy as np
+import mindspore.ops as ops
 from mindspore import nn
 from mindspore import load_param_into_net
-from mindspore.common.tensor import Tensor
+from mindspore.communication.management import init, get_rank
+from mindspore import Tensor
 from mindspore.common.parameter import Parameter
 from mindspore.train.callback import Callback
 from mindspore._checkparam import Validator, Rel
@@ -146,6 +148,7 @@ class FederatedLearningManager(Callback):
 
                          - adaptive: The frequency of parameter synchronization changes adaptively.
 
+        run_distribute (Bool): Whether open distribute training. Default: False.
         ssl_config (Union(None, SSLConfig)): Config of ssl. Default: None.
         min_consistent_rate (float): Minimum consistency ratio threshold. The greater the value, the more
                                      difficult it is to improve the synchronization frequency.
@@ -188,7 +191,7 @@ class FederatedLearningManager(Callback):
     """
 
     def __init__(self, yaml_config, model, sync_frequency, http_server_address="", data_size=1, sync_type='fixed',
-                 ssl_config=None, **kwargs):
+                 run_distribute=False, ssl_config=None, **kwargs):
         super(FederatedLearningManager, self).__init__()
         check_type.check_str("yaml_config", yaml_config)
         init_ssl_config(ssl_config)
@@ -210,6 +213,12 @@ class FederatedLearningManager(Callback):
         self._next_sync_iter_id = self._sync_frequency
         self._data_size = data_size
         self._sync_type = sync_type
+        self._run_distribute = run_distribute
+        if self._run_distribute:
+            init()
+            self._broadcast = ops.Broadcast(0)
+            self._rank_id = get_rank()
+            logger.info(f"Rank id is {self._rank_id}")
         self._global_step = 0
         self._encrypt_type = encrypt_type
         if self._encrypt_type not in (
@@ -372,6 +381,62 @@ class FederatedLearningManager(Callback):
             parameter_dict[key] = Parameter(Tensor(param_data), name=key)
         load_param_into_net(self._model, parameter_dict)
 
+    def _update_model_with_distribute(self, weights, weight_infos):
+        """
+        Update model with distributed training mode.
+        """
+        if self._rank_id == 0:
+            update_and_get_model = _UpdateAndGetModel(weights)
+            feature_map = update_and_get_model.construct()
+            if not feature_map:
+                raise ValueError("Feature map from getting model is empty!")
+
+            parameter_dict = {}
+            for key, weight_info in weight_infos.items():
+                if not feature_map[key]:
+                    continue
+                value = feature_map[key]
+                shape, dtype = weight_info[0], weight_info[1]
+                param_data = np.reshape(value, shape).astype(dtype)
+                parameter_dict[key] = Parameter(Tensor(param_data), name=key)
+
+            self._broadcast(tuple(parameter_dict.values()))
+            load_param_into_net(self._model, parameter_dict)
+        else:
+            ts_list = []
+            for key, weight_info in weight_infos.items():
+                shape, dtype = weight_info[0], weight_info[1]
+                param_data = np.reshape(weights[key], shape).astype(dtype)
+                ts_list.append(Tensor(param_data))
+
+            output = self._broadcast(tuple(ts_list))
+            if len(output) != len(weights):
+                raise ValueError("Broadcast tensor is failed!")
+            parameter_dict = {}
+            index = 0
+            for key, value in weights.items():
+                parameter_dict[key] = Parameter(output[index], name=key)
+                index += 1
+            load_param_into_net(self._model, parameter_dict)
+
+    def _update_model(self, weights, weight_infos):
+        """
+        Update and get model without distributed training mode.
+        """
+        update_and_get_model = _UpdateAndGetModel(weights)
+        feature_map = update_and_get_model.construct()
+        if not feature_map:
+            raise ValueError("Feature map from getting model is empty!")
+
+        parameter_dict = {}
+        for key, value in feature_map.items():
+            if key not in weight_infos:
+                continue
+            shape, dtype = weight_infos[key]
+            param_data = np.reshape(value, shape).astype(dtype)
+            parameter_dict[key] = Parameter(Tensor(param_data), name=key)
+        load_param_into_net(self._model, parameter_dict)
+
     def _start_push_weight(self):
         """
         Push weight to server in hybrid training mode.
@@ -404,8 +469,9 @@ class FederatedLearningManager(Callback):
         self._global_step += 1
         if self._server_mode == _fl_context.SERVER_MODE_CLOUD:
             if self._global_step == self._next_sync_iter_id:
-                start_fl_job = _StartFLJob(self._data_size)
-                start_fl_job.construct()
+                if (self._run_distribute and self._rank_id == 0) or not self._run_distribute:
+                    start_fl_job = _StartFLJob(self._data_size)
+                    start_fl_job.construct()
                 if self._is_adaptive_sync():
                     self._as_set_grads()
                 if self._encrypt_type == _fl_context.ENCRYPT_STABLE_PW:
@@ -422,18 +488,10 @@ class FederatedLearningManager(Callback):
                         continue
                     weight_infos[param.name] = (param_np.shape, param_np.dtype)
                     weights[param.name] = param_np.reshape(-1).tolist()
-                update_and_get_model = _UpdateAndGetModel(weights)
-                feature_map = update_and_get_model.construct()
-                if not feature_map:
-                    raise ValueError("Feature map from getting model is empty!")
-                parameter_dict = {}
-                for key, value in feature_map.items():
-                    if key not in weight_infos:
-                        continue
-                    shape, dtype = weight_infos[key]
-                    param_data = np.reshape(value, shape).astype(dtype)
-                    parameter_dict[key] = Parameter(Tensor(param_data), name=key)
-                load_param_into_net(self._model, parameter_dict)
+                if self._run_distribute:
+                    self._update_model_with_distribute(weights, weight_infos)
+                else:
+                    self._update_model(weights, weight_infos)
                 logger.info("Load params from getting model into net, global step is {}.".format(self._global_step))
                 self._next_sync_iter_id = self._global_step + self._sync_frequency
                 if self._is_adaptive_sync():
