@@ -105,6 +105,13 @@ void InitVFLContext(const py::module &m) {
     .def("client_password", &VFLContext::client_password, "Get the client password to decode the p12 file.")
     .def("set_server_password", &VFLContext::set_server_password, "Set the server password to decode the p12 file.")
     .def("server_password", &VFLContext::server_password, "Get the server password to decode the p12 file.")
+    .def("set_server_cert_path", &VFLContext::set_server_cert_path, "Set server certificate file path.")
+    .def("set_client_cert_path", &VFLContext::set_client_cert_path, "Set client certificate file path.")
+    .def("set_ca_cert_path", &VFLContext::set_ca_cert_path, "Set CA server certificate file path.")
+    .def("set_crl_path", &VFLContext::set_crl_path, "Set CRL certificate file path.")
+    .def("set_cipher_list", &VFLContext::set_cipher_list, "Set encryption suite supported by ssl.")
+    .def("set_cert_expire_warning_time_in_day", &VFLContext::set_cert_expire_warning_time_in_day,
+         "Set warning time before the certificate expires.")
     .def("http_url_prefix", &VFLContext::http_url_prefix, "http url prefix for http communication.")
     .def("load_yaml_config", &VFLContext::LoadYamlConfig, "Load yaml config")
     .def("set_worker_config", &VFLContext::set_worker_config, "Set data join worker config.")
@@ -185,7 +192,6 @@ PYBIND11_MODULE(_mindspore_federated, m) {
     .def_static("pull_weight", &FederatedJob::PullWeight)
     .def_static("push_weight", &FederatedJob::PushWeight)
     .def_static("push_metrics", &FederatedJob::PushMetrics);
-
 
   (void)py::class_<FeatureItemPy, std::shared_ptr<FeatureItemPy>>(m, "FeatureItem_")
     .def(py::init<const std::string &, const py::array &, const std::vector<size_t> &, const std::string &, bool>())

@@ -63,14 +63,17 @@ struct CompressionConfig {
 };
 
 struct SslConfig {
-  // for tcp server
+  // Server certificate file path.
   std::string server_cert_path;
-  // for tcp client
+  // Client certificate file path.
   std::string client_cert_path;
-  // common
+  // CA Server certificate file path.
   std::string ca_cert_path;
+  // CRL certificate file path.
   std::string crl_path;
+  // Encryption suite supported by ssl.
   std::string cipher_list;
+  // Warning time before the certificate expires.
   uint64_t cert_expire_warning_time_in_day = kCertExpireWarningTimeInDay;
 };
 

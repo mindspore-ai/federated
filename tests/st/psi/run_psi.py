@@ -19,6 +19,7 @@ import ast
 from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
 from mindspore_federated._mindspore_federated import RunPSI
 from mindspore_federated._mindspore_federated import PlainIntersection
+#from mindspore_federated.startup.ssl_config import SSLConfig
 
 
 def get_parser():
@@ -95,8 +96,20 @@ if __name__ == "__main__":
 
     http_server_config = ServerConfig(server_name=comm_role, server_address=http_server_address)
     remote_server_config = ServerConfig(server_name=peer_comm_role, server_address=remote_server_address)
+    # support ssl communication
+    # ssl_config = SSLConfig(server_password="server_password_12345", client_password="client_password_12345",
+    #                        server_cert_path="",
+    #                        client_cert_path="",
+    #                        ca_cert_path="")
+    #
+    # vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+    #                                                       remote_server_config=remote_server_config,
+    #                                                       enable_ssl=True,
+    #                                                       ssl_config=ssl_config)
+
     vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
                                                           remote_server_config=remote_server_config)
+
     vertical_communicator.launch()
     input_data = generate_input_data(input_begin, input_end, read_file, file_name)
     for bucket_id in range(bucket_size):

@@ -21,6 +21,14 @@
 namespace mindspore {
 namespace fl {
 std::shared_ptr<HttpCommunicator> AbstractCommunicator::CreateHttpCommunicator() {
+  const auto &vertical_fl_context = VFLContext::instance();
+  const auto &fl_context = FLContext::instance();
+  if (vertical_fl_context->enable_ssl()) {
+    fl_context->set_enable_ssl(vertical_fl_context->enable_ssl());
+    fl_context->set_client_password(vertical_fl_context->client_password());
+    fl_context->set_server_password(vertical_fl_context->server_password());
+    fl_context->set_ssl_config(vertical_fl_context->ssl_config());
+  }
   auto http_server_address = VFLContext::instance()->http_server_address();
   std::string server_ip;
   uint32_t http_port = 0;

@@ -19,7 +19,8 @@ import pandas as pd
 from mindspore_federated.data_join import FLDataWorker
 from mindspore_federated.data_join import load_mindrecord
 from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
-from common import vfl_data_test
+from mindspore_federated.startup.ssl_config import SSLConfig
+from common import vfl_data_test, get_default_ssl_config
 from common_data import generate_schema
 
 http_server_config = ServerConfig(server_name='server', server_address="127.0.0.1:6969")
@@ -251,8 +252,16 @@ def worker_process_fun(
     file_num = 4 if role == "leader" else 2
     config1 = ServerConfig(server_name=server_name, server_address=http_server_address)
     config2 = ServerConfig(server_name=target_server_name, server_address=remote_server_address)
+    server_cert_path, client_cert_path, ca_cert_path, _, _ = get_default_ssl_config()
+
+    ssl_config = SSLConfig(server_password="server_password_12345", client_password="client_password_12345",
+                           server_cert_path=server_cert_path,
+                           client_cert_path=client_cert_path,
+                           ca_cert_path=ca_cert_path)
     communicator = VerticalFederatedCommunicator(http_server_config=config1,
-                                                 remote_server_config=config2)
+                                                 remote_server_config=config2,
+                                                 enable_ssl=True,
+                                                 ssl_config=ssl_config)
     communicator.launch()
     worker = FLDataWorker(
         role=role,
