@@ -9,22 +9,22 @@ Private Set Intersection
         Use `from mindspore_federated._mindspore_federated import RunPSI` to import this interface;
         A vertical federated communication instance must be initialized before calling this interface. See `MindSpore federated ST <https://gitee.com/mindspore/federated/blob/master/tests/st/psi/run_psi.py>`_ .
 
-    Parameters:
+    Parameters
         - **input_data** (list[string]) - Self input dataset.
         - **comm_role** (string) - Self communication role, "server" or "client".
         - **peer_comm_role** (string) - The peer communication role, "server" or "client".
         - **bucket_id** (int) - Bucket index from the external bucket division. During the running of the protocol, the parties' bucket index must be consistent, otherwise the server will abort and the client will be blocked.
         - **thread_num** (int) - Thread number. Set to 0 means the maximum available thread number of the machine minus 5. The final value will be restrict to the range of 1 to the maximum available thread number.
 
-    Return:
+    Returns
         - **result** (list[string]) - The intersection set.
 
-    Exception:
+    Raises
         - **TypeError** - The input type of `input_data` is not list[string].
         - **TypeError** - The input type of `bucket_id` is not a integer larger than or equal to 0, such as a negative or decimal number.
         - **TypeError** - The input type of `thread_num` is not a integer larger than or equal to 0, such as a negative or decimal number.
 
-    Examples:
+    Examples
         >>> from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
         >>> from mindspore_federated._mindspore_federated import RunPSI
         >>> http_server_config = ServerConfig(server_name='server', server_address="127.0.0.1:1086")
@@ -44,22 +44,22 @@ Private Set Intersection
         Use `from mindspore_federated._mindspore_federated import PlainIntersection` to import this interface;
         A vertical federated communication instance must be initialized before calling this interface. See `MindSpore federated ST <https://gitee.com/mindspore/federated/blob/master/tests/st/psi/run_psi.py>`_ .
 
-    Parameters:
+    Parameters
         - **input_data** (list[string]) - Self input dataset.
         - **comm_role** (string) - Self communication role, "server" or "client".
         - **peer_comm_role** (string) - The peer communication role, "server" or "client".
         - **bucket_id** (int) - Bucket index from the external bucket division. During the running of the protocol, the parties' bucket index must be consistent, otherwise the server will abort and the client will be blocked.
         - **thread_num** (int) - Thread number. Set to 0 means the maximum available thread number of the machine minus 5. The final value will be restrict to the range of 1 to the maximum available thread number.
 
-    Return:
+    Returns
         - **result** (list[string]) - The intersection set.
 
-    Exception:
+    Raises
         - **TypeError** - The input type of `input_data` is not list[string].
         - **TypeError** - The input type of `bucket_id` is not a integer larger than or equal to 0, such as a negative or decimal number.
         - **TypeError** - The input type of `thread_num` is not a integer larger than or equal to 0, such as a negative or decimal number.
 
-    Examples:
+    Examples
         >>> from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
         >>> from mindspore_federated._mindspore_federated import PlainIntersection
         >>> http_server_config = ServerConfig(server_name='server', server_address="127.0.0.1:1086")
