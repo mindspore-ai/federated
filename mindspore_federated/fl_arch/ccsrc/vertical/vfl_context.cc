@@ -48,11 +48,9 @@ void VFLContext::set_http_server_name(const std::string &http_server_name) {
 std::string VFLContext::http_server_name() const { return http_server_name_; }
 
 void VFLContext::set_ssl_config(const SslConfig &config) { ssl_config_ = config; }
-
 const SslConfig &VFLContext::ssl_config() const { return ssl_config_; }
 
 bool VFLContext::enable_ssl() const { return enable_ssl_; }
-
 void VFLContext::set_enable_ssl(bool enabled) { enable_ssl_ = enabled; }
 
 std::string VFLContext::client_password() const { return client_password_; }
@@ -61,8 +59,31 @@ void VFLContext::set_client_password(const std::string &password) { client_passw
 std::string VFLContext::server_password() const { return server_password_; }
 void VFLContext::set_server_password(const std::string &password) { server_password_ = password; }
 
-std::string VFLContext::http_url_prefix() const { return http_url_prefix_; }
+std::string VFLContext::server_cert_path() { return ssl_config_.server_cert_path; }
+void VFLContext::set_server_cert_path(const std::string &server_cert_path) {
+  ssl_config_.server_cert_path = server_cert_path;
+}
 
+std::string VFLContext::client_cert_path() { return ssl_config_.client_cert_path; }
+void VFLContext::set_client_cert_path(const std::string &client_cert_path) {
+  ssl_config_.client_cert_path = client_cert_path;
+}
+
+std::string VFLContext::ca_cert_path() { return ssl_config_.ca_cert_path; }
+void VFLContext::set_ca_cert_path(const std::string &ca_cert_path) { ssl_config_.ca_cert_path = ca_cert_path; }
+
+std::string VFLContext::crl_path() { return ssl_config_.crl_path; }
+void VFLContext::set_crl_path(const std::string &crl_path) { ssl_config_.crl_path = crl_path; }
+
+std::string VFLContext::cipher_list() { return ssl_config_.cipher_list; }
+void VFLContext::set_cipher_list(const std::string &cipher_list) { ssl_config_.cipher_list = cipher_list; }
+
+uint64_t VFLContext::cert_expire_warning_time_in_day() { return ssl_config_.cert_expire_warning_time_in_day; }
+void VFLContext::set_cert_expire_warning_time_in_day(const uint64_t &cert_expire_warning_time_in_day) {
+  ssl_config_.cert_expire_warning_time_in_day = cert_expire_warning_time_in_day;
+}
+
+std::string VFLContext::http_url_prefix() const { return http_url_prefix_; }
 void VFLContext::set_http_url_prefix(const std::string &http_url_prefix) { http_url_prefix_ = http_url_prefix; }
 
 void VFLContext::set_remote_server_address(const std::map<std::string, std::string> &remote_server_address) {

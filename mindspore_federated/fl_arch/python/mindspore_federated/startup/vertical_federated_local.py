@@ -18,8 +18,9 @@ from collections import OrderedDict
 from mindspore_federated._mindspore_federated import VerticalFederated_
 from mindspore_federated.common import tensor_utils, data_join_utils
 from mindspore_federated.data_join.context import _WorkerRegister
-from .ssl_config import init_ssl_config, SSLConfig
+
 from .server_config import ServerConfig, init_server_config
+from .ssl_config import SSLConfig, init_vertical_ssl_config, init_vertical_enable_ssl
 
 
 class VerticalFederatedCommunicator:
@@ -41,7 +42,7 @@ class VerticalFederatedCommunicator:
         >>> vertical_communicator.data_join_wait_for_start()
     """
 
-    def __init__(self, http_server_config: ServerConfig, remote_server_config: ServerConfig,
+    def __init__(self, http_server_config: ServerConfig, remote_server_config: ServerConfig, enable_ssl=False,
                  ssl_config=None):
         if http_server_config is not None and not isinstance(http_server_config, ServerConfig):
             raise RuntimeError(
@@ -58,8 +59,10 @@ class VerticalFederatedCommunicator:
                 f"Parameter 'ssl_config' should be None or instance of SSLConfig, but got {type(ssl_config)}")
         self._http_server_config = http_server_config
         self._remote_server_config = remote_server_config
+        self._enable_ssl = enable_ssl
         self._ssl_config = ssl_config
-        init_ssl_config(self._ssl_config)
+        init_vertical_enable_ssl(self._enable_ssl)
+        init_vertical_ssl_config(self._ssl_config)
         init_server_config(self._http_server_config, self._remote_server_config)
 
     def launch(self):

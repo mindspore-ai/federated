@@ -14,6 +14,7 @@
 # ============================================================================
 """Essential tools to check the users input."""
 
+
 def check_str(arg_name, str_val):
     """Check whether the input parameters are reasonable str input"""
     if not isinstance(str_val, str):
@@ -28,3 +29,9 @@ def check_list(arg_name, list_val):
         raise RuntimeError(f"Parameter '{arg_name}' should be list, but actually {type(list)}")
     if not list_val:
         raise RuntimeError(f"Parameter '{arg_name}' should not be empty list")
+
+
+def check_int(arg_name, int_val):
+    """Check whether the input parameters are reasonable int input"""
+    if not isinstance(int_val, int):
+        raise RuntimeError(f"Parameter '{arg_name}' should be int, but actually {type(int_val)}")

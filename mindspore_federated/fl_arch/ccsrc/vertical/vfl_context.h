@@ -24,6 +24,7 @@
 #include <unordered_map>
 #include "common/constants.h"
 #include "common/common.h"
+#include "common/fl_context.h"
 #include "common/core/yaml_config.h"
 #include "vertical/python/worker_config_py.h"
 
@@ -48,17 +49,35 @@ class MS_EXPORT VFLContext {
   void set_http_server_name(const std::string &http_server_name);
   std::string http_server_name() const;
 
-  bool enable_ssl() const;
-  void set_enable_ssl(bool enabled);
-
   void set_ssl_config(const SslConfig &config);
   const SslConfig &ssl_config() const;
+
+  bool enable_ssl() const;
+  void set_enable_ssl(bool enabled);
 
   std::string client_password() const;
   void set_client_password(const std::string &password);
 
   std::string server_password() const;
   void set_server_password(const std::string &password);
+
+  std::string server_cert_path();
+  void set_server_cert_path(const std::string &server_cert_path);
+
+  std::string client_cert_path();
+  void set_client_cert_path(const std::string &client_cert_path);
+
+  std::string ca_cert_path();
+  void set_ca_cert_path(const std::string &ca_cert_path);
+
+  std::string crl_path();
+  void set_crl_path(const std::string &crl_path);
+
+  std::string cipher_list();
+  void set_cipher_list(const std::string &cipher_list);
+
+  uint64_t cert_expire_warning_time_in_day();
+  void set_cert_expire_warning_time_in_day(const uint64_t &cert_expire_warning_time_in_day);
 
   std::string http_url_prefix() const;
   void set_http_url_prefix(const std::string &http_url_prefix);
