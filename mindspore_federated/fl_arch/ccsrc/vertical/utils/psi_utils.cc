@@ -220,8 +220,9 @@ SliceProto CreateProtoWithSlices(const psi::AlicePbaAndBF &alice_pba_bf) {
   for (size_t i = 0; i < slice_cnt; i++) {
     datajoin::AlicePbaAndBFProto proto;
     proto.set_bin_id(alice_pba_bf.bin_id());
-    proto.set_bf_alice(alice_pba_bf.bf_alice());
-
+    if (i == 0) {
+      proto.set_bf_alice(alice_pba_bf.bf_alice());
+    }
     auto data = GetSplitData(begin_ptr, i, size, kPsiSliceSize);
     for (auto &item : data) {
       proto.add_p_b_a_vct(item);
@@ -237,15 +238,18 @@ SliceProto CreateProtoWithSlices(const psi::AlicePbaAndBF &alice_pba_bf) {
 SliceProto CreateProtoWithSlices(const psi::AliceCheck &alice_check) {
   auto wrong_id = alice_check.wrong_id();
   size_t size = wrong_id.size();
-  size_t slice_cnt;
+  std::vector<uint8_t> slice_data;
   if (size == 0) {
-    slice_cnt = 1;
-  } else {
-    slice_cnt = CalSliceCount(size, kPsiSliceSize);
+    datajoin::AliceCheckProto proto;
+    proto.set_msg(alice_check.msg());
+    auto proto_data = proto.SerializeAsString();
+    slice_data = {proto_data.begin(), proto_data.end()};
+    std::string offset = std::to_string(proto_data.size()) + KProtoSplitSign;
+    return {slice_data, offset};
   }
+  size_t slice_cnt = CalSliceCount(size, kPsiSliceSize);
   auto begin_ptr = wrong_id.data();
 
-  std::vector<uint8_t> slice_data;
   std::string offset;
   size_t index = 0;
   for (size_t i = 0; i < slice_cnt; i++) {
@@ -292,10 +296,18 @@ SliceProto CreateProtoWithSlices(const psi::BobPb &bob_pb) {
 SliceProto CreateProtoWithSlices(const psi::BobAlignResult &bob_align_result) {
   auto align_result = bob_align_result.align_result();
   size_t size = align_result.size();
+  std::vector<uint8_t> slice_data;
+  if (size == 0) {
+    datajoin::BobAlignResultProto proto;
+    proto.set_msg(bob_align_result.msg());
+    auto proto_data = proto.SerializeAsString();
+    slice_data = {proto_data.begin(), proto_data.end()};
+    std::string offset = std::to_string(proto_data.size()) + KProtoSplitSign;
+    return {slice_data, offset};
+  }
   size_t slice_cnt = CalSliceCount(size, kPsiSliceSize);
   auto begin_ptr = align_result.data();
 
-  std::vector<uint8_t> slice_data;
   std::string offset;
   size_t index = 0;
   for (size_t i = 0; i < slice_cnt; i++) {
@@ -317,10 +329,18 @@ SliceProto CreateProtoWithSlices(const psi::BobAlignResult &bob_align_result) {
 SliceProto CreateProtoWithSlices(const psi::PlainData &plain_data) {
   auto plain_data_vct = plain_data.plain_data_vct();
   size_t size = plain_data_vct.size();
+  std::vector<uint8_t> slice_data;
+  if (size == 0) {
+    datajoin::PlainDataProto proto;
+    proto.set_msg(plain_data.msg());
+    auto proto_data = proto.SerializeAsString();
+    slice_data = {proto_data.begin(), proto_data.end()};
+    std::string offset = std::to_string(proto_data.size()) + KProtoSplitSign;
+    return {slice_data, offset};
+  }
   size_t slice_cnt = CalSliceCount(size, kPsiSliceSize);
   auto begin_ptr = plain_data_vct.data();
 
-  std::vector<uint8_t> slice_data;
   std::string offset;
   size_t index = 0;
   for (size_t i = 0; i < slice_cnt; i++) {

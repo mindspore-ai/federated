@@ -177,18 +177,16 @@ void PsiCommunicator::Receive(const std::string &target_server_name, psi::AliceC
   auto offset = slice_proto.offset;
 
   std::vector<datajoin::AliceCheckProto> protos;
-  auto start = slice_data.begin();
   std::vector<std::string> offset_vec = StringSplit(offset, KProtoSplitSign);
+  auto begin_ptr = slice_data.data();
+  size_t index = 0;
   for (const auto &item : offset_vec) {
-    size_t size = std::atoi(item.c_str());
-    auto end = slice_data.begin() + size;
-    std::vector<uint8_t> data{start, end};
-
+    size_t size = std::stoull(item.c_str()) - index;
     datajoin::AliceCheckProto proto;
-    proto.ParseFromArray(data.data(), size);
-    protos.push_back(proto);
-
-    start = end;
+    proto.ParseFromArray(begin_ptr, size);
+    protos.emplace_back(proto);
+    begin_ptr += size;
+    index += size;
   }
   *aliceCheck = std::move(ParseProtoWithSlices(protos));
 }
@@ -204,20 +202,17 @@ void PsiCommunicator::Receive(const std::string &target_server_name, psi::BobPb 
   auto slice_proto = queue->pop(kPsiWaitSecondTimes);
   auto slice_data = slice_proto.slice_data;
   auto offset = slice_proto.offset;
-
   std::vector<datajoin::BobPbProto> protos;
-  auto start = slice_data.begin();
   std::vector<std::string> offset_vec = StringSplit(offset, KProtoSplitSign);
+  auto begin_ptr = slice_data.data();
+  size_t index = 0;
   for (const auto &item : offset_vec) {
-    size_t size = std::atoi(item.c_str());
-    auto end = slice_data.begin() + size;
-    std::vector<uint8_t> data{start, end};
-
+    size_t size = std::stoull(item.c_str()) - index;
     datajoin::BobPbProto proto;
-    proto.ParseFromArray(data.data(), size);
-    protos.push_back(proto);
-
-    start = end;
+    proto.ParseFromArray(begin_ptr, size);
+    protos.emplace_back(proto);
+    begin_ptr += size;
+    index += size;
   }
 
   *bobPb = std::move(ParseProtoWithSlices(protos));
@@ -236,18 +231,16 @@ void PsiCommunicator::Receive(const std::string &target_server_name, psi::AliceP
   auto offset = slice_proto.offset;
 
   std::vector<datajoin::AlicePbaAndBFProto> protos;
-  auto start = slice_data.begin();
   std::vector<std::string> offset_vec = StringSplit(offset, KProtoSplitSign);
+  auto begin_ptr = slice_data.data();
+  size_t index = 0;
   for (const auto &item : offset_vec) {
-    size_t size = std::atoi(item.c_str());
-    auto end = slice_data.begin() + size;
-    std::vector<uint8_t> data{start, end};
-
+    size_t size = std::stoull(item.c_str()) - index;
     datajoin::AlicePbaAndBFProto proto;
-    proto.ParseFromArray(data.data(), size);
-    protos.push_back(proto);
-
-    start = end;
+    proto.ParseFromArray(begin_ptr, size);
+    protos.emplace_back(proto);
+    begin_ptr += size;
+    index += size;
   }
   *alicePbaAndBF = std::move(ParseProtoWithSlices(protos));
 }
@@ -265,18 +258,16 @@ void PsiCommunicator::Receive(const std::string &target_server_name, psi::BobAli
   auto offset = slice_proto.offset;
 
   std::vector<datajoin::BobAlignResultProto> protos;
-  auto start = slice_data.begin();
   std::vector<std::string> offset_vec = StringSplit(offset, KProtoSplitSign);
+  auto begin_ptr = slice_data.data();
+  size_t index = 0;
   for (const auto &item : offset_vec) {
-    size_t size = std::atoi(item.c_str());
-    auto end = slice_data.begin() + size;
-    std::vector<uint8_t> data{start, end};
-
+    size_t size = std::stoull(item.c_str()) - index;
     datajoin::BobAlignResultProto proto;
-    proto.ParseFromArray(data.data(), size);
-    protos.push_back(proto);
-
-    start = end;
+    proto.ParseFromArray(begin_ptr, size);
+    protos.emplace_back(proto);
+    begin_ptr += size;
+    index += size;
   }
   *bobAlignResult = std::move(ParseProtoWithSlices(protos));
 }
@@ -310,18 +301,16 @@ void PsiCommunicator::Receive(const std::string &target_server_name, psi::PlainD
   auto offset = slice_proto.offset;
 
   std::vector<datajoin::PlainDataProto> protos;
-  auto start = slice_data.begin();
   std::vector<std::string> offset_vec = StringSplit(offset, KProtoSplitSign);
+  auto begin_ptr = slice_data.data();
+  size_t index = 0;
   for (const auto &item : offset_vec) {
-    size_t size = std::atoi(item.c_str());
-    auto end = slice_data.begin() + size;
-    std::vector<uint8_t> data{start, end};
-
+    size_t size = std::stoull(item.c_str()) - index;
     datajoin::PlainDataProto proto;
-    proto.ParseFromArray(data.data(), size);
-    protos.push_back(proto);
-
-    start = end;
+    proto.ParseFromArray(begin_ptr, size);
+    protos.emplace_back(proto);
+    begin_ptr += size;
+    index += size;
   }
   *plainData = std::move(ParseProtoWithSlices(protos));
 }
