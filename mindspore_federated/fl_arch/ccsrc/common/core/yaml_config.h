@@ -154,6 +154,7 @@ class YamlConfig {
   void Get(const std::string &key, const std::function<void(bool)> &set_fun, bool required) const;
 
   void InitCommonConfig();
+  void InitAggregationConfig();
   void InitDistributedCacheConfig();
   void InitRoundConfig();
   void InitSummaryConfig();

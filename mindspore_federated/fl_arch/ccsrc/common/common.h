@@ -86,7 +86,7 @@ enum TypeId : int {
 // Definitions for the server framework.
 enum ServerMode { PARAMETER_SERVER = 0, FL_SERVER };
 enum CommType { HTTP = 0, TCP };
-enum AggregationType { FedAvg = 0, FedAdam, FedAdagarg, FedMeta, qffl, DenseGradAccum, SparseGradAccum };
+enum AggregationType { FedAvg = 0, FedProx, FedAdagarg, FedMeta, qffl, DenseGradAccum, SparseGradAccum };
 
 struct RoundConfig {
   // The name of the round. Please refer to round kernel *.cc files.
