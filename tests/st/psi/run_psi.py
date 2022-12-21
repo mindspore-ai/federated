@@ -119,7 +119,8 @@ if __name__ == "__main__":
         else:
             intersection_type = "PSI"
             intersection_result = RunPSI(input_data, comm_role, peer_comm_role, bucket_id, thread_num)
-        print("{} result: {} (display limit: 20)".format(intersection_type, intersection_result[:20]))
+        print("{} result: {} (display limit: 20), result size is: {}".format(
+            intersection_type, intersection_result[:20], len(intersection_result)))
         if need_check:
             peer_input_data = generate_input_data(peer_input_begin, peer_input_end, peer_read_file, peer_file_name)
             actual_result = compute_right_result(input_data, peer_input_data)
