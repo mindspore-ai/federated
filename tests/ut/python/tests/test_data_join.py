@@ -18,6 +18,7 @@ import pytest
 import pandas as pd
 from mindspore_federated.data_join import FLDataWorker
 from mindspore_federated.data_join import load_mindrecord
+from mindspore_federated.data_join.store import PandasData
 from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
 from mindspore_federated.startup.ssl_config import SSLConfig
 from common import vfl_data_test, get_default_ssl_config
@@ -51,9 +52,10 @@ def test_case_data_join_role():
     )
     role = "wtc"
     with pytest.raises(ValueError) as err:
+        raw_data = PandasData(main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(4)])
         FLDataWorker(
             role=role,
-            main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(4)],
+            raw_data=raw_data,
             output_dir="temp/{}/".format(role),
             data_schema_path="temp/schema.yaml",
             communicator=vertical_communicator
@@ -84,9 +86,10 @@ def test_case_data_join_join_type():
     )
     role = "leader"
     with pytest.raises(ValueError) as err:
+        raw_data = PandasData(main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(4)])
         FLDataWorker(
             role=role,
-            main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(4)],
+            raw_data=raw_data,
             output_dir="temp/{}/".format(role),
             join_type="wtc",
             data_schema_path="temp/schema.yaml",
@@ -120,9 +123,10 @@ def test_case_data_join_small_bucket_num():
     )
     role = "leader"
     with pytest.raises(ValueError) as err:
+        raw_data = PandasData(main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(4)])
         FLDataWorker(
             role=role,
-            main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(4)],
+            raw_data=raw_data,
             output_dir="temp/{}/".format(role),
             bucket_num=0,
             data_schema_path="temp/schema.yaml",
@@ -156,9 +160,10 @@ def test_case_data_join_big_bucket_num():
     )
     role = "leader"
     with pytest.raises(ValueError) as err:
+        raw_data = PandasData(main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(4)])
         FLDataWorker(
             role=role,
-            main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(4)],
+            raw_data=raw_data,
             output_dir="temp/{}/".format(role),
             bucket_num=1000001,
             data_schema_path="temp/schema.yaml",
@@ -192,9 +197,10 @@ def test_case_data_join_small_shard_num():
     )
     role = "leader"
     with pytest.raises(ValueError) as err:
+        raw_data = PandasData(main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(4)])
         FLDataWorker(
             role=role,
-            main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(4)],
+            raw_data=raw_data,
             output_dir="temp/{}/".format(role),
             shard_num=0,
             data_schema_path="temp/schema.yaml",
@@ -228,9 +234,10 @@ def test_case_data_join_big_shard_num():
     )
     role = "leader"
     with pytest.raises(ValueError) as err:
+        raw_data = PandasData(main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(4)])
         FLDataWorker(
             role=role,
-            main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(4)],
+            raw_data=raw_data,
             output_dir="temp/{}/".format(role),
             shard_num=1001,
             data_schema_path="temp/schema.yaml",
@@ -263,9 +270,10 @@ def worker_process_fun(
                                                  enable_ssl=True,
                                                  ssl_config=ssl_config)
     communicator.launch()
+    raw_data = PandasData(main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(file_num)])
     worker = FLDataWorker(
         role=role,
-        main_table_files=["temp/{}_data_{}.csv".format(role, _) for _ in range(file_num)],
+        raw_data=raw_data,
         output_dir="temp/{}/".format(role),
         data_schema_path="temp/{}_schema.yaml".format(role),
         communicator=communicator,

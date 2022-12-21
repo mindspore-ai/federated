@@ -72,7 +72,7 @@ class FLDataWorker:
 
     Args:
         role (str): Role of the worker, which must be set in both leader and follower. Supports ["leader", "follower"].
-        main_table_files (Union(list(str), str): The raw data paths, which must be set in both leader and follower.
+        raw_data (Union(PandasData, MysqlData)): The raw data source, which must be set in both leader and follower.
         output_dir (str): The output directory, which must be set in both leader and follower.
         data_schema_path (str): Path of data schema file, which must be set in both leader and follower. User need to
             provide the column name and type of the data to be exported in the schema.
@@ -101,7 +101,7 @@ class FLDataWorker:
         ...                                                       remote_server_config=remote_server_config)
         >>> vertical_communicator.launch()
         >>> worker = FLDataWorker(role="leader",
-        ...                       main_table_files=["input/leader_data_0.csv", "input/leader_data_1.csv"],
+        ...                       raw_data=pandas_data,
         ...                       output_dir="output/leader/",
         ...                       data_schema_path="leader_schema.yaml",
         ...                       communicator=vertical_communicator,
@@ -117,7 +117,7 @@ class FLDataWorker:
 
     def __init__(self,
                  role,
-                 main_table_files,
+                 raw_data,
                  output_dir,
                  data_schema_path,
                  communicator,
@@ -129,8 +129,8 @@ class FLDataWorker:
                  thread_num=0,
                  ):
         self._role = role
+        self._raw_data = raw_data
         self._worker_config = _WorkerConfig(
-            main_table_files=main_table_files,
             output_dir=output_dir,
             primary_key=primary_key,
             bucket_num=bucket_num,
@@ -146,9 +146,9 @@ class FLDataWorker:
             self._schema = yaml.load(f, yaml.Loader)
         self._verify()
 
-        self._communicator = communicator
-        if self._communicator is None:
+        if communicator is None:
             raise ValueError("Communicator must not be None.")
+        self._communicator = communicator
 
         if role == "leader":
             self.data_join_obj = _DataJoinServer(self._worker_config, self._communicator)
@@ -165,7 +165,10 @@ class FLDataWorker:
         """
         Verify hyper parameters and schema.
         """
-        self._verify_main_table_files()
+        self._raw_data.verify()
+        self._raw_data.set_store_type(self._worker_config.store_type)
+        self._raw_data.set_primary_key(self._worker_config.primary_key)
+        self._raw_data.set_schema(self._schema)
         _check_str(self._worker_config.output_dir, arg_name="output_dir")
         if not os.path.isdir(self._worker_config.output_dir):
             raise ValueError("output_dir: {} is not a directory.".format(self._worker_config.output_dir))
@@ -181,26 +184,6 @@ class FLDataWorker:
                             'shard_num * bucket_num be smaller than 4096. Actually, the value is: %d',
                             self._worker_config.shard_num * self._worker_config.bucket_num)
         self._verify_schema()
-
-    def _verify_main_table_files(self):
-        """
-        Verify main_table_files.
-        """
-        main_table_files = self._worker_config.main_table_files
-        if isinstance(main_table_files, list):
-            for main_table_file in main_table_files:
-                if not os.path.isfile(main_table_file):
-                    raise ValueError("{} in main_table_files is not a file.".format(main_table_file))
-        elif isinstance(main_table_files, str):
-            if not os.path.exists(main_table_files):
-                raise ValueError("main_table_files: {} is not exist.".format(main_table_files))
-            if os.path.isdir(main_table_files):
-                for main_table_file in os.listdir(main_table_files):
-                    main_table_file = os.path.join(main_table_files, main_table_file)
-                    if not os.path.isfile(main_table_file):
-                        raise ValueError("{} in main_table_files is not a file.".format(main_table_file))
-        else:
-            raise TypeError("main_table_files must be list or str, but get {}".format(type(main_table_files)))
 
     def _verify_schema(self):
         """
@@ -227,36 +210,6 @@ class FLDataWorker:
         else:
             raise TypeError("schema must be dict, but get {}".format(type(self._schema)))
 
-    def _load_raw_data(self):
-        """
-        Load data from the file system. Only support "csv" currently.
-
-        Returns:
-            - raw_data (BaseData): The raw data.
-        """
-        if self._worker_config.store_type == "csv":
-            from .store import PandasData
-            raw_data = PandasData(None, primary_key=self._worker_config.primary_key, schema=self._schema)
-            main_table_files = self._worker_config.main_table_files
-            if isinstance(main_table_files, list):
-                for main_table_file in main_table_files:
-                    raw_data.load_raw_data(main_table_file)
-            elif isinstance(main_table_files, str):
-                if os.path.isdir(main_table_files):
-                    index = 0
-                    for main_table_file in os.listdir(main_table_files):
-                        index += 1
-                        main_table_file = os.path.join(main_table_files, main_table_file)
-                        raw_data.load_raw_data(main_table_file)
-                else:
-                    raw_data.load_raw_data(main_table_files)
-            else:
-                raise TypeError("main_table_files must be list or str, but get {}".format(
-                    type(main_table_files)))
-        else:
-            raise ValueError("store type: {} is not support currently".format(self._worker_config.store_type))
-        return raw_data
-
     def _join_func(self, input_vct, bucket_id):
         """
         Join function.
@@ -274,8 +227,8 @@ class FLDataWorker:
         """
         Export MindRecord by intersection keys.
         """
-        raw_data = self._load_raw_data()
-        keys = raw_data.keys()
+        self._raw_data.load_raw_data()
+        keys = self._raw_data.keys()
         divide_key_to_bucket = _DivideKeyTobucket(bucket_num=self._worker_config.bucket_num, keys=keys)
         buckets = divide_key_to_bucket.get_buckets()
         shard_num = self._worker_config.shard_num
@@ -286,7 +239,7 @@ class FLDataWorker:
                 continue
             file_name = "mindrecord_{}_".format(bucket_id) if shard_num > 1 else "mindrecord_{}".format(bucket_id)
             output_file_name = os.path.join(self._worker_config.output_dir, file_name)
-            export_mindrecord(output_file_name, raw_data, intersection_keys, shard_num=shard_num)
+            export_mindrecord(output_file_name, self._raw_data, intersection_keys, shard_num=shard_num)
             export_count += 1
         if export_count == 0:
             raise ValueError("The intersection_keys of all buckets is empty")

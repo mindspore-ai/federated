@@ -15,7 +15,8 @@
 """base data processing"""
 
 
-class BaseData(object):
+class BaseData():
+    """Abstract base data source"""
     def __init__(self, store=None, schema=None, desc=None):
         super().__init__()
         self._store = dict() if store is None else store
@@ -49,6 +50,9 @@ class BaseData(object):
 
     def size(self):
         return len(self._store)
+
+    def verify(self):
+        pass
 
     def __iter__(self):
         self._it = iter(self._store)
