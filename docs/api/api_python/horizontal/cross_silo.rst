@@ -1,4 +1,4 @@
-云云联邦学习
+云侧客户端
 ================================
 
 .. py:class:: mindspore_federated.FederatedLearningManager(yaml_config, model, sync_frequency, http_server_address="", data_size=1, sync_type='fixed', ssl_config=None, **kwargs)
