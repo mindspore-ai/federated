@@ -1,4 +1,4 @@
-隐私集合求交
+psi
 ================================
 
 .. py:function:: RunPSI(input_data, comm_role, peer_comm_role, bucket_id, thread_num)

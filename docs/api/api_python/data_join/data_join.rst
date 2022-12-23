@@ -1,4 +1,4 @@
-mindspore_federated.data_join
+data_join
 ================================
 
 .. py:class:: mindspore_federated.data_join.FLDataWorker(role, main_table_files, output_dir, data_schema_path,communicator, primary_key="oaid", bucket_num=5, store_type="csv", shard_num=1, join_type="psi", thread_num=0)

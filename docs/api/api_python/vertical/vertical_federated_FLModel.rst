@@ -1,4 +1,4 @@
-纵向联邦学习模型训练接口
+模型训练接口
 ==========================================
 
 .. py:class:: mindspore_federated.FLModel(yaml_data, network, loss_fn=None, optimizers=None, metrics=None, eval_network=None, grad_network=None)

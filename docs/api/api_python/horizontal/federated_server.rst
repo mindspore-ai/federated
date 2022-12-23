@@ -1,4 +1,4 @@
-Federated-Server
+服务器启动接口
 ======================
 
 .. py:class:: mindspore_federated.FLServerJob(yaml_config, http_server_address, tcp_server_ip="127.0.0.1", checkpoint_dir="./fl_ckpt/", ssl_config=None)
