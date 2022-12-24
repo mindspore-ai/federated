@@ -32,7 +32,6 @@ class _WorkerConfig:
     Config of worker.
 
     Args:
-        main_table_files (Union(list(str), str): The raw data paths.
         output_dir (str): The output directory.
         join_type (str): The data join type. Default: "psi".
         bucket_num (int): The number of buckets. Default: 1.
@@ -42,9 +41,8 @@ class _WorkerConfig:
         shard_num (int): The output number of each bucket when export. Default: 1.
     """
 
-    def __init__(self, main_table_files, output_dir, join_type="psi", bucket_num=1, store_type="csv",
+    def __init__(self, output_dir, join_type="psi", bucket_num=1, store_type="csv",
                  primary_key="oaid", thread_num=0, shard_num=1):
-        self.main_table_files = main_table_files
         self.output_dir = output_dir
         self.join_type = join_type
         self.bucket_num = bucket_num

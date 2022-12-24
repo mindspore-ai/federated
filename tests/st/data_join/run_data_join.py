@@ -17,7 +17,7 @@ import argparse
 import os
 from mindspore_federated.data_join import FLDataWorker
 from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
-
+from mindspore_federated.data_join.store import PandasData
 
 def mkdir(directory):
     try:
@@ -99,8 +99,9 @@ if __name__ == '__main__':
                                                           remote_server_config=remote_server_config)
     vertical_communicator.launch()
 
+    raw_data = PandasData(main_table_files=main_table_files)
     worker = FLDataWorker(role=role,
-                          main_table_files=main_table_files,
+                          raw_data=raw_data,
                           output_dir=output_dir,
                           data_schema_path=data_schema_path,
                           primary_key=primary_key,
