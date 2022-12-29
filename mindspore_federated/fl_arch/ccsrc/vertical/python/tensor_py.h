@@ -47,12 +47,24 @@ class MS_EXPORT TensorItemPy {
   void set_raw_data(const std::string &raw_data);
   std::string raw_data() const;
 
+  void set_compress_type(const std::string &compress_type);
+  std::string compress_type() const;
+
+  void set_min_val(const float &min_val);
+  float min_val() const;
+
+  void set_max_val(const float &max_val);
+  float max_val() const;
+
  private:
   std::string name_;
   std::string ref_key_;
   std::vector<size_t> shape_;
   std::string dtype_;
   std::string raw_data_;
+  std::string compress_type_;
+  float min_val_;
+  float max_val_;
 };
 }  // namespace fl
 }  // namespace mindspore

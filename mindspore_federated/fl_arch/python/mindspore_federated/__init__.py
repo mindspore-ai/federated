@@ -25,6 +25,7 @@ from .trainer.vfl_optim import PartyGradOperation, PartyOptimizer, PartyGradScal
 from .common import vfl_utils, tensor_utils
 from .common.vfl_utils import FLYamlData
 from . import privacy
+from . import compress
 
 __all__ = [
     "FLServerJob",
@@ -43,5 +44,6 @@ __all__ = [
     "tensor_utils",
     "privacy",
     "VerticalFederatedCommunicator",
-    "ServerConfig"
+    "ServerConfig",
+    "compress",
 ]
