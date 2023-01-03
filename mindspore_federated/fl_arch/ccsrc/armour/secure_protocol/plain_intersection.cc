@@ -29,8 +29,8 @@ std::vector<std::string> PlainIntersection(const std::vector<std::string> &input
   PsiCtx psi_ctx;
   psi_ctx.bin_id = bin_id;
   psi_ctx.thread_num = thread_num;
-  psi_ctx.input_vct = input_vct;
-  psi_ctx.self_num = psi_ctx.input_vct.size();
+  psi_ctx.input_vct = &input_vct;
+  psi_ctx.self_num = input_vct.size();
   MS_LOG(INFO) << comm_role << " start to hash input and truncate to compare_length (12 bytes)...";
   std::vector<std::string> input_hash_vct = HashInputs(psi_ctx.input_vct, psi_ctx.thread_num, psi_ctx.chunk_size);
   ParallelSync parallel_sync(thread_num);

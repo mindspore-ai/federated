@@ -89,6 +89,8 @@ struct BloomFilter {
 
   ~BloomFilter() { delete[] bit_array_; }
 
+  void set_empty() { bit_array_ = new unsigned char[0]; }
+
   size_t ezHash(const std::string &inputStr, size_t startPos) const {
     size_t ret = 0;
     size_t i = 0;

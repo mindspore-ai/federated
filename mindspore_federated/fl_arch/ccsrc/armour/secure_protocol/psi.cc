@@ -46,7 +46,7 @@ std::vector<std::string> Align(std::vector<std::string> *alice_vct, const std::v
   parallel_sync.parallel_for(0, bob_vct.size(), psi_ctx.chunk_size, [&](size_t beg, size_t end) {
     for (size_t i = beg; i < end; i++) {
       if (std::binary_search(alice_vct->begin(), alice_vct->end(), bob_vct[i])) {
-        align_results_vector[idx++] = psi_ctx.input_vct[i];
+        align_results_vector[idx++] = psi_ctx.input_vct->at(i);
       }
     }
   });
@@ -71,7 +71,7 @@ std::vector<std::string> Align(const std::vector<std::string> &p_b_a_bI_vct, con
   parallel_sync.parallel_for(0, p_b_a_bI_vct.size(), psi_ctx.chunk_size, [&](size_t beg, size_t end) {
     for (size_t i = beg; i < end; i++) {
       if (bf.LookUp(p_b_a_bI_vct[i])) {
-        align_results_vector[idx++] = psi_ctx.input_vct[i];
+        align_results_vector[idx++] = psi_ctx.input_vct->at(i);
       }
     }
   });
@@ -95,8 +95,8 @@ void FindWrong(const PsiCtx &psi_ctx, const std::vector<std::string> &align_resu
   parallel_sync.parallel_for(0, psi_ctx.self_num, psi_ctx.chunk_size, [&](size_t beg, size_t end) {
     for (size_t i = beg; i < end; i++) {
       size_t index = distance(align_result.begin(),
-                              std::lower_bound(align_result.begin(), align_result.end(), psi_ctx.input_vct[i]));
-      if (index < align_result.size() && align_result[index] == psi_ctx.input_vct[i]) {
+                              std::lower_bound(align_result.begin(), align_result.end(), psi_ctx.input_vct->at(i)));
+      if (index < align_result.size() && align_result[index] == psi_ctx.input_vct->at(i)) {
         flag_vct[index] = 1;
       }
     }
@@ -187,7 +187,7 @@ std::vector<std::string> RunInverseFilterEcdhPsi(const PsiCtx &psi_ctx_alice, co
   auto align_results_vector = Align(p_b_a_bI_vct, bf_alice_recv, psi_ctx_bob);
   std::vector<std::string>().swap(p_b_a_bI_vct);
   MS_LOG(INFO) << "Number of false positive cases: "
-               << static_cast<int>(align_results_vector.size() - psi_ctx_bob.input_vct.size() / 2);
+               << static_cast<int>(align_results_vector.size() - psi_ctx_bob.input_vct->size() / 2);
 
   if (!psi_ctx_bob.need_check) {
     MS_LOG(INFO) << "  -------------------------- 5. bob send align_result -----------------------";
@@ -237,8 +237,8 @@ std::vector<std::string> RunPSIDemo(const std::vector<std::string> &alice_input,
   psi_ctx_alice.thread_num = thread_num;
   psi_ctx_alice.ecc =
     std::make_unique<ECC>(psi_ctx_alice.curve_name, psi_ctx_alice.thread_num, psi_ctx_alice.chunk_size);
-  psi_ctx_alice.input_vct = alice_input;
-  psi_ctx_alice.self_num = psi_ctx_alice.input_vct.size();
+  psi_ctx_alice.input_vct = &alice_input;
+  psi_ctx_alice.self_num = alice_input.size();
   psi_ctx_alice.peer_num = bob_input.size();
   psi_ctx_alice.compare_length = LENGTH_32;
 
@@ -257,8 +257,8 @@ std::vector<std::string> RunPSIDemo(const std::vector<std::string> &alice_input,
   PsiCtx psi_ctx_bob;
   psi_ctx_bob.thread_num = thread_num;
   psi_ctx_bob.ecc = std::make_unique<ECC>(psi_ctx_bob.curve_name, psi_ctx_bob.thread_num, psi_ctx_bob.chunk_size);
-  psi_ctx_bob.input_vct = bob_input;
-  psi_ctx_bob.self_num = psi_ctx_bob.input_vct.size();
+  psi_ctx_bob.input_vct = &bob_input;
+  psi_ctx_bob.self_num = bob_input.size();
   psi_ctx_bob.peer_num = alice_input.size();
   psi_ctx_bob.compare_length = LENGTH_32;
   psi_ctx_bob.SetRole(client_psi_init_recv.self_size());
@@ -312,6 +312,9 @@ std::vector<std::string> RunInverseFilterEcdhPsi(const std::string &target_serve
     MS_LOG(INFO) << " -------------------------- 3. alice send AlicePbaAndBFProto ------------------------";
     AlicePbaAndBF alice_p_b_a_bf(psi_ctx.bin_id, p_b_a_vct, bf_alice.GetData());
     verticalServer.Send(target_server_name, alice_p_b_a_bf);
+    std::vector<std::string>().swap(p_b_a_vct);
+    bf_alice.set_empty();
+    alice_p_b_a_bf.set_empty();
 
     MS_LOG(INFO) << "-------------------------- 6. alice receive align_result -----------------------";
     std::vector<std::string> wrong_vct;
@@ -332,6 +335,8 @@ std::vector<std::string> RunInverseFilterEcdhPsi(const std::string &target_serve
     MS_LOG(INFO) << "-------------------------- 1. bob send bobPb -----------------------";
     BobPb bob_p_b(psi_ctx.bin_id, p_b_vct);
     verticalServer.Send(target_server_name, bob_p_b);
+    std::vector<std::string>().swap(p_b_vct);
+    bob_p_b.set_empty();
 
     MS_LOG(INFO) << "-------------------------- 4. bob receive alice_p_b_a_bf -----------------------";
     AlicePbaAndBF alice_p_b_a_bf_recv;
@@ -343,6 +348,7 @@ std::vector<std::string> RunInverseFilterEcdhPsi(const std::string &target_serve
     alice_p_b_a_bf_recv.set_empty();
     align_results_vector = Align(p_b_a_bI_vct, bf_alice_recv, psi_ctx);
     std::vector<std::string>().swap(p_b_a_bI_vct);
+    bf_alice_recv.set_empty();
 
     time_t time_start;
     time_t time_end;
@@ -354,6 +360,7 @@ std::vector<std::string> RunInverseFilterEcdhPsi(const std::string &target_serve
     MS_LOG(INFO) << "-------------------------- 5. bob send align_result -----------------------";
     BobAlignResult bob_align_result(psi_ctx.bin_id, align_results_vector);
     verticalServer.Send(target_server_name, bob_align_result);
+    bob_align_result.set_empty();
 
     MS_LOG(INFO) << "-------------------------- 8. bob receive wrong_id -----------------------";
     AliceCheck alice_check_recv;
@@ -373,8 +380,8 @@ std::vector<std::string> RunPSI(const std::vector<std::string> &input_vct, const
   PsiCtx psi_ctx;
   psi_ctx.bin_id = bin_id;
   psi_ctx.thread_num = thread_num;
-  psi_ctx.input_vct = input_vct;
-  psi_ctx.self_num = psi_ctx.input_vct.size();
+  psi_ctx.input_vct = &input_vct;
+  psi_ctx.self_num = input_vct.size();
   psi_ctx.ecc = std::make_unique<ECC>(psi_ctx.curve_name, psi_ctx.thread_num, psi_ctx.chunk_size);
 
   if (comm_role == "client") {

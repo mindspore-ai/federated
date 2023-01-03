@@ -52,8 +52,8 @@ class TestFindDelWrong : public testing::Test {
       std::string tmp_str = std::to_string(i);
       alice_input[i] = std::string(max_digit - tmp_str.size(), '0') + tmp_str;
     }
-    psi_ctx_alice.input_vct = alice_input;
-    psi_ctx_alice.self_num = psi_ctx_alice.input_vct.size();
+    psi_ctx_alice.input_vct = &alice_input;
+    psi_ctx_alice.self_num = alice_input.size();
 
     std::shuffle(alice_input.begin(), alice_input.end(), std::mt19937(std::random_device()()));
     for (size_t i = 0, start_str = alice_num - intersect_num; i < intersect_num + wrong_num; i++) {
