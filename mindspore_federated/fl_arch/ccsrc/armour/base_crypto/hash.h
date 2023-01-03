@@ -31,7 +31,7 @@ namespace psi {
 
 std::string HashInput(const std::string &item);
 
-std::vector<std::string> HashInputs(const std::vector<std::string> &items, size_t thread_num, size_t chunk_size);
+std::vector<std::string> HashInputs(const std::vector<std::string> *items, size_t thread_num, size_t chunk_size);
 
 }  // namespace psi
 }  // namespace fl

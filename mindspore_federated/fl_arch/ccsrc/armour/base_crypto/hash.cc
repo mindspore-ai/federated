@@ -26,16 +26,16 @@ std::string HashInput(const std::string &item) {
   return hash_result;
 }
 
-std::vector<std::string> HashInputs(const std::vector<std::string> &items, size_t thread_num, size_t chunk_size) {
+std::vector<std::string> HashInputs(const std::vector<std::string> *items, size_t thread_num, size_t chunk_size) {
   time_t time_start;
   time_t time_end;
   time(&time_start);
-  std::vector<std::string> ret(items.size());
+  std::vector<std::string> ret(items->size());
 
   ParallelSync parallel_sync(thread_num);
   parallel_sync.parallel_for(0, ret.size(), chunk_size, [&](size_t beg, size_t end) {
     for (size_t i = beg; i < end; i++) {
-      ret[i] = HashInput(items[i]);
+      ret[i] = HashInput(items->at(i));
     }
   });
 

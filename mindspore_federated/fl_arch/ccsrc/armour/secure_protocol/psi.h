@@ -112,7 +112,7 @@ struct PsiCtx {
   size_t chunk_size = 1;                // default
   bool need_check = true;
 
-  std::vector<std::string> input_vct;
+  const std::vector<std::string> *input_vct;
   size_t self_num = 0;
   size_t peer_num = 0;
 };
