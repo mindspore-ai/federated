@@ -60,7 +60,8 @@ class VerticalFederatedCommunicator:
                 f"Parameter 'ssl_config' should be None or instance of SSLConfig, but got {type(ssl_config)}")
         if compress_config is not None and not isinstance(compress_config, CompressConfig):
             raise RuntimeError(
-                f"Parameter 'compress_config' should be None or instance of CompressConfig, but got {type(compress_config)}")
+                f"Parameter 'compress_config' should be None or instance of CompressConfig,"
+                f"but got {type(compress_config)}")
         self._http_server_config = http_server_config
         self._remote_server_config = remote_server_config
         self._enable_ssl = enable_ssl

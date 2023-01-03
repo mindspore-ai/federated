@@ -14,14 +14,13 @@
 # ============================================================================
 """Essential tools to encoding the training communication compress."""
 
-import numpy as np
-
 
 def quant_compress(data_list, quant_bits):
+    """quant compression"""
     min_val = min(data_list)
     max_val = max(data_list)
 
-    quant_p1 = ((1 << quant_bits) - 1) * 1.0 / (max_val - min_val + 1e-10)
+    quant_p1 = ((1 << quant_bits) - 1) / (max_val - min_val + 1e-10)
     quant_p2 = int(round(quant_p1 * min_val))
 
     compress_data_list = []

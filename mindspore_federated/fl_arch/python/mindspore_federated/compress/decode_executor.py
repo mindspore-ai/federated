@@ -16,6 +16,7 @@
 
 
 def quant_decompress(quant_compress_data, quant_bits, min_val, max_val):
+    """quant decompression"""
     quant_p1 = ((1 << quant_bits) - 1) * 1.0 / (max_val - min_val + 1e-10)
     quant_p2 = int(round(quant_p1 * min_val))
     decompress_data_list = []

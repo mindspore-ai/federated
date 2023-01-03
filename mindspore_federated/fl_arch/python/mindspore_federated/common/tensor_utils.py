@@ -45,22 +45,24 @@ DATATYPE_STRING_QUANT_DICT = {
     32: np.uint32,
     64: np.uint64,
 }
-kNoCompressType = "no_compress"
-kQuant = "quant"
-kQuant8Bits = "quant_8_bits"
+NO_COMPRESS_TYPE = "no_compress"
+QUANT = "quant"
+QUANT_8BITS = "quant_8_bits"
 
 
 def get_compress_type(compress_config: CompressConfig):
-    if compress_config.type == kQuant:
-        return kQuant + "_" + str(compress_config.quant_bits) + "_bits"
+    if compress_config.type == QUANT:
+        return QUANT + "_" + str(compress_config.quant_bits) + "_bits"
+    raise ValueError('get_compress_type: compress config type is invalid.')
 
 
 def construct_compress_tensor(data_list: list, compress_config: CompressConfig, tensor: TensorItem_):
+    """tensor compression"""
     if data_list is None:
         raise RuntimeError(
             f"Parameter 'data_list' should be list, but got {type(data_list)}")
     quant_bits = compress_config.quant_bits
-    if compress_config.type == kQuant and 0 < quant_bits <= 255:
+    if compress_config.type == QUANT and quant_bits in DATATYPE_STRING_QUANT_DICT:
         min_val, max_val, compress_data_list = encode_executor.quant_compress(data_list, quant_bits)
         tensor.set_min_val(min_val)
         tensor.set_max_val(max_val)
@@ -71,10 +73,11 @@ def construct_compress_tensor(data_list: list, compress_config: CompressConfig, 
 
 
 def decompress_tensor(raw_data, compress_type: str, tensor_item: TensorItem_):
+    """tensor decompression"""
     if raw_data is None:
         raise RuntimeError(
             f"Parameter 'raw_data' should be str, but got {type(raw_data)}")
-    if compress_type == kQuant8Bits:
+    if compress_type == QUANT_8BITS:
         quant_bits = 8
         data_type = DATATYPE_STRING_QUANT_DICT.get(quant_bits)
         np_data = np.frombuffer(raw_data, dtype=data_type).reshape(-1)
@@ -100,7 +103,7 @@ def tensor_to_tensor_pybind_obj(ts: Tensor, ref_key: str, compress_config: Compr
         tensor.set_ref_key(ref_key)
     if ts.dtype is None:
         raise TypeError('tensor_to_tensor_pybind_obj: input a Tensor with unsupported value type.')
-    np_data = ts.reshape(ts.size, ).asnumpy()
+    np_data = ts.reshape(ts.size,).asnumpy()
     tensor.set_dtype(str(np_data.dtype))
     tensor.set_shape(ts.shape)
     if compress_config is not None:
@@ -108,7 +111,7 @@ def tensor_to_tensor_pybind_obj(ts: Tensor, ref_key: str, compress_config: Compr
         compress_type = get_compress_type(compress_config)
         tensor.set_compress_type(compress_type)
     else:
-        tensor.set_compress_type(kNoCompressType)
+        tensor.set_compress_type(NO_COMPRESS_TYPE)
     np_data_b64 = base64.b64encode(np_data.tobytes())
     tensor.set_raw_data(np_data_b64)
     return tensor
@@ -153,7 +156,7 @@ def tensor_pybind_obj_to_tensor(tensor_item: TensorItem_):
     dtype = DATATYPE_STRING_NPTYPE_DICT.get(dtype_str)
 
     values = base64.b64decode(raw_data)
-    if compress_type != kNoCompressType:
+    if compress_type != NO_COMPRESS_TYPE:
         np_data = decompress_tensor(values, compress_type, tensor_item)
     else:
         np_data = np.frombuffer(values, dtype=dtype).reshape(shape)

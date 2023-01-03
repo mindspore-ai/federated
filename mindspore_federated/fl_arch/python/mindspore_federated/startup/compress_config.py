@@ -15,13 +15,13 @@
 """Compress config for vertical fl communication"""
 from ..common import check_type
 
-
+# pylint: disable=redefined-builtin
 class CompressConfig:
     """
     Define the vertical server compress config.
 
     Args:
-        type (str): Compress type for vertical fl communication
+        ctype (str): Compress type for vertical fl communication
         quant_bits (int): Bits num of quant algorithm
     """
 
