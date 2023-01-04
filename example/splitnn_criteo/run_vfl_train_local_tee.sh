@@ -26,4 +26,4 @@ WORKPATH=$(
 
 export PYTHONPATH="${PYTHONPATH}:${WORKPATH}/../"
 echo "Start executing Wide&Deep splitnn with TEE demo."
-python run_vfl_train_local_tee.py --enable_TEE True --batch_size 1000 --device_target CPU
+python run_vfl_train_local.py --leader_top_yaml_path "./yaml_files/leader_top_tee.yaml"
