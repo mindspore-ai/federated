@@ -40,6 +40,9 @@ message TensorProto {
   repeated int64 max_dims = 8;
 
   ExternalDataProto external_data = 9;
+  string compress_type = 10;
+  float min_val = 11;
+  float max_val = 12;
 }
 
 //encapsulate embeddings and grad-scales

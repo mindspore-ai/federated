@@ -32,6 +32,9 @@ TensorListItemPy ParseTensorListProto(const TensorListProto &tensorListProto) {
     tensor.set_ref_key(item.ref_key());
     tensor.set_dtype(item.data_type());
     tensor.set_raw_data(item.raw_data());
+    tensor.set_compress_type(item.compress_type());
+    tensor.set_min_val(item.min_val());
+    tensor.set_max_val(item.max_val());
     std::vector<size_t> shape;
     int dims_size = item.dims_size();
     for (int i = 0; i < dims_size; i++) {
@@ -65,6 +68,9 @@ void CreateTensorProto(TensorProto *tensor_proto, const TensorItemPy &tensor, st
     tensor_proto->add_dims(dim);
   }
   tensor_proto->set_raw_data(tensor.raw_data());
+  tensor_proto->set_compress_type(tensor.compress_type());
+  tensor_proto->set_min_val(tensor.min_val());
+  tensor_proto->set_max_val(tensor.max_val());
 }
 
 void CreateTensorListProto(TensorListProto *tensor_list_proto, const TensorListItemPy &tensorListItemPy) {

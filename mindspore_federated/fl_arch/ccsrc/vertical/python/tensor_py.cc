@@ -33,5 +33,14 @@ std::string TensorItemPy::dtype() const { return dtype_; }
 
 void TensorItemPy::set_raw_data(const std::string &raw_data) { raw_data_ = raw_data; }
 std::string TensorItemPy::raw_data() const { return raw_data_; }
+
+void TensorItemPy::set_compress_type(const std::string &compress_type) { compress_type_ = compress_type; }
+std::string TensorItemPy::compress_type() const { return compress_type_; }
+
+void TensorItemPy::set_min_val(const float &min_val) { min_val_ = min_val; }
+float TensorItemPy::min_val() const { return min_val_; }
+
+void TensorItemPy::set_max_val(const float &max_val) { max_val_ = max_val; }
+float TensorItemPy::max_val() const { return max_val_; }
 }  // namespace fl
 }  // namespace mindspore

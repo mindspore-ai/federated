@@ -20,6 +20,7 @@ from mindspore_federated.common import tensor_utils, data_join_utils
 from mindspore_federated.data_join.context import _WorkerRegister
 
 from .server_config import ServerConfig, init_server_config
+from .compress_config import CompressConfig, init_compress_config
 from .ssl_config import SSLConfig, init_vertical_ssl_config, init_vertical_enable_ssl
 
 
@@ -43,7 +44,7 @@ class VerticalFederatedCommunicator:
     """
 
     def __init__(self, http_server_config: ServerConfig, remote_server_config: ServerConfig, enable_ssl=False,
-                 ssl_config=None):
+                 ssl_config=None, compress_config=None):
         if http_server_config is not None and not isinstance(http_server_config, ServerConfig):
             raise RuntimeError(
                 f"Parameter 'http_server_config' should be instance of ServerConfig,"
@@ -57,13 +58,19 @@ class VerticalFederatedCommunicator:
         if ssl_config is not None and not isinstance(ssl_config, SSLConfig):
             raise RuntimeError(
                 f"Parameter 'ssl_config' should be None or instance of SSLConfig, but got {type(ssl_config)}")
+        if compress_config is not None and not isinstance(compress_config, CompressConfig):
+            raise RuntimeError(
+                f"Parameter 'compress_config' should be None or instance of CompressConfig,"
+                f"but got {type(compress_config)}")
         self._http_server_config = http_server_config
         self._remote_server_config = remote_server_config
         self._enable_ssl = enable_ssl
         self._ssl_config = ssl_config
+        self._compress_config = compress_config
         init_vertical_enable_ssl(self._enable_ssl)
         init_vertical_ssl_config(self._ssl_config)
         init_server_config(self._http_server_config, self._remote_server_config)
+        init_compress_config(self._compress_config)
 
     def launch(self):
         """
@@ -79,7 +86,8 @@ class VerticalFederatedCommunicator:
             target_server_name (str): Specifies the name of the remote server.
             tensor_dict (OrderedDict): The dict of Tensors to be sent.
         """
-        tensor_list_item_py = tensor_utils.tensor_dict_to_tensor_list_pybind_obj(tensor_dict)
+        tensor_list_item_py = tensor_utils.tensor_dict_to_tensor_list_pybind_obj(ts_dict=tensor_dict, name="",
+                                                                                 compress_config=self._compress_config)
         return VerticalFederated_.send_tensor_list(target_server_name, tensor_list_item_py)
 
     def send_register(self, target_server_name: str, worker_register: _WorkerRegister):

@@ -77,6 +77,7 @@ install(
         ${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/python/mindspore_federated/trainer
         ${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/python/mindspore_federated/startup
         ${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/python/mindspore_federated/privacy
+        ${CMAKE_SOURCE_DIR}/mindspore_federated/fl_arch/python/mindspore_federated/compress
         DESTINATION ${INSTALL_PY_DIR}
         COMPONENT mindspore_federated
 )

@@ -22,7 +22,7 @@ import logging
 from mindspore import set_seed
 from mindspore import context
 from mindspore_federated import FLModel, FLYamlData
-from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig
+from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig, CompressConfig
 from wide_and_deep import FollowerBottomNet, FollowerBottomLossNet
 
 from network_config import config
@@ -39,8 +39,14 @@ class FollowerTrainer:
         super(FollowerTrainer, self).__init__()
         http_server_config = ServerConfig(server_name='follower', server_address=config.http_server_address)
         remote_server_config = ServerConfig(server_name='leader', server_address=config.remote_server_address)
-        self.vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
-                                                                   remote_server_config=remote_server_config)
+        if config.compress:
+            compress_config = CompressConfig(type="quant", quant_bits=8)
+            self.vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+                                                                       remote_server_config=remote_server_config,
+                                                                       compress_config=compress_config)
+        else:
+            self.vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+                                                                       remote_server_config=remote_server_config)
         self.vertical_communicator.launch()
         logging.info('start vfl trainer success')
         follower_bottom_yaml_data = FLYamlData(config.follower_bottom_yaml_path)

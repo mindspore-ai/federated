@@ -35,3 +35,9 @@ def check_int(arg_name, int_val):
     """Check whether the input parameters are reasonable int input"""
     if not isinstance(int_val, int):
         raise RuntimeError(f"Parameter '{arg_name}' should be int, but actually {type(int_val)}")
+
+
+def check_float(arg_name, float_val):
+    """Check whether the input parameters are reasonable float input"""
+    if not isinstance(float_val, float):
+        raise RuntimeError(f"Parameter '{arg_name}' should be float, but actually {type(float_val)}")

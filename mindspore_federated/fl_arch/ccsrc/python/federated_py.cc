@@ -128,11 +128,17 @@ void InitTensorItemPy(const py::module &m) {
     .def("set_shape", &TensorItemPy::set_shape, "Set shape.")
     .def("set_dtype", &TensorItemPy::set_dtype, "Set dtype.")
     .def("set_raw_data", &TensorItemPy::set_raw_data, "Set tensor raw data.")
+    .def("set_compress_type", &TensorItemPy::set_compress_type, "Set compress type.")
+    .def("set_min_val", &TensorItemPy::set_min_val, "Set min val with quant compress.")
+    .def("set_max_val", &TensorItemPy::set_max_val, "Set max val with quant compress.")
     .def("name", &TensorItemPy::name, "Get name.")
     .def("ref_key", &TensorItemPy::ref_key, "Get ref_key.")
     .def("shape", &TensorItemPy::shape, "Get shape.")
     .def("dtype", &TensorItemPy::dtype, "Get dtype.")
-    .def("raw_data", &TensorItemPy::raw_data, "Get tensor raw data.");
+    .def("raw_data", &TensorItemPy::raw_data, "Get tensor raw data.")
+    .def("compress_type", &TensorItemPy::compress_type, "Get compress type.")
+    .def("min_val", &TensorItemPy::min_val, "Get min val.")
+    .def("max_val", &TensorItemPy::max_val, "Get max val.");
 }
 
 void InitTensorListItemPy(const py::module &m) {
