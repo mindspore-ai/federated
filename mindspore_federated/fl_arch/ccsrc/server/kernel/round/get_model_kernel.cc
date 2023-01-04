@@ -154,6 +154,7 @@ void GetModelKernel::BuildGetModelRsp(const std::shared_ptr<FBBuilder> &fbb, con
     return;
   }
   auto server_mode = FLContext::instance()->server_mode();
+  auto aggregation_type = FLContext::instance()->aggregation_type();
   auto fbs_reason = fbb->CreateString(reason);
   auto fbs_timestamp = fbb->CreateString(timestamp);
   std::vector<flatbuffers::Offset<schema::FeatureMap>> fbs_feature_maps;
@@ -161,7 +162,9 @@ void GetModelKernel::BuildGetModelRsp(const std::shared_ptr<FBBuilder> &fbb, con
     auto weight_data = model->weight_data.data();
     for (const auto &feature : model->weight_items) {
       auto weight_item = feature.second;
-      if (!weight_item.require_aggr && server_mode != kServerModeHybrid) {
+      bool flag1 = (!weight_item.require_aggr && server_mode != kServerModeHybrid);
+      bool flag2 = (aggregation_type == kScaffoldAggregation && startswith(feature.first, kControlPrefix));
+      if (flag1 || flag2) {
         continue;
       }
       auto fbs_weight_fullname = fbb->CreateString(feature.first);

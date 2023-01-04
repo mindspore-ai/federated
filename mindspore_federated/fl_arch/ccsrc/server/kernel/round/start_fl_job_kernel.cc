@@ -314,6 +314,30 @@ void StartFLJobKernel::StartFLJob(const std::shared_ptr<FBBuilder> &fbb, const D
   return;
 }
 
+std::vector<flatbuffers::Offset<schema::FeatureMap>> StartFLJobKernel::BuildParamsRsp(
+  const ModelItemPtr &model_item,
+  const std::string &server_mode,
+  const std::shared_ptr<FBBuilder> &fbb) {
+  auto aggregation_type = FLContext::instance()->aggregation_type();
+  std::vector<flatbuffers::Offset<schema::FeatureMap>> fbs_feature_maps;
+  // No need to send weights in cross silo mode if aggregation type is not Scaffold during start fl job stage
+  if (model_item) {
+    auto weight_data_base = model_item->weight_data.data();
+    for (auto &feature : model_item->weight_items) {
+      bool flag1 = (server_mode == kServerModeHybrid || server_mode == kServerModeFL);
+      bool flag2 = (aggregation_type == kScaffoldAggregation && startswith(feature.first, kControlPrefix));
+      if (flag1 || flag2) {
+        auto fbs_weight_fullname = fbb->CreateString(feature.first);
+        auto fbs_weight_data = fbb->CreateVector(reinterpret_cast<float *>(weight_data_base + feature.second.offset),
+                                                 feature.second.size / sizeof(float));
+        auto fbs_feature_map = schema::CreateFeatureMap(*(fbb.get()), fbs_weight_fullname, fbs_weight_data);
+        fbs_feature_maps.push_back(fbs_feature_map);
+      }
+    }
+  }
+  return fbs_feature_maps;
+}
+
 void StartFLJobKernel::BuildStartFLJobRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
                                           const std::string &reason, const bool is_selected,
                                           const std::string &next_req_time, const ModelItemPtr &model_item,
@@ -368,18 +392,7 @@ void StartFLJobKernel::BuildStartFLJobRsp(const std::shared_ptr<FBBuilder> &fbb,
 
   auto fbs_fl_plan = fl_plan_builder.Finish();
 
-  std::vector<flatbuffers::Offset<schema::FeatureMap>> fbs_feature_maps;
-  // No need to send weights in cross silo mode during start fl job stage
-  if (model_item && server_mode != kServerModeCloud) {
-    auto weight_data_base = model_item->weight_data.data();
-    for (auto &feature : model_item->weight_items) {
-      auto fbs_weight_fullname = fbb->CreateString(feature.first);
-      auto fbs_weight_data = fbb->CreateVector(reinterpret_cast<float *>(weight_data_base + feature.second.offset),
-                                               feature.second.size / sizeof(float));
-      auto fbs_feature_map = schema::CreateFeatureMap(*(fbb.get()), fbs_weight_fullname, fbs_weight_data);
-      fbs_feature_maps.push_back(fbs_feature_map);
-    }
-  }
+  std::vector<flatbuffers::Offset<schema::FeatureMap>> fbs_feature_maps = BuildParamsRsp(model_item, server_mode, fbb);
   auto fbs_feature_maps_vector = fbb->CreateVector(fbs_feature_maps);
 
   // construct compress feature maps with fbs

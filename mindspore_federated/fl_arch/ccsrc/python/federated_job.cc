@@ -101,7 +101,9 @@ void FederatedJob::StopFederatedWorker() {
   worker::CloudWorker::GetInstance().Stop();
 }
 
-bool FederatedJob::StartFLJob(size_t data_size) { return StartFLJobKernelMod::GetInstance()->Launch(data_size); }
+py::dict FederatedJob::StartFLJob(size_t data_size) {
+  return StartFLJobKernelMod::GetInstance()->Launch(data_size);
+}
 
 py::dict FederatedJob::UpdateAndGetModel(std::map<std::string, std::vector<float>> weight_datas) {
   py::dict dict_data;

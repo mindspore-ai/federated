@@ -28,20 +28,22 @@ enum ResponseCode: int {
   SystemError=500
 }
 
-enum AggregationType:byte {FedAvg=0, FedAdam = 1, FedAdagrag=2, FedMeta=3, qffl=4}
-enum Metrics:byte {accuracy = 0, precision = 1, recall = 2, AUC = 3,f1=4, fbeta=5}
+enum AggregationType:byte {FedAvg = 0, FedProx = 1, Scaffold = 2, FedNova = 3, qffl = 4}
+enum Metrics:byte {accuracy = 0, precision = 1, recall = 2, AUC = 3,f1 = 4, fbeta = 5}
 enum EarlyStopType:byte {loss_diff = 0, loss_abs = 1, weight_diff = 2}
 
 table Aggregation {
   type:AggregationType;
   weights:[float];
+  iid_rate:float;
+  total_client_num:int;
 }
 
 table EarlyStop {
   early_stop_type:EarlyStopType;
   weight:float;
   rounds:int;    
- }
+}
 
 table FeatureMap{
   weight_fullname:string;

@@ -46,6 +46,7 @@ _check_positive_int_keys = ["server_num", "scheduler_port",
 
 _check_non_negative_int_keys = ["worker_num"]
 
+
 def _check_conflict_value(kwargs):
     if "upload_compress_type" in kwargs and "encrypt_type" in kwargs:
         if kwargs["upload_compress_type"] != "NO_COMPRESS" and kwargs["encrypt_type"] in ("SIGNDS", "PW_ENCRYPT"):
@@ -63,12 +64,15 @@ ROLE_OF_SCHEDULER = "MS_SCHED"
 
 FEDAVG = "FedAvg"
 FEDPROX = "FedProx"
+SCAFFOLD = "Scaffold"
+SUPPORT_AGG_TYPES = (FEDAVG, FEDPROX, SCAFFOLD)
 
 ENCRYPT_NONE = "NOT_ENCRYPT"
 ENCRYPT_SIGNDS = "SIGNDS"
 ENCRYPT_PW = "PW_ENCRYPT"
 ENCRYPT_DP = "DP_ENCRYPT"
 ENCRYPT_STABLE_PW = "STABLE_PW_ENCRYPT"
+SUPPORT_ENC_TYPES_CLOUD = (ENCRYPT_NONE, ENCRYPT_STABLE_PW)
 
 SERVER_MODE_FL = "FEDERATED_LEARNING"
 SERVER_MODE_HYBRID = "HYBRID_TRAINING"

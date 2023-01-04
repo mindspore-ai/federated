@@ -6,6 +6,7 @@ enable_ssl: false
 aggregation:
   aggregation_type: FedProx
   iid_rate: 0.01
+  total_client_num: 7
 
 distributed_cache:
   type: redis

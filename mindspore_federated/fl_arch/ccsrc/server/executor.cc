@@ -391,13 +391,37 @@ bool Executor::RunWeightAggregationInner(const std::map<std::string, std::string
     MS_LOG_INFO << "Servers count for RunWeightAggregation is 1";
   }
   std::unique_lock<std::mutex> lock(parameter_mutex_);
+  auto model = mindspore::fl::server::ModelStore::GetInstance().GetLatestModel().second;
+  if (model == nullptr || model->weight_data.empty()) {
+    MS_LOG_WARNING << "Failed to get latest model";
+    return false;
+  }
+  auto weight_data_base = model->weight_data.data();
+  auto aggregation_type = FLContext::instance()->aggregation_type();
   for (auto &item : param_aggregation_info_) {
     auto &param_aggr = item.second;
     if (!(*param_aggr.require_aggr)) {
       continue;
     }
-    if (!kernel::FedAvgKernel<float, size_t>::AllReduce(server_map, &param_aggr)) {
-      continue;
+    auto name = item.first;
+    if (aggregation_type == kScaffoldAggregation && startswith(name, kControlPrefix)) {
+      bool ret = kernel::FedAvgKernel<float, size_t>::ScaffoldAllReduce(server_map, &param_aggr);
+      if (!ret) {
+        MS_LOG(ERROR) << "ScaffoldAllReduce is failed.";
+        return false;
+      }
+      float *weight_data = reinterpret_cast<float *>(weight_data_base + model->weight_items[name].offset);
+      float *weight_addr = reinterpret_cast<float *>(param_aggr.weight_data);
+      auto elem_num = param_aggr.weight_size / sizeof(float);
+      for (size_t i = 0; i < elem_num; i++) {
+        weight_addr[i] += weight_data[i];
+      }
+    } else {
+      bool ret = kernel::FedAvgKernel<float, size_t>::AllReduce(server_map, &param_aggr);
+      if (!ret) {
+        MS_LOG(ERROR) << "AllReduce is failed.";
+        return false;
+      }
     }
   }
   is_aggregation_done_ = true;

@@ -144,7 +144,11 @@ class UpdateModelKernelMod : public AbstractKernel {
   }
 
   bool WeightingData(std::map<std::string, std::vector<float>> *weight_datas) {
+    auto aggregation_type = FLContext::instance()->aggregation_type();
     for (auto &item : *weight_datas) {
+      if (aggregation_type == kScaffoldAggregation && startswith(item.first, kControlPrefix)) {
+        continue;
+      }
       auto &data = item.second;
       for (size_t i = 0; i < data.size(); i++) {
         data[i] *= data_size_;

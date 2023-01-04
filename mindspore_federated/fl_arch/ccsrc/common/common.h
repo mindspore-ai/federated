@@ -86,7 +86,7 @@ enum TypeId : int {
 // Definitions for the server framework.
 enum ServerMode { PARAMETER_SERVER = 0, FL_SERVER };
 enum CommType { HTTP = 0, TCP };
-enum AggregationType { FedAvg = 0, FedProx, FedAdagarg, FedMeta, qffl, DenseGradAccum, SparseGradAccum };
+enum AggregationType { FedAvg = 0, FedProx, Scaffold, FedNova, qffl, DenseGradAccum, SparseGradAccum };
 
 struct RoundConfig {
   // The name of the round. Please refer to round kernel *.cc files.
@@ -170,6 +170,7 @@ constexpr auto SECRET_MAX_LEN = 32;
 constexpr auto PRIME_MAX_LEN = 33;
 const char PYTHON_MOD_SERIALIZE_MODULE[] = "mindspore.train.serialization";
 const char PYTHON_MOD_SAFE_WEIGHT[] = "_save_weight";
+constexpr auto kControlPrefix = "control.";
 
 // This macro the current timestamp in milliseconds.
 #define CURRENT_TIME_MILLI \
@@ -197,6 +198,16 @@ inline std::string GetEnv(const std::string &env_var) {
 }
 
 inline bool isNaN(float num) { return num != num; }
+
+inline bool startswith(const std::string &full_str, const std::string &prefix) {
+  size_t prefix_len = prefix.size();
+
+  int flag = full_str.compare(0, prefix_len, prefix);
+  if (flag == 0) {
+    return true;
+  }
+  return false;
+}
 }  // namespace fl
 }  // namespace mindspore
 #endif  // MINDSPORE_CCSRC_FL_COMMON_COMMON_H_
