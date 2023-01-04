@@ -24,7 +24,7 @@ from mindspore import Tensor, Parameter
 from mindspore import nn, context
 from mindspore.ops import PrimitiveWithInfer, prim_attr_register
 from mindspore.context import ParallelMode
-from mindspore_federated.privacy import LabelDP
+from mindspore_federated.privacy import LabelDP, SimuTEE
 
 from .vfl_optim import PartyOptimizer, PartyGradScaler, _reorganize_input_data
 
@@ -96,8 +96,6 @@ class FLModel:
             to use standard optimizers of MindSpore specified in the yaml file. Default: None.
         metrics (Metric): Metrics to evaluate the evaluation network. Default: None.
         eval_network (Cell): Evaluation network of the party, which outputs the predict value. Default: None.
-        grad_network (Cell): Network running on the trusted execution environment(TEE) environment for protect
-            the data privacy. Default: None.
 
     Examples:
         >>> from mindspore_federated import FLModel, FLYamlData
@@ -117,8 +115,7 @@ class FLModel:
                  loss_fn=None,
                  optimizers=None,
                  metrics=None,
-                 eval_network=None,
-                 grad_network=None):
+                 eval_network=None):
         self._yaml_data = yaml_data
         self._role = self._yaml_data.role
         self._train_net_yaml = self._yaml_data.train_net
@@ -147,7 +144,6 @@ class FLModel:
             self._train_network.set_broadcast_flag()
         self._train_network.set_train(mode=True)
 
-        self._grad_network = grad_network
         self._metrics = metrics
 
         self.global_step = 0
@@ -160,16 +156,19 @@ class FLModel:
         if self._label_dp is not None and self._role != 'leader':
             raise AttributeError('FLModel: only a leader party can employ the label dp strategy')
 
-        if self._grad_network is None:
-            if optimizers is None:
-                self._optimizers = []
-                self._build_optimizer()
-            elif isinstance(optimizers, list):
-                self._optimizers = optimizers
-            else:
-                self._optimizers = [optimizers]
+        # init the tee layer
+        if hasattr(self._yaml_data, 'tee_layer'):
+            self.tee_layer = SimuTEE(self._yaml_data.tee_layer)
 
-            self._grad_scalers = self._build_grad_scaler() if self._yaml_data.grad_scalers else None
+        if optimizers is None:
+            self._optimizers = []
+            self._build_optimizer()
+        elif isinstance(optimizers, list):
+            self._optimizers = optimizers
+        else:
+            self._optimizers = [optimizers]
+
+        self._grad_scalers = self._build_grad_scaler() if self._yaml_data.grad_scalers else None
 
     def _build_train_network(self):
         """
@@ -230,7 +229,11 @@ class FLModel:
                 input_data_batch[input_data['name']] = data_batch[input_data['name']]
             else:
                 raise ValueError('FLModel: missing input data \'%s\'' % input_data['name'])
-        out_tuple = self._eval_network(**input_data_batch)
+        input_data_batch = tuple(input_data_batch.values())
+        # if tee_layer is applied, forward one step in tee and update the input data batch
+        if hasattr(self._yaml_data, 'tee_layer'):
+            input_data_batch = self.tee_layer.forward_one_step(*input_data_batch)
+        out_tuple = self._eval_network(*input_data_batch)
         if len(self._yaml_data.eval_net_outs) != len(out_tuple):
             raise ValueError('FLModel: output of %s do not match the description of yaml' % self._eval_network.__name__)
         if self._yaml_data.eval_net_gt not in data_batch:
@@ -272,6 +275,10 @@ class FLModel:
             else:
                 raise ValueError("FLModel: missing input data \'%s\'" % input_data['name'])
         input_data_batch = tuple(input_data_batch.values())
+        # if tee_layer is applied, forward one step in tee and update the input data batch
+        if hasattr(self._yaml_data, 'tee_layer'):
+            input_data_batch = self.tee_layer.forward_one_step(*input_data_batch[:-1]) + (input_data_batch[-1],)
+
         out_tuple = self._train_network(*input_data_batch)
         out_length = len(out_tuple) if isinstance(out_tuple, tuple) else 1
         if out_length != len(self._yaml_data.train_net_outs):
@@ -303,13 +310,31 @@ class FLModel:
             is the input of the training network, and the value of the value dict is the sense tensor of corresponding
             input.
         """
+        # if tee_layer is applied, forward one step in tee and update the data batch
+        if hasattr(self._yaml_data, 'tee_layer'):
+            data_batch = OrderedDict()
+            for input_data in self._yaml_data.train_net_ins:
+                if input_data['name'] in local_data_batch:
+                    data_batch[input_data['name']] = local_data_batch[input_data['name']]
+                elif input_data['name'] in remote_data_batch:
+                    data_batch[input_data['name']] = remote_data_batch[input_data['name']]
+                else:
+                    raise ValueError("FLModel: missing input data \'%s\'" % input_data['name'])
+            data_batch = dict(zip(list(data_batch.keys())[:-1],
+                                  self.tee_layer.forward_one_step(*list(data_batch.values())[:-1])))
+            for key, _ in data_batch.items():
+                if key in local_data_batch:
+                    local_data_batch[key] = data_batch[key]
+                elif key in remote_data_batch:
+                    remote_data_batch[key] = data_batch[key]
+                else:
+                    raise ValueError("FLModel: unmatched key \'%s\'" % key)
+
+        # label dp
         if self._role == 'leader' and self._label_dp is not None:
             label = local_data_batch[self._yaml_data.eval_net_gt]
             dp_label = self._label_dp(label)
             local_data_batch[self._yaml_data.eval_net_gt] = dp_label
-
-        if self._grad_network:
-            return self._grad_network(local_data_batch, remote_data_batch)
 
         scales = dict()
         if self._grad_scalers:
@@ -331,8 +356,12 @@ class FLModel:
                     else:
                         optimizer(*input_data_batch, sens=sens)
 
-        if self._role == 'leader' and self._label_dp is not None:
-            local_data_batch[self._yaml_data.eval_net_gt] = label
+        # if tee_layer is applied, backward one step in tee and update the gradient
+        if hasattr(self._yaml_data, 'tee_layer'):
+            key = list(scales.keys())[0]
+            grad_batch = tuple(scales[key].values())
+            out_grad_batch = self.tee_layer.backward_one_step(*grad_batch)
+            scales[key] = OrderedDict(zip(scales[key].keys(), out_grad_batch))
 
         # increase the global step
         self.global_step += 1
