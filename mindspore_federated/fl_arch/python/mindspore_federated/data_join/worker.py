@@ -22,20 +22,17 @@ from mindspore._checkparam import Validator, Rel
 from mindspore_federated.data_join.server import _DataJoinServer
 from mindspore_federated.data_join.client import _DataJoinClient
 from mindspore_federated.data_join.context import _WorkerRegister, _WorkerConfig
+from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
+from mindspore_federated.data_join.store import DataSourceMgr
+from mindspore_federated._mindspore_federated import VFLContext
+from mindspore_federated.common import data_join_utils
+from mindspore_federated.common.check_type import check_str
+from mindspore_federated.startup.ssl_config import SSLConfig
+
 from .io import export_mindrecord
 
 SUPPORT_JOIN_TYPES = ("psi",)
 SUPPORT_STORE_TYPES = ("csv",)
-SUPPORT_TYPES = ("int32", "int64", "float32", "float64", "string", "bytes")
-SUPPORT_ARRAY_TYPES = ("int32", "int64", "float32", "float64")
-
-
-def _check_str(arg_value, arg_name=None, prim_name=None):
-    if not isinstance(arg_value, str):
-        prim_name = f"For '{prim_name}', the" if prim_name else 'The'
-        arg_name = f"'{arg_name}'" if arg_name else 'input value'
-        raise TypeError(f"{prim_name} {arg_name} must be a str, but got {type(arg_value).__name__}.")
-    return arg_value
 
 
 class _DivideKeyTobucket:
@@ -71,144 +68,80 @@ class FLDataWorker:
     Data join worker.
 
     Args:
-        role (str): Role of the worker, which must be set in both leader and follower. Supports ["leader", "follower"].
-        raw_data (Union(PandasData, MysqlData)): The raw data source, which must be set in both leader and follower.
-        output_dir (str): The output directory, which must be set in both leader and follower.
-        data_schema_path (str): Path of data schema file, which must be set in both leader and follower. User need to
-            provide the column name and type of the data to be exported in the schema.
-            The schema needs to be parsed as a two-level key-value dictionary.
-            The key of the first-level dictionary is the column name, and the value is the second-level dictionary.
-            The key of the second-level dictionary must be a string: "type", and the value is the type of the
-            exported data.
-            Currently, the types support ["int32", "int64", "float32", "float64", "string", "bytes"].
-        communicator (VerticalFederatedCommunicator): Http and Https communicator which used in vertical.
-        primary_key (str): The primary key. The value set by leader is used, and the value set by follower is invalid.
-            Default: "oaid".
-        bucket_num (int): The number of buckets. The value set by leader is used, and the value set by follower is
-            invalid. Default: 1.
-        store_type (str): The data store type. Default: "csv".
-        shard_num (int): The output number of each bucket when export. The value set by leader is used, and the value
-            set by follower is invalid. Default: 1.
-        join_type (str): The data join type. The value set by leader is used, and the value set by follower is
-            invalid. Default: "psi".
-        thread_num (int): The thread number of psi. Default: 0.
+        config (dict): the key/value of dict defined as below
+
+        config for common
+        role(str): Role of the worker, which must be set in both leader and follower. Supports [leader, follower].
+        bucket_num(int): The number of buckets. The value set by leader is used, and the value set by follower
+            is invalid
+
+        config for store
+        store_type(str): The origin data store type. Now only support csv/mysql.
+        data_schema_path(str): Path of data schema file, which must be set in both leader and follower. User need to
+            provide the column name and type of the data to be exported in the schema. The schema
+            needs to be parsed as a two-level key-value dictionary. The key of the first-level
+            dictionary is the column name, and the value is the second-level dictionary. The key of
+            the second-level dictionary must be a string: type, and the value is the type of the
+            exported data. Currently, the types support [int32, int64, float32, float64, string, bytes]
+        primary_key(str): The primary key. The value set by leader is used, and the value set by follower is invalid.
+
+        config for store csv
+        main_table_files(str): The raw data paths, which must be set in both leader and follower.
+
+        config for store mysql
+        mysql_host(str): Host where the database server is located.
+        mysql_port(int): MySQL port to use, usually use 3306
+        mysql_database(str): Database to use, None to not use a particular one.
+        mysql_charset(str): Charset you want to use.
+        mysql_user(str): Username to login mysql.
+        mysql_password(str): Password to login mysql.
+        mysql_table_name(str): The table that contains origin data.
+
+        config for communicator
+        server_name(str): Local http server name, used for communication.
+        http_server_address(str): Local IP and Port Address, which must be set in both leader and follower.
+        remote_server_name(str): Remote http server name, used for communication.
+        remote_server_address(str): Peer IP and Port Address, which must be set in both leader and follower.
+        enable_ssl(bool): SSL mode enabled or disabled for communication. Supports [True, False]
+        server_password(str): The server password to decode the p12 file.
+            For security please giving it in start command line.
+        client_password(str): The client password to decode the p12 file.
+            For security please giving it in start command line.
+        server_cert_path(str): Certificate file path for server.
+        client_cert_path(str): Certificate file path for client.
+        ca_cert_path(str): CA server certificate file path.
+        crl_path(str): CRL certificate file path.
+        cipher_list(str): Encryption suite supported by ssl
+        cert_expire_warning_time_in_day(str): Warning time before the certificate expires.
+
+        config for do data join
+        join_type(str): The data join type. The value set by leader is used, and the value set by follower is invalid.
+            Now only support "psi"
+        thread_num(int): The thread number of psi.
+
+        config for output MindRecord
+        output_dir: The output directory, which must be set in both leader and follower.
+        shard_num: The output number of each bucket when export.
+            The value set by leader is used, and the value set by follower is invalid.
+
+        More details refer to:
+            https://e.gitee.com/mind_spore/repos/mindspore/federated/tree/master/tests/st/data_join/vfl/vfl_data_join_config.yaml
 
     Examples:
-        >>> from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
-        >>> http_server_config = ServerConfig(server_name='server', server_address="127.0.0.1:1086")
-        >>> remote_server_config = ServerConfig(server_name='client', server_address="127.0.0.1:1087")
-        >>> vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
-        ...                                                       remote_server_config=remote_server_config)
-        >>> vertical_communicator.launch()
-        >>> worker = FLDataWorker(role="leader",
-        ...                       raw_data=pandas_data,
-        ...                       output_dir="output/leader/",
-        ...                       data_schema_path="leader_schema.yaml",
-        ...                       communicator=vertical_communicator,
-        ...                       primary_key="oaid",
-        ...                       bucket_num=5,
-        ...                       store_type="csv",
-        ...                       shard_num=1,
-        ...                       join_type="psi",
-        ...                       thread_num=0,
-        ...                       )
-        >>> worker.export()
+        >>> from mindspore_federated import FLDataWorker
+        >>> from mindspore_federated.common.config import get_config
+        >>>
+        >>> current_dir = os.path.dirname(os.path.abspath(__file__))
+        >>> args = get_config(os.path.join(current_dir, "vfl/vfl_data_join_config.yaml"))
+        >>> dict_cfg = args.__dict__
+        >>>
+        >>> worker = FLDataWorker(config=dict_cfg)
+        >>> worker.do_worker()
     """
+    _communicator = None
 
-    def __init__(self,
-                 role,
-                 raw_data,
-                 output_dir,
-                 data_schema_path,
-                 communicator,
-                 primary_key="oaid",
-                 bucket_num=5,
-                 store_type="csv",
-                 shard_num=1,
-                 join_type="psi",
-                 thread_num=0,
-                 ):
-        self._role = role
-        self._raw_data = raw_data
-        self._worker_config = _WorkerConfig(
-            output_dir=output_dir,
-            primary_key=primary_key,
-            bucket_num=bucket_num,
-            store_type=store_type,
-            shard_num=shard_num,
-            join_type=join_type,
-            thread_num=thread_num,
-        )
-        self._data_schema_path = data_schema_path
-        if self._role not in ("leader", "follower"):
-            raise ValueError("role must be \"leader\" or \"follower\"")
-        with open(self._data_schema_path, "r") as f:
-            self._schema = yaml.load(f, yaml.Loader)
-        self._verify()
-
-        if communicator is None:
-            raise ValueError("Communicator must not be None.")
-        self._communicator = communicator
-
-        if role == "leader":
-            self.data_join_obj = _DataJoinServer(self._worker_config, self._communicator)
-            self.data_join_obj.launch()
-        elif role == "follower":
-            worker_register = _WorkerRegister(self._role)
-            self.data_join_obj = _DataJoinClient(self._worker_config, self._communicator, worker_register)
-            self._worker_config = self.data_join_obj.launch()
-        else:
-            raise ValueError("role must be \"leader\" or \"follower\"")
-        self._verify()
-
-    def _verify(self):
-        """
-        Verify hyper parameters and schema.
-        """
-        self._raw_data.verify()
-        self._raw_data.set_store_type(self._worker_config.store_type)
-        self._raw_data.set_primary_key(self._worker_config.primary_key)
-        self._raw_data.set_schema(self._schema)
-        _check_str(self._worker_config.output_dir, arg_name="output_dir")
-        if not os.path.isdir(self._worker_config.output_dir):
-            raise ValueError("output_dir: {} is not a directory.".format(self._worker_config.output_dir))
-        Validator.check_string(self._worker_config.join_type, SUPPORT_JOIN_TYPES, arg_name="join_type")
-        Validator.check_int_range(self._worker_config.bucket_num, 1, 1000000, Rel.INC_BOTH, arg_name="bucket_num")
-        Validator.check_string(self._worker_config.store_type, SUPPORT_STORE_TYPES, arg_name="store_type")
-
-        _check_str(self._worker_config.primary_key, arg_name="primary_key")
-        Validator.check_non_negative_int(self._worker_config.thread_num, arg_name="thread_num")
-        Validator.check_int_range(self._worker_config.shard_num, 1, 1000, Rel.INC_BOTH, arg_name="shard_num")
-        if self._worker_config.shard_num * self._worker_config.bucket_num > 4096:
-            logging.warning('The maximum number of files read by MindData is 4096. It is recommended that the value of '
-                            'shard_num * bucket_num be smaller than 4096. Actually, the value is: %d',
-                            self._worker_config.shard_num * self._worker_config.bucket_num)
-        self._verify_schema()
-
-    def _verify_schema(self):
-        """
-        Verify schema.
-        """
-        if isinstance(self._schema, dict):
-            for key in self._schema:
-                _check_str(key, arg_name="column name")
-
-                shape = self._schema[key].get("shape")
-                data_type = self._schema[key].get("type")
-
-                if shape is not None:
-                    if isinstance(shape, list):
-                        raise TypeError("shape must be list, but get {}".format(type(shape)))
-                else:
-                    shape = (1,)
-
-                if data_type is not None:
-                    if len(shape) == 1:
-                        Validator.check_string(data_type, SUPPORT_TYPES, arg_name="data type")
-                    else:
-                        Validator.check_string(data_type, SUPPORT_ARRAY_TYPES, arg_name="array data type")
-        else:
-            raise TypeError("schema must be dict, but get {}".format(type(self._schema)))
+    def __init__(self, config: dict):
+        self._config = config
 
     def _join_func(self, input_vct, bucket_id):
         """
@@ -227,7 +160,6 @@ class FLDataWorker:
         """
         Export MindRecord by intersection keys.
         """
-        self._raw_data.load_raw_data()
         keys = self._raw_data.keys()
         divide_key_to_bucket = _DivideKeyTobucket(bucket_num=self._worker_config.bucket_num, keys=keys)
         buckets = divide_key_to_bucket.get_buckets()
@@ -243,3 +175,148 @@ class FLDataWorker:
             export_count += 1
         if export_count == 0:
             raise ValueError("The intersection_keys of all buckets is empty")
+
+    def get_data_source(self):
+        """
+        create data source by config
+        """
+        with open(self._config['data_schema_path'], "r") as f:
+            self._schema = yaml.load(f, yaml.Loader)
+
+        cls_data_source = DataSourceMgr.get_data_source_cls(self._worker_config.store_type)
+        if cls_data_source is not None:
+            self._raw_data = cls_data_source(store_type=self._worker_config.store_type,
+                                             primary_key=self._worker_config.primary_key,
+                                             schema=self._schema,
+                                             config=self._config)
+        else:
+            raise ValueError("Unsupported Data Source type " + self._worker_config.store_type)
+
+        self._raw_data.verify()
+        self._raw_data.load_raw_data()
+
+    def get_data_joiner(self):
+        """
+        create data joiner by config
+        """
+        role = self._config['role']
+        if role == "leader":
+            self.data_join_obj = _DataJoinServer(self._worker_config, FLDataWorker._communicator)
+        elif role == "follower":
+            self.data_join_obj = _DataJoinClient(self._worker_config, FLDataWorker._communicator)
+        else:
+            raise ValueError("role must be \"leader\" or \"follower\"")
+
+    def verify_worker_config(self):
+        """
+        verify worker config
+        """
+        Validator.check_string(self._worker_config.join_type, SUPPORT_JOIN_TYPES, arg_name="join_type")
+        Validator.check_int_range(self._worker_config.bucket_num, 1, 1000000, Rel.INC_BOTH, arg_name="bucket_num")
+        Validator.check_string(self._worker_config.store_type, SUPPORT_STORE_TYPES, arg_name="store_type")
+        check_str(arg_name="primary_key", str_val=self._worker_config.primary_key)
+        Validator.check_non_negative_int(self._worker_config.thread_num, arg_name="thread_num")
+        Validator.check_int_range(self._worker_config.shard_num, 1, 1000, Rel.INC_BOTH, arg_name="shard_num")
+        if self._worker_config.shard_num * self._worker_config.bucket_num > 4096:
+            logging.warning('The maximum number of files read by MindData is 4096. It is recommended that the value of '
+                            'shard_num * bucket_num be smaller than 4096. Actually, the value is: %d',
+                            self._worker_config.shard_num * self._worker_config.bucket_num)
+        check_str(arg_name="output_dir", str_val=self._worker_config.output_dir)
+        if not os.path.isdir(self._worker_config.output_dir):
+            raise ValueError("output_dir: {} is not a directory.".format(self._worker_config.output_dir))
+
+    def negotiate_hyper_params(self):
+        """
+        negotiate hyper parameters
+        The hyper parameters include:
+            primary_key (str)
+            bucket_num (int)
+            shard_num (int)
+            join_type (str)
+        """
+        self._worker_config = _WorkerConfig(
+            output_dir=self._config['output_dir'],
+            primary_key=self._config['primary_key'],
+            bucket_num=self._config['bucket_num'],
+            store_type=self._config['store_type'],
+            shard_num=self._config['shard_num'],
+            join_type=self._config['join_type'],
+            thread_num=self._config['thread_num'],
+        )
+        role = self._config['role']
+        if role == "leader":
+            self.verify_worker_config()
+            ctx = VFLContext.get_instance()
+            worker_config_item_py = data_join_utils.worker_config_to_pybind_obj(self._worker_config)
+            ctx.set_worker_config(worker_config_item_py)
+            FLDataWorker._communicator.data_join_wait_for_start()
+        elif role == "follower":
+            worker_register = _WorkerRegister(role)
+            primary_key, bucket_num, shard_num, join_type = FLDataWorker._communicator.send_register(
+                self._config['remote_server_name'],
+                worker_register=worker_register)
+            self._worker_config.primary_key = primary_key
+            self._worker_config.bucket_num = bucket_num
+            self._worker_config.shard_num = shard_num
+            self._worker_config.join_type = join_type
+            self.verify_worker_config()
+        else:
+            raise ValueError("role must be \"leader\" or \"follower\"")
+
+    def create_communicator(self):
+        """
+        create communicator for data join
+        communicator will be used both at data join && model train
+        """
+        if FLDataWorker._communicator is not None:
+            return
+
+        # create communicator for data join
+        http_server_config = ServerConfig(server_name=self._config['server_name'],
+                                          server_address=self._config['http_server_address'])
+        remote_server_config = ServerConfig(server_name=self._config['remote_server_name'],
+                                            server_address=self._config['remote_server_address'])
+
+        enable_ssl = self._config['enable_ssl']
+        ssl_config = None
+        if isinstance(enable_ssl, bool) and enable_ssl:
+            ssl_config = SSLConfig(
+                self._config['server_password'],
+                self._config['client_password'],
+                self._config['server_cert_path'],
+                self._config['client_cert_path'],
+                self._config['ca_cert_path'],
+                self._config['crl_path'],
+                self._config['cipher_list'],
+                self._config['cert_expire_warning_time_in_day']
+            )
+        FLDataWorker._communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+                                                                   remote_server_config=remote_server_config,
+                                                                   enable_ssl=enable_ssl,
+                                                                   ssl_config=ssl_config)
+        FLDataWorker._communicator.launch()
+
+    def communicator(self):
+        """
+        The data join && train model use the same communicator,
+        here provide a api for train to get the communicator
+        """
+        return FLDataWorker._communicator
+
+    def do_worker(self):
+        """
+        create the environment for worker
+        """
+        self.create_communicator()
+
+        # negotiate params
+        self.negotiate_hyper_params()
+
+        # get data source
+        self.get_data_source()
+
+        # get data joiner
+        self.get_data_joiner()
+
+        #
+        self.export()

@@ -1,0 +1,123 @@
+# Builtin Configurations(DO NOT CHANGE THESE CONFIGURATIONS unless you know exactly what you are doing)
+role:
+  def_val: "leader"
+  help: "Role of the worker, which must be set in both leader and follower. Supports [leader, follower]."
+  choices: [ 'leader', 'follower' ]
+bucket_num:
+  def_val: 5
+  help: "The number of buckets. The value set by leader is used, and the value set by follower is invalid"
+
+# =================================================================
+# config for data source
+store_type:
+  def_val: "csv"
+  help: "The origin data store type. Now only support csv/mysql."
+  choices: [ 'csv', 'mysql' ]
+
+data_schema_path:
+  def_val: "vfl/leader_schema.yaml"
+  help: >
+    "Path of data schema file, which must be set in both leader and follower. User need to"
+    "provide the column name and type of the data to be exported in the schema. The schema"
+    "needs to be parsed as a two-level key-value dictionary. The key of the first-level"
+    "dictionary is the column name, and the value is the second-level dictionary. The key of"
+    "the second-level dictionary must be a string: type, and the value is the type of the"
+    "exported data. Currently, the types support [int32, int64, float32, float64, string,"
+    "bytes]."
+primary_key:
+  def_val: "oaid"
+  help: "The primary key. The value set by leader is used, and the value set by follower is invalid."
+
+# path for local  storage
+main_table_files:
+  def_val: "vfl/input/leader/"
+  help: "The raw data paths, which must be set in both leader and follower."
+
+# config for mysql
+mysql_host:
+  def_val: "127.0.0.1"
+  help: "Host where the database server is located."
+mysql_port:
+  def_val: 3306
+  help: "MySQL port to use, default is usually OK. (default: 3306)"
+mysql_database:
+  def_val: ""
+  help: "Database to use, None to not use a particular one."
+mysql_charset:
+  def_val: ""
+  help: "Charset you want to use."
+mysql_user:
+  def_val: "test"
+  help: "Username to log in mysql"
+mysql_password:
+  def_val: "1234"
+  help: "Password to log in mysql"
+mysql_table_name:
+  def_val: "test_data"
+  help: "The table that contains origin data."
+
+
+# ==================================================================
+# config for communicator
+server_name:
+  def_val: "leader_node"
+  help: "Local http server name, used for communication."
+http_server_address:
+  def_val: "127.0.0.1:1086"
+  help: "Local IP and Port Address, which must be set in both leader and follower."
+remote_server_name:
+  def_val: "follower_node"
+  help: "Remote http server name, used for communication."
+remote_server_address:
+  def_val: "127.0.0.1:1087"
+  help: "Peer IP and Port Address, which must be set in both leader and follower."
+# arguments for ssl
+enable_ssl:
+  def_val: False
+  help: "SSL mode enabled or disabled for communication."
+  choices: [ True, False ]
+server_password:
+  def_val: "server_password_12345"
+  help: "The server password to decode the p12 file. For security please giving it in start command line."
+client_password:
+  def_val: "client_password_12345"
+  help: "The client password to decode the p12 file. For security please giving it in start command line."
+server_cert_path:
+  def_val: "server.p12"
+  help: "Certificate file path for server."
+client_cert_path:
+  def_val: "client.p12"
+  help: "Certificate file path for client."
+ca_cert_path:
+  def_val: "cacert.pem"
+  help: "CA server certificate file path."
+crl_path:
+  def_val: ""
+  help: " CRL certificate file path."
+cipher_list:
+  def_val: "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-PSK-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-CCM:ECDHE-ECDSA-AES256-CCM:ECDHE-ECDSA-CHACHA20-POLY1305"
+  help: "Encryption suite supported by ssl.."
+cert_expire_warning_time_in_day:
+  def_val: 90
+  help: "Warning time before the certificate expires."
+
+
+# =================================================================================
+# config for do data join
+join_type:
+  def_val: "psi"
+  help: "The data join type. The value set by leader is used, and the value set by follower is invalid."
+thread_num:
+  def_val: 0
+  help: "The thread number of psi."
+
+# =================================================================================
+# config for output MindRecord
+output_dir:
+  def_val: "./"
+  help: "The output directory, which must be set in both leader and follower."
+shard_num:
+  def_val: 1
+  help: >
+    "The output number of each bucket when export."
+    "The value set by leader is used, and the value set by follower is invalid."

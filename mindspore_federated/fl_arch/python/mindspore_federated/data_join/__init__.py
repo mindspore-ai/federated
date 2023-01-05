@@ -14,10 +14,8 @@
 # ============================================================================
 
 """data join"""
-from .worker import FLDataWorker
 from .io import load_mindrecord
 
 __all__ = [
-    "FLDataWorker",
     "load_mindrecord",
 ]

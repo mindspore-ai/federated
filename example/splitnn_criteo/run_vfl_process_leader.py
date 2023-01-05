@@ -22,8 +22,7 @@ from collections import OrderedDict
 
 from mindspore import context
 from mindspore_federated import FLModel, FLYamlData
-from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig
-from mindspore_federated.data_join import FLDataWorker
+from mindspore_federated import FLDataWorker
 
 from wide_and_deep import LeaderTopNet, LeaderTopLossNet, LeaderTopEvalNet, LeaderBottomNet, LeaderBottomLossNet, \
     AUCMetric
@@ -95,24 +94,24 @@ context.set_context(mode=context.GRAPH_MODE, device_target=config.device_target)
 logging.info("config is:")
 logging.info(config)
 
-http_server_config = ServerConfig(server_name='server', server_address=config.http_server_address)
-remote_server_config = ServerConfig(server_name='client', server_address=config.remote_server_address)
-vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
-                                                      remote_server_config=remote_server_config)
-vertical_communicator.launch()
-worker = FLDataWorker(role="leader",
-                      main_table_files=config.raw_dataset_dir,
-                      output_dir=config.dataset_dir,
-                      data_schema_path=config.data_schema_path,
-                      primary_key=config.primary_key,
-                      bucket_num=config.bucket_num,
-                      store_type=config.store_type,
-                      shard_num=config.shard_num,
-                      join_type=config.join_type,
-                      thread_num=config.thread_num,
-                      communicator=vertical_communicator
-                      )
-worker.export()
+cfg_dict = {'server_name': 'server',
+            'http_server_address': config.http_server_address,
+            'remote_server_name': 'client',
+            'remote_server_address': config.remote_server_address,
+            'role': "leader",
+            'main_table_files': config.raw_dataset_dir,
+            'output_dir': config.dataset_dir,
+            'data_schema_path': config.data_schema_path,
+            'primary_key': config.primary_key,
+            'enable_ssl': False,
+            'bucket_num': config.bucket_num,
+            'store_type': config.store_type,
+            'shard_num': config.shard_num,
+            'join_type': config.join_type,
+            'thread_num': config.thread_num}
+
+worker = FLDataWorker(cfg_dict)
+worker.do_worker()
 logging.info('train dataset export is done')
 ds_train = create_joined_dataset(config.dataset_dir, batch_size=config.batch_size, train_mode=True,
                                  role="leader")
@@ -120,26 +119,17 @@ train_iter = ds_train.create_dict_iterator()
 train_size = ds_train.get_dataset_size()
 logging.info("train_size is: %d", train_size)
 
-worker = FLDataWorker(role="leader",
-                      main_table_files=config.raw_eval_dataset_dir,
-                      output_dir=config.eval_dataset_dir,
-                      data_schema_path=config.data_schema_path,
-                      primary_key=config.primary_key,
-                      bucket_num=config.bucket_num,
-                      store_type=config.store_type,
-                      shard_num=config.shard_num,
-                      join_type=config.join_type,
-                      thread_num=config.thread_num,
-                      communicator=vertical_communicator
-                      )
-worker.export()
+cfg_dict['main_table_files'] = config.raw_eval_dataset_dir
+cfg_dict['output_dir'] = config.eval_dataset_dir
+worker = FLDataWorker(cfg_dict)
+worker.do_worker()
 logging.info('eval dataset export is done')
 ds_eval = create_joined_dataset(config.eval_dataset_dir, batch_size=config.batch_size, train_mode=False,
                                 role="leader")
 eval_iter = ds_eval.create_dict_iterator()
 eval_size = ds_eval.get_dataset_size()
 logging.info("eval_size is: %d", eval_size)
-
+vertical_communicator = worker.communicator()
 
 if __name__ == '__main__':
     leader_trainer = LeaderTrainer()
