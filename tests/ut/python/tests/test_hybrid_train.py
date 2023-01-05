@@ -13,27 +13,23 @@
 # limitations under the License.
 # ============================================================================
 """Test the functions of server and worker in server mode HYBRID_TRAINING"""
-import os
-import subprocess
+
 import time
-from multiprocessing import Pipe
 import numpy as np
 
-from common import fl_name_with_idx, make_yaml_config, start_fl_server, g_redis_server_address, fl_test
-from common_client import post_start_fl_job, post_get_model, post_update_model
-from common_client import server_safemode_rsp, server_disabled_finished_rsp
-from common_client import ResponseCode, ResponseFLJob, ResponseGetModel, ResponseUpdateModel
-from common import start_fl_job_expect_success, update_model_expect_success, get_model_expect_success
-from common import check_feature_map, post_scheduler_state_msg, start_fl_scheduler, stop_processes
-from common import run_worker_client_task, wait_worker_client_task_result, read_metrics
-
-from mindspore_federated import FeatureMap
-
-from hybrid_train_network import LeNet5
 from mindspore.train.callback import RunContext, _InternalCallbackParam
 import mindspore as ms
 from mindspore_federated import FederatedLearningManager
+from mindspore_federated import FeatureMap
 import mindspore_federated as ms_fl
+
+from common import fl_name_with_idx, make_yaml_config, start_fl_server, fl_test
+from common import start_fl_job_expect_success, update_model_expect_success, get_model_expect_success
+from common import check_feature_map, post_scheduler_state_msg, start_fl_scheduler, stop_processes
+from common import run_worker_client_task, wait_worker_client_task_result, read_metrics
+from common_client import post_get_model
+from common_client import ResponseGetModel
+from hybrid_train_network import LeNet5
 
 
 def get_trainable_params(network):
@@ -102,7 +98,7 @@ def test_hybrid_one_server_success():
         expect_feature_map[name] = val / data_size
 
     # wait worker pull, push weight
-    for i in range(6):
+    for _ in range(6):
         client_feature_map, get_model_rsp = post_get_model(http_server_address, fl_name, iteration)
         assert client_feature_map is None
         time.sleep(0.5)
@@ -130,27 +126,29 @@ def test_hybrid_one_server_success():
         callback_paras.batch_num = 16
         run_context = RunContext(callback_paras)
         # pull weight from sever, and the weight will be equal to update model weight
-        federated_learning_manager.step_end(run_context)
+        federated_learning_manager.on_train_step_begin()
+        federated_learning_manager.on_train_step_end(run_context)
 
         pull_feature_map = get_trainable_params(network)
         check_feature_map(expect_feature_map, pull_feature_map)
 
         load_params_to_network(network, push_feature_map)
         # push weight to sever, and the model weight get from server will be equal to push weight
-        federated_learning_manager.step_end(run_context)
+        federated_learning_manager.on_train_step_begin()
+        federated_learning_manager.on_train_step_end(run_context)
         push_metrics.construct(loss, acc)
 
         # get state
         post_rsp = post_scheduler_state_msg(scheduler_http_address)
         print("get state:", post_rsp)
-        assert "code" in post_rsp and post_rsp["code"] == "0"
-        assert "cluster_state" in post_rsp and post_rsp["cluster_state"] == "CLUSTER_READY"
-        assert "nodes" in post_rsp and len(post_rsp["nodes"]) == 2
-        node0 = post_rsp["nodes"][0]
-        assert node0["tcp_address"] in node0["node_id"]
-        assert node0["role"] == "SERVER"
-        node1 = post_rsp["nodes"][1]
-        assert node1["role"] == "WORKER"
+        assert "code" in post_rsp and post_rsp.get("code") == "0"
+        assert "cluster_state" in post_rsp and post_rsp.get("cluster_state") == "CLUSTER_READY"
+        assert "nodes" in post_rsp and len(post_rsp.get("nodes")) == 2
+        node0 = post_rsp.get("nodes")[0]
+        assert node0.get("tcp_address") in node0.get("node_id")
+        assert node0.get("role") == "SERVER"
+        node1 = post_rsp.get("nodes")[1]
+        assert node1.get("role") == "WORKER"
 
     worker_process, worker_recv_pipe = run_worker_client_task(worker_fun)
     wait_worker_client_task_result(worker_process, worker_recv_pipe, max_run_secs=6)
@@ -161,7 +159,7 @@ def test_hybrid_one_server_success():
 
     assert isinstance(get_model_rsp, ResponseGetModel.ResponseGetModel)
     metrics = read_metrics()
-    assert len(metrics) > 0
+    assert metrics
     last_metrics = metrics[-1]
     assert "metricsLoss" in last_metrics and last_metrics["metricsLoss"] == loss
     assert "metricsAuc" in last_metrics and last_metrics["metricsAuc"] == acc
@@ -170,12 +168,12 @@ def test_hybrid_one_server_success():
     assert stop_processes(worker_process)
     post_rsp = post_scheduler_state_msg(scheduler_http_address)
     print("get state:", post_rsp)
-    assert "code" in post_rsp and post_rsp["code"] == "0"
-    assert "cluster_state" in post_rsp and post_rsp["cluster_state"] == "CLUSTER_READY"
-    assert "nodes" in post_rsp and len(post_rsp["nodes"]) == 1
-    node0 = post_rsp["nodes"][0]
-    assert node0["tcp_address"] in node0["node_id"]
-    assert node0["role"] == "SERVER"
+    assert "code" in post_rsp and post_rsp.get("code") == "0"
+    assert "cluster_state" in post_rsp and post_rsp.get("cluster_state") == "CLUSTER_READY"
+    assert "nodes" in post_rsp and len(post_rsp.get("nodes")) == 1
+    node0 = post_rsp.get("nodes")[0]
+    assert node0.get("tcp_address") in node0.get("node_id")
+    assert node0.get("role") == "SERVER"
 
 
 @fl_test
@@ -233,7 +231,7 @@ def test_hybrid_two_server_success():
                                     upload_loss=10.1)
 
         # get model from the second server
-        client_feature_map, get_model_rsp = get_model_expect_success(http_server_address2, fl_name, iteration)
+        client_feature_map, _ = get_model_expect_success(http_server_address2, fl_name, iteration)
         check_feature_map(push_feature_map0, client_feature_map)
 
         # client post message to the second server
@@ -244,7 +242,7 @@ def test_hybrid_two_server_success():
                                     upload_loss=20.1)
 
         # get model from the first server
-        client_feature_map, get_model_rsp = get_model_expect_success(http_server_address, fl_name, iteration)
+        client_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
         check_feature_map(push_feature_map1, client_feature_map)
 
     def worker_fun():
@@ -263,26 +261,30 @@ def test_hybrid_two_server_success():
 
         # for iteration 1
         # pull weight from sever, and the weight will be equal to update model weight
-        federated_learning_manager.step_end(run_context)
+        federated_learning_manager.on_train_step_begin()
+        federated_learning_manager.on_train_step_end(run_context)
 
         pull_feature_map = get_trainable_params(network)
         check_feature_map(expect_feature_map0, pull_feature_map)
 
         load_params_to_network(network, push_feature_map0)
         # push weight to sever, and the model weight get from server will be equal to push weight
-        federated_learning_manager.step_end(run_context)
+        federated_learning_manager.on_train_step_begin()
+        federated_learning_manager.on_train_step_end(run_context)
         push_metrics.construct(loss0, acc0)
 
         # for iteration 2
         # pull weight from sever, and the weight will be equal to update model weight
-        federated_learning_manager.step_end(run_context)
+        federated_learning_manager.on_train_step_begin()
+        federated_learning_manager.on_train_step_end(run_context)
 
         pull_feature_map = get_trainable_params(network)
         check_feature_map(expect_feature_map1, pull_feature_map)
 
         load_params_to_network(network, push_feature_map1)
         # push weight to sever, and the model weight get from server will be equal to push weight
-        federated_learning_manager.step_end(run_context)
+        federated_learning_manager.on_train_step_begin()
+        federated_learning_manager.on_train_step_end(run_context)
         push_metrics.construct(loss1, acc1)
 
     client_process, client_recv_pipe = run_worker_client_task(client_fun)

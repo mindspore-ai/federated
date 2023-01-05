@@ -65,6 +65,10 @@ class StartFLJobKernel : public RoundKernel {
 
   bool StoreKeyAttestation(const std::shared_ptr<FBBuilder> &fbb, const schema::RequestFLJob *start_fl_job_req);
 
+  std::vector<flatbuffers::Offset<schema::FeatureMap>> BuildParamsRsp(const ModelItemPtr &model_item,
+                                                                      const std::string &server_mode,
+                                                                      const std::shared_ptr<FBBuilder> &fbb);
+
   // Build response for startFLJob round no matter success or failure.
   void BuildStartFLJobRsp(const std::shared_ptr<FBBuilder> &fbb, const schema::ResponseCode retcode,
                           const std::string &reason, const bool is_selected, const std::string &next_req_time,

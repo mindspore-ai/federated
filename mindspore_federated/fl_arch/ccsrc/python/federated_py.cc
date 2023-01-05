@@ -64,6 +64,7 @@ void InitFLContext(const py::module &m) {
     .def("client_batch_size", &FLContext::client_batch_size, "Get federated learning client batch size.")
     .def("aggregation_type", &FLContext::aggregation_type, "Get federated learning aggregation type")
     .def("iid_rate", &FLContext::iid_rate, "Get federated learning aggregation iid_rate parameter")
+    .def("total_client_num", &FLContext::total_client_num, "Get federated learning total_client_num parameter")
     .def("encrypt_type", &FLContext::encrypt_type, "Get encrypt type for federated learning secure aggregation.")
     .def("client_learning_rate", &FLContext::client_learning_rate,
          "Get worker's standalone training step number before communicating with server.")

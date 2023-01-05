@@ -61,11 +61,11 @@ class HFLModel(Model):
         self._server_mode = ctx.server_mode()
         aggregation_type = ctx.aggregation_type()
         self._aggregation_type = aggregation_type
-        if self._aggregation_type not in (
-                _fl_context.FEDAVG,
-                _fl_context.FEDPROX) and self._server_mode == _fl_context.SERVER_MODE_CLOUD:
+        if self._aggregation_type not in _fl_context.SUPPORT_AGG_TYPES and \
+                self._server_mode == _fl_context.SERVER_MODE_CLOUD:
             raise ValueError(
-                "encrypt_mode must be 'FedAvg' or 'FedProx', but got {}.".format(self._aggregation_type))
+                "aggregation_type must be in {}, but got {}.".format(_fl_context.SUPPORT_AGG_TYPES,
+                                                                     self._aggregation_type))
         if self._aggregation_type == _fl_context.FEDPROX:
             self._iid_rate = ctx.iid_rate()
 

@@ -38,6 +38,7 @@ constexpr char kEnvSchedulerPort[] = "MS_SCHED_PORT";
 // multi aggregation algorithm
 constexpr char kFedAvgAggregation[] = "FedAvg";
 constexpr char kFedProxAggregation[] = "FedProx";
+constexpr char kScaffoldAggregation[] = "Scaffold";
 
 constexpr char kCommTypeOfIBVerbs[] = "ibverbs";
 constexpr char kRoleOfPServer[] = "server";

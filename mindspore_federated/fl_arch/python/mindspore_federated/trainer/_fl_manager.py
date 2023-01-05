@@ -31,7 +31,6 @@ from ..startup.ssl_config import init_ssl_config
 from ..startup.yaml_config import load_yaml_config
 from ..common import _fl_context, check_type
 
-ONE_STEP_PER_ITERATION = 1
 TRAIN_BEGIN_STEP_NUM = 1
 TRAIN_END_STEP_NUM = 0
 
@@ -127,6 +126,16 @@ def _get_fl_param_names(network, fl_param_names, requires_aggr=False):
     return fl_param_names
 
 
+def _get_lr(network):
+    for sub_cell in network.cells():
+        if isinstance(sub_cell, nn.Optimizer):
+            return sub_cell.get_lr().asnumpy()
+        lr = _get_lr(sub_cell)
+        if lr is not None:
+            return lr
+    return None
+
+
 class FederatedLearningManager(Callback):
     """
     Manage Federated Learning during training.
@@ -211,7 +220,8 @@ class FederatedLearningManager(Callback):
         self._server_mode = server_mode
         self._model = model
         self._sync_frequency = sync_frequency
-        self._next_sync_iter_id = self._sync_frequency
+        self._next_begin_sync_iter = 1
+        self._next_end_sync_iter = self._sync_frequency
         self._data_size = data_size
         self._sync_type = sync_type
         self._run_distribute = run_distribute
@@ -223,11 +233,11 @@ class FederatedLearningManager(Callback):
         self._global_step = 0
         self._aggregation_type = aggregation_type
         self._global_prefix = "global_weights"
-        if self._aggregation_type not in (
-                _fl_context.FEDAVG,
-                _fl_context.FEDPROX) and self._server_mode == _fl_context.SERVER_MODE_CLOUD:
+        if self._aggregation_type not in _fl_context.SUPPORT_AGG_TYPES and \
+                self._server_mode == _fl_context.SERVER_MODE_CLOUD:
             raise ValueError(
-                "_aggregation_type must be 'FedAvg' or 'FedProx', but got {}.".format(self._aggregation_type))
+                "aggregation_type must be in {}, but got {}.".format(_fl_context.SUPPORT_AGG_TYPES,
+                                                                     self._aggregation_type))
 
         if self._aggregation_type == _fl_context.FEDPROX:
             self._global_weights = ParameterTuple(self._model.trainable_params()).clone(prefix=self._global_prefix)
@@ -236,17 +246,33 @@ class FederatedLearningManager(Callback):
                 self._model.insert_param_to_cell(param.name, param, False)
 
         self._encrypt_type = encrypt_type
-        if self._encrypt_type not in (
-                _fl_context.ENCRYPT_NONE,
-                _fl_context.ENCRYPT_STABLE_PW) and self._server_mode == _fl_context.SERVER_MODE_CLOUD:
+        if self._encrypt_type not in _fl_context.SUPPORT_ENC_TYPES_CLOUD and \
+                self._server_mode == _fl_context.SERVER_MODE_CLOUD:
             raise ValueError(
-                "encrypt_mode must be 'NOT_ENCRYPT' or 'STABLE_PW_ENCRYPT', but got {}.".format(self._encrypt_type))
+                "encrypt_mode must be in {}, but got {}.".format(_fl_context.SUPPORT_ENC_TYPES_CLOUD,
+                                                                 self._encrypt_type))
         if self._is_adaptive_sync():
             self._as_set_init_state(kwargs)
             self._as_wrap_cell()
-        logger.info(f"Step number needs to run per iteration {self._next_sync_iter_id},"
+        logger.info(f"Step number needs to run per iteration {self._next_end_sync_iter},"
                     f"server mode {self._server_mode}, aggregation type {self._aggregation_type},"
                     f"encrypt type {self._encrypt_type}, http server address {http_server_address}")
+        self._fl_param_names = list()
+        self._fl_param_names = _get_fl_param_names(self._model, self._fl_param_names)
+
+        if not self._fl_param_names:
+            self._fl_param_names = [_.name for _ in self._model.trainable_params()]
+        self._last_params = dict()
+        self._local_control_params = dict()
+        self._global_control_params = dict()
+
+        self._scaffold_prefix = "control."
+        if self._is_scaffold():
+            for param in self._model.trainable_params():
+                if param.name in self._fl_param_names:
+                    self._last_params[param.name] = deepcopy(param.asnumpy())
+                    self._local_control_params[param.name] = np.zeros_like(param.asnumpy())
+                    self._global_control_params[param.name] = np.zeros_like(param.asnumpy())
 
     def __del__(self):
         Federated_.stop_federated_worker()
@@ -256,6 +282,12 @@ class FederatedLearningManager(Callback):
         Determine whether adaptive frequency synchronization is required.
         """
         return self._sync_type == "adaptive"
+
+    def _is_scaffold(self):
+        """
+        Determine whether scaffold is required.
+        """
+        return self._aggregation_type == _fl_context.SCAFFOLD
 
     def _as_set_init_state(self, kwargs):
         """
@@ -478,7 +510,80 @@ class FederatedLearningManager(Callback):
         push_weight = _PushWeight(weights)
         push_weight.construct()
 
-    def step_end(self, run_context):
+    def _scaffold_set_global_control_params(self, flattened_control_params):
+        for name in self._global_control_params:
+            control_name = self._scaffold_prefix + name
+            if control_name in flattened_control_params:
+                global_control_param = deepcopy(flattened_control_params[control_name])
+                shape = self._global_control_params[name].shape
+                self._global_control_params[name] = np.array(global_control_param, dtype=np.float32).reshape(shape)
+            else:
+                raise ValueError("'{}' is not in control parameters sent by server".format(control_name))
+
+    def _scaffold_update_params(self, lr):
+        """
+        Using control parameters to update parameters every step.
+        """
+        for param in self._model.trainable_params():
+            name = param.name
+            if name in self._fl_param_names:
+                if name in self._global_control_params:
+                    global_control_param = self._global_control_params[name]
+                else:
+                    raise ValueError("'{}' is not in global_control_params".format(name))
+                if name in self._local_control_params:
+                    local_control_param = self._local_control_params[name]
+                else:
+                    raise ValueError("'{}' is not in local_control_params".format(name))
+                control_params = lr * (global_control_param - local_control_param)
+                param.set_data(Tensor(param.asnumpy() - control_params))
+
+    def _scaffold_get_control_params(self, lr):
+        """
+        Get updated control parameters.
+        """
+        control_params = dict()
+        for param in self._model.trainable_params():
+            name = param.name
+            if name in self._fl_param_names:
+                if name in self._local_control_params:
+                    local_control_param = deepcopy(self._local_control_params[name])
+                else:
+                    raise ValueError("'{}' is not in local_control_params".format(name))
+                if name in self._global_control_params:
+                    global_control_param = deepcopy(self._global_control_params[name])
+                else:
+                    raise ValueError("'{}' is not in global_control_params".format(name))
+                temp1 = local_control_param - global_control_param
+                if name in self._last_params:
+                    temp2 = (self._last_params[name] - param.asnumpy()) / (self._sync_frequency * lr)
+                else:
+                    raise ValueError("'{}' is not in last_params".format(name))
+                control_params[name] = temp1 + temp2
+        return control_params
+
+    def _scaffold_set_last_params_and_local_control_params(self, control_params):
+        for param in self._model.trainable_params():
+            name = param.name
+            if name in self._fl_param_names:
+                self._last_params[name] = deepcopy(param.asnumpy())
+                if name in control_params:
+                    self._local_control_params[name] = control_params[name]
+                else:
+                    raise ValueError("'{}' is not in control_params".format(name))
+
+    def on_train_step_begin(self):
+        self._global_step += 1
+        is_cloud = self._server_mode == _fl_context.SERVER_MODE_CLOUD
+        is_sync = self._global_step == self._next_begin_sync_iter
+        is_dist = self._rank_id == 0 if self._run_distribute else not self._run_distribute
+        if is_cloud and is_sync and is_dist:
+            start_fl_job = _StartFLJob(self._data_size)
+            flattened_control_params = start_fl_job.construct()
+            if self._is_scaffold() and self._global_step != 1:
+                self._scaffold_set_global_control_params(flattened_control_params)
+
+    def on_train_step_end(self, run_context):
         """
         Synchronization parameters at the end of step. If sync_type is "adaptive", the synchronous frequency is
         adaptively adjusted here.
@@ -486,12 +591,16 @@ class FederatedLearningManager(Callback):
         Args:
             run_context (RunContext): Include some information of the model.
         """
-        self._global_step += 1
+        lr = 0.0
+        if self._is_scaffold():
+            cb_params = run_context.original_args()
+            train_network = cb_params.train_network
+            lr = _get_lr(train_network)
+            if lr is None:
+                raise ValueError("Can not find optimizer in train network!")
+            self._scaffold_update_params(lr)
         if self._server_mode == _fl_context.SERVER_MODE_CLOUD:
-            if self._global_step == self._next_sync_iter_id:
-                if (self._run_distribute and self._rank_id == 0) or not self._run_distribute:
-                    start_fl_job = _StartFLJob(self._data_size)
-                    start_fl_job.construct()
+            if self._global_step == self._next_end_sync_iter:
                 if self._is_adaptive_sync():
                     self._as_set_grads()
                 if self._encrypt_type == _fl_context.ENCRYPT_STABLE_PW:
@@ -499,6 +608,10 @@ class FederatedLearningManager(Callback):
                     exchange_keys.construct()
                     get_keys = _GetKeys()
                     get_keys.construct()
+
+                control_params = dict()
+                if self._is_scaffold():
+                    control_params = self._scaffold_get_control_params(lr)
 
                 weights = {}
                 weight_infos = {}
@@ -509,13 +622,19 @@ class FederatedLearningManager(Callback):
                             continue
                         weight_infos[param.name] = (param_np.shape, param_np.dtype)
                         weights[param.name] = param_np.reshape(-1).tolist()
+                if self._is_scaffold():
+                    for name in control_params:
+                        delta_control_param = control_params[name] - self._local_control_params[name]
+                        weights[self._scaffold_prefix + name] = delta_control_param.reshape(-1).tolist()
                 if self._run_distribute:
                     self._update_model_with_distribute(weights, weight_infos)
                 else:
                     self._update_model(weights, weight_infos)
-
+                if self._is_scaffold():
+                    self._scaffold_set_last_params_and_local_control_params(control_params)
                 logger.info("Load params from getting model into net, global step is {}.".format(self._global_step))
-                self._next_sync_iter_id = self._global_step + self._sync_frequency
+                self._next_end_sync_iter = self._global_step + self._sync_frequency
+                self._next_begin_sync_iter = self._global_step + 1
                 if self._is_adaptive_sync():
                     self._as_analyze_gradient()
                     self._round_id += 1

@@ -5,7 +5,7 @@
 class AggregationType(object):
     FedAvg = 0
     FedProx = 1
-    FedAdagrag = 2
-    FedMeta = 3
+    Scaffold = 2
+    FedNova = 3
     qffl = 4
 

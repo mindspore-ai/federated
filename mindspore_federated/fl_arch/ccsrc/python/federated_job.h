@@ -37,7 +37,7 @@ class MS_EXPORT FederatedJob {
   static void InitFederatedWorker();
   static void StopFederatedWorker();
 
-  static bool StartFLJob(size_t data_size);
+  static py::dict StartFLJob(size_t data_size);
   static py::dict UpdateAndGetModel(std::map<std::string, std::vector<float>> weight_datas);
   static py::dict PullWeight(const std::vector<std::string> &pull_weight_names);
   static bool PushWeight(const std::map<std::string, std::vector<float>> &weight_datas);

@@ -147,6 +147,7 @@ class FLServerJob:
         load_yaml_config(yaml_config, _fl_context.ROLE_OF_SERVER)
         self.checkpoint_dir = checkpoint_dir
         self.fl_name = ctx.fl_name()
+        self.aggregation_type = ctx.aggregation_type()
         self.callback = None
 
     def run(self, feature_map=None, callback=None):
@@ -169,6 +170,11 @@ class FLServerJob:
             feature_cxx = FeatureItem_(feature.feature_name, feature.data, feature.shape, "fp32",
                                        feature.require_aggr)
             feature_list_cxx.append(feature_cxx)
+        if self.aggregation_type == _fl_context.SCAFFOLD:
+            for _, feature in feature_map.feature_map().items():
+                feature_cxx = FeatureItem_("control." + feature.feature_name, np.zeros_like(feature.data),
+                                           feature.shape, "fp32", feature.require_aggr)
+                feature_list_cxx.append(feature_cxx)
         Federated_.start_federated_server(feature_list_cxx, recovery_iteration, self.after_started_callback,
                                           self.before_stopped_callback, self.on_iteration_end_callback)
 

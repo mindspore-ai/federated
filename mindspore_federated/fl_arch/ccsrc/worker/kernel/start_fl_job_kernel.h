@@ -45,27 +45,28 @@ class StartFLJobKernelMod : public AbstractKernel {
     return instance;
   }
 
-  bool Launch(size_t data_size) {
+  py::dict Launch(size_t data_size) {
+    py::dict dict_data;
     MS_LOG(INFO) << "Launching client StartFLJobKernelMod";
     FBBuilder fbb;
     if (!BuildStartFLJobReq(&fbb, data_size)) {
       MS_LOG(EXCEPTION) << "Building request for StartFLJob failed.";
-      return false;
+      return dict_data;
     }
     MS_LOG(INFO) << "Data size in start fl job is " << data_size;
     auto response_msg =
       fl::worker::CloudWorker::GetInstance().SendToServerSync(fbb.GetBufferPointer(), fbb.GetSize(), kernel_path_);
     if (response_msg == nullptr) {
       MS_LOG(WARNING) << "The response message is invalid.";
-      return false;
+      return dict_data;
     }
     flatbuffers::Verifier verifier(response_msg->data(), response_msg->size());
     if (!verifier.VerifyBuffer<schema::ResponseFLJob>()) {
       MS_LOG(WARNING) << "The schema of response message is invalid.";
-      return false;
+      return dict_data;
     }
     const schema::ResponseFLJob *start_fl_job_rsp = flatbuffers::GetRoot<schema::ResponseFLJob>(response_msg->data());
-    MS_ERROR_IF_NULL_W_RET_VAL(start_fl_job_rsp, false);
+    MS_ERROR_IF_NULL_W_RET_VAL(start_fl_job_rsp, dict_data);
     auto response_code = start_fl_job_rsp->retcode();
     switch (response_code) {
       case schema::ResponseCode_SUCCEED:
@@ -78,8 +79,20 @@ class StartFLJobKernelMod : public AbstractKernel {
     uint64_t iteration = IntToSize(start_fl_job_rsp->iteration());
     fl::worker::CloudWorker::GetInstance().set_fl_iteration_num(iteration);
     fl::worker::CloudWorker::GetInstance().set_data_size(data_size);
+    auto feature_map = start_fl_job_rsp->feature_map();
+    MS_EXCEPTION_IF_NULL(feature_map);
+
+    for (size_t i = 0; i < feature_map->size(); i++) {
+      const auto &feature_fbs = feature_map->Get(i);
+      const auto &feature_data_fbs = feature_fbs->data();
+
+      std::string weight_fullname = feature_fbs->weight_fullname()->str();
+      float *weight_data = const_cast<float *>(feature_data_fbs->data());
+      std::vector<float> weight_data_vec(weight_data, weight_data + feature_data_fbs->size());
+      dict_data[py::str(weight_fullname)] = weight_data_vec;
+    }
     MS_LOG(INFO) << "Start fl job for iteration " << iteration << " success.";
-    return true;
+    return dict_data;
   }
 
   void Init() override {

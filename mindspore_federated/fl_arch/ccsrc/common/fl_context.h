@@ -41,6 +41,7 @@ struct FeatureInfo {
 struct AggregationConfig {
   std::string aggregation_type = kFedAvgAggregation;
   float iid_rate = 0.0f;
+  size_t total_client_num = 1;
 };
 
 struct EncryptConfig {
@@ -161,6 +162,7 @@ class MS_EXPORT FLContext {
   const AggregationConfig &aggregation_config() const;
   const std::string &aggregation_type() const;
   const float &iid_rate() const;
+  const size_t &total_client_num() const;
 
   // Set the iteration number of the federated learning.
   void set_fl_iteration_num(uint64_t fl_iteration_num);

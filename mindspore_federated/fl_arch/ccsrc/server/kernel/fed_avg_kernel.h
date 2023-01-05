@@ -36,7 +36,7 @@ namespace kernel {
 // FL-clients is already multiplied by its data size so only sum and division are done in this kernel.
 
 // Pay attention that this kernel is the distributed version of federated average, which means each server node in the
-// cluster in invalved in the aggragation process. So the DistributedCountService and CollectiveOpsImpl are called.
+// cluster in invalid in the aggregation process. So the DistributedCountService and CollectiveOpsImpl are called.
 template <typename T, typename S>
 class FedAvgKernel {
  public:
@@ -59,12 +59,34 @@ class FedAvgKernel {
     if (data_size == 0) {
       *info->require_aggr = false;
       MS_LOG(INFO) << "Parameter:" << info->name << " data size is 0, do not need to run fed avg.";
-      return false;
+      return true;
     }
     LocalMetaStore::GetInstance().put_value(kCtxFedAvgTotalDataSize, data_size);
     auto elem_num = info->weight_size / sizeof(T);
     for (size_t i = 0; i < elem_num; i++) {
       weight_addr[i] /= data_size;
+    }
+    return true;
+  }
+
+  static bool ScaffoldAllReduce(const std::map<std::string, std::string> &server_map, ParamAggregationInfo *info) {
+    if (info == nullptr) {
+      return false;
+    }
+    T *weight_addr = reinterpret_cast<T *>(info->weight_data);
+    if (!CollectiveOpsImpl::GetInstance().AllReduce<T>(info->name, weight_addr, weight_addr,
+                                                       info->weight_size / sizeof(T), server_map)) {
+      MS_LOG(ERROR) << "Federated average allreduce failed.";
+      return false;
+    }
+    auto elem_num = info->weight_size / sizeof(T);
+    size_t total_client_num = FLContext::instance()->total_client_num();
+    if (total_client_num == 0) {
+      MS_LOG(ERROR) << "total_client_num is 0.";
+      return false;
+    }
+    for (size_t i = 0; i < elem_num; i++) {
+      weight_addr[i] /= total_client_num;
     }
     return true;
   }
