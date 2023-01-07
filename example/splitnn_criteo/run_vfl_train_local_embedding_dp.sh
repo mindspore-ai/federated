@@ -1,3 +1,4 @@
+#!/bin/bash
 # Copyright 2022 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,13 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ============================================================================
-"""This module provide mechanisms to protect the privacy of the federated learner"""
 
-from .dp import LabelDP, EmbeddingDP
-from .tee import SimuTEE
+# Execute Wide&Deep splitnn demo locally training on criteo dataset. Unlike run_vfl_train_local.sh,
+# the embeddings and grad scales are encapsulated using protobuf and are transmitted through socket.
 
-__all__ = [
-    'LabelDP',
-    'SimuTEE',
-    'EmbeddingDP',
-]
+set -e
+
+WORKPATH=$(
+  cd "$(dirname $0)" || exit
+  pwd
+)
+
+export PYTHONPATH="${PYTHONPATH}:${WORKPATH}/../"
+echo "Start executing Wide&Deep splitnn with embedding dp demo."
+python run_vfl_train_local.py --follower_bottom_yaml_path "./yaml_files/follower_bottom_embedding_dp.yaml"

@@ -45,8 +45,15 @@ def construct_local_dataset():
     return train_dataset, eval_dataset
 
 
+def apply_embedding_dp(fl_embedding, embedding_dp):
+    fl_embedding['follower_wide_embedding'] = embedding_dp(fl_embedding['follower_wide_embedding'])
+    fl_embedding['follower_deep_embedding'] = embedding_dp(fl_embedding['follower_deep_embedding'])
+    return fl_embedding
+
+
 if __name__ == '__main__':
-    logging.basicConfig(filename='log_local_{}.txt'.format(config.device_target), level=logging.INFO)
+    logging.basicConfig(filename='log_local_{}.txt'.format(config.device_target), level=logging.INFO,
+                        format='%(asctime)s %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     context.set_context(mode=context.GRAPH_MODE, device_target=config.device_target)
     leader_top_yaml_data = FLYamlData(config.leader_top_yaml_path)
     leader_bottom_yaml_data = FLYamlData(config.leader_bottom_yaml_path)
@@ -96,6 +103,8 @@ if __name__ == '__main__':
             for step, item in enumerate(train_iter, start=1):
                 step = steps_per_epoch * epoch + step
                 follower_embedding = follower_bottom_fl_model.forward_one_step(item)
+                if follower_bottom_fl_model.embedding_dp:
+                    follower_embedding = apply_embedding_dp(follower_embedding, follower_bottom_fl_model.embedding_dp)
                 leader_embedding = leader_bottom_fl_model.forward_one_step(item)
                 item.update(leader_embedding)
                 leader_out = leader_top_fl_model.forward_one_step(item, follower_embedding)

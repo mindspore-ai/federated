@@ -18,6 +18,7 @@ import os.path
 
 import yaml
 from mindspore import nn, ParameterTuple
+from mindspore import log as logger
 
 
 def parse_yaml_file(file_path):
@@ -76,20 +77,7 @@ class FLYamlData:
             self._parse_dataset()
             self._parse_hyper_params()
 
-            if 'privacy' in self.yaml_data:
-                privacy = self.yaml_data['privacy']
-                if 'label_dp' in privacy:
-                    if 'eps' not in privacy['label_dp']:
-                        raise ValueError('FLYamlData init failed: missing field of \'eps\' under \'label_dp\'')
-                    self.privacy_eps = privacy['label_dp']['eps']
-                if 'TEE' in privacy:
-                    if 'tee_layer' in privacy['TEE']:
-                        self.tee_layer = privacy['TEE']['tee_layer']
-
-                for scheme in privacy.keys():
-                    if scheme not in ['label_dp', 'TEE']:
-                        raise ValueError(f'FLYamlData init failed: unknown privacy scheme {scheme}. Currently \
-                                         support: label_dp, TEE')
+            self._parse_privacy()
 
             if 'ckpt_path' in self.yaml_data:
                 self.ckpt_path = self.yaml_data['ckpt_path']
@@ -152,6 +140,37 @@ class FLYamlData:
         if not self.eval_net_outs:
             raise ValueError('FLYamlData init failed: outputs of \'eval_net\' are empty')
         self.eval_net_gt = self.eval_net['gt'] if 'gt' in self.eval_net else None
+
+    def _check_eps(self, eps):
+        if eps:
+            if not isinstance(eps, (int, float)):
+                raise TypeError(f'FLYamlData init failed: eps must be int or float, but {type(eps)} found.')
+            if eps < 0:
+                raise ValueError(f'FLYamlData init failed: eps cannot be less than zero, but got {eps}')
+            if eps > 100:
+                logger.warning(f'FLYamlData init: eps {eps} is far too large and is reassigned to 100.')
+                eps = 100
+        return eps
+
+    def _parse_privacy(self):
+        """Verify configurations of privacy defined in the yaml file."""
+        if 'privacy' in self.yaml_data:
+            privacy = self.yaml_data['privacy']
+            if 'embedding_dp' in privacy:
+                self.embedding_dp_eps = None
+                if privacy['embedding_dp'] and 'eps' in privacy['embedding_dp']:
+                    self.embedding_dp_eps = self._check_eps(privacy['embedding_dp']['eps'])
+            if 'label_dp' in privacy:
+                if 'eps' not in privacy['label_dp']:
+                    raise ValueError('FLYamlData init failed: missing field of \'eps\' under \'label_dp\'')
+                self.privacy_eps = privacy['label_dp']['eps']
+            if 'TEE' in privacy:
+                if 'tee_layer' in privacy['TEE']:
+                    self.tee_layer = privacy['TEE']['tee_layer']
+            for scheme in privacy.keys():
+                if scheme not in ['label_dp', 'TEE', 'embedding_dp']:
+                    raise ValueError(f'FLYamlData init failed: unknown privacy scheme {scheme}. Currently \
+                                        support: label_dp, embedding_dp and TEE')
 
     def _check_opts(self):
         """Verify configurations of optimizers defined in the yaml file."""
