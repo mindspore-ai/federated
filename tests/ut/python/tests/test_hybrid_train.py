@@ -17,19 +17,21 @@
 import time
 import numpy as np
 
-from mindspore.train.callback import RunContext, _InternalCallbackParam
 import mindspore as ms
-from mindspore_federated import FederatedLearningManager
-from mindspore_federated import FeatureMap
-import mindspore_federated as ms_fl
+from mindspore.train.callback import RunContext, _InternalCallbackParam
 
-from common import fl_name_with_idx, make_yaml_config, start_fl_server, fl_test
-from common import start_fl_job_expect_success, update_model_expect_success, get_model_expect_success
+import mindspore_federated as ms_fl
+from mindspore_federated.startup.ssl_config import SSLConfig
+from mindspore_federated import FeatureMap, FederatedLearningManager
+
 from common import check_feature_map, post_scheduler_state_msg, start_fl_scheduler, stop_processes
+from common import fl_name_with_idx, make_yaml_config, start_fl_server, fl_test
+from common import get_model_expect_success, start_redis_with_ssl, get_default_redis_ssl_config
 from common import run_worker_client_task, wait_worker_client_task_result, read_metrics
-from common_client import post_get_model
+from common import start_fl_job_expect_success, update_model_expect_success
 from common_client import ResponseGetModel
-from hybrid_train_network import LeNet5
+from common_client import post_get_model
+from train_network import LeNet5
 
 
 def get_trainable_params(network):
@@ -301,3 +303,128 @@ def test_hybrid_two_server_success():
     metrics1 = metrics[-1]
     assert "metricsLoss" in metrics1 and metrics1["metricsLoss"] == loss1
     assert "metricsAuc" in metrics1 and metrics1["metricsAuc"] == acc1
+
+
+@fl_test
+def test_hybrid_one_server_open_ssl_success():
+    """
+    Feature: Test FL in server mode HYBRID_TRAINING
+    Description: Test the whole process of Hybrid mode with one server and one worker with open ssl communication.
+    Expectation: The server and worker work as expected.
+    """
+    start_redis_with_ssl()
+    _, _, client_crt, client_key, ca_crt = get_default_redis_ssl_config()
+    ssl_config = SSLConfig(server_password="server_password_12345", client_password="client_password_12345")
+
+    client_ssl_config = {"distributed_cache.cacert_filename": ca_crt,
+                         "distributed_cache.cert_filename": client_crt,
+                         "distributed_cache.private_key_filename": client_key}
+
+    fl_name = fl_name_with_idx("FlTest")
+    http_server_address = "127.0.0.1:3001"
+    yaml_config_file = f"temp/yaml_{fl_name}_config.yaml"
+    fl_iteration_num = 5
+    server_mode = "HYBRID_TRAINING"
+    make_yaml_config(fl_name, client_ssl_config, output_yaml_file=yaml_config_file, fl_iteration_num=fl_iteration_num,
+                     server_mode=server_mode, enable_ssl=True)
+
+    network = LeNet5(62, 3)
+    feature_map = FeatureMap()
+    init_feature_map = get_trainable_params(network)
+    for param_name, param_np in init_feature_map.items():
+        print(f"----------------{param_name} {param_np.shape}")
+        feature_map.add_feature(param_name, param_np, require_aggr=True)
+
+    start_fl_server(feature_map, yaml_config_file, http_server_address, ssl_config=ssl_config)
+
+    fl_id = "1xxx"
+    data_size = 32
+    # start fl job
+    start_fl_job_expect_success(http_server_address, fl_name, fl_id, data_size, enable_ssl=True)
+
+    iteration = 1
+    update_feature_map = create_updated_params(init_feature_map)
+    update_model_expect_success(http_server_address, fl_name, fl_id, iteration, update_feature_map, enable_ssl=True)
+    expect_feature_map = {}
+    for name, val in update_feature_map.items():
+        expect_feature_map[name] = val / data_size
+
+    # wait worker pull, push weight
+    for _ in range(6):
+        client_feature_map, get_model_rsp = post_get_model(http_server_address, fl_name, iteration, enable_ssl=True)
+        assert client_feature_map is None
+        time.sleep(0.5)
+    assert isinstance(get_model_rsp, ResponseGetModel.ResponseGetModel)
+    assert "The model is not ready yet for iteration" in get_model_rsp.Reason().decode()
+
+    push_feature_map = create_updated_params(init_feature_map)
+    loss = 6.9
+    acc = 10.1
+
+    scheduler_http_address = "127.0.0.1:4000"
+    start_fl_scheduler(yaml_config_file, scheduler_http_address, ssl_config=ssl_config)
+
+    def worker_fun():
+        num_batches = 4
+        # define fl manager
+        federated_learning_manager = FederatedLearningManager(
+            yaml_config=yaml_config_file,
+            model=network,
+            sync_frequency=2,
+            data_size=num_batches,
+            ssl_config=ssl_config
+        )
+        push_metrics = ms_fl.PushMetrics()
+        callback_paras = _InternalCallbackParam()
+        callback_paras.batch_num = 16
+        run_context = RunContext(callback_paras)
+        # pull weight from sever, and the weight will be equal to update model weight
+        federated_learning_manager.on_train_step_begin()
+        federated_learning_manager.on_train_step_end(run_context)
+
+        pull_feature_map = get_trainable_params(network)
+        check_feature_map(expect_feature_map, pull_feature_map)
+
+        load_params_to_network(network, push_feature_map)
+        # push weight to sever, and the model weight get from server will be equal to push weight
+        federated_learning_manager.on_train_step_begin()
+        federated_learning_manager.on_train_step_end(run_context)
+        push_metrics.construct(loss, acc)
+
+        # get state
+        post_rsp = post_scheduler_state_msg(scheduler_http_address, enable_ssl=True)
+        print("get state:", post_rsp)
+        assert "code" in post_rsp and post_rsp.get("code") == "0"
+        assert "cluster_state" in post_rsp and post_rsp.get("cluster_state") == "CLUSTER_READY"
+        assert "nodes" in post_rsp and len(post_rsp.get("nodes")) == 2
+        node0 = post_rsp.get("nodes")[0]
+        assert node0.get("tcp_address") in node0.get("node_id")
+        assert node0.get("role") == "SERVER"
+        node1 = post_rsp.get("nodes")[1]
+        assert node1.get("role") == "WORKER"
+
+    worker_process, worker_recv_pipe = run_worker_client_task(worker_fun)
+    wait_worker_client_task_result(worker_process, worker_recv_pipe, max_run_secs=6)
+
+    # get model
+    client_feature_map, get_model_rsp = get_model_expect_success(http_server_address, fl_name, iteration,
+                                                                 enable_ssl=True)
+    check_feature_map(push_feature_map, client_feature_map)
+
+    assert isinstance(get_model_rsp, ResponseGetModel.ResponseGetModel)
+    metrics = read_metrics()
+    assert metrics
+    last_metrics = metrics[-1]
+    assert "metricsLoss" in last_metrics and last_metrics["metricsLoss"] == loss
+    assert "metricsAuc" in last_metrics and last_metrics["metricsAuc"] == acc
+
+    # stop(wait) worker process
+    assert stop_processes(worker_process)
+    post_rsp = post_scheduler_state_msg(scheduler_http_address, enable_ssl=True)
+    print("get state:", post_rsp)
+    assert "code" in post_rsp and post_rsp.get("code") == "0"
+    assert "cluster_state" in post_rsp and post_rsp.get("cluster_state") == "CLUSTER_READY"
+    assert "nodes" in post_rsp and len(post_rsp.get("nodes")) == 1
+    node0 = post_rsp.get("nodes")[0]
+    assert node0.get("tcp_address") in node0.get("node_id")
+    assert node0.get("role") == "SERVER"

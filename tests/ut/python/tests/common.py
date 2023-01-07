@@ -319,7 +319,7 @@ def start_fl_server(feature_map, yaml_config, http_server_address, tcp_server_ip
     return server_process
 
 
-def start_fl_scheduler(yaml_config, scheduler_http_address):
+def start_fl_scheduler(yaml_config, scheduler_http_address, ssl_config=None):
     """start fl scheduler"""
     print("new scheduler process", flush=True)
     signal.signal(signal.SIGCHLD, signal.SIG_IGN)
@@ -327,7 +327,7 @@ def start_fl_scheduler(yaml_config, scheduler_http_address):
 
     def server_process_fun():
         try:
-            server_job = FlSchedulerJob(yaml_config, manage_address=scheduler_http_address)
+            server_job = FlSchedulerJob(yaml_config, manage_address=scheduler_http_address, ssl_config=ssl_config)
             server_job.run()
             send_pipe.send("Success")
         except Exception as e:
@@ -374,6 +374,28 @@ def start_fl_scheduler(yaml_config, scheduler_http_address):
                 pass
     assert index < 100
     return scheduler_process
+
+
+def run_cloud_worker_client_task(task, yaml_config_file, network, sync_frequency, http_server_address,
+                                 data_size, ssl_config):
+    """run worker client task"""
+    signal.signal(signal.SIGCHLD, signal.SIG_IGN)
+    send_pipe, recv_pipe = Pipe()
+
+    def worker_task_fun():
+        try:
+            task(yaml_config_file, network, sync_frequency, http_server_address, data_size, ssl_config)
+            send_pipe.send("Success")
+        except Exception as e:
+            traceback.print_exc()
+            logging.exception(e)
+            send_pipe.send(e)
+
+    worker_task_process = Process(target=worker_task_fun, args=tuple())
+    worker_task_process.start()
+    global g_server_processes
+    g_server_processes.append(worker_task_process)
+    return worker_task_process, recv_pipe
 
 
 def run_worker_client_task(task):
@@ -577,16 +599,19 @@ def check_feature_map(expect_feature_map, result_feature_map):
             raise RuntimeError(f"feature: {feature_name}, expect: {expect.reshape(-1)}, result: {result.reshape(-1)}")
 
 
-def post_scheduler_msg(http_address, request_url, post_data):
+def post_scheduler_msg(http_address, request_url, post_data, enable_ssl=None):
     try:
-        resp = requests.post(f"http://{http_address}/{request_url}", data=post_data)
+        if enable_ssl:
+            resp = requests.post(f"https://{http_address}/{request_url}", data=post_data, verify=False)
+        else:
+            resp = requests.post(f"http://{http_address}/{request_url}", data=post_data)
         return json.loads(resp.text)
     except Exception as e:
         return e
 
 
-def post_scheduler_state_msg(scheduler_http_address):
-    return post_scheduler_msg(scheduler_http_address, "state", None)
+def post_scheduler_state_msg(scheduler_http_address, enable_ssl=None):
+    return post_scheduler_msg(scheduler_http_address, "state", None, enable_ssl)
 
 
 def post_scheduler_new_instance_msg(scheduler_http_address, post_msg):
