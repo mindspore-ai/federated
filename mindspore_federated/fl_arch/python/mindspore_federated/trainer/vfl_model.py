@@ -88,10 +88,10 @@ class FLModel:
             optimizers, gradient calculators, etc. The information mentioned above is parsed from the yaml file
             provided by the developer.
         network (Cell): Training network of the party, which outputs the loss. If loss_fn is not specified, the
-            the network will be used as the training network directly. If loss_fn is specified, the training
-            network will be constructed on the basis of network and loss_fn.
-        loss_fn (Cell): Loss function to construct the training network on the basis of the input network. If a
-            train_network has been specified, it will not work even has been provided. Default: None.
+            network will be used as the training network directly. If loss_fn is specified, the training network
+            will be constructed on the basis of network and loss_fn.
+        loss_fn (Cell): Loss function to construct the training network on the basis of the input network. If not
+            specified, the input network will be used as the training network. Default: None.
         optimizers (Cell): Customized optimizer for training the train_network. If not specified, FLModel will try
             to use standard optimizers of MindSpore specified in the yaml file. Default: None.
         metrics (Metric): Metrics to evaluate the evaluation network. Default: None.
