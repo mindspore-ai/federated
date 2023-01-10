@@ -32,7 +32,7 @@
         - **unchanged_round** (int) - 频率不发生变化的轮数，在前 `unchanged_round` 个轮次，频率不会发生变化。
           取值范围：大于等于0。默认值：0。
 
-    .. py:method:: step_end(run_context)
+    .. py:method:: on_train_step_end(run_context)
 
         在step结束时同步参数。如果 `sync_type` 是"adaptive"，同步频率会在这里自适应的调整。
 
