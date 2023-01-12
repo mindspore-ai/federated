@@ -195,6 +195,10 @@ void CipherMetaStorage::RegisterPrime(const std::string &prime) {
 }
 
 bool CipherMetaStorage::UpdateClientKeyToServer(const schema::RequestExchangeKeys *exchange_keys_req) {
+  if (exchange_keys_req == nullptr) {
+    MS_LOG(ERROR) << "exchange_keys_req is null!";
+    return false;
+  }
   std::string fl_id = exchange_keys_req->fl_id()->str();
   auto fbs_cpk = exchange_keys_req->c_pk();
   auto fbs_spk = exchange_keys_req->s_pk();
@@ -281,6 +285,10 @@ bool CipherMetaStorage::UpdateClientKeyToServer(const schema::RequestExchangeKey
 }
 
 bool CipherMetaStorage::UpdateStableClientKeyToServer(const schema::RequestExchangeKeys *exchange_keys_req) {
+  if (exchange_keys_req == nullptr) {
+    MS_LOG(ERROR) << "exchange_keys_req is null!";
+    return false;
+  }
   auto fbs_fl_id = exchange_keys_req->fl_id();
   MS_EXCEPTION_IF_NULL(fbs_fl_id);
   std::string fl_id = fbs_fl_id->str();

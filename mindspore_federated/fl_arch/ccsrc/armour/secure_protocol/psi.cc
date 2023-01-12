@@ -31,6 +31,11 @@ namespace psi {
 std::vector<std::string> Align(std::vector<std::string> *alice_vct, const std::vector<std::string> &bob_vct,
                                const PsiCtx &psi_ctx) {
   MS_LOG(INFO) << "Bob start doing align.";
+  if (alice_vct == nullptr) {
+    MS_LOG(ERROR) << "input alice_vct is null!";
+    std::vector<std::string> ret;
+    return ret;
+  }
   time_t time_start;
   time_t time_end;
   time(&time_start);

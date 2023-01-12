@@ -41,7 +41,7 @@ int PrivateKey::GetPrivateBytes(size_t *len, uint8_t *privKeyBytes) const {
 
 int PrivateKey::GetPublicBytes(size_t *len, uint8_t *pubKeyBytes) const {
   if (evpPrivKey == nullptr) {
-    MS_LOG(ERROR) << "input pubKeyBytes invalid.";
+    MS_LOG(ERROR) << "input evpPrivKey invalid.";
     return -1;
   }
   if (!EVP_PKEY_get_raw_public_key(evpPrivKey, pubKeyBytes, len)) {
@@ -137,6 +137,7 @@ PublicKey *KeyAgreement::GeneratePubKey(PrivateKey *privKey) {
   uint8_t *pubKeyBytes;
   size_t len = 0;
   if (privKey == nullptr) {
+    MS_LOG(ERROR) << "privKey is null!";
     return NULL;
   }
   if (!EVP_PKEY_get_raw_public_key(privKey->evpPrivKey, NULL, &len)) {
