@@ -32,8 +32,12 @@ bool CipherReconStruct::CombineMask(std::vector<Share *> *shares_tmp,
                                     const std::vector<std::string> &client_list,
                                     const std::map<std::string, std::vector<std::vector<uint8_t>>> &client_ivs) {
   bool retcode = true;
-  if (shares_tmp == nullptr || client_noise == nullptr) {
-    MS_LOG(ERROR) << "shares_tmp or client_noise is nullptr.";
+  if (shares_tmp == nullptr) {
+    MS_LOG(ERROR) << "shares_tmp is nullptr.";
+    return false;
+  }
+  if (client_noise == nullptr) {
+    MS_LOG(ERROR) << "client_noise is nullptr.";
     return false;
   }
   for (auto iter = reconstruct_secret_list.begin(); iter != reconstruct_secret_list.end(); ++iter) {

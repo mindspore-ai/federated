@@ -104,6 +104,9 @@ struct BigNumClass {
 
 struct ECGroupClass {
   explicit ECGroupClass(EC_GROUP *group) : group_ptr(group) {
+    if (group == nullptr) {
+      MS_LOG(ERROR) << "EC_GROUP is null, please check nid!";
+    }
     BnCtxPtr bn_ctx(BN_CTX_new());
     EC_GROUP_get_curve(group_ptr.get(), bn_p.get(), bn_a.get(), bn_b.get(), bn_ctx.get());
     EC_GROUP_get_order(group_ptr.get(), bn_n.get(), bn_ctx.get());

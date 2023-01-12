@@ -59,6 +59,10 @@ bool Send(const ClientPSIInit &client_psi_init) {
 }
 
 void Recv(ClientPSIInit *client_psi_init) {
+  if (client_psi_init == nullptr) {
+    MS_LOG(ERROR) << "client_psi_init is null!";
+    return;
+  }
   std::string bin_array = ReadBinFile("client_psi_init");
   datajoin::ClientPSIInitProto client_init_proto;
   client_init_proto.ParseFromArray(bin_array.data(), static_cast<int>(bin_array.size()));
@@ -82,6 +86,10 @@ bool Send(const ServerPSIInit &server_psi_init) {
 }
 
 void Recv(ServerPSIInit *server_psi_init) {
+  if (server_psi_init == nullptr) {
+    MS_LOG(ERROR) << "server_psi_init is null!";
+    return;
+  }
   std::string bin_array = ReadBinFile("server_psi_init");
   datajoin::ServerPSIInitProto server_init_proto;
   server_init_proto.ParseFromArray(bin_array.data(), static_cast<int>(bin_array.size()));
@@ -104,6 +112,10 @@ bool Send(const BobPb &bob_p_b) {
 }
 
 void Recv(BobPb *bob_p_b) {
+  if (bob_p_b == nullptr) {
+    MS_LOG(ERROR) << "bob_p_b is null!";
+    return;
+  }
   std::string bin_array = ReadBinFile("bob_p_b");
   datajoin::BobPbProto bob_p_b_proto;
   bob_p_b_proto.ParseFromArray(bin_array.data(), static_cast<int>(bin_array.size()));
@@ -130,6 +142,10 @@ bool Send(const AlicePbaAndBF &alice_pba_bf) {
 }
 
 void Recv(AlicePbaAndBF *alice_p_b_a_bf) {
+  if (alice_p_b_a_bf == nullptr) {
+    MS_LOG(ERROR) << "alice_p_b_a_bf is null!";
+    return;
+  }
   std::string bin_array = ReadBinFile("alice_pba_bf");
   datajoin::AlicePbaAndBFProto alice_p_b_a_bf_proto;
   alice_p_b_a_bf_proto.ParseFromArray(bin_array.data(), static_cast<int>(bin_array.size()));
@@ -158,6 +174,10 @@ bool Send(const BobAlignResult &bob_align_result) {
 }
 
 void Recv(BobAlignResult *bob_align_result) {
+  if (bob_align_result == nullptr) {
+    MS_LOG(ERROR) << "bob_align_result is null!";
+    return;
+  }
   std::string bin_array = ReadBinFile("bob_align_result");
   datajoin::BobAlignResultProto bob_align_result_proto;
   bob_align_result_proto.ParseFromArray(bin_array.data(), static_cast<int>(bin_array.size()));
@@ -183,6 +203,10 @@ bool Send(const AliceCheck &alice_check) {
 }
 
 void Recv(AliceCheck *alice_check) {
+  if (alice_check == nullptr) {
+    MS_LOG(ERROR) << "alice_check is null!";
+    return;
+  }
   std::string bin_array = ReadBinFile("alice_check");
   datajoin::AliceCheckProto alice_check_proto;
   alice_check_proto.ParseFromArray(bin_array.data(), static_cast<int>(bin_array.size()));
