@@ -75,6 +75,7 @@ class GetModelKernelMod : public AbstractKernel {
       MS_ERROR_IF_NULL_W_RET_VAL(get_model_rsp, dict_data);
       auto response_code = get_model_rsp->retcode();
       if (response_code == schema::ResponseCode_SUCCEED) {
+        MS_LOG(INFO) << "Get model response code from server is success.";
       } else if (response_code == schema::ResponseCode_SucNotReady) {
         MS_LOG(INFO) << "Get model response code from server is not ready.";
         continue;

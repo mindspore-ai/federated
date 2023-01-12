@@ -88,6 +88,10 @@ void Executor::HandleModelUpdate(const std::map<std::string, Address> &feature_m
 }
 
 bool Executor::OnReceiveModelWeight(const uint8_t *proto_model_data, size_t len) {
+  MS_ERROR_IF_NULL_W_RET_VAL(proto_model_data, false);
+  if (len == 0) {
+    return false;
+  }
   ProtoModel proto_model;
   if (!proto_model.ParseFromArray(proto_model_data, static_cast<int>(len))) {
     MS_LOG_WARNING << "Failed to parse data to ProtoModel object";
@@ -141,6 +145,7 @@ std::map<std::string, Address> Executor::ParseFeatureMap(const schema::RequestPu
     }
     std::string weight_full_name = feature->weight_fullname()->str();
     float *weight_data = const_cast<float *>(feature->data()->data());
+    MS_ERROR_IF_NULL_W_RET_VAL(weight_data, {});
     size_t weight_size = feature->data()->size() * sizeof(float);
     upload_feature_map[weight_full_name] = {weight_data, weight_size};
   }
@@ -212,14 +217,14 @@ FlStatus Executor::BuildPullWeightRsp(size_t iteration, const std::vector<std::s
 
 FlStatus Executor::HandlePullWeightRequest(const uint8_t *req_data, size_t len, FBBuilder *fbb) {
   std::string reason;
-  if (!IsAggregationDone() || !IsUnmasked()) {
-    reason = "The aggregation for the weights is not done yet.";
-    return FlStatus(kAggregationNotDone, reason);
-  }
-  if (req_data == nullptr || fbb == nullptr) {
+  if (req_data == nullptr || fbb == nullptr || len == 0) {
     reason = "System error: Input parameter invalid";
     MS_LOG(WARNING) << reason;
     return FlStatus(kRequestError, reason);
+  }
+  if (!IsAggregationDone() || !IsUnmasked()) {
+    reason = "The aggregation for the weights is not done yet.";
+    return FlStatus(kAggregationNotDone, reason);
   }
   flatbuffers::Verifier verifier(req_data, len);
   if (!verifier.VerifyBuffer<schema::RequestPullWeight>()) {
@@ -268,6 +273,7 @@ bool Executor::IsAggregationSkip() const { return is_aggregation_skip_; }
 bool Executor::IsAggregationDone() const { return is_aggregation_done_; }
 
 bool Executor::GetServersForAllReduce(std::map<std::string, std::string> *all_reduce_server_map) {
+  MS_ERROR_IF_NULL_W_RET_VAL(all_reduce_server_map, false);
   std::map<std::string, std::string> all_server_map;
   std::unordered_map<std::string, uint64_t> count_server_map;
   auto cache_ret = cache::Server::Instance().GetAllServersRealtime(&all_server_map);
@@ -411,7 +417,9 @@ bool Executor::RunWeightAggregationInner(const std::map<std::string, std::string
         return false;
       }
       float *weight_data = reinterpret_cast<float *>(weight_data_base + model->weight_items[name].offset);
+      MS_ERROR_IF_NULL_W_RET_VAL(weight_data, false);
       float *weight_addr = reinterpret_cast<float *>(param_aggr.weight_data);
+      MS_ERROR_IF_NULL_W_RET_VAL(weight_addr, false);
       auto elem_num = param_aggr.weight_size / sizeof(float);
       for (size_t i = 0; i < elem_num; i++) {
         weight_addr[i] += weight_data[i];

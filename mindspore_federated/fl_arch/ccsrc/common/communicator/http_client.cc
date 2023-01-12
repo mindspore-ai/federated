@@ -102,6 +102,7 @@ void HttpClient::Init() {
 
   evhttp_conn_ =
     evhttp_connection_base_bufferevent_new(event_base_, nullptr, buffer_event_, evhttp_uri_get_host(uri_), port);
+  MS_EXCEPTION_IF_NULL(evhttp_conn_);
   MS_LOG(INFO) << "Host is:" << evhttp_uri_get_host(uri_) << ", port is:" << port;
 }
 
@@ -151,7 +152,9 @@ void HttpClient::ReadCallback(struct evhttp_request *http_req, void *const arg) 
   MS_ERROR_IF_NULL_WO_RET_VAL(http_client);
 
   event_base *base = http_client->get_event_base();
+  MS_ERROR_IF_NULL_WO_RET_VAL(base);
   struct evkeyvalq *headers = evhttp_request_get_input_headers(http_req);
+  MS_ERROR_IF_NULL_WO_RET_VAL(headers);
   auto rsp_message_id_ptr = evhttp_find_header(headers, "Message-Id");
   std::string rsp_message_id = rsp_message_id_ptr == nullptr ? "" : std::string(rsp_message_id_ptr);
   std::string expect_message_id = http_client->message_id();
@@ -166,12 +169,12 @@ void HttpClient::ReadCallback(struct evhttp_request *http_req, void *const arg) 
     return;
   }
 
-  MS_ERROR_IF_NULL_WO_RET_VAL(base);
   MS_LOG(INFO) << "Response code is " << http_req->response_code << ", target msg type is " << target_msg_type
                << ", message id is " << rsp_message_id;
   switch (http_req->response_code) {
     case HTTP_OK: {
       struct evbuffer *evbuf = evhttp_request_get_input_buffer(http_req);
+      MS_ERROR_IF_NULL_WO_RET_VAL(evbuf);
       size_t length = evbuffer_get_length(evbuf);
       MS_LOG(INFO) << "response message data length is:" << length;
 
@@ -240,6 +243,7 @@ bool HttpClient::SendMessage(const void *data, size_t data_size, const std::shar
   set_message_id(message_id);
   set_response_msg(nullptr);
   http_req_ = evhttp_request_new(ReadCallback, this);
+  MS_ERROR_IF_NULL_W_RET_VAL(http_req_, false);
 
   /** Set the post data */
   evbuffer_add(http_req_->output_buffer, data, data_size);
@@ -268,6 +272,7 @@ bool HttpClient::SendMessage(const void *data, size_t data_size, const std::shar
   set_response_track(response_track);
   set_target_msg_type(target_msg_type);
   http_req_ = evhttp_request_new(ReadCallback, this);
+  MS_ERROR_IF_NULL_W_RET_VAL(http_req_, false);
 
   /** Set the post data */
   evbuffer_add(http_req_->output_buffer, data, data_size);

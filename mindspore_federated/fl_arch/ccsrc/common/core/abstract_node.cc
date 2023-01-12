@@ -237,6 +237,7 @@ void AbstractNode::StartTcpServer(const std::string &ip, uint16_t port) {
 
   // create tcp client to itself in case of event dispatch failed when there are no events pending or actvie
   tcp_client_local_ = std::make_shared<TcpClient>(node_info_.ip_, node_info_.port_, NodeRole::SERVER);
+  MS_EXCEPTION_IF_NULL(tcp_client_local_);
   constexpr int timeout_in_seconds_wait_connected = 3;
   tcp_client_local_->Start(timeout_in_seconds_wait_connected);
 }
@@ -318,6 +319,9 @@ void AbstractNode::HandleCollectiveData(const std::shared_ptr<TcpConnection> &co
   auto &recv_meta = meta.collective_meta();
   const auto &send_node = recv_meta.send_node();
   MS_LOG(DEBUG) << "Receive data from node:" << send_node << ", recv meta:" << CollectiveMetaToString(recv_meta);
+  if (collective_received_data_.find(send_node) == collective_received_data_.end()) {
+    MS_LOG(WARNING) << "Send node is not in collective received data.";
+  }
   collective_received_data_[send_node].emplace_back(std::make_pair(recv_meta, data));
   collective_received_cond_.notify_all();
 }

@@ -69,6 +69,7 @@ bool LocalMetaStore::verifyAggregationFeatureMap(const ModelItemPtr &modelItemPt
     }
   }
   float *data_arr = reinterpret_cast<float *>(modelItemPtr->weight_data.data());
+  MS_ERROR_IF_NULL_W_RET_VAL(data_arr, false);
   std::vector<float> weight_data(data_arr, data_arr + modelItemPtr->weight_data.size() / sizeof(float));
 
   for (const auto &data : weight_data) {
@@ -91,6 +92,7 @@ bool LocalMetaStore::verifyAggregationFeatureMap(const std::map<std::string, Add
     weight.size = weight_size;
 
     uint8_t *upload_weight_data_arr = reinterpret_cast<uint8_t *>(const_cast<void *>(item.second.addr));
+    MS_ERROR_IF_NULL_W_RET_VAL(upload_weight_data_arr, false);
     std::vector<uint8_t> upload_weight_data(upload_weight_data_arr,
                                             upload_weight_data_arr + weight_size / sizeof(uint8_t));
     modelItemPtr->weight_items[weight_full_name] = weight;

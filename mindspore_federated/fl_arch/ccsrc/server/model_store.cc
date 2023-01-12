@@ -388,6 +388,7 @@ void ModelStore::StoreCompressModelByIterNum(size_t iteration, const ModelItemPt
 }
 
 void ModelStore::RelModelResponseCache(const void *data, size_t datalen, void *extra) {
+  MS_ERROR_IF_NULL_WO_RET_VAL(data);
   auto &instance = GetInstance();
   std::unique_lock<std::mutex> lock(instance.model_response_cache_lock_);
   auto it =

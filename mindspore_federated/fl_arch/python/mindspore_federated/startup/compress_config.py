@@ -21,7 +21,7 @@ class CompressConfig:
     Define the vertical server compress config.
 
     Args:
-        ctype (str): Compress type for vertical fl communication
+        type (str): Compress type for vertical fl communication
         quant_bits (int): Bits num of quant algorithm
     """
 

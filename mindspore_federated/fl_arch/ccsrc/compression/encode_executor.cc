@@ -46,6 +46,7 @@ bool CompressExecutor::construct_compress_weight(std::map<std::string, CompressW
 
 bool CompressExecutor::quant_min_max(std::map<std::string, CompressWeight> *compressWeights,
                                      std::map<std::string, std::vector<float>> feature_maps, size_t num_bits) {
+  MS_EXCEPTION_IF_NULL(compressWeights);
   auto temp1 = static_cast<float>(1 << num_bits) - 1.0f;
   auto temp2 = static_cast<float>(1 << (num_bits - 1));
   for (const auto &feature_map : feature_maps) {
@@ -76,7 +77,6 @@ bool CompressExecutor::quant_min_max(std::map<std::string, CompressWeight> *comp
     compressWeight.min_val = min_value;
     compressWeight.max_val = max_value;
     compressWeight.compress_data_len = size;
-
     (*compressWeights)[weight_name] = compressWeight;
   }
   return true;

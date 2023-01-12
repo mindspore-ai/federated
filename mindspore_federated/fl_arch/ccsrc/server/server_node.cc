@@ -396,6 +396,9 @@ void ServerNode::HandleBroadcastModelWeight(const std::shared_ptr<TcpConnection>
 
 bool ServerNode::PullWeight(const uint8_t *req_data, size_t len, VectorPtr *output) {
   MS_LOG_DEBUG << "Begin pull weight from other servers";
+  if (req_data == nullptr || len == 0) {
+    return false;
+  }
   if (output == nullptr) {
     return false;
   }
