@@ -24,7 +24,7 @@ from mindspore import Tensor, Parameter
 from mindspore import nn, context
 from mindspore.ops import PrimitiveWithInfer, prim_attr_register
 from mindspore.context import ParallelMode
-from mindspore_federated.privacy import LabelDP, SimuTEE
+from mindspore_federated.privacy import LabelDP, SimuTEE, EmbeddingDP
 
 from .vfl_optim import PartyOptimizer, PartyGradScaler, _reorganize_input_data
 
@@ -154,7 +154,12 @@ class FLModel:
             self._label_dp = LabelDP(eps=label_dp_eps)
 
         if self._label_dp is not None and self._role != 'leader':
-            raise AttributeError('FLModel: only a leader party can employ the label dp strategy')
+            raise AttributeError('FLModel: only a leader can employ the label dp strategy')
+
+        self.embedding_dp = None
+        if hasattr(self._yaml_data, 'embedding_dp_eps'):
+            embedding_dp_eps = self._yaml_data.embedding_dp_eps
+            self.embedding_dp = EmbeddingDP(eps=embedding_dp_eps)
 
         # init the tee layer
         if hasattr(self._yaml_data, 'tee_layer'):
@@ -288,6 +293,7 @@ class FLModel:
         out = OrderedDict()
         for idx, output_data in enumerate(self._yaml_data.train_net_outs):
             out[output_data['name']] = out_tuple[idx] if isinstance(out_tuple, tuple) else out_tuple
+
         return out
 
     def backward_one_step(self, local_data_batch: dict = None, remote_data_batch: dict = None, sens: dict = None):

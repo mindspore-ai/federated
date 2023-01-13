@@ -14,11 +14,13 @@
 # ============================================================================
 """classes of differential privacy mechanisms for the federated learner."""
 
+import logging
 import numpy as np
 import mindspore as ms
 from mindspore import Tensor, ops
 from mindspore import numpy as mnp
 from mindspore import log as logger
+
 
 class LabelDP:
     """
@@ -110,3 +112,68 @@ class LabelDP:
             raise ValueError(f'''LabelDP currently only support binary or onehot labels, so the dim of the input labels
                              is expected to be 1 or 2, but got {len(label.shape)}''')
         return dp_label
+
+
+class EmbeddingDP:
+    """
+    This class uses unary quantization and random response technique to create differentially private embeddings.
+
+    Args:
+        eps (Union[None, int, float]): the privacy budget which controls the level of differential privacy.
+
+    Inputs:
+        - **embedding** (Tensor) - a batch of embeddings that need protection.
+
+    Outputs:
+        Tensor, has the same shape and data type as `embedding`.
+
+    Raises:
+        TypeError: If `eps` is not a float or int.
+        TypeError: If `embedding` is not a Tensor.
+        ValueError: If `eps` is less than zero.
+
+    Examples:
+        >>> from mindspore import Tensor
+        >>> from mindspore_federated.privacy import EmbeddingDP
+        >>> ori_tensor = Tensor([1.5, -0.6, 7, -10])
+        >>> dp_tensor = EmbeddingDP()(ori_tensor)
+        >>> print(dp_tensor)
+        [1., 0., 1., 0.]
+    """
+    def __init__(self, eps=None) -> None:
+        self.eps = eps
+        if self.eps or self.eps == 0:
+            if not isinstance(eps, (int, float)):
+                raise TypeError(f'EmbeddingDP: the type of eps must be int or float, but {type(eps)} found.')
+            self.eps = float(eps)
+            if self.eps < 0:
+                raise ValueError(f'EmbeddingDP: eps must be greater than or equal to zero, but got {self.eps}')
+            if self.eps > 100:
+                logger.warning(f'EmbeddingDP: eps {self.eps} is far too large and is reassigned to 100.')
+                self.eps = 100
+
+            self.q = 1 / (ops.exp(Tensor(eps / 2)) + 1)
+            self.p = 1 - self.q
+            logging.info("The follower's embedding is protected by EmbeddingDP with eps %f", self.eps)
+        else:
+            logger.warning(f'EmbeddingDP: eps is missing and only quantization is applied.')
+            logging.info("The follower's embedding is protected by EmbeddingDP with quantization only")
+
+    def __call__(self, embedding):
+        if not isinstance(embedding, Tensor):
+            raise TypeError(f'EmbeddingDP: the embedding must be a Tensor, but got {type(embedding)} instead.')
+        embedding = self._unary_encoding(embedding)
+        embedding = self._randomize(embedding)
+        return embedding
+
+    def _unary_encoding(self, embedding):
+        embedding[embedding > 0] = 1
+        embedding[embedding <= 0] = 0
+        return embedding
+
+    def _randomize(self, embedding):
+        if self.eps:
+            p_binomial = np.random.binomial(1, self.p, embedding.shape)
+            q_binomial = np.random.binomial(1, self.q, embedding.shape)
+            return Tensor(np.where(embedding.asnumpy() == 1, p_binomial, q_binomial), dtype=embedding.dtype)
+        return embedding
