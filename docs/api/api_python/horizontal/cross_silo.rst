@@ -1,7 +1,7 @@
 云侧客户端
 ================================
 
-.. py:class:: mindspore_federated.FederatedLearningManager(yaml_config, model, sync_frequency, http_server_address="", data_size=1, sync_type='fixed', ssl_config=None, **kwargs)
+.. py:class:: mindspore_federated.FederatedLearningManager(yaml_config, model, sync_frequency, http_server_address="", data_size=1, sync_type='fixed', run_distribute=False, ssl_config=None, **kwargs)
 
     在训练过程中管理联邦学习。
 
@@ -17,6 +17,7 @@
           支持["fixed", "adaptive"]。默认值："fixed"。
           - fixed：参数的同步频率是固定的。
           - adaptive：参数的同步频率是自适应变化的。
+        - **run_distribute** (bool) - 是否开启分布式训练。默认值：False。
         - **ssl_config** (Union(None, SSLConfig)) - ssl配置项。默认值：None。
         - **min_consistent_rate** (float) - 最小一致性比率阈值，该值越大同步频率提升难度越大。
           取值范围：大于等于0.0。默认值：1.1。
@@ -31,6 +32,10 @@
           取值范围：大于0。默认值：2。
         - **unchanged_round** (int) - 频率不发生变化的轮数，在前 `unchanged_round` 个轮次，频率不会发生变化。
           取值范围：大于等于0。默认值：0。
+
+    .. py:method:: on_train_step_begin()
+
+        在step开始时云云联邦接入联邦学习任务。
 
     .. py:method:: on_train_step_end(run_context)
 

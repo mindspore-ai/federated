@@ -157,7 +157,7 @@ class FederatedLearningManager(Callback):
 
                          - adaptive: The frequency of parameter synchronization changes adaptively.
 
-        run_distribute (Bool): Whether open distribute training. Default: False.
+        run_distribute (bool): Whether to open distribute training. Default: False.
         ssl_config (Union(None, SSLConfig)): Config of ssl. Default: None.
         min_consistent_rate (float): Minimum consistency ratio threshold. The greater the value, the more
                                      difficult it is to improve the synchronization frequency.
@@ -573,6 +573,7 @@ class FederatedLearningManager(Callback):
                     raise ValueError("'{}' is not in control_params".format(name))
 
     def on_train_step_begin(self):
+        """ At the beginning of step, the cloud federation accesses the federated learning task. """
         self._global_step += 1
         is_cloud = self._server_mode == _fl_context.SERVER_MODE_CLOUD
         is_sync = self._global_step == self._next_begin_sync_iter

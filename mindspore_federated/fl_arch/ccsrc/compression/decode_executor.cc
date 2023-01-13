@@ -51,6 +51,7 @@ bool DecodeExecutor::DeQuantSparseDiff(std::map<std::string, std::vector<float>>
                                        const std::vector<CompressFeatureMap> &compress_feature_maps, size_t num_bits,
                                        float upload_sparse_rate, int seed, const std::vector<std::string> &name_vec,
                                        size_t data_size) {
+  MS_EXCEPTION_IF_NULL(weight_map);
   std::vector<std::vector<float>> decompress_feature_maps;
 
   // origin parameters
@@ -123,6 +124,7 @@ bool DecodeExecutor::DeQuantSparseDiff(std::map<std::string, std::vector<float>>
     size_t feature_size = decompress_feature_maps[i].size();
     std::string name = name_vec[i];
     float *weight_data = reinterpret_cast<float *>(weight_data_base + model->weight_items[name].offset);
+    MS_EXCEPTION_IF_NULL(weight_data);
     auto &weight_item = (*weight_map)[name];
     weight_item.resize(feature_size);
     for (size_t j = 0; j < feature_size; ++j) {

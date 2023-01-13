@@ -19,6 +19,7 @@ from .startup.federated_local import Callback, CallbackContext
 from .startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig
 from .startup.feature_map import FeatureMap
 from .startup.ssl_config import SSLConfig
+from .startup.compress_config import CompressConfig
 from .trainer._fl_manager import FederatedLearningManager, PushMetrics
 from .trainer.vfl_model import FLModel
 from .trainer.vfl_optim import PartyGradOperation, PartyOptimizer, PartyGradScaler
@@ -45,5 +46,6 @@ __all__ = [
     "privacy",
     "VerticalFederatedCommunicator",
     "ServerConfig",
+    "CompressConfig",
     "compress",
 ]

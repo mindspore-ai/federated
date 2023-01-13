@@ -84,10 +84,14 @@ class FusedPushMetricsKernelMod : public AbstractKernel {
     auto response_code = push_metrics_rsp->retcode();
     switch (response_code) {
       case schema::ResponseCode_SUCCEED:
-      case schema::ResponseCode_OutOfTime:
+        MS_LOG(INFO) << "Push metrics response code from server is success.";
         break;
+      case schema::ResponseCode_OutOfTime:
+        MS_LOG(WARNING) << "Push metrics response code from server is out of time.";
+        return false;
       default:
         MS_LOG(WARNING) << "Launching push metrics for worker failed.";
+        return false;
     }
 
     MS_LOG(INFO) << "Push metrics for loss and accuracy success.";

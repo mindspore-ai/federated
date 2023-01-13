@@ -34,9 +34,10 @@ bool HttpRequestHandler::Initialize(int fd, const std::unordered_map<std::string
 
   if (FLContext::instance()->enable_ssl()) {
     MS_LOG(INFO) << "Enable ssl support.";
-    if (!SSL_CTX_set_options(SSLHTTP::GetInstance().GetSSLCtx(), SSL_OP_SINGLE_DH_USE | SSL_OP_SINGLE_ECDH_USE |
-                                                                   SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3 | SSL_OP_NO_TLSv1 |
-                                                                   SSL_OP_NO_TLSv1_1)) {
+    auto ssl_ctx = SSLHTTP::GetInstance().GetSSLCtx();
+    MS_EXCEPTION_IF_NULL(ssl_ctx);
+    if (!SSL_CTX_set_options(ssl_ctx, SSL_OP_SINGLE_DH_USE | SSL_OP_SINGLE_ECDH_USE | SSL_OP_NO_SSLv2 |
+                                        SSL_OP_NO_SSLv3 | SSL_OP_NO_TLSv1 | SSL_OP_NO_TLSv1_1)) {
       if (evbase_) {
         event_base_free(evbase_);
         evbase_ = nullptr;
@@ -45,7 +46,7 @@ bool HttpRequestHandler::Initialize(int fd, const std::unordered_map<std::string
       http = nullptr;
       MS_LOG(EXCEPTION) << "SSL_CTX_set_options failed.";
     }
-    evhttp_set_bevcb(http, BuffereventCallback, SSLHTTP::GetInstance().GetSSLCtx());
+    evhttp_set_bevcb(http, BuffereventCallback, ssl_ctx);
   }
 
   int result = evhttp_accept_socket(http, fd);
@@ -64,6 +65,7 @@ bool HttpRequestHandler::Initialize(int fd, const std::unordered_map<std::string
         httpReq->set_request(req);
         httpReq->InitHttpMessage();
         OnRequestReceive *func = reinterpret_cast<OnRequestReceive *>(arg);
+        MS_EXCEPTION_IF_NULL(func);
         (*func)(httpReq);
       } catch (const std::exception &e) {
         MS_LOG(ERROR) << "Catch exception: " << e.what();

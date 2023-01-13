@@ -31,7 +31,9 @@ class VerticalFederatedCommunicator:
     Args:
         http_server_config (ServerConfig): Configuration of local http server.
         remote_server_config (ServerConfig): Configuration of remote http server.
-        ssl_config (SSLConfig): Configuration of ssl encryption.
+        enable_ssl (bool): whether to enable ssl communication. Default: False.
+        ssl_config (SSLConfig): Configuration of ssl encryption. Default: None.
+        compress_config (CompressConfig): Configuration of compress communication. Default: None.
 
     Examples:
         >>> from mindspore_federated import VerticalFederatedCommunicator, ServerConfig

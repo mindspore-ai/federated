@@ -30,6 +30,11 @@ void PullWeightKernel::InitKernel(size_t) {}
 
 bool PullWeightKernel::Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<MessageHandler> &message) {
   MS_LOG(DEBUG) << "Launching PullWeightKernel kernel.";
+  if (req_data == nullptr || len == 0) {
+    std::string reason = "req_data is nullptr or len is 0.";
+    MS_LOG(ERROR) << reason;
+    return false;
+  }
   auto current_iter = cache::InstanceContext::Instance().iteration_num();
   FBBuilder fbb;
   auto status = Executor::GetInstance().HandlePullWeightRequest(req_data, len, &fbb);

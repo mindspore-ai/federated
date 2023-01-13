@@ -59,8 +59,14 @@ struct ParallelSync {
       f(begin, end);
       return;
     }
+    if (thread_num_ == 0) {
+      MS_LOG(EXCEPTION) << "Thread num must be greater than zero.";
+    }
     size_t chunk_size = (end - begin - 1) / thread_num_ + 1;
     chunk_size = std::max(static_cast<size_t>(grain_size), chunk_size);
+    if (chunk_size == 0) {
+      MS_LOG(EXCEPTION) << "Chunk size must be greater than zero.";
+    }
     task_num_ = (end - begin - 1) / chunk_size + 1;
     std::atomic<size_t> finish_count(0);
 

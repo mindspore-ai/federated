@@ -197,8 +197,6 @@ inline std::string GetEnv(const std::string &env_var) {
   return std::string(value);
 }
 
-inline bool isNaN(float num) { return num != num; }
-
 inline bool startswith(const std::string &full_str, const std::string &prefix) {
   size_t prefix_len = prefix.size();
 

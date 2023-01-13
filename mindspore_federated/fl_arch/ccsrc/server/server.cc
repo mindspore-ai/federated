@@ -628,6 +628,10 @@ void Server::BroadcastModelWeight(const std::string &proto_model,
 }
 
 bool Server::PullWeight(const uint8_t *req_data, size_t len, VectorPtr *output) {
+  if (req_data == nullptr || len == 0) {
+    MS_LOG_ERROR << "req_data is nullptr or len is 0";
+    return false;
+  }
   if (server_node_ == nullptr) {
     MS_LOG_ERROR << "server_node_ cannot be nullptr";
     return false;

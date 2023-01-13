@@ -292,6 +292,8 @@ void RedisClient::Disconnect() {
 }
 
 RedisReply RedisClient::RunCommand(int argc, const char **argv, const size_t *argvlen) {
+  MS_EXCEPTION_IF_NULL(argv);
+  MS_EXCEPTION_IF_NULL(argvlen);
   std::unique_lock<std::mutex> lock(lock_);
   if (!IsValid()) {
     auto status = ReconnectInner();
@@ -397,6 +399,7 @@ CacheStatus RedisClient::SIsMember(const std::string &key, const std::string &me
 }
 
 CacheStatus RedisClient::SMembers(const std::string &key, std::vector<std::string> *members) {
+  MS_EXCEPTION_IF_NULL(members);
   RedisReply reply = RunCommand({"SMEMBERS", key});
   if (!reply.IsValid()) {
     MS_LOG(WARNING) << "Reply invalid: " << reply.GetError();
@@ -465,6 +468,7 @@ CacheStatus RedisClient::HMSet(const std::string &key, const std::unordered_map<
 }
 
 CacheStatus RedisClient::HGet(const std::string &key, const std::string &filed, std::string *value) {
+  MS_EXCEPTION_IF_NULL(value);
   RedisReply reply = RunCommand({"HGET", key, filed});
   if (!reply.IsValid()) {
     MS_LOG(WARNING) << "Reply invalid: " << reply.GetError();
@@ -481,6 +485,7 @@ CacheStatus RedisClient::HGet(const std::string &key, const std::string &filed, 
 }
 
 CacheStatus RedisClient::HGetAll(const std::string &key, std::unordered_map<std::string, std::string> *items) {
+  MS_EXCEPTION_IF_NULL(items);
   RedisReply reply = RunCommand({"HGETALL", key});
   if (!reply.IsValid()) {
     MS_LOG(WARNING) << "Reply invalid: " << reply.GetError();

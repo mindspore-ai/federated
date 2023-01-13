@@ -23,7 +23,19 @@ default_cipher_list = "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256
 
 class SSLConfig:
     """
-       Define the ssl certificate config.
+    Define the ssl certificate config.
+
+    Args:
+        server_password (str): The password of the server certificate. Default: None.
+        client_password (str): The password of the client certificate. Default: None.
+        server_cert_path (str): The absolute path of the server certificate on the server. Default: None.
+        client_cert_path (str): The absolute path of the client certificate on the server. Default: None.
+        ca_cert_path (str): The absolute path of the root certificate on the server. Default: None.
+        crl_path (str): The absolute path of the CRL certificate on the server. Default: None.
+        cipher_list (str): The server supports the default encryption suite for ssl communication.
+                           Default: default_cipher_list.
+        cert_expire_warning_time_in_day (int): How long before the certificate expires to start printing warning
+                                               messages. Default: 90.
     """
     def __init__(self, server_password, client_password, server_cert_path=None, client_cert_path=None,
                  ca_cert_path=None, crl_path=None, cipher_list=default_cipher_list,
@@ -83,6 +95,7 @@ def init_vertical_ssl_config(ssl_config):
 
 
 def init_vertical_enable_ssl(enable_ssl):
+    """init vertical federated enable ssl"""
     ctx = VFLContext.get_instance()
     if not isinstance(enable_ssl, bool):
         raise RuntimeError(f"Parameter 'enable_ssl' should be instance of bool, but got {type(enable_ssl)}")

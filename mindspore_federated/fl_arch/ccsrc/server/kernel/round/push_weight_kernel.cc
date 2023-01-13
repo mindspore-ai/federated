@@ -25,6 +25,11 @@ void PushWeightKernel::InitKernel(size_t) {}
 
 bool PushWeightKernel::Launch(const uint8_t *req_data, size_t len, const std::shared_ptr<MessageHandler> &message) {
   MS_LOG(INFO) << "Launching PushWeightKernel kernel.";
+  if (req_data == nullptr || len == 0) {
+    std::string reason = "req_data is nullptr or len is 0.";
+    MS_LOG(ERROR) << reason;
+    return false;
+  }
   FBBuilder fbb;
   auto current_iter = cache::InstanceContext::Instance().iteration_num();
   if (Executor::GetInstance().IsIterationModelFinished(current_iter)) {

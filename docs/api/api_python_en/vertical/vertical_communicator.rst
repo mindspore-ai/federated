@@ -5,4 +5,10 @@ Vertical Federated Learning Communicator
     :members: 
 
 .. autoclass:: mindspore_federated.ServerConfig
-    :members: 
+    :members:
+
+.. autoclass:: mindspore_federated.SSLConfig
+    :members:
+
+.. autoclass:: mindspore_federated.CompressConfig
+    :members:
