@@ -39,6 +39,7 @@ constexpr char kEnvSchedulerPort[] = "MS_SCHED_PORT";
 constexpr char kFedAvgAggregation[] = "FedAvg";
 constexpr char kFedProxAggregation[] = "FedProx";
 constexpr char kScaffoldAggregation[] = "Scaffold";
+constexpr char kFedNovaAggregation[] = "FedNova";
 
 constexpr char kCommTypeOfIBVerbs[] = "ibverbs";
 constexpr char kRoleOfPServer[] = "server";

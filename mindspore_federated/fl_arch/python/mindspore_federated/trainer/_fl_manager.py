@@ -143,11 +143,15 @@ class FederatedLearningManager(Callback):
     Args:
         yaml_config (str): The yaml file path. More detail see `federated_server_yaml <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python_en/horizontal/federated_server_yaml.md>`_.
         model (nn.Cell): A model for Federated Training.
-        sync_frequency (int): Synchronization frequency of parameters in Federated Learning.
-                              Note that in dataset sink mode, the unit of the frequency is the number of epochs.
-                              Otherwise, the unit of the frequency is the number of steps.
-                              The initial synchronization frequency is in adaptive synchronization frequency mode and
-                              the synchronization frequency in fixed frequency mode.
+        sync_frequency (int): Synchronization frequency of parameters in Federated Learning. Indicating the number
+                              of steps between two adjacent synchronization operations when dataset_sink_mode is
+                              set to False. If sync_type is set to "fixed", it serves as a fixed number of steps.
+                              If sync_type is set to "adaptive", it serves as the initial value of the adaptive
+                              synchronization frequency. Note that its function is changed in dataset sink mode.
+                              If dataset_sink_mode is set to True and sink_size is set to a non-positive value,
+                              the synchronization operation will execute once every sync_frequency epochs. If
+                              dataset_sink_mode is set to True and sink_size is set to a positive value, the
+                              synchronization operation will execute once every sink_size*sync_frequency steps.
         http_server_address (str): The http server address used for communicating. Default: "".
         data_size (int): The data size to be reported to the worker. Default: 1.
         sync_type (str): The synchronization type of parameter in Federated Learning.
@@ -239,7 +243,7 @@ class FederatedLearningManager(Callback):
                 "aggregation_type must be in {}, but got {}.".format(_fl_context.SUPPORT_AGG_TYPES,
                                                                      self._aggregation_type))
 
-        if self._aggregation_type == _fl_context.FEDPROX:
+        if self._aggregation_type in (_fl_context.FEDPROX, _fl_context.FEDNOVA):
             self._global_weights = ParameterTuple(self._model.trainable_params()).clone(prefix=self._global_prefix)
             for param in self._global_weights:
                 param.requires_grad = False
@@ -288,6 +292,12 @@ class FederatedLearningManager(Callback):
         Determine whether scaffold is required.
         """
         return self._aggregation_type == _fl_context.SCAFFOLD
+
+    def _is_fednova(self):
+        """
+        Determine whether FedNova is required.
+        """
+        return self._aggregation_type == _fl_context.FEDNOVA
 
     def _as_set_init_state(self, kwargs):
         """
@@ -486,7 +496,7 @@ class FederatedLearningManager(Callback):
             parameter_dict_global[self._global_prefix + "." + key] = \
                 Parameter(Tensor(param_data), name=self._global_prefix + "." + key)
         load_param_into_net(self._model, parameter_dict)
-        if self._aggregation_type == _fl_context.FEDPROX:
+        if self._aggregation_type in (_fl_context.FEDPROX, _fl_context.FEDNOVA):
             load_param_into_net(self._model, parameter_dict_global)
 
     def _start_push_weight(self):
@@ -572,17 +582,46 @@ class FederatedLearningManager(Callback):
                 else:
                     raise ValueError("'{}' is not in control_params".format(name))
 
-    def on_train_step_begin(self):
+    def _model_params_to_weights_dict(self, weights, weight_infos):
+        """Exact trainable params from model, then fill into weights and weights_infos"""
+        for param in self._model.trainable_params():
+            if self._global_prefix not in param.name:
+                param_np = param.asnumpy()
+                if param_np.dtype != np.float32:
+                    continue
+                weight_infos[param.name] = (param_np.shape, param_np.dtype)
+                weights[param.name] = param_np.reshape(-1).tolist()
+
+    def _model_params_to_weights_diff_dict(self, weights, weight_infos):
+        """Exact trainable params from model, then calculate diff value for FedNova"""
+        local_params = list(filter(lambda x: self._global_prefix not in x.name and x.requires_grad,
+                                   self._model.get_parameters()))
+        global_params = list(filter(lambda x: self._global_prefix in x.name and not x.requires_grad,
+                                    self._model.get_parameters()))
+        for local_param, global_param in zip(local_params, global_params):
+            param = local_param - global_param
+            param_np = param.asnumpy()
+            weight_infos[local_param.name] = (param_np.shape, param_np.dtype)
+            weights[local_param.name] = param_np.reshape(-1).tolist()
+
+    def on_train_step_begin(self, run_context):
         """ At the beginning of step, the cloud federation accesses the federated learning task. """
         self._global_step += 1
         is_cloud = self._server_mode == _fl_context.SERVER_MODE_CLOUD
         is_sync = self._global_step == self._next_begin_sync_iter
         is_dist = self._rank_id == 0 if self._run_distribute else not self._run_distribute
+
         if is_cloud and is_sync and is_dist:
+            # In FedNova mode, the upload _data_size will be reset to the number of training steps
+            if self._is_fednova():
+                cb_params = run_context.original_args()
+                self._data_size = cb_params.batch_num * self._sync_frequency \
+                        if cb_params.dataset_sink_mode else self._sync_frequency
             start_fl_job = _StartFLJob(self._data_size)
             flattened_control_params = start_fl_job.construct()
             if self._is_scaffold() and self._global_step != 1:
                 self._scaffold_set_global_control_params(flattened_control_params)
+        logger.debug("run_context is %r", run_context)
 
     def on_train_step_end(self, run_context):
         """
@@ -616,13 +655,11 @@ class FederatedLearningManager(Callback):
 
                 weights = {}
                 weight_infos = {}
-                for param in self._model.trainable_params():
-                    if self._global_prefix not in param.name:
-                        param_np = param.asnumpy()
-                        if param_np.dtype != np.float32:
-                            continue
-                        weight_infos[param.name] = (param_np.shape, param_np.dtype)
-                        weights[param.name] = param_np.reshape(-1).tolist()
+                if self._is_fednova():
+                    self._model_params_to_weights_diff_dict(weights, weight_infos)
+                else:
+                    self._model_params_to_weights_dict(weights, weight_infos)
+
                 if self._is_scaffold():
                     for name in control_params:
                         delta_control_param = control_params[name] - self._local_control_params[name]

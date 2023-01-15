@@ -424,6 +424,20 @@ bool Executor::RunWeightAggregationInner(const std::map<std::string, std::string
       for (size_t i = 0; i < elem_num; i++) {
         weight_addr[i] += weight_data[i];
       }
+    } else if (aggregation_type == kFedNovaAggregation) {
+      bool ret = kernel::FedAvgKernel<float, size_t>::FedNovaAllReduce(server_map, &param_aggr);
+      if (!ret) {
+        MS_LOG(ERROR) << "FedNovaAllReduce is failed.";
+        return false;
+      }
+      float *weight_data = reinterpret_cast<float *>(weight_data_base + model->weight_items[name].offset);
+      MS_ERROR_IF_NULL_W_RET_VAL(weight_data, false);
+      float *weight_addr = reinterpret_cast<float *>(param_aggr.weight_data);
+      MS_ERROR_IF_NULL_W_RET_VAL(weight_addr, false);
+      auto elem_num = param_aggr.weight_size / sizeof(float);
+      for (size_t i = 0; i < elem_num; i++) {
+        weight_addr[i] += weight_data[i];
+      }
     } else {
       bool ret = kernel::FedAvgKernel<float, size_t>::AllReduce(server_map, &param_aggr);
       if (!ret) {

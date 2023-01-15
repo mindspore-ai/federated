@@ -56,7 +56,7 @@ def worker_fun(yaml_config_file, network, sync_frequency, http_server_address, d
     callback_paras.cur_step_num = 4
     run_context = RunContext(callback_paras)
     for _ in range(sync_frequency):
-        federated_learning_manager.on_train_step_begin()
+        federated_learning_manager.on_train_step_begin(run_context)
         federated_learning_manager.on_train_step_end(run_context)
 
 

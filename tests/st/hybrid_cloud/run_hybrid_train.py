@@ -162,7 +162,7 @@ def start_one_worker():
         test_acc, _ = evalute_process(model, test_path, img_size, client_batch_size)
         loss_list = loss_cb.get_loss()
         loss = sum(loss_list) / len(loss_list)
-        print('local epoch: {}, loss: {}, trian acc: {}, test acc: {}'.format(iter_num, loss, train_acc, test_acc),
+        print('local epoch: {}, loss: {}, train acc: {}, test acc: {}'.format(iter_num, loss, train_acc, test_acc),
               flush=True)
         push_metrics.construct(loss, test_acc)
 
