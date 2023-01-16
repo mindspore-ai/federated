@@ -150,6 +150,7 @@ int init_tee_cut_layer(size_t batch_size, size_t featureA_dims, size_t featureB_
         }
     }
     char *final_p = reinterpret_cast<char *>(malloc(strlen(real_p) + strlen("/enclave.signed.so")));
+    MS_EXCEPTION_IF_NULL(final_p);
     (void)snprintf(final_p, PATH_MAX, "%s", real_p);
 
     res = cc_enclave_create(final_p, SGX_ENCLAVE_TYPE, 0, SECGEAR_DEBUG_FLAG, NULL, 0, context);
@@ -181,6 +182,7 @@ std::pair<std::vector<uint8_t>, int> encrypt_client_data(std::vector<float> *pla
         printf("context is null\n");
         return std::pair<std::vector<uint8_t>, int>();
     }
+    MS_EXCEPTION_IF_NULL(plain);
 
     int ret_len = 0;
     uint8_t *out_buf = NULL;
@@ -217,6 +219,8 @@ std::vector<float> secure_forward_tee_cut_layer(size_t batch_size, size_t featur
         printf("context is null\n");
         return std::vector<float>();
     }
+    MS_EXCEPTION_IF_NULL(encrypted_embA);
+    MS_EXCEPTION_IF_NULL(encrypted_embB);
     cc_enclave_result_t res = CC_FAIL;
     int retval = 0;
     float *output = reinterpret_cast<float *>(malloc(sizeof(float)*batch_size*output_dims));
@@ -251,6 +255,8 @@ std::vector<float> forward_tee_cut_layer(size_t batch_size, size_t featureA_dims
         printf("context is null\n");
         return std::vector<float>();
     }
+    MS_EXCEPTION_IF_NULL(embA);
+    MS_EXCEPTION_IF_NULL(embB);
     cc_enclave_result_t res = CC_FAIL;
     int retval = 0;
     float *output = reinterpret_cast<float *>(malloc(sizeof(float)*batch_size*output_dims));
@@ -283,6 +289,7 @@ std::vector<std::vector<float>> backward_tee_cut_layer(size_t batch_size, size_t
         printf("context is null\n");
         return std::vector<std::vector<float>>();
     }
+    MS_EXCEPTION_IF_NULL(d_output);
     cc_enclave_result_t res = CC_FAIL;
     int retval = 0;
 
