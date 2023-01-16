@@ -1,16 +1,16 @@
 纵向联邦学习通信器
 ======================
 
-.. py:class:: mindspore_federated.VerticalFederatedCommunicator(http_server_config: ServerConfig, remote_server_config: ServerConfig, enable_ssl=True, ssl_config=None, compress_config=None)
+.. py:class:: mindspore_federated.VerticalFederatedCommunicator(http_server_config: ServerConfig, remote_server_config: ServerConfig, enable_ssl=False, ssl_config=None, compress_config=None)
 
     定义纵向联邦学习通信器。
 
     参数：
         - **http_server_config** (ServerConfig) - 本地服务器配置。
         - **remote_server_config** (ServerConfig) - 远程服务器配置。
-        - **enable_ssl** (bool) - 是否开启SSL加密通信，默认关闭。
-        - **ssl_config** (SSLConfig) - SSL加密通信配置，默认为None。
-        - **compress_config** (CompressConfig) - 通信压缩配置。默认为None。
+        - **enable_ssl** (bool) - 是否开启SSL加密通信。默认值：False。
+        - **ssl_config** (SSLConfig) - SSL加密通信配置，默认值：None。
+        - **compress_config** (CompressConfig) - 通信压缩配置。默认值：None。
 
     .. py:method:: data_join_wait_for_start()
 
@@ -72,18 +72,6 @@
         - **crl_path** (str) - CRL证书在服务器上的绝对路径。默认为None。
         - **cipher_list** (str) - 服务器支持ssl通信的默认加密套件。默认为default_cipher_list。
         - **cert_expire_warning_time_in_day** (int) - 证书在过期前多少时间开始打印警告信息。默认为90。
-
-    .. py:method:: init_ssl_config()
-
-        横向与云云联邦初始化ssl配置信息。
-
-    .. py:method:: init_vertical_ssl_config()
-
-        纵向联邦初始化ssl配置信息。
-
-    .. py:method:: init_vertical_enable_ssl()
-
-        纵向联邦初始化enable ssl配置信息。
 
 .. py:class:: mindspore_federated.CompressConfig(type, quant_bits)
 
