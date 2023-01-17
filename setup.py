@@ -105,6 +105,7 @@ required_package = [
     'mmh3',
     'pandas',
     'joblib',
+    'pymysql>=1.0.2'
 ]
 
 package_data = {

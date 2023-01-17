@@ -14,33 +14,27 @@
 # ============================================================================
 """base data processing"""
 
+from mindspore._checkparam import Validator
+from mindspore_federated.common.check_type import check_str
+from mindspore_federated.data_join.store.data_source_mgr import DataSourceMete
 
-class BaseData():
+SUPPORT_TYPES = ("int32", "int64", "float32", "float64", "string", "bytes")
+SUPPORT_ARRAY_TYPES = ("int32", "int64", "float32", "float64")
+
+
+class BaseData(metaclass=DataSourceMete):
     """Abstract base data source"""
-    def __init__(self, store=None, schema=None, desc=None):
+
+    def __init__(self, schema=None, desc=None):
         super().__init__()
-        self._store = dict() if store is None else store
-        self._it = iter(self._store)
         self._schema = dict() if schema is None else schema
         self._desc = desc
 
-    def set(self, store):
-        self._store = store
-
-    def merge(self, store):
-        origin_len = len(self._store) + len(store)
-        self._store = dict(self._store, **store)
-        drop_duplicate_len = len(self._store)
-        if drop_duplicate_len != origin_len:
-            raise ValueError("There are {} duplicated ids".format(origin_len - drop_duplicate_len))
-
     def keys(self):
-        return list(self._store.keys())
+        pass
 
     def values(self, keys=None):
-        if keys is None:
-            return list(self._store.values())
-        return [self._store[_] for _ in keys]
+        pass
 
     def schema(self):
         return self._schema
@@ -48,15 +42,30 @@ class BaseData():
     def desc(self):
         return self._desc
 
-    def size(self):
-        return len(self._store)
-
     def verify(self):
         pass
 
-    def __iter__(self):
-        self._it = iter(self._store)
-        return self
+    def _verify_schema(self):
+        """
+        Verify schema.
+        """
+        if isinstance(self._schema, dict):
+            for key in self._schema:
+                check_str(arg_name="column name", str_val=key)
 
-    def __next__(self):
-        return next(self._it)
+                shape = self._schema[key].get("shape")
+                data_type = self._schema[key].get("type")
+
+                if shape is not None:
+                    if isinstance(shape, list):
+                        raise TypeError("shape must be list, but get {}".format(type(shape)))
+                else:
+                    shape = (1,)
+
+                if data_type is not None:
+                    if len(shape) == 1:
+                        Validator.check_string(data_type, SUPPORT_TYPES, arg_name="data type")
+                    else:
+                        Validator.check_string(data_type, SUPPORT_ARRAY_TYPES, arg_name="array data type")
+        else:
+            raise TypeError("schema must be dict, but get {}".format(type(self._schema)))

@@ -23,31 +23,25 @@ class PandasData(BaseData):
     """
     Pandas Data format.
     """
+    # using this field to do register
+    reg_key = "csv"
 
-    def __init__(self, store_type=None, main_table_files=None, store=None, primary_key=None, schema=None, desc=None):
+    def __init__(self, store_type=None, primary_key=None, schema=None, desc=None,
+                 config: dict = None):
         super().__init__()
         self._store_type = store_type
-        if main_table_files is None:
+        if not self._store_type == "csv":
+            raise ValueError("store type: {} is not support currently".format(self._store_type))
+        if config['main_table_files'] is None:
             raise ValueError("The main table files are None.")
         # The raw data paths, which must be set in both leader and follower, type is (Union(list(str), str):.
-        self._main_table_files = main_table_files
-        self._store = pd.DataFrame() if store is None else store
+        self._main_table_files = config['main_table_files']
+        self._store = pd.DataFrame()
         self._primary_key = primary_key
         self._schema = dict() if schema is None else schema
-        self._desc = desc
-        self._pd_schema = None
-        self._usecols = None
-
-    def set_primary_key(self, primary_key):
-        self._primary_key = primary_key
-
-    def set_store_type(self, store_type):
-        self._store_type = store_type
-
-    def set_schema(self, schema):
-        self._schema = schema
         self._pd_schema = dict() if schema is None else {_: schema[_]["type"] for _ in schema}
         self._usecols = None if schema is None else [_ for _ in schema]
+        self._desc = desc
 
     def read_csv_data(self, data_path):
         df = pd.read_csv(data_path, index_col=self._primary_key, usecols=self._usecols, dtype=self._pd_schema)
@@ -58,25 +52,23 @@ class PandasData(BaseData):
         """
         Load data from the file system. Only support "csv, mysql" currently.
         """
-        if self._store_type == "csv":
-            main_table_files = self._main_table_files
-            if isinstance(main_table_files, list):
-                for main_table_file in main_table_files:
+        main_table_files = self._main_table_files
+        if isinstance(main_table_files, list):
+            for main_table_file in main_table_files:
+                self.read_csv_data(main_table_file)
+        elif isinstance(main_table_files, str):
+            if os.path.isdir(main_table_files):
+                index = 0
+                for main_table_file in os.listdir(main_table_files):
+                    index += 1
+                    main_table_file = os.path.join(main_table_files, main_table_file)
                     self.read_csv_data(main_table_file)
-            elif isinstance(main_table_files, str):
-                if os.path.isdir(main_table_files):
-                    index = 0
-                    for main_table_file in os.listdir(main_table_files):
-                        index += 1
-                        main_table_file = os.path.join(main_table_files, main_table_file)
-                        self.read_csv_data(main_table_file)
-                else:
-                    self.read_csv_data(main_table_files)
             else:
-                raise TypeError("main_table_files must be list or str, but get {}".format(
-                    type(main_table_files)))
+                self.read_csv_data(main_table_files)
         else:
-            raise ValueError("store type: {} is not support currently".format(self._store_type))
+            raise TypeError("main_table_files must be list or str, but get {}".format(
+                type(main_table_files)))
+
 
     def keys(self):
         return self._store.index
@@ -112,6 +104,7 @@ class PandasData(BaseData):
         """
         Verify main_table_files.
         """
+        self._verify_schema()
         main_table_files = self._main_table_files
         if isinstance(main_table_files, list):
             for main_table_file in main_table_files:

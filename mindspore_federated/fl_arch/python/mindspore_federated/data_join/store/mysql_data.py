@@ -22,35 +22,27 @@ class MysqlData(BaseData):
     """
     Mysql Data format.
     """
+    # using this field to do register
+    reg_key = "mysql"
 
-    def __init__(self, host, port, database, charset, user, password, table_name, store_type=None, store=None,
-                 primary_key=None, schema=None,
-                 desc=None):
+    def __init__(self, store_type=None, primary_key=None, schema=None, desc=None, config: dict = None):
         super().__init__()
-        self._conn = pymysql.connect(host=host,
-                                     port=port,
-                                     database=database,
-                                     charset=charset,
-                                     user=user,
-                                     password=password)
-        self._cursor = self._conn.cursor()
-        self._table_name = table_name
         self._store_type = store_type
-        self._store = store
+        if not self._store_type == "mysql":
+            raise ValueError("store type: {} is not support currently".format(self._store_type))
+        self._conn = pymysql.connect(host=config['mysql_host'],
+                                     port=config['mysql_port'],
+                                     database=config['mysql_database'],
+                                     charset=config['mysql_charset'],
+                                     user=config['mysql_user'],
+                                     password=config['mysql_password'])
+        self._cursor = self._conn.cursor()
+        self._table_name = config['mysql_table_name']
         self._primary_key = primary_key
         self._schema = dict() if schema is None else schema
         self._desc = desc
         self._keys = []
         self._values = {}
-
-    def set_primary_key(self, primary_key):
-        self._primary_key = primary_key
-
-    def set_store_type(self, store_type):
-        self._store_type = store_type
-
-    def set_schema(self, schema):
-        self._schema = schema
 
     def load_raw_data(self):
         """Init raw data"""
@@ -90,3 +82,9 @@ class MysqlData(BaseData):
     def __del__(self):
         self._cursor.close()
         self._conn.close()
+
+    def verify(self):
+        """
+        Verify schema and connections.
+        """
+        self._verify_schema()

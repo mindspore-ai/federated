@@ -104,7 +104,13 @@ std::shared_ptr<std::vector<unsigned char>> AbstractCommunicator::SendMessage(co
     MS_LOG(EXCEPTION) << "Data size for sending request must be greater than 0";
   }
   if (remote_server_address_.count(target_server_name) <= 0 || http_clients_.count(target_server_name) <= 0) {
-    MS_LOG(EXCEPTION) << "Remote server name is invalid.";
+    for (auto item : remote_server_address_) {
+      MS_LOG(ERROR) << "remote_server_address_ is:" << item.first << "-" << item.second;
+    }
+    for (auto item : http_clients_) {
+      MS_LOG(ERROR) << "http_clients_ is:" << item.first;
+    }
+    MS_LOG(EXCEPTION) << "Remote server name is invalid. target_server_name is:" << target_server_name;
   }
   auto http_client = http_clients_[target_server_name];
   MS_EXCEPTION_IF_NULL(http_client);

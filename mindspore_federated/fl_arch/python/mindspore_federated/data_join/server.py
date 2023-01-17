@@ -14,8 +14,6 @@
 # ============================================================================
 """Communicator server in data join."""
 from mindspore_federated._mindspore_federated import RunPSI
-from mindspore_federated._mindspore_federated import VFLContext
-from mindspore_federated.common import data_join_utils
 
 
 class _DataJoinServer:
@@ -32,31 +30,6 @@ class _DataJoinServer:
         self._worker_config = worker_config
         self._vertical_communicator = vertical_communicator
         self._target_server_name = vertical_communicator.remote_server_config().server_name
-
-        ctx = VFLContext.get_instance()
-        worker_config_item_py = data_join_utils.worker_config_to_pybind_obj(self._worker_config)
-        ctx.set_worker_config(worker_config_item_py)
-
-    def launch(self):
-        """
-        Negotiate hyper parameters with client.
-        """
-        return self._wait_for_negotiated()
-
-    def _wait_for_negotiated(self):
-        """
-        Wait for hyper parameters request from client.
-
-        The hyper parameters include:
-            primary_key (str)
-            bucket_num (int)
-            shard_num (int)
-            join_type (str)
-
-        Returns:
-            - worker_config (_WorkerConfig): The config of worker.
-        """
-        return self._vertical_communicator.data_join_wait_for_start()
 
     def join_func(self, input_vct, bucket_id):
         """

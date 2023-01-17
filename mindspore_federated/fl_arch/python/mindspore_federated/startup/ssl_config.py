@@ -55,7 +55,7 @@ class SSLConfig:
         if ca_cert_path is not None:
             check_type.check_str("ca_cert_path", ca_cert_path)
             self.ca_cert_path = ca_cert_path
-        if crl_path is not None:
+        if crl_path is not None and crl_path != "":
             check_type.check_str("crl_path", crl_path)
             self.crl_path = crl_path
         else:

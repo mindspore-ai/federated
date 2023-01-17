@@ -27,6 +27,7 @@ from .common import vfl_utils, tensor_utils
 from .common.vfl_utils import FLYamlData
 from . import privacy
 from . import compress
+from .data_join.worker import FLDataWorker
 
 __all__ = [
     "FLServerJob",
@@ -48,4 +49,5 @@ __all__ = [
     "ServerConfig",
     "CompressConfig",
     "compress",
+    "FLDataWorker"
 ]
