@@ -144,6 +144,7 @@ class UpdateModelKernelMod : public AbstractKernel {
   }
 
   bool WeightingData(std::map<std::string, std::vector<float>> *weight_datas) {
+    MS_EXCEPTION_IF_NULL(weight_datas);
     auto aggregation_type = FLContext::instance()->aggregation_type();
     for (auto &item : *weight_datas) {
       if (aggregation_type == kScaffoldAggregation && startswith(item.first, kControlPrefix)) {
@@ -166,6 +167,7 @@ class UpdateModelKernelMod : public AbstractKernel {
   }
 
   void EncryptData(std::map<std::string, std::vector<float>> *weight_datas) {
+    MS_EXCEPTION_IF_NULL(weight_datas);
     // calculate the sum of all layer's weight size
     size_t total_size = 0;
     for (auto &weight_item : *weight_datas) {
@@ -222,6 +224,7 @@ class UpdateModelKernelMod : public AbstractKernel {
       std::vector<uint8_t> remote_public_key = public_key_set_i.publicKey;
       armour::PublicKey *pubKey =
         armour::KeyAgreement::FromPublicBytes(remote_public_key.data(), remote_public_key.size());
+      MS_EXCEPTION_IF_NULL(pubKey);
       uint8_t secret1[SECRET_MAX_LEN] = {0};
       int ret = armour::KeyAgreement::ComputeSharedKey(
         local_private_key, pubKey, SECRET_MAX_LEN, encrypt_pw_salt.data(), SizeToInt(encrypt_pw_salt.size()), secret1);

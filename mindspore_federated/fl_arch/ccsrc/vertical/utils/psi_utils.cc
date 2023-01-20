@@ -21,6 +21,7 @@
 namespace mindspore {
 namespace fl {
 void CreateAliceCheckProto(datajoin::AliceCheckProto *alice_check_proto, const psi::AliceCheck &alice_check) {
+  MS_EXCEPTION_IF_NULL(alice_check_proto);
   alice_check_proto->set_bin_id(alice_check.bin_id());
   alice_check_proto->set_wrong_num(alice_check.wrong_num());
 
@@ -33,18 +34,21 @@ void CreateAliceCheckProto(datajoin::AliceCheckProto *alice_check_proto, const p
 }
 
 void CreateClientPSIInitProto(datajoin::ClientPSIInitProto *client_init_proto, const psi::ClientPSIInit &client_init) {
+  MS_EXCEPTION_IF_NULL(client_init_proto);
   client_init_proto->set_bin_id(client_init.bin_id());
   client_init_proto->set_psi_type(client_init.psi_type());
   client_init_proto->set_self_size(client_init.self_size());
 }
 
 void CreateServerPSIInitProto(datajoin::ServerPSIInitProto *server_init_proto, const psi::ServerPSIInit &server_init) {
+  MS_EXCEPTION_IF_NULL(server_init_proto);
   server_init_proto->set_bin_id(server_init.bin_id());
   server_init_proto->set_self_size(server_init.self_size());
   server_init_proto->set_self_role(server_init.self_role());
 }
 
 void CreateBobPbProto(datajoin::BobPbProto *bob_p_b_proto, const psi::BobPb &bob_p_b) {
+  MS_EXCEPTION_IF_NULL(bob_p_b_proto);
   bob_p_b_proto->set_bin_id(bob_p_b.bin_id());
 
   auto p_b_vct = bob_p_b.p_b_vct();
@@ -55,6 +59,7 @@ void CreateBobPbProto(datajoin::BobPbProto *bob_p_b_proto, const psi::BobPb &bob
 
 void CreateAlicePbaAndBFProto(datajoin::AlicePbaAndBFProto *alice_pba_bf_proto,
                               const psi::AlicePbaAndBF &alice_pba_bf) {
+  MS_EXCEPTION_IF_NULL(alice_pba_bf_proto);
   alice_pba_bf_proto->set_bin_id(alice_pba_bf.bin_id());
 
   auto p_b_a_vct = alice_pba_bf.p_b_a_vct();
@@ -67,6 +72,7 @@ void CreateAlicePbaAndBFProto(datajoin::AlicePbaAndBFProto *alice_pba_bf_proto,
 
 void CreateBobAlignResultProto(datajoin::BobAlignResultProto *bob_align_result_proto,
                                const psi::BobAlignResult &bob_align_result) {
+  MS_EXCEPTION_IF_NULL(bob_align_result_proto);
   bob_align_result_proto->set_bin_id(bob_align_result.bin_id());
 
   auto align_result = bob_align_result.align_result();
@@ -77,6 +83,7 @@ void CreateBobAlignResultProto(datajoin::BobAlignResultProto *bob_align_result_p
 }
 
 void CreatePlainDataProto(datajoin::PlainDataProto *plain_data_proto, const psi::PlainData &plain_data) {
+  MS_EXCEPTION_IF_NULL(plain_data_proto);
   plain_data_proto->set_bin_id(plain_data.bin_id());
 
   auto plain_data_vct = plain_data.plain_data_vct();

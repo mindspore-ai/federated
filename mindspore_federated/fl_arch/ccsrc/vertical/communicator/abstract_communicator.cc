@@ -49,6 +49,7 @@ void AbstractCommunicator::StartHttpServer(const std::shared_ptr<HttpCommunicato
   }
   http_communicator->Start();
   auto http_server = http_communicator->http_server();
+  MS_EXCEPTION_IF_NULL(http_server);
   MS_LOG(INFO) << "Initialize http server IP:" << http_server->address() << ", PORT:" << http_server->port();
   if (!http_server->Start()) {
     MS_LOG(EXCEPTION) << "Http server starting failed.";
