@@ -8,9 +8,12 @@
     参数：
         - **yaml_config** (str) - yaml文件路径。更多细节见 `yaml配置说明 <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python/horizontal/federated_server_yaml.md>`_。
         - **model** (nn.Cell) - 一个用于联邦训练的模型。
-        - **sync_frequency** (int) - 联邦学习中的参数同步频率。
-          需要注意在数据下沉模式中，频率的值等于epoch。否则，频率的值等于step。
-          在自适应同步频率模式下为初始同步频率，在固定频率模式下为同步频率。
+        - **sync_frequency** (int) - 联邦学习中的参数同步频率。若dataset_sink_mode设置为False，表示两个
+          相邻同步操作之间的step数量。此时，若sync_type设置为"fixed"，其为固定的step数量。若sync_type设置为
+          "adaptive"，其为动态同步频率的初始值。
+          需要注意在数据下沉模式中，该参数的功能会改变。若dataset_sink_mode 设置为True，且sink_size设置为一个
+          非正数，同步操作将每间隔sync_frequency个epoch执行一次。若dataset_sink_mode 设置为True，且sink_size
+          设置为一个正数，同步操作将每间隔sink_size*sync_frequency个step执行一次。
         - **http_server_address** (str) - 用于通信的http服务器地址。默认值：“”。
         - **data_size** (int) - 需要向worker报告的数据量。默认值：1。
         - **sync_type** (str) - 采用同步策略类型的参数。
@@ -33,9 +36,12 @@
         - **unchanged_round** (int) - 频率不发生变化的轮数，在前 `unchanged_round` 个轮次，频率不会发生变化。
           取值范围：大于等于0。默认值：0。
 
-    .. py:method:: on_train_step_begin()
+    .. py:method:: on_train_step_begin(run_context)
 
         在step开始时云云联邦接入联邦学习任务。
+
+        参数：
+            - **run_context** (RunContext) - 包含模型的相关信息。
 
     .. py:method:: on_train_step_end(run_context)
 

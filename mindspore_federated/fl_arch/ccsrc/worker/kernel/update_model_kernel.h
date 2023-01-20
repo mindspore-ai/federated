@@ -151,7 +151,15 @@ class UpdateModelKernelMod : public AbstractKernel {
       }
       auto &data = item.second;
       for (size_t i = 0; i < data.size(); i++) {
-        data[i] *= data_size_;
+        if (aggregation_type == kFedNovaAggregation) {
+          if (data_size_ == 0) {
+            MS_LOG(ERROR) << "WeightingData failed: number of training steps is 0, which is incorrect in FedNova.";
+            return false;
+          }
+          data[i] /= data_size_;
+        } else {
+          data[i] *= data_size_;
+        }
       }
     }
     return true;

@@ -128,7 +128,7 @@ def test_hybrid_one_server_success():
         callback_paras.batch_num = 16
         run_context = RunContext(callback_paras)
         # pull weight from sever, and the weight will be equal to update model weight
-        federated_learning_manager.on_train_step_begin()
+        federated_learning_manager.on_train_step_begin(run_context)
         federated_learning_manager.on_train_step_end(run_context)
 
         pull_feature_map = get_trainable_params(network)
@@ -136,7 +136,7 @@ def test_hybrid_one_server_success():
 
         load_params_to_network(network, push_feature_map)
         # push weight to sever, and the model weight get from server will be equal to push weight
-        federated_learning_manager.on_train_step_begin()
+        federated_learning_manager.on_train_step_begin(run_context)
         federated_learning_manager.on_train_step_end(run_context)
         push_metrics.construct(loss, acc)
 
@@ -263,7 +263,7 @@ def test_hybrid_two_server_success():
 
         # for iteration 1
         # pull weight from sever, and the weight will be equal to update model weight
-        federated_learning_manager.on_train_step_begin()
+        federated_learning_manager.on_train_step_begin(run_context)
         federated_learning_manager.on_train_step_end(run_context)
 
         pull_feature_map = get_trainable_params(network)
@@ -271,13 +271,13 @@ def test_hybrid_two_server_success():
 
         load_params_to_network(network, push_feature_map0)
         # push weight to sever, and the model weight get from server will be equal to push weight
-        federated_learning_manager.on_train_step_begin()
+        federated_learning_manager.on_train_step_begin(run_context)
         federated_learning_manager.on_train_step_end(run_context)
         push_metrics.construct(loss0, acc0)
 
         # for iteration 2
         # pull weight from sever, and the weight will be equal to update model weight
-        federated_learning_manager.on_train_step_begin()
+        federated_learning_manager.on_train_step_begin(run_context)
         federated_learning_manager.on_train_step_end(run_context)
 
         pull_feature_map = get_trainable_params(network)
@@ -285,7 +285,7 @@ def test_hybrid_two_server_success():
 
         load_params_to_network(network, push_feature_map1)
         # push weight to sever, and the model weight get from server will be equal to push weight
-        federated_learning_manager.on_train_step_begin()
+        federated_learning_manager.on_train_step_begin(run_context)
         federated_learning_manager.on_train_step_end(run_context)
         push_metrics.construct(loss1, acc1)
 
@@ -379,7 +379,7 @@ def test_hybrid_one_server_open_ssl_success():
         callback_paras.batch_num = 16
         run_context = RunContext(callback_paras)
         # pull weight from sever, and the weight will be equal to update model weight
-        federated_learning_manager.on_train_step_begin()
+        federated_learning_manager.on_train_step_begin(run_context)
         federated_learning_manager.on_train_step_end(run_context)
 
         pull_feature_map = get_trainable_params(network)
@@ -387,7 +387,7 @@ def test_hybrid_one_server_open_ssl_success():
 
         load_params_to_network(network, push_feature_map)
         # push weight to sever, and the model weight get from server will be equal to push weight
-        federated_learning_manager.on_train_step_begin()
+        federated_learning_manager.on_train_step_begin(run_context)
         federated_learning_manager.on_train_step_end(run_context)
         push_metrics.construct(loss, acc)
 

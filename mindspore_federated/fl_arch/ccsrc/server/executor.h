@@ -37,7 +37,7 @@ struct ParamAggregationInfo {
   std::string name;
   uint8_t *weight_data = nullptr;
   size_t weight_size = 0;  // bytes len of weight_data
-  size_t data_size = 0;    // batch size
+  size_t data_size = 0;    // batch size, will be set to number of training steps in FedNova mode
   bool *require_aggr;
 };
 // Executor is the entrance for server to handle aggregation, optimizing, model querying, etc. It handles
