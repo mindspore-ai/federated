@@ -71,9 +71,7 @@ class FedAvgKernel {
   }
 
   static bool ScaffoldAllReduce(const std::map<std::string, std::string> &server_map, ParamAggregationInfo *info) {
-    if (info == nullptr) {
-      return false;
-    }
+    MS_EXCEPTION_IF_NULL(info);
     T *weight_addr = reinterpret_cast<T *>(info->weight_data);
     if (!CollectiveOpsImpl::GetInstance().AllReduce<T>(info->name, weight_addr, weight_addr,
                                                        info->weight_size / sizeof(T), server_map)) {
@@ -98,11 +96,10 @@ class FedAvgKernel {
     if (start_fl_job_threshold == 0 || update_model_ratio == 0) {
       MS_LOG(ERROR) << "FedNovaAllReduce failed: start_fl_job_threshold or update_model_ratio in yaml file is "
                        "incorrectly set to zero.";
-    }
-    float fednova_weight = pow(start_fl_job_threshold / update_model_ratio, 2);
-    if (info == nullptr) {
       return false;
     }
+    float fednova_weight = pow(start_fl_job_threshold / update_model_ratio, 2);
+    MS_EXCEPTION_IF_NULL(info);
     T *weight_addr = reinterpret_cast<T *>(info->weight_data);
     if (!CollectiveOpsImpl::GetInstance().AllReduce<T>(info->name, weight_addr, weight_addr,
                                                        info->weight_size / sizeof(T), server_map)) {
