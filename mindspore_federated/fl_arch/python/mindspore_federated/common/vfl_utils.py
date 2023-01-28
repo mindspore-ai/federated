@@ -18,7 +18,6 @@ import os.path
 
 import yaml
 from mindspore import nn, ParameterTuple
-from mindspore import log as logger
 
 
 def parse_yaml_file(file_path):
@@ -147,9 +146,6 @@ class FLYamlData:
                 raise TypeError(f'FLYamlData init failed: eps must be int or float, but {type(eps)} found.')
             if eps < 0:
                 raise ValueError(f'FLYamlData init failed: eps cannot be less than zero, but got {eps}')
-            if eps > 100:
-                logger.warning(f'FLYamlData init: eps {eps} is far too large and is reassigned to 100.')
-                eps = 100
         return eps
 
     def _parse_privacy(self):

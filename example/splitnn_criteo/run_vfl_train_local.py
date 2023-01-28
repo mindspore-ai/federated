@@ -45,12 +45,6 @@ def construct_local_dataset():
     return train_dataset, eval_dataset
 
 
-def apply_embedding_dp(fl_embedding, embedding_dp):
-    fl_embedding['follower_wide_embedding'] = embedding_dp(fl_embedding['follower_wide_embedding'])
-    fl_embedding['follower_deep_embedding'] = embedding_dp(fl_embedding['follower_deep_embedding'])
-    return fl_embedding
-
-
 if __name__ == '__main__':
     logging.basicConfig(filename='log_local_{}.txt'.format(config.device_target), level=logging.INFO,
                         format='%(asctime)s %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
@@ -96,6 +90,8 @@ if __name__ == '__main__':
         if os.path.exists(config.pre_trained_leader_top):
             leader_top_fl_model.load_ckpt(path=config.pre_trained_leader_top)
 
+    edp = follower_bottom_fl_model.embedding_dp
+
     # forward/backward batch by batch
     steps_per_epoch = ds_train.get_dataset_size()
     with SummaryRecord('./summary') as summary_record:
@@ -103,8 +99,10 @@ if __name__ == '__main__':
             for step, item in enumerate(train_iter, start=1):
                 step = steps_per_epoch * epoch + step
                 follower_embedding = follower_bottom_fl_model.forward_one_step(item)
-                if follower_bottom_fl_model.embedding_dp:
-                    follower_embedding = apply_embedding_dp(follower_embedding, follower_bottom_fl_model.embedding_dp)
+                # if embedding dp is applied
+                if edp:
+                    follower_embedding['follower_wide_embedding'] = edp(follower_embedding['follower_wide_embedding'])
+                    follower_embedding['follower_deep_embedding'] = edp(follower_embedding['follower_deep_embedding'])
                 leader_embedding = leader_bottom_fl_model.forward_one_step(item)
                 item.update(leader_embedding)
                 leader_out = leader_top_fl_model.forward_one_step(item, follower_embedding)

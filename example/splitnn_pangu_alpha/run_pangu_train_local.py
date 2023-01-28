@@ -40,13 +40,14 @@ if __name__ == '__main__':
     print("rank_id is {}, device_num is {}".format(rank_id, device_num))
     opt = get_args()
     set_parse(opt)
-    logging.basicConfig(filename='splitnn_pangu_local.txt', level=logging.INFO)
+    logging.basicConfig(filename='splitnn_pangu_local.txt', level=logging.INFO,
+                        format='%(asctime)s %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     context.set_context(mode=context.GRAPH_MODE, device_target='GPU')
 
     # read, parse and check the .yaml files of sub-networks
-    embedding_yaml = FLYamlData('./embedding.yaml')
-    backbone_yaml = FLYamlData('./backbone.yaml')
-    head_yaml = FLYamlData('./head.yaml')
+    embedding_yaml = FLYamlData(opt.embedding_yaml_file_path)
+    backbone_yaml = FLYamlData(opt.backbone_yaml_file_path)
+    head_yaml = FLYamlData(opt.head_yaml_file_path)
 
     # local data iteration for experiment
     ds_train = construct_local_dataset(opt, rank_id, device_num)
@@ -110,6 +111,8 @@ if __name__ == '__main__':
         backbone_fl_model.load_ckpt()
         head_fl_model.load_ckpt()
 
+    edp = embedding_fl_model.embedding_dp
+
     # forward/backward batch by batch
     with SummaryRecord('./summary') as summary_record:
         for epoch in range(50):
@@ -117,6 +120,9 @@ if __name__ == '__main__':
                 # forward process
                 step = epoch * train_size + step
                 embedding_out = embedding_fl_model.forward_one_step(item)
+                # if embedding dp is applied
+                if edp:
+                    embedding_out["embedding_table"] = edp(embedding_out["embedding_table"])
                 backbone_out = backbone_fl_model.forward_one_step(item, embedding_out)
                 logit_out = head_fl_model.forward_one_step(item, backbone_out)
                 # backward process

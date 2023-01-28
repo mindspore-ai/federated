@@ -19,7 +19,6 @@ import numpy as np
 import mindspore as ms
 from mindspore import Tensor, ops
 from mindspore import numpy as mnp
-from mindspore import log as logger
 
 
 class LabelDP:
@@ -79,8 +78,8 @@ class LabelDP:
         if self.eps < 0:
             raise ValueError('LabelDP: eps must be greater than or equal to zero, but got {}'.format(self.eps))
         if self.eps > 700:
-            logger.warning("Current eps {} is far too large and may cause overflow.".format(self.eps))
-            logger.warning("The training would use eps of value 700 instead.")
+            logging.info('Current eps %f is far too large and may cause overflow.', self.eps)
+            logging.info('The training would use eps of value 700 instead.')
             self.eps = 700
 
         self._onehot = ops.OneHot()
@@ -149,15 +148,14 @@ class EmbeddingDP:
             if self.eps < 0:
                 raise ValueError(f'EmbeddingDP: eps must be greater than or equal to zero, but got {self.eps}')
             if self.eps > 100:
-                logger.warning(f'EmbeddingDP: eps {self.eps} is far too large and is reassigned to 100.')
+                logging.info('EmbeddingDP: eps %f is far too large and is reassigned to 100.', self.eps)
                 self.eps = 100
 
             self.q = 1 / (ops.exp(Tensor(eps / 2)) + 1)
             self.p = 1 - self.q
             logging.info("The follower's embedding is protected by EmbeddingDP with eps %f", self.eps)
         else:
-            logger.warning(f'EmbeddingDP: eps is missing and only quantization is applied.')
-            logging.info("The follower's embedding is protected by EmbeddingDP with quantization only")
+            logging.info("Eps is missing: the follower's embedding is protected with quantization only.")
 
     def __call__(self, embedding):
         if not isinstance(embedding, Tensor):

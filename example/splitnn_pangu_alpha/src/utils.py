@@ -516,6 +516,22 @@ def add_retrain_params(opt):
                      help="Steps has been trained before.")
 
 
+def add_yaml_files(opt):
+    """Add yaml files"""
+    opt.add_argument("--embedding_yaml_file_path",
+                     type=str,
+                     default='./embedding.yaml',
+                     help="The yaml file path for the embedding part.")
+    opt.add_argument("--backbone_yaml_file_path",
+                     type=str,
+                     default='./backbone.yaml',
+                     help="The yaml file path for the backbone part.")
+    opt.add_argument("--head_yaml_file_path",
+                     type=str,
+                     default='./head.yaml',
+                     help="The yaml file path for the head part.")
+
+
 def get_args(inference=False):
     """train function for PanguAlpha"""
     parser = argparse.ArgumentParser(description="PanguAlpha training")
@@ -611,6 +627,7 @@ def get_args(inference=False):
     add_context_args_mode(parser)
     add_training_params(parser)
     add_retrain_params(parser)
+    add_yaml_files(parser)
     if inference:
         add_inference_params(parser)
     args_opt = parser.parse_args()
