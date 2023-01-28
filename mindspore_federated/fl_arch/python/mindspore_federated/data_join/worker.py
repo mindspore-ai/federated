@@ -70,62 +70,51 @@ class FLDataWorker:
     Args:
         config (dict): the key/value of dict defined as below
 
-        config for common
-        role(str): Role of the worker, which must be set in both leader and follower. Supports [leader, follower].
-        bucket_num(int): The number of buckets. The value set by leader is used, and the value set by follower
-            is invalid
+            - role(str): Role of the worker, which must be set in both leader and follower. Supports [leader, follower].
+            - bucket_num(int): The number of buckets.
+              If leader has set a valid value, the value set by follower will not be used.
+            - store_type(str): The origin data store type. Now only support csv/mysql.
+            - data_schema_path(str): Path of data schema file, which must be set in both leader and follower. User need
+              to provide the column name and type of the data to be exported in the schema. The schema needs to be
+              parsed as a two-level key-value dictionary. The key of the first-level dictionary is the column name, and
+              the value is the second-level dictionary. The key of the second-level dictionary must be a string: type,
+              and the value is the type of the exported data. Currently, the types support
+              [int32, int64, float32, float64, string, bytes]
+            - primary_key(str): The primary key.
+              If leader has set a valid value, the value set by follower will not be used.
+            - main_table_files(str): The raw data paths, which must be set in both leader and follower.
+            - mysql_host(str): Host where the database server is located.
+            - mysql_port(int): MySQL port to use, usually use 3306
+            - mysql_database(str): Database to use, None to not use a particular one.
+            - mysql_charset(str): Charset you want to use.
+            - mysql_user(str): Username to login mysql.
+            - mysql_password(str): Password to login mysql.
+            - mysql_table_name(str): The table that contains origin data.
+            - server_name(str): Local http server name, used for communication.
+            - http_server_address(str): Local IP and Port Address, which must be set in both leader and follower.
+            - remote_server_name(str): Remote http server name, used for communication.
+            - remote_server_address(str): Peer IP and Port Address, which must be set in both leader and follower.
+            - enable_ssl(bool): SSL mode enabled or disabled for communication. Supports [True, False]
+            - server_password(str): The server password to decode the p12 file.
+              For security please giving it in start command line.
+            - client_password(str): The client password to decode the p12 file.
+              For security please giving it in start command line.
+            - server_cert_path(str): Certificate file path for server.
+            - client_cert_path(str): Certificate file path for client.
+            - ca_cert_path(str): CA server certificate file path.
+            - crl_path(str): CRL certificate file path.
+            - cipher_list(str): Encryption suite supported by ssl
+            - cert_expire_warning_time_in_day(str): Warning time before the certificate expires.
+            - join_type(str): The data join type.
+              If leader has set a valid value, the value set by follower will not be used.
+              Now only support "psi"
+            - thread_num(int): The thread number of psi.
+            - output_dir(str): The output directory, which must be set in both leader and follower.
+            - shard_num(int): The output number of each bucket when export.
+              If leader has set a valid value, the value set by follower will not be used.
 
-        config for store
-        store_type(str): The origin data store type. Now only support csv/mysql.
-        data_schema_path(str): Path of data schema file, which must be set in both leader and follower. User need to
-            provide the column name and type of the data to be exported in the schema. The schema
-            needs to be parsed as a two-level key-value dictionary. The key of the first-level
-            dictionary is the column name, and the value is the second-level dictionary. The key of
-            the second-level dictionary must be a string: type, and the value is the type of the
-            exported data. Currently, the types support [int32, int64, float32, float64, string, bytes]
-        primary_key(str): The primary key. The value set by leader is used, and the value set by follower is invalid.
-
-        config for store csv
-        main_table_files(str): The raw data paths, which must be set in both leader and follower.
-
-        config for store mysql
-        mysql_host(str): Host where the database server is located.
-        mysql_port(int): MySQL port to use, usually use 3306
-        mysql_database(str): Database to use, None to not use a particular one.
-        mysql_charset(str): Charset you want to use.
-        mysql_user(str): Username to login mysql.
-        mysql_password(str): Password to login mysql.
-        mysql_table_name(str): The table that contains origin data.
-
-        config for communicator
-        server_name(str): Local http server name, used for communication.
-        http_server_address(str): Local IP and Port Address, which must be set in both leader and follower.
-        remote_server_name(str): Remote http server name, used for communication.
-        remote_server_address(str): Peer IP and Port Address, which must be set in both leader and follower.
-        enable_ssl(bool): SSL mode enabled or disabled for communication. Supports [True, False]
-        server_password(str): The server password to decode the p12 file.
-            For security please giving it in start command line.
-        client_password(str): The client password to decode the p12 file.
-            For security please giving it in start command line.
-        server_cert_path(str): Certificate file path for server.
-        client_cert_path(str): Certificate file path for client.
-        ca_cert_path(str): CA server certificate file path.
-        crl_path(str): CRL certificate file path.
-        cipher_list(str): Encryption suite supported by ssl
-        cert_expire_warning_time_in_day(str): Warning time before the certificate expires.
-
-        config for do data join
-        join_type(str): The data join type. The value set by leader is used, and the value set by follower is invalid.
-            Now only support "psi"
-        thread_num(int): The thread number of psi.
-
-        config for output MindRecord
-        output_dir: The output directory, which must be set in both leader and follower.
-        shard_num: The output number of each bucket when export.
-            The value set by leader is used, and the value set by follower is invalid.
-
-        More details refer to:
-            https://e.gitee.com/mind_spore/repos/mindspore/federated/tree/master/tests/st/data_join/vfl/vfl_data_join_config.yaml
+            More details refer to:
+              https://e.gitee.com/mind_spore/repos/mindspore/federated/tree/master/tests/st/data_join/vfl/vfl_data_join_config.yaml
 
     Examples:
         >>> from mindspore_federated import FLDataWorker
@@ -305,7 +294,7 @@ class FLDataWorker:
 
     def do_worker(self):
         """
-        create the environment for worker
+        Do data join worker according to the config.
         """
         self.create_communicator()
 
