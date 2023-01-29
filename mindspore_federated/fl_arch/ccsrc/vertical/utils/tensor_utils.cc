@@ -74,6 +74,7 @@ void CreateTensorProto(TensorProto *tensor_proto, const TensorItemPy &tensor, st
 }
 
 void CreateTensorListProto(TensorListProto *tensor_list_proto, const TensorListItemPy &tensorListItemPy) {
+  MS_EXCEPTION_IF_NULL(tensor_list_proto);
   tensor_list_proto->set_name(tensorListItemPy.name());
 
   auto tensors = tensorListItemPy.tensors();

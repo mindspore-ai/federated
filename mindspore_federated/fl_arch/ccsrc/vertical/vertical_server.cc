@@ -131,48 +131,56 @@ WorkerConfigItemPy VerticalServer::Send(const std::string &target_server_name,
 }
 
 void VerticalServer::Receive(const std::string &target_server_name, TensorListItemPy *tensorListItemPy) {
+  MS_EXCEPTION_IF_NULL(tensorListItemPy);
   auto communicator_ptr = reinterpret_cast<TrainerCommunicator *>(communicators_[KTrainer].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
   *tensorListItemPy = std::move(communicator_ptr->Receive(target_server_name));
 }
 
 void VerticalServer::Receive(const std::string &target_server_name, psi::BobPb *bobPb) {
+  MS_EXCEPTION_IF_NULL(bobPb);
   auto communicator_ptr = reinterpret_cast<PsiCommunicator *>(communicators_[KPsi].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
   communicator_ptr->Receive(target_server_name, bobPb);
 }
 
 void VerticalServer::Receive(const std::string &target_server_name, psi::ClientPSIInit *clientPSIInit) {
+  MS_EXCEPTION_IF_NULL(clientPSIInit);
   auto communicator_ptr = reinterpret_cast<PsiCommunicator *>(communicators_[KPsi].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
   communicator_ptr->Receive(target_server_name, clientPSIInit);
 }
 
 void VerticalServer::Receive(const std::string &target_server_name, psi::ServerPSIInit *serverPSIInit) {
+  MS_EXCEPTION_IF_NULL(serverPSIInit);
   auto communicator_ptr = reinterpret_cast<PsiCommunicator *>(communicators_[KPsi].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
   communicator_ptr->Receive(target_server_name, serverPSIInit);
 }
 
 void VerticalServer::Receive(const std::string &target_server_name, psi::BobAlignResult *bobAlignResult) {
+  MS_EXCEPTION_IF_NULL(bobAlignResult);
   auto communicator_ptr = reinterpret_cast<PsiCommunicator *>(communicators_[KPsi].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
   communicator_ptr->Receive(target_server_name, bobAlignResult);
 }
 
 void VerticalServer::Receive(const std::string &target_server_name, psi::AlicePbaAndBF *alicePbaAndBF) {
+  MS_EXCEPTION_IF_NULL(alicePbaAndBF);
   auto communicator_ptr = reinterpret_cast<PsiCommunicator *>(communicators_[KPsi].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
   communicator_ptr->Receive(target_server_name, alicePbaAndBF);
 }
 
 void VerticalServer::Receive(const std::string &target_server_name, psi::AliceCheck *aliceCheck) {
+  MS_EXCEPTION_IF_NULL(aliceCheck);
   auto communicator_ptr = reinterpret_cast<PsiCommunicator *>(communicators_[KPsi].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
   communicator_ptr->Receive(target_server_name, aliceCheck);
 }
 
 void VerticalServer::Receive(const std::string &target_server_name, psi::PlainData *plainData) {
+  MS_EXCEPTION_IF_NULL(plainData);
   auto communicator_ptr = reinterpret_cast<PsiCommunicator *>(communicators_[KPsi].get());
   MS_EXCEPTION_IF_NULL(communicator_ptr);
   communicator_ptr->Receive(target_server_name, plainData);

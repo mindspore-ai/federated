@@ -109,6 +109,7 @@ bool ExchangeKeysKernelMod::BuildExchangeKeysReq(FBBuilder *fbb) {
 std::vector<uint8_t> ExchangeKeysKernelMod::GetPubicKeyBytes() {
   // generate private key of secret
   armour::PrivateKey *sPriKeyPtr = armour::KeyAgreement::GeneratePrivKey();
+  MS_EXCEPTION_IF_NULL(sPriKeyPtr);
   fl::worker::CloudWorker::GetInstance().set_secret_pk(sPriKeyPtr);
 
   // get public bytes length
