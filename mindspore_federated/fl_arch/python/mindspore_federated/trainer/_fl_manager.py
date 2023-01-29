@@ -17,7 +17,8 @@
 from copy import deepcopy
 import numpy as np
 import mindspore.ops as ops
-from mindspore import nn
+from mindspore import nn, ms_function
+from mindspore.nn import Cell
 from mindspore import load_param_into_net
 from mindspore.communication.management import init, get_rank
 from mindspore.common.tensor import Tensor
@@ -112,6 +113,20 @@ class PushMetrics:
     @staticmethod
     def construct(loss, accuracy):
         return Federated_.push_metrics(loss, accuracy)
+
+
+class BroadcastNet(Cell):
+    """
+    Construct of weight input for Broadcast.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._broadcast = ops.Broadcast(0)
+
+    @ms_function
+    def construct(self, input_x):
+        return self._broadcast(input_x)
 
 
 def _get_fl_param_names(network, fl_param_names, requires_aggr=False):
@@ -231,7 +246,7 @@ class FederatedLearningManager(Callback):
         self._run_distribute = run_distribute
         if self._run_distribute:
             init()
-            self._broadcast = ops.Broadcast(0)
+            self._broadcast = BroadcastNet()
             self._rank_id = get_rank()
             logger.info(f"Rank id is {self._rank_id}")
         self._global_step = 0
@@ -449,15 +464,18 @@ class FederatedLearningManager(Callback):
                 raise ValueError("Feature map from getting model is empty!")
 
             parameter_dict = {}
+            ts_list = []
             for key, weight_info in weight_infos.items():
                 if not feature_map[key]:
                     continue
                 value = feature_map[key]
                 shape, dtype = weight_info[0], weight_info[1]
                 param_data = np.reshape(value, shape).astype(dtype)
-                parameter_dict[key] = Parameter(Tensor(param_data), name=key)
+                ts_data = Tensor(param_data)
+                ts_list.append(ts_data)
+                parameter_dict[key] = Parameter(ts_data, name=key)
 
-            self._broadcast(tuple(parameter_dict.values()))
+            self._broadcast(tuple(ts_list))
             load_param_into_net(self._model, parameter_dict)
         else:
             ts_list = []
