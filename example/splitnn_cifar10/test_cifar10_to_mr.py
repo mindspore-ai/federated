@@ -17,15 +17,11 @@
 
 import os
 import sys
-from cifar10_to_mr import SplitCifar10ToMR
-import mindspore as ms
+
 import mindspore.dataset as ds
+import mindspore.dataset.vision as vision
 
-if ms.__version__ <= "1.7.0":
-    import mindspore.dataset.vision.c_transforms as vision
-else:
-    import mindspore.dataset.vision as vision
-
+from cifar10_to_mr import SplitCifar10ToMR
 
 CIFAR10_PATH = os.path.join(sys.path[0], "datasets", "cifar-10-batches-py")
 MINDRECORD_PATH = os.path.join(sys.path[0], "datasets", "mr_cifar10")

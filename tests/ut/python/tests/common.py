@@ -31,6 +31,7 @@ import yaml
 import numpy as np
 import psutil
 
+from mindspore import dataset as ds
 from mindspore_federated import FLServerJob, FlSchedulerJob, Callback
 from mindspore_federated import log as logger
 
@@ -42,6 +43,7 @@ from common_data import generate_random_data
 
 def fl_test(func):
     """fl test"""
+
     def clean_temp_files():
         cwd_dir = os.getcwd()
         temp_dir = os.path.join(cwd_dir, "temp")
@@ -160,6 +162,7 @@ g_fl_name_idx = 1
 fl_training_mode = "FEDERATED_LEARNING"
 fl_hybrid_mode = "HYBRID_TRAINING"
 
+
 # pylint: disable=unused-argument
 def fl_name_with_idx(fl_name):
     global g_fl_name_idx
@@ -210,6 +213,7 @@ def make_yaml_config(fl_name, update_configs, output_yaml_file, enable_ssl=False
                 multi_layer_dict_as_one_layer(dst_dict, prefix + key + ".", val)
             else:
                 dst_dict[prefix + key] = val
+
     yaml_configs_new = {}
     multi_layer_dict_as_one_layer(yaml_configs_new, "", yaml_configs)
     yaml_configs = yaml_configs_new
@@ -250,7 +254,7 @@ def make_yaml_config(fl_name, update_configs, output_yaml_file, enable_ssl=False
 
     rmv_list_real = []
     for key, val in yaml_configs.items():
-        if any(key == item or key[:len(item)+1] == item + "." for item in rmv_configs):
+        if any(key == item or key[:len(item) + 1] == item + "." for item in rmv_configs):
             rmv_list_real.append(key)
     for item in rmv_list_real:
         yaml_configs.pop(item)
@@ -376,15 +380,33 @@ def start_fl_scheduler(yaml_config, scheduler_http_address, ssl_config=None):
     return scheduler_process
 
 
-def run_cloud_worker_client_task(task, yaml_config_file, network, sync_frequency, http_server_address,
-                                 data_size, ssl_config):
+class WorkerParam:
+    """hybrid and cloud worker param"""
+
+    def __init__(self, yaml_config_file=None, network=None, sync_frequency=None, http_server_address=None,
+                 data_size=None, ssl_config=None, epoch=None, data_sink_mode=False, iteration=None, enable_ssl=None,
+                 dataset=None):
+        self.yaml_config_file = yaml_config_file
+        self.network = network
+        self.sync_frequency = sync_frequency
+        self.http_server_address = http_server_address
+        self.data_size = data_size
+        self.ssl_config = ssl_config
+        self.epoch = epoch
+        self.data_sink_mode = data_sink_mode
+        self.iteration = iteration
+        self.enable_ssl = enable_ssl
+        self.dataset = dataset
+
+
+def run_worker_client_with_train_task(task, worker_param: WorkerParam):
     """run worker client task"""
     signal.signal(signal.SIGCHLD, signal.SIG_IGN)
     send_pipe, recv_pipe = Pipe()
 
     def worker_task_fun():
         try:
-            task(yaml_config_file, network, sync_frequency, http_server_address, data_size, ssl_config)
+            task(worker_param)
             send_pipe.send("Success")
         except Exception as e:
             traceback.print_exc()
@@ -567,7 +589,7 @@ def update_model_expect_success(http_server_address, fl_name, fl_id, iteration, 
     return result, update_model_rsp
 
 
-def get_model_expect_success(http_server_address, fl_name, iteration, enable_ssl=None):
+def get_model_expect_success(http_server_address, fl_name, iteration=1, enable_ssl=None):
     """get model expect success"""
     for i in range(60):  # 0.5*60=30s
         client_feature_map, get_model_rsp = post_get_model(http_server_address, fl_name, iteration,
@@ -640,3 +662,23 @@ def read_metrics(metrics_file="metrics.json"):
     for line in metrics_lines:
         metrics.append(json.loads(line))
     return metrics
+
+
+# create dataset
+def get_data(num, img_size=(1, 32, 32), num_classes=10, is_onehot=True):
+    for _ in range(num):
+        img = np.random.randn(*img_size)
+        target = np.random.randint(0, num_classes)
+        target_ret = np.array([target]).astype(np.float32)
+        if is_onehot:
+            target_onehot = np.zeros(shape=(num_classes,))
+            target_onehot[target] = 1
+            target_ret = target_onehot.astype(np.float32)
+        yield img.astype(np.float32), target_ret
+
+
+def create_dataset(num_data=32, batch_size=32, repeat_size=1):
+    input_data = ds.GeneratorDataset(list(get_data(num_data)), column_names=['data', 'label'])
+    input_data = input_data.batch(batch_size, drop_remainder=True)
+    input_data = input_data.repeat(repeat_size)
+    return input_data

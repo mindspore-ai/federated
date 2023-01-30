@@ -75,7 +75,7 @@ class StartFLJobKernelMod : public AbstractKernel {
       case schema::ResponseCode_OutOfTime:
         MS_LOG(INFO) << "Start fl job response code from server is out of time.";
       default:
-        MS_LOG(EXCEPTION) << "Launching start fl job for worker failed. Reason: " << start_fl_job_rsp->reason();
+        MS_LOG(EXCEPTION) << "Launching start fl job for worker failed. Reason: " << start_fl_job_rsp->reason()->str();
     }
 
     uint64_t iteration = IntToSize(start_fl_job_rsp->iteration());
