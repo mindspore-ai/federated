@@ -95,6 +95,7 @@ class ClientInfos {
   CacheStatus GetClientNoises(ClientNoises *noises);
 
   bool ResetOnNewIteration();
+  CacheStatus AddUnsupervisedEvalItem(const UnsupervisedEvalItem &unsupervised_eval_item);
 
  private:
   CacheStatus AddPbItem(const std::string &name, const std::string &fl_id, const google::protobuf::Message &value);
@@ -165,6 +166,9 @@ class ClientInfos {
   CacheStatus SetPbValue(const std::string &name, const std::string &value);
   CacheStatus GetPbValue(const std::string &name, std::string *value);
   std::shared_ptr<RedisClientBase> GetOneClient();
+
+  CacheStatus AddPbItemList(const std::string &name, const google::protobuf::Message &value);
+  CacheStatus AddPbItemList(const std::string &name, const std::string &value);
 };
 }  // namespace cache
 }  // namespace fl

@@ -52,7 +52,7 @@ class Timer {
   static uint64_t iteration_expire_time_in_seconds();
   static uint64_t release_expire_time_in_seconds();
   static uint64_t global_time_window_in_seconds();
-
+  static uint64_t unsupervised_data_expire_time_in_seconds();
   bool HandleEvent();
 
  private:

@@ -69,6 +69,9 @@ class RedisClientBase {
   virtual CacheStatus SetNx(const std::string &key, const std::string &value) = 0;
   virtual CacheStatus SetExNx(const std::string &key, const std::string &value, uint64_t seconds) = 0;
   virtual CacheStatus Incr(const std::string &key, uint64_t *new_value) = 0;
+  virtual CacheStatus LPush(const std::string &key, const std::string &value) = 0;
+  virtual CacheStatus LRange(const std::string &key, size_t start, size_t end, std::vector<std::string> *items) = 0;
+  virtual CacheStatus LTrim(const std::string &key, size_t start, size_t end) = 0;
 
   // Set Hash filed and int64 value
   CacheStatus HMSet(const std::string &key, const std::unordered_map<std::string, uint64_t> &items);

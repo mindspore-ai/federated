@@ -104,6 +104,35 @@ bool UpdateModelKernel::VerifyUpdateModelRequest(const schema::RequestUpdateMode
     MS_LOG(WARNING) << "The upload accuracy is nan or inf, client fl id is " << fl_id;
     return false;
   }
+  if (!VerifyUnsupervisedEval(update_model_req)) {
+    MS_LOG(WARNING) << "Verify unsupervised eval data failed.";
+    return false;
+  }
+
+  return true;
+}
+
+bool UpdateModelKernel::VerifyUnsupervisedEval(const schema::RequestUpdateModel *update_model_req) {
+  auto fbs_unsupervised_eval_items = update_model_req->unsupervised_eval_items();
+  if (fbs_unsupervised_eval_items != nullptr) {
+    auto fbs_eval_items = fbs_unsupervised_eval_items->eval_items();
+    MS_ERROR_IF_NULL_W_RET_VAL(fbs_eval_items, false);
+    auto eval_items_size = fbs_eval_items->size();
+    for (size_t i = 0; i < eval_items_size; i++) {
+      auto eval_item = fbs_eval_items->Get(i);
+      MS_ERROR_IF_NULL_W_RET_VAL(eval_item, false);
+      MS_ERROR_IF_NULL_W_RET_VAL(eval_item->eval_data(), false);
+      auto eval_data_ptr = eval_item->eval_data()->data();
+      auto eval_data_size = eval_item->eval_data()->size();
+      for (size_t j = 0; j < eval_data_size; j++) {
+        if (std::isnan(eval_data_ptr[j]) || std::isinf(eval_data_ptr[j])) {
+          MS_LOG(WARNING) << "The upload unsupervised eval data is nan or inf, client fl id is "
+                          << update_model_req->fl_id()->str();;
+          return false;
+        }
+      }
+    }
+  }
   return true;
 }
 
@@ -427,6 +456,14 @@ ResultCode UpdateModelKernel::UpdateModel(const schema::RequestUpdateModel *upda
   executor_->HandleModelUpdate(feature_map, data_size);
   UpdateClientUploadLoss(update_model_req->upload_loss(), data_size);
   UpdateClientUploadAccuracy(update_model_req->upload_accuracy(), eval_data_size);
+  if (!UpdateClientUnsupervisedEval(update_model_req)) {
+    std::string reason = "Updating client unsupervised eval failed for fl id " + update_model_fl_id;
+    MS_LOG(WARNING) << reason;
+    BuildUpdateModelRsp(
+      fbb, schema::ResponseCode_OutOfTime, reason,
+      std::to_string(LocalMetaStore::GetInstance().value<uint64_t>(kCtxIterationNextRequestTimestamp)));
+    return ResultCode::kFail;
+  }
   BuildUpdateModelRsp(fbb, schema::ResponseCode_SUCCEED, "success not ready",
                       std::to_string(LocalMetaStore::GetInstance().value<uint64_t>(kCtxIterationNextRequestTimestamp)));
   return ResultCode::kSuccess;
@@ -697,6 +734,33 @@ void UpdateModelKernel::CheckAndTransPara(const std::string &participation_time_
   participation_time_and_num_.emplace_back(std::make_pair(level1 * kMinuteToSecond * kSecondToMills, 0));
   participation_time_and_num_.emplace_back(std::make_pair(level2 * kMinuteToSecond * kSecondToMills, 0));
   participation_time_and_num_.emplace_back(std::make_pair(UINT64_MAX, 0));
+}
+
+bool UpdateModelKernel::UpdateClientUnsupervisedEval(const schema::RequestUpdateModel *update_model_req) {
+  auto fbs_unsupervised_eval_items = update_model_req->unsupervised_eval_items();
+  MS_ERROR_IF_NULL_W_RET_VAL(fbs_unsupervised_eval_items, true);
+  UnsupervisedEvalItem unsupervised_eval_item_pb;
+  std::string fl_id = update_model_req->fl_id()->str();
+  unsupervised_eval_item_pb.set_fl_id(fl_id);
+  auto fbs_eval_items = fbs_unsupervised_eval_items->eval_items();
+  MS_ERROR_IF_NULL_W_RET_VAL(fbs_eval_items, false);
+  auto eval_items_size = fbs_eval_items->size();
+  for (size_t i = 0; i < eval_items_size; i++) {
+    auto eval_item = fbs_eval_items->Get(i);
+    MS_ERROR_IF_NULL_W_RET_VAL(eval_item, false);
+    MS_ERROR_IF_NULL_W_RET_VAL(eval_item->eval_data(), false);
+    auto eval_data_ptr = eval_item->eval_data()->data();
+    auto eval_data_size = eval_item->eval_data()->size();
+    for (size_t j = 0; j < eval_data_size; j++) {
+      unsupervised_eval_item_pb.add_eval_data(eval_data_ptr[j]);
+    }
+  }
+
+  auto ret = cache::ClientInfos::GetInstance().AddUnsupervisedEvalItem(unsupervised_eval_item_pb);
+  if (!ret.IsSuccess()) {
+    return false;
+  }
+  return true;
 }
 
 REG_ROUND_KERNEL(updateModel, UpdateModelKernel)

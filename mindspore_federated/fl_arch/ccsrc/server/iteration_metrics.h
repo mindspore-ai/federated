@@ -44,6 +44,7 @@ constexpr auto kStartTime = "startTime";
 constexpr auto kEndTime = "endTime";
 constexpr auto kDataRate = "dataRate";
 constexpr auto kFailureEvent = "failureEvent";
+constexpr auto kMetricsUnsupervisedEval = "unsupervisedEval";
 
 const std::map<cache::InstanceState, std::string> kInstanceStateName = {
   {cache::InstanceState::kStateRunning, "running"},
@@ -76,6 +77,7 @@ class IterationMetrics {
   void SetStartTime(const Time &start_time);
   void SetEndTime(const Time &end_time);
   void SetInstanceName(const std::string &instance_name);
+  void set_unsupervised_eval(const float &unsupervised_eval);
 
  private:
   // The metrics file object.
@@ -119,6 +121,9 @@ class IterationMetrics {
   Time end_time_;
 
   std::string instance_name_;
+
+  // The unsupervised evaluation result after this federated learning iteration.
+  float unsupervised_eval_ = 0.0f;
 };
 }  // namespace server
 }  // namespace fl

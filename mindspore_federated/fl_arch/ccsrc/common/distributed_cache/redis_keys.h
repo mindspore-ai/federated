@@ -103,6 +103,8 @@ class RedisKeys {
   std::string ClientNoisesString() const { return PrefixIteration() + "client:Noises:String"; }
   std::string ClientPrimeString() const { return PrefixIteration() + "client:Prime:String"; }
 
+  std::string ClientUnsupervisedEvalHash() const { return Prefix() + "client:UnsupervisedEval:Hash"; }
+
   std::string InstanceStatusHash() const {
     auto fl_name = InstanceContext::Instance().fl_name();
     auto instance_name = InstanceContext::Instance().instance_name();

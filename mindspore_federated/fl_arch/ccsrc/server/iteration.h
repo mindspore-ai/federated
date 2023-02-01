@@ -57,6 +57,7 @@ class Iteration {
 
   void set_loss(float loss);
   void set_accuracy(float accuracy);
+  void set_unsupervised_eval(float unsupervised_eval);
 
   // Need to wait all the rounds to finish before proceed to next iteration.
   void WaitAllRoundsFinish() const;
@@ -90,6 +91,7 @@ class Iteration {
   bool SummarizeIteration();
   void SubmitSummary();
   void GetAllSummaries();
+  void SummarizeUnsupervisedEval();
 
   void InitEventTxtFile();
   void LogFailureEvent(const std::string &node_role, const std::string &node_address, const std::string &event);
@@ -134,6 +136,9 @@ class Iteration {
   std::string event_file_path_;
   // Whether last iteration is successfully finished and the reason.
   bool is_iteration_valid_;
+
+  // The unsupervised evaluation result after this federated learning iteration.
+  float unsupervised_eval_ = 0.0f;
 };
 }  // namespace server
 }  // namespace fl

@@ -244,6 +244,9 @@ class MS_EXPORT FLContext {
   void set_data_rate_dir(const std::string &data_rate_dir);
   const std::string &data_rate_dir();
 
+  void set_unsupervised_client_num(uint64_t unsupervised_client_num);
+  uint64_t unsupervised_client_num() const;
+
  private:
   FLContext() = default;
 
@@ -346,6 +349,9 @@ class MS_EXPORT FLContext {
 
   // The times of iteration continuous failure
   uint32_t continuous_failure_times_ = 10;
+
+  // unsupervised client number of federeated learning.
+  uint64_t unsupervised_client_num_ = 1000;
 
   DistributedCacheConfig distributed_cache_config_;
   SslConfig ssl_config_;

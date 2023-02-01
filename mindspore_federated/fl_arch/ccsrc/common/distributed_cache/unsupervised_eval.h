@@ -13,31 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#ifndef MINDSPORE_FL_CACHE_SUMMARY_H
-#define MINDSPORE_FL_CACHE_SUMMARY_H
+#ifndef MINDSPORE_FL_CACHE_UNSUPERVISED_EVAL_H
+#define MINDSPORE_FL_CACHE_UNSUPERVISED_EVAL_H
 #include <string>
 #include <vector>
-#include "distributed_cache/cache_status.h"
+
 namespace mindspore {
 namespace fl {
 namespace cache {
-class Summary {
+class UnsupervisedEval {
  public:
-  static Summary &Instance() {
-    static Summary instance;
+  static UnsupervisedEval &Instance() {
+    static UnsupervisedEval instance;
     return instance;
   }
-  static CacheStatus SubmitSummary(const std::string &summary_pb);
-  static void GetAllSummaries(std::vector<std::string> *summary_pbs);
-
-  static bool TryLockSummary(bool *has_finished, bool *has_locked);
-  static void GetSummaryLockInfo(bool *has_finished, bool *lock_expired);
-  static void UnlockSummary();
-
-  static void GetUnsupervisedEvalItems(std::vector<std::string> *unsupervised_eval_item_pbs, size_t start, size_t end);
-  static void reset_unsupervised_eval(size_t start, size_t end);
+  static size_t cluster_argmax(const std::vector<float> &group_id);
+  static float calinski_harabasz_score(const std::vector<std::vector<float>> &group_ids,
+                                       const std::vector<size_t> &labels);
 };
 }  // namespace cache
 }  // namespace fl
 }  // namespace mindspore
-#endif  // MINDSPORE_FL_CACHE_SUMMARY_H
+#endif  // MINDSPORE_FL_CACHE_UNSUPERVISED_EVAL_H

@@ -21,10 +21,10 @@ file_identifier "FLJ0";
 file_extension "fl";
 
 enum ResponseCode: int {
-  SUCCEED=200,  
+  SUCCEED=200,
   SucNotReady=201,
   OutOfTime=300,
-  RequestError=400, 
+  RequestError=400,
   SystemError=500
 }
 
@@ -43,7 +43,7 @@ table Aggregation {
 table EarlyStop {
   early_stop_type:EarlyStopType;
   weight:float;
-  rounds:int;    
+  rounds:int;
 }
 
 table FeatureMap{
