@@ -14,9 +14,8 @@
 # limitations under the License.
 # ============================================================================
 
-# Execute Wide&Deep splitnn demo locally training on criteo dataset. Unlike run_vfl_train_local.sh,
-# the embeddings and grad scales are encapsulated using protobuf and are transmitted through socket.
-
+# Execute pangu-splitnn distributed training demo on wiki dataset.
+export CUDA_VISIBLE_DEVICES=0
 set -e
 
 WORKPATH=$(
@@ -24,6 +23,21 @@ WORKPATH=$(
   pwd
 )
 
+HTTP_SERVER_ADDRESS=$1
+REMOTE_SERVER_ADDRESS=$2
+DATA_URL=$3
+EVAL_DATA_URL=$4
+RESUME=$5
+
+#export GLOG_v=1
 export PYTHONPATH="${PYTHONPATH}:${WORKPATH}/../"
-echo "Start executing Wide&Deep splitnn with embedding dp demo."
-python run_vfl_train_local.py --follower_bottom_yaml_path "./yaml_files/follower_bottom_embedding_dp.yaml"
+pid=`ps -ef|grep http_server_address=$HTTP_SERVER_ADDRESS |grep -v "grep" |awk '{print $2}'` && for id in $pid; do kill -9 $id && echo "killed $id"; done
+
+echo "run_pangu_train_leader.py is started."
+rm -rf $WORKPATH/run_pangu_train_leader.log
+nohup python run_pangu_train_leader.py --embedding_dp=True \
+  --http_server_address=$HTTP_SERVER_ADDRESS \
+  --remote_server_address=$REMOTE_SERVER_ADDRESS  \
+  --data_url=$DATA_URL \
+  --eval_data_url=$EVAL_DATA_URL \
+  --resume=$RESUME >> $WORKPATH/run_pangu_train_leader.log 2>&1 &

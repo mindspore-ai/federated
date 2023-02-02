@@ -23,6 +23,7 @@ from collections import OrderedDict
 from mindspore import set_seed
 from mindspore import context
 from mindspore_federated import FLModel, FLYamlData
+from mindspore_federated.privacy import LabelDP
 from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig, CompressConfig
 from wide_and_deep import LeaderTopNet, LeaderTopLossNet, LeaderTopEvalNet, LeaderBottomNet, LeaderBottomLossNet, \
     AUCMetric
@@ -52,7 +53,11 @@ class LeaderTrainer:
         self.vertical_communicator.launch()
         logging.info('start vfl trainer success')
         leader_top_yaml_data = FLYamlData(config.leader_top_yaml_path)
+        self.ldp = None
+        if hasattr(leader_top_yaml_data, 'label_dp_eps') and config.label_dp:
+            self.ldp = LabelDP(leader_top_yaml_data.label_dp_eps)
         leader_bottom_yaml_data = FLYamlData(config.leader_bottom_yaml_path)
+
         # Leader Bottom Net
         leader_bottom_eval_net = leader_bottom_base_net = LeaderBottomNet(config)
         leader_bottom_train_net = LeaderBottomLossNet(leader_bottom_base_net, config)
@@ -84,7 +89,10 @@ class LeaderTrainer:
                 item.update(leader_embedding)
                 follower_embedding = self.vertical_communicator.receive("follower")
                 leader_out = self.leader_top_fl_model.forward_one_step(item, follower_embedding)
-                logging.info('epoch %d step %d loss: %f', epoch, step, leader_out['loss'])
+                if step % 100 == 0:
+                    logging.info('epoch %d step %d loss: %f', epoch, step, leader_out['loss'])
+                if self.ldp:
+                    item['label'] = self.ldp(item['label'])
                 grad_scale = self.leader_top_fl_model.backward_one_step(item, follower_embedding)
                 grad_scale_follower = {'loss': OrderedDict(list(grad_scale['loss'].items())[2:])}
                 self.vertical_communicator.send_tensors("follower", grad_scale_follower)
@@ -103,7 +111,8 @@ class LeaderTrainer:
             logging.info('epoch %d auc: %f', epoch, auc)
 
 
-logging.basicConfig(filename='leader_train.log', level=logging.INFO)
+logging.basicConfig(filename='leader_train.log', level=logging.INFO,
+                    format='%(asctime)s %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 context.set_context(mode=context.GRAPH_MODE, device_target=config.device_target)
 ds_train, ds_eval = construct_local_dataset()
 train_iter = ds_train.create_dict_iterator()

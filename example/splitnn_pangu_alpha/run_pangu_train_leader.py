@@ -21,6 +21,7 @@ from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
 from mindspore.nn.wrap.cell_wrapper import _VirtualDatasetCell
 from mindspore.train.summary import SummaryRecord
 from mindspore_federated import FLModel, FLYamlData
+from mindspore_federated.privacy import EmbeddingDP
 from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig
 
 from src.split_pangu_alpha import PanGuHead, HeadLossNet, EmbeddingLayer, EmbeddingNecessaryLossNet, PPLMetric
@@ -47,6 +48,9 @@ class LeaderTrainer:
 
         # read, parse and check the .yaml files of sub-networks
         embedding_yaml = FLYamlData('./embedding_https.yaml')
+        self.edp = None
+        if hasattr(embedding_yaml, 'embedding_dp_eps') and opt.embedding_dp:
+            self.edp = EmbeddingDP(embedding_yaml.embedding_dp_eps)
         head_yaml = FLYamlData('./head_https.yaml')
 
         # local data iteration for experiment
@@ -111,7 +115,8 @@ class LeaderTrainer:
                     for step, item in enumerate(self.train_iter, start=1):
                         step = epoch * self.train_size + step
                         embedding_out = self.embedding_fl_model.forward_one_step(item)
-
+                        if self.edp:
+                            embedding_out['embedding_table'] = self.edp(embedding_out['embedding_table'])
                         word_table_ts = embedding_out.pop('word_table')
                         self.vertical_communicator.send_tensors("follower", embedding_out)
                         backbone_out = self.vertical_communicator.receive("follower")
@@ -143,7 +148,8 @@ if __name__ == '__main__':
     rank_id = 0
     opt = get_args()
     set_parse(opt)
-    logging.basicConfig(filename='leader_process.log', level=logging.INFO)
+    logging.basicConfig(filename='leader_process.log', level=logging.INFO,
+                        format='%(asctime)s %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     logging.info("config is:")
     logging.info(opt)
     context.set_context(mode=context.GRAPH_MODE, device_target='GPU')

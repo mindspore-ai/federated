@@ -60,3 +60,6 @@ resume: False
 pre_trained_follower: ""
 pre_trained_leader: ""
 
+# privacy
+label_dp: False
+embedding_tee: False

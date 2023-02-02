@@ -140,33 +140,39 @@ class FLYamlData:
             raise ValueError('FLYamlData init failed: outputs of \'eval_net\' are empty')
         self.eval_net_gt = self.eval_net['gt'] if 'gt' in self.eval_net else None
 
-    def _check_eps(self, eps):
+    def _check_eps(self, privacy, dp_name='embedding_dp'):
+        """validate the eps parameter in dp mechanism"""
+        if not privacy[dp_name] or 'eps' not in privacy[dp_name]:
+            raise ValueError(f'FLYamlData init failed: parameter eps missed for {dp_name}.')
+        eps = privacy[dp_name]['eps']
         if eps:
             if not isinstance(eps, (int, float)):
-                raise TypeError(f'FLYamlData init failed: eps must be int or float, but {type(eps)} found.')
+                raise TypeError(f'FLYamlData init failed: parameter eps must be an int or a float number, \
+                                but {type(eps)} found.')
             if eps < 0:
-                raise ValueError(f'FLYamlData init failed: eps cannot be less than zero, but got {eps}')
+                raise ValueError(f'FLYamlData init failed: parameter eps cannot be negative, but got {eps}.')
         return eps
 
     def _parse_privacy(self):
         """Verify configurations of privacy defined in the yaml file."""
         if 'privacy' in self.yaml_data:
             privacy = self.yaml_data['privacy']
-            if 'embedding_dp' in privacy:
-                self.embedding_dp_eps = None
-                if privacy['embedding_dp'] and 'eps' in privacy['embedding_dp']:
-                    self.embedding_dp_eps = self._check_eps(privacy['embedding_dp']['eps'])
-            if 'label_dp' in privacy:
-                if 'eps' not in privacy['label_dp']:
-                    raise ValueError('FLYamlData init failed: missing field of \'eps\' under \'label_dp\'')
-                self.privacy_eps = privacy['label_dp']['eps']
-            if 'TEE' in privacy:
-                if 'tee_layer' in privacy['TEE']:
-                    self.tee_layer = privacy['TEE']['tee_layer']
-            for scheme in privacy.keys():
-                if scheme not in ['label_dp', 'TEE', 'embedding_dp']:
-                    raise ValueError(f'FLYamlData init failed: unknown privacy scheme {scheme}. Currently \
-                                        support: label_dp, embedding_dp and TEE')
+            if privacy:
+                if 'embedding_dp' in privacy:
+                    self.embedding_dp_eps = self._check_eps(privacy, 'embedding_dp')
+                if 'label_dp' in privacy:
+                    eps = self._check_eps(privacy, 'label_dp')
+                    if eps or eps == 0:
+                        self.label_dp_eps = eps
+                    else:
+                        raise ValueError(f'FLYamlData init failed: the value of eps is missing.')
+                if 'TEE' in privacy:
+                    if 'tee_layer' in privacy['TEE']:
+                        self.tee_layer = privacy['TEE']['tee_layer']
+                for scheme in privacy.keys():
+                    if scheme not in ['embedding_dp', 'label_dp', 'TEE']:
+                        raise ValueError(f'FLYamlData init failed: unknown privacy scheme {scheme}. Currently \
+                                            support: label_dp, embedding_dp and TEE')
 
     def _check_opts(self):
         """Verify configurations of optimizers defined in the yaml file."""

@@ -16,9 +16,18 @@
 
 import logging
 import numpy as np
-import mindspore as ms
 from mindspore import Tensor, ops
-from mindspore import numpy as mnp
+
+
+def _check_eps(eps):
+    if not isinstance(eps, (int, float)):
+        raise TypeError(f"Parameter eps must be an int or a float number, but {type(eps)} found.")
+    if eps < 0:
+        raise ValueError(f"Parameter eps cannot be negative, but got {eps}.")
+    if eps > 100:
+        logging.info('Parameter eps %f is far too large which may cause overflow and is reassigned to 100.', eps)
+        eps = 100
+    return float(eps)
 
 
 class LabelDP:
@@ -70,18 +79,8 @@ class LabelDP:
     """
 
     def __init__(self, eps) -> None:
-        self.eps = eps
-
-        if not isinstance(self.eps, int) and not isinstance(self.eps, float):
-            raise TypeError('LabelDP: eps must be an int or a float, but found {}'.format(type(self.eps)))
-        self.eps = float(self.eps)
-        if self.eps < 0:
-            raise ValueError('LabelDP: eps must be greater than or equal to zero, but got {}'.format(self.eps))
-        if self.eps > 700:
-            logging.info('Current eps %f is far too large and may cause overflow.', self.eps)
-            logging.info('The training would use eps of value 700 instead.')
-            self.eps = 700
-
+        self.eps = _check_eps(eps)
+        logging.info('The label is protected by LabelDP with eps %f.', self.eps)
         self._onehot = ops.OneHot()
 
     def __call__(self, label):
@@ -89,27 +88,28 @@ class LabelDP:
         input a label batch, output a perturbed label batch satisfying label differential privacy.
         """
         if not isinstance(label, Tensor):
-            raise TypeError('LabelDP: the input label must be a Tensor, but got {}'.format(type(label)))
+            raise TypeError(f"The label must be a Tensor, but got {type(label)}")
 
-        if (len(label.shape) == 2 and label.shape[1] == 1) or len(label.shape) == 1:
-            # binary label
-            if sum(label == 1) + sum(label == 0) != label.shape[0]:
-                raise ValueError('Unsupported labels. LabelDP currently only support binary or onehot labels.')
-            flip_prob = 1 / (1 + np.exp(self.eps))
-            flip = Tensor(np.random.binomial(1, flip_prob, size=label.shape), dtype=label.dtype)
-            dp_label = mnp.abs(flip - label)
-        elif len(label.shape) == 2:
-            # onehot label
-            if mnp.sum(label == 1) != label.shape[0] or mnp.sum(label == 1) + mnp.sum(label == 0) != label.size:
-                raise ValueError('Unsupported labels. LabelDP currently only support binary or onehot labels.')
-            dp_label = label * self.eps + Tensor(np.random.laplace(0, 1, label.shape), ms.float32)
-            dp_label = ops.Argmax(output_type=ms.int32)(dp_label)
-            dp_label = self._onehot(dp_label, label.shape[1], Tensor(1.0, ms.float32), Tensor(0.0, ms.float32))
-            if dp_label.dtype != label.dtype:
-                dp_label = Tensor(dp_label, dtype=label.dtype)
+        ones_cnt = np.sum(label.asnumpy() == 1)
+        zeros_cnt = np.sum(label.asnumpy() == 0)
+        if ones_cnt + zeros_cnt != label.size:
+            raise ValueError(f"Invalid label form: the elements should be either 0 or 1.")
+
+        if label.ndim == 1 or (label.ndim == 2 and label.shape[1] == 1):
+            flip_prob = 1 / (np.exp(self.eps) + 1)
+            binomial = np.random.binomial(1, flip_prob, label.shape)
+            dp_label = (label - Tensor(binomial, dtype=label.dtype)).abs()
+        elif label.ndim == 2:
+            if ones_cnt != len(label):
+                raise ValueError('Invalid one-hot form: each label should contain only a single 1.')
+            keep_prob = np.exp(self.eps) / (np.exp(self.eps) + label.shape[1] - 1)
+            flip_prob = 1 / (np.exp(self.eps) + label.shape[1] - 1)
+            prob_array = label * (keep_prob - flip_prob) + Tensor(np.ones(label.shape)) * flip_prob
+            dp_index = np.array([np.random.choice(label.shape[1], p=prob/sum(prob)) for prob in prob_array])
+            dp_label = Tensor(np.eye(label.shape[1])[dp_index], dtype=label.dtype)
         else:
-            raise ValueError(f'''LabelDP currently only support binary or onehot labels, so the dim of the input labels
-                             is expected to be 1 or 2, but got {len(label.shape)}''')
+            raise ValueError(f"Invalid label dim: the dim must be 1 or 2.")
+
         return dp_label
 
 
@@ -141,27 +141,20 @@ class EmbeddingDP:
     """
     def __init__(self, eps=None) -> None:
         self.eps = eps
-        if self.eps or self.eps == 0:
-            if not isinstance(eps, (int, float)):
-                raise TypeError(f'EmbeddingDP: the type of eps must be int or float, but {type(eps)} found.')
-            self.eps = float(eps)
-            if self.eps < 0:
-                raise ValueError(f'EmbeddingDP: eps must be greater than or equal to zero, but got {self.eps}')
-            if self.eps > 100:
-                logging.info('EmbeddingDP: eps %f is far too large and is reassigned to 100.', self.eps)
-                self.eps = 100
-
-            self.q = 1 / (ops.exp(Tensor(eps / 2)) + 1)
+        if eps or eps == 0:
+            self.eps = _check_eps(eps)
+            self.q = 1 / (ops.exp(Tensor(self.eps / 2)) + 1)
             self.p = 1 - self.q
-            logging.info("The follower's embedding is protected by EmbeddingDP with eps %f", self.eps)
+            logging.info('The embedding is protected by EmbeddingDP with eps %f.', self.eps)
         else:
-            logging.info("Eps is missing: the follower's embedding is protected with quantization only.")
+            logging.info('Parameter eps is missing and the embedding is protected with quantization only.')
 
     def __call__(self, embedding):
         if not isinstance(embedding, Tensor):
-            raise TypeError(f'EmbeddingDP: the embedding must be a Tensor, but got {type(embedding)} instead.')
+            raise TypeError(f'The embedding must be a Tensor, but got {type(embedding)}.')
         embedding = self._unary_encoding(embedding)
-        embedding = self._randomize(embedding)
+        if self.eps or self.eps == 0:
+            embedding = self._randomize(embedding)
         return embedding
 
     def _unary_encoding(self, embedding):
@@ -170,8 +163,6 @@ class EmbeddingDP:
         return embedding
 
     def _randomize(self, embedding):
-        if self.eps:
-            p_binomial = np.random.binomial(1, self.p, embedding.shape)
-            q_binomial = np.random.binomial(1, self.q, embedding.shape)
-            return Tensor(np.where(embedding.asnumpy() == 1, p_binomial, q_binomial), dtype=embedding.dtype)
-        return embedding
+        p_binomial = np.random.binomial(1, self.p, embedding.shape)
+        q_binomial = np.random.binomial(1, self.q, embedding.shape)
+        return Tensor(np.where(embedding.asnumpy() == 1, p_binomial, q_binomial), dtype=embedding.dtype)

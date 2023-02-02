@@ -21,7 +21,7 @@ from mindspore import context, Tensor
 from mindspore.train.summary import SummaryRecord
 
 from mindspore_federated import FLModel, FLYamlData
-
+from mindspore_federated.privacy import LabelDP
 from criteo_dataset import create_dataset, DataType
 from network_config import config
 from wide_and_deep import LeaderTopNet, LeaderTopLossNet, LeaderTopEvalNet, LeaderBottomNet, LeaderBottomLossNet, \
@@ -49,9 +49,14 @@ if __name__ == '__main__':
     logging.basicConfig(filename='log_local_{}.txt'.format(config.device_target), level=logging.INFO,
                         format='%(asctime)s %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     context.set_context(mode=context.GRAPH_MODE, device_target=config.device_target)
+    # parse yaml files
     leader_top_yaml_data = FLYamlData(config.leader_top_yaml_path)
+    ldp = None
+    if hasattr(leader_top_yaml_data, 'label_dp_eps') and config.label_dp:
+        ldp = LabelDP(leader_top_yaml_data.label_dp_eps)
     leader_bottom_yaml_data = FLYamlData(config.leader_bottom_yaml_path)
     follower_bottom_yaml_data = FLYamlData(config.follower_bottom_yaml_path)
+
     # local data iteration for experiment
     ds_train, ds_eval = construct_local_dataset()
     train_iter = ds_train.create_dict_iterator()
@@ -90,27 +95,28 @@ if __name__ == '__main__':
         if os.path.exists(config.pre_trained_leader_top):
             leader_top_fl_model.load_ckpt(path=config.pre_trained_leader_top)
 
-    edp = follower_bottom_fl_model.embedding_dp
-
     # forward/backward batch by batch
     steps_per_epoch = ds_train.get_dataset_size()
     with SummaryRecord('./summary') as summary_record:
         for epoch in range(config.epochs):
             for step, item in enumerate(train_iter, start=1):
                 step = steps_per_epoch * epoch + step
+
+                # forward process
                 follower_embedding = follower_bottom_fl_model.forward_one_step(item)
-                # if embedding dp is applied
-                if edp:
-                    follower_embedding['follower_wide_embedding'] = edp(follower_embedding['follower_wide_embedding'])
-                    follower_embedding['follower_deep_embedding'] = edp(follower_embedding['follower_deep_embedding'])
                 leader_embedding = leader_bottom_fl_model.forward_one_step(item)
                 item.update(leader_embedding)
                 leader_out = leader_top_fl_model.forward_one_step(item, follower_embedding)
+
+                # backward process
+                if ldp:
+                    item['label'] = ldp(item['label'])
                 scale = leader_top_fl_model.backward_one_step(item, follower_embedding)
                 leader_scale = {'loss': OrderedDict(list(scale['loss'].items())[:2])}
                 follower_scale = {'loss': OrderedDict(list(scale['loss'].items())[2:])}
                 leader_bottom_fl_model.backward_one_step(item, sens=leader_scale)
                 follower_bottom_fl_model.backward_one_step(item, sens=follower_scale)
+
                 if step % 100 == 0:
                     summary_record.add_value('scalar', 'loss', leader_out['loss'])
                     summary_record.record(step)
