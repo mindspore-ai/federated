@@ -623,7 +623,12 @@ class FederatedLearningManager(Callback):
             weights[local_param.name] = param_np.reshape(-1).tolist()
 
     def on_train_step_begin(self, run_context):
-        """ At the beginning of step, the cloud federation accesses the federated learning task. """
+        """
+        At the beginning of step, the cloud federation accesses the federated learning task.
+
+        Args:
+            run_context (RunContext): Include some information of the model.
+        """
         self._global_step += 1
         is_cloud = self._server_mode == _fl_context.SERVER_MODE_CLOUD
         is_sync = self._global_step == self._next_begin_sync_iter
