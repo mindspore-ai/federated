@@ -113,8 +113,8 @@ class FLDataWorker:
             - shard_num(int): The output number of each bucket when export.
               If leader has set a valid value, the value set by follower will not be used.
 
-            More details refer to:
-              https://e.gitee.com/mind_spore/repos/mindspore/federated/tree/master/tests/st/data_join/vfl/vfl_data_join_config.yaml
+            More details refer to `vfl_data_join_config <https://e.gitee.com/mind_spore/repos/mindspore/federated/tree/master/tests/st/data_join/vfl/vfl_data_join_config.yaml>`_.
+
 
     Examples:
         >>> from mindspore_federated import FLDataWorker
@@ -145,7 +145,7 @@ class FLDataWorker:
         """
         return self.data_join_obj.join_func(input_vct, bucket_id)
 
-    def export(self):
+    def _export(self):
         """
         Export MindRecord by intersection keys.
         """
@@ -165,7 +165,7 @@ class FLDataWorker:
         if export_count == 0:
             raise ValueError("The intersection_keys of all buckets is empty")
 
-    def get_data_source(self):
+    def _get_data_source(self):
         """
         create data source by config
         """
@@ -184,7 +184,7 @@ class FLDataWorker:
         self._raw_data.verify()
         self._raw_data.load_raw_data()
 
-    def get_data_joiner(self):
+    def _get_data_joiner(self):
         """
         create data joiner by config
         """
@@ -196,7 +196,7 @@ class FLDataWorker:
         else:
             raise ValueError("role must be \"leader\" or \"follower\"")
 
-    def verify_worker_config(self):
+    def _verify_worker_config(self):
         """
         verify worker config
         """
@@ -214,10 +214,10 @@ class FLDataWorker:
         if not os.path.isdir(self._worker_config.output_dir):
             raise ValueError("output_dir: {} is not a directory.".format(self._worker_config.output_dir))
 
-    def negotiate_hyper_params(self):
+    def _negotiate_hyper_params(self):
         """
-        negotiate hyper parameters
-        The hyper parameters include:
+        negotiate hyperparameters
+        The hyperparameters include:
             primary_key (str)
             bucket_num (int)
             shard_num (int)
@@ -234,7 +234,7 @@ class FLDataWorker:
         )
         role = self._config['role']
         if role == "leader":
-            self.verify_worker_config()
+            self._verify_worker_config()
             ctx = VFLContext.get_instance()
             worker_config_item_py = data_join_utils.worker_config_to_pybind_obj(self._worker_config)
             ctx.set_worker_config(worker_config_item_py)
@@ -248,11 +248,11 @@ class FLDataWorker:
             self._worker_config.bucket_num = bucket_num
             self._worker_config.shard_num = shard_num
             self._worker_config.join_type = join_type
-            self.verify_worker_config()
+            self._verify_worker_config()
         else:
             raise ValueError("role must be \"leader\" or \"follower\"")
 
-    def create_communicator(self):
+    def _create_communicator(self):
         """
         create communicator for data join
         communicator will be used both at data join && model train
@@ -288,7 +288,7 @@ class FLDataWorker:
     def communicator(self):
         """
         The data join && train model use the same communicator,
-        here provide a api for train to get the communicator
+        here provide api for train to get the communicator
         """
         return FLDataWorker._communicator
 
@@ -296,16 +296,16 @@ class FLDataWorker:
         """
         Do data join worker according to the config.
         """
-        self.create_communicator()
+        self._create_communicator()
 
         # negotiate params
-        self.negotiate_hyper_params()
+        self._negotiate_hyper_params()
 
         # get data source
-        self.get_data_source()
+        self._get_data_source()
 
         # get data joiner
-        self.get_data_joiner()
+        self._get_data_joiner()
 
         #
-        self.export()
+        self._export()
