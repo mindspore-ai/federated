@@ -218,10 +218,11 @@ class FLDataWorker:
         """
         negotiate hyperparameters
         The hyperparameters include:
-            primary_key (str)
-            bucket_num (int)
-            shard_num (int)
-            join_type (str)
+
+        - primary_key (str)
+        - bucket_num (int)
+        - shard_num (int)
+        - join_type (str)
         """
         self._worker_config = _WorkerConfig(
             output_dir=self._config['output_dir'],
