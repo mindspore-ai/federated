@@ -30,7 +30,7 @@ public class FLFrameSingleCaseRun {
         if (utBasePath == null || utBasePath.isEmpty()) {
             utBasePath = projectPath;
         }
-        String caseFilePath = utBasePath + "/test_case/fl_frame_ut_case_infer.json";
+        String caseFilePath = utBasePath + "/test_case/fl_frame_ut_case.json";
         FLFrameTestCaseParser caseParser = new FLFrameTestCaseParser(caseFilePath);
         testCases = caseParser.Parser();
 
@@ -60,7 +60,7 @@ public class FLFrameSingleCaseRun {
         FLFrameTestCase flTestCase = null;
         for(Object[] arrObj : testCases){
             String caseName = (String) arrObj[0];
-            if(caseName.equals("New_Frame_Tag_Infer")){
+            if(caseName.equals("New_Frame_Lenet_FlJobRun")){
                 flTestCase = (FLFrameTestCase)arrObj[1];
             }
         }

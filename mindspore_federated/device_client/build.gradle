@@ -65,10 +65,10 @@ dependencies {
 test {
     // need add the frame lib path to LD_LIBRARY_PATH
     // ref to https://www.mindspore.cn/federated/docs/zh-CN/r1.6/deploy_federated_client.html#id7
-    environment "LD_LIBRARY_PATH", "/home/zhangzhaoju/ms_dev/ms_master/output/mindspore-lite-1.8.0-linux-x64/runtime/lib"
+    environment "LD_LIBRARY_PATH", "~/worker/fl_ut/lite/mindspore-lite-1.9.0-linux-x64/runtime/lib"
     // need set MS_FL_UT_BASE_PATH the path of ut_data
     // now ut data on the private repository https://gitee.com/zhangzhaoju/mindspore_fl_test_data
-    environment "MS_FL_UT_BASE_PATH", "/home/zhangzhaoju/ms_dev/mindspore_fl_test_data/ut_data"
+    environment "MS_FL_UT_BASE_PATH", "~/worker/fl_ut/ut_data"
     // set MS_CATCH_MSG we can using real server to catch msg
     // environment "MS_CATCH_MSG", "True"
     jvmArgs "-javaagent:${project.configurations.testCompile.find { it.name.startsWith("jmockit") }}"
@@ -208,7 +208,7 @@ task packFLJarX86UT(type: Jar, dependsOn: ['compileTestJava']) {
         }
     }
     from {
-        configurations.compile.collect {
+        configurations.compileOnly.collect {
             it.isDirectory() ? it : zipTree(it)
         }
     }
