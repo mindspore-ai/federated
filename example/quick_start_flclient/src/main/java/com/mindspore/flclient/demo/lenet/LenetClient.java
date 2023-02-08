@@ -102,6 +102,16 @@ public class LenetClient extends Client {
     }
 
     @Override
+    public Map<String, float[]> genUnsupervisedEvalData(List<Callback> evalCallbacks) {
+        for (Callback callBack : evalCallbacks) {
+            if (callBack instanceof ClassifierAccuracyCallback) {
+                return ((ClassifierAccuracyCallback) callBack).getClassifierResult();
+            }
+        }
+        return new HashMap<String, float[]>();
+    }
+
+    @Override
     public List<Object> getInferResult(List<Callback> inferCallbacks) {
         DataSet inferDataSet = dataSets.getOrDefault(RunType.INFERMODE, null);
         if (inferDataSet == null) {

@@ -19,7 +19,6 @@ package com.mindspore.flclient;
 import com.mindspore.flclient.common.FLLoggerGenerater;
 import com.mindspore.flclient.model.Client;
 import com.mindspore.flclient.model.ClientManager;
-import com.mindspore.flclient.model.CommonUtils;
 import com.mindspore.flclient.model.RunType;
 import com.mindspore.flclient.model.Status;
 import com.mindspore.flclient.pki.PkiBean;
@@ -35,11 +34,8 @@ import mindspore.fl.schema.ResponseUpdateModel;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
-import java.util.ArrayList;
 
 /**
  * Defining the general process of federated learning tasks.
@@ -100,7 +96,7 @@ public class FLLiteClient {
         batchSize = flPlan.miniBatch();
         String serverMod = flPlan.serverMode();
         localFLParameter.setServerMod(serverMod);
-        // Get and set hyper parameters for compression.
+        // Get and set hyperparameters for compression.
         byte uploadCompressType = flJob.uploadCompressType();
         LOGGER.info("[startFLJob] [compression] uploadCompressType: " + uploadCompressType);
         localFLParameter.setUploadCompressType(uploadCompressType);
@@ -371,7 +367,9 @@ public class FLLiteClient {
         String url = Common.generateUrl(flParameter.isUseElb(), flParameter.getServerNum(),
                 flParameter.getDomainName());
         UpdateModel updateModelBuf = UpdateModel.getInstance();
-        byte[] updateModelBuffer = updateModelBuf.getRequestUpdateFLJob(iteration, secureProtocol, trainDataSize, evaAcc);
+        Map<String, float[]> unsupervisedEvalData = client.getUnsupervisedEvalData();
+        byte[] updateModelBuffer = updateModelBuf.getRequestUpdateFLJob(iteration, secureProtocol, trainDataSize,
+                evaAcc, unsupervisedEvalData);
         if (updateModelBuf.getStatus() == FLClientStatus.FAILED) {
             LOGGER.info("[updateModel] catch error in build RequestUpdateFLJob");
             return FLClientStatus.FAILED;

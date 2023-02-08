@@ -18,8 +18,7 @@ package com.mindspore.flclient;
 
 import com.mindspore.flclient.common.FLLoggerGenerater;
 import org.bouncycastle.math.ec.rfc7748.X25519;
-import java.util.ArrayList;
-import java.util.List;
+
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -82,7 +81,8 @@ public class LocalFLParameter {
     // default enable_fp16 -> false
     private boolean enableFp16 = false;
 
-
+    // default unsupervised train evaluate enable/disable flg.
+    private boolean unsupervisedEvalFlg = false;
     private LocalFLParameter() {
     }
 
@@ -254,5 +254,13 @@ public class LocalFLParameter {
 
     public void setUploadSparseRatio(float uploadSparseRatio) {
         this.uploadSparseRatio = uploadSparseRatio;
+    }
+
+    public boolean getUnsupervisedEvalFlg() {
+        return unsupervisedEvalFlg;
+    }
+
+    public void setUnsupervisedEvalFlg(boolean unsupervisedEvalFlg) {
+        this.unsupervisedEvalFlg = unsupervisedEvalFlg;
     }
 }

@@ -14,6 +14,7 @@
 # limitations under the License.
 # ============================================================================
 
+BASEPATH=$(cd "$(dirname $0)" || exit; pwd)
 display_usage()
 {
     echo -e "Usage:"
@@ -24,7 +25,7 @@ display_usage()
 
 checkopts()
 {
-  FL_CLIENT_PATH=""
+  FL_CLIENT_PATH=$(ls ${BASEPATH}/../../mindspore_federated/device_client/build/libs/jarX86/mindspore-lite-java-flclient-*jar)
   while getopts 'r:' opt
   do
     case "${opt}" in
@@ -46,9 +47,11 @@ if [ ! -e $FL_CLIENT_PATH ] ; then
   exit
 fi
 
-BASEPATH=$(cd "$(dirname $0)" || exit; pwd)
 rm -rf lib
 mkdir -p lib
+
+jar_base_name=$(basename ${FL_CLIENT_PATH})
+sed -i "s/mindspore-lite-java-flclient.*.jar/${jar_base_name}/" pom.xml
 
 cp $FL_CLIENT_PATH ${BASEPATH}/lib/
 

@@ -31,6 +31,7 @@ enum ResponseCode: int {
 enum AggregationType:byte {FedAvg = 0, FedProx = 1, Scaffold = 2, FedNova = 3, qffl = 4}
 enum Metrics:byte {accuracy = 0, precision = 1, recall = 2, AUC = 3,f1 = 4, fbeta = 5}
 enum EarlyStopType:byte {loss_diff = 0, loss_abs = 1, weight_diff = 2}
+enum UnsupervisedEvalFlg:byte {EVAL_DISABLE = 0, EVAL_ENABLE = 1}
 
 table Aggregation {
   type:AggregationType;
@@ -48,6 +49,15 @@ table EarlyStop {
 table FeatureMap{
   weight_fullname:string;
   data:[float];
+}
+
+table UnsupervisedEvalItem{
+   eval_name:string;
+   eval_data:[float];
+}
+
+table UnsupervisedEvalItems{
+   eval_items:[UnsupervisedEvalItem];
 }
 
 enum CompressType:byte {NO_COMPRESS = 0, DIFF_SPARSE_QUANT = 1, QUANT = 2}
@@ -87,6 +97,7 @@ table ResponseFLJob {
   upload_sparse_rate:float;
   download_compress_type:CompressType;
   compress_feature_map:[CompressFeatureMap];
+  unsupervised_eval_flg:UnsupervisedEvalFlg = EVAL_DISABLE;
 }
 
 table FLPlan {
@@ -118,6 +129,7 @@ table RequestUpdateModel{
   upload_sparse_rate:float;
   name_vec:[string];
   upload_accuracy:float;
+  unsupervised_eval_items:UnsupervisedEvalItems;
 }
 
 table ResponseUpdateModel{

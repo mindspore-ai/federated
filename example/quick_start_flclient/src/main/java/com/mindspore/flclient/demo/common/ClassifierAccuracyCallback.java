@@ -20,11 +20,11 @@ import com.mindspore.Model;
 import com.mindspore.flclient.model.Callback;
 import com.mindspore.flclient.model.CommonUtils;
 import com.mindspore.flclient.model.Status;
-import com.mindspore.MSTensor;
 
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.logging.Logger;
 
 /**
@@ -39,6 +39,10 @@ public class ClassifierAccuracyCallback extends Callback {
     private final List<Integer> targetLabels;
     private float accuracy;
 
+    private final String unsupervisedItemName = "DirectClassifierResult";
+
+    private HashMap<String, float[]> classifierResult = new HashMap<>();
+
     /**
      * Defining a constructor of  ClassifierAccuracyCallback.
      */
@@ -47,6 +51,8 @@ public class ClassifierAccuracyCallback extends Callback {
         this.batchSize = batchSize;
         this.numOfClass = numOfClass;
         this.targetLabels = targetLabels;
+        float[] directClassifierResult = new float[numOfClass];
+        classifierResult.put(unsupervisedItemName, directClassifierResult);
     }
 
     /**
@@ -57,6 +63,16 @@ public class ClassifierAccuracyCallback extends Callback {
     public float getAccuracy() {
         return accuracy;
     }
+
+    /**
+     * Get  ClassifierResult.
+     *
+     * @return ClassifierResult.
+     */
+    public HashMap<String, float[]> getClassifierResult() {
+        return classifierResult;
+    }
+
 
     @Override
     public Status stepBegin() {
@@ -69,6 +85,12 @@ public class ClassifierAccuracyCallback extends Callback {
         if (status != Status.SUCCESS) {
             return status;
         }
+
+        status = calClassifierResult();
+        if (status != Status.SUCCESS) {
+            return status;
+        }
+
         steps++;
         return Status.SUCCESS;
     }
@@ -82,9 +104,50 @@ public class ClassifierAccuracyCallback extends Callback {
     public Status epochEnd() {
         LOGGER.info("average accuracy:" + steps + ",acc is:" + accuracy / steps);
         accuracy = accuracy / steps;
+
+        float[] directClassifierResult = classifierResult.get(unsupervisedItemName);
+        for (int c = 0; c < numOfClass; c++) {
+            directClassifierResult[c] /= steps * batchSize;
+        }
+
         steps = 0;
         return Status.SUCCESS;
     }
+
+    /***
+     * Cal ClassifierResult for unsupervised train evaluate.
+     * Now just return the mean of classifier result for saving communication data size while model update request
+     * @return
+     */
+    private Status calClassifierResult() {
+        Map<String, float[]> outputs = getOutputsBySize(batchSize * numOfClass);
+        if (outputs.isEmpty()) {
+            LOGGER.severe("Cannot find outputs tensor for calClassifierResult");
+            return Status.FAILED;
+        }
+
+        Map.Entry<String, float[]> first = outputs.entrySet().iterator().next();
+        float[] scores = first.getValue();
+
+        if (scores.length != batchSize * numOfClass) {
+            LOGGER.severe("Expect ClassifierResult length is:" + batchSize * numOfClass + ", but got " + scores.length);
+            return Status.FAILED;
+        }
+
+        float[] directClassifierResult = classifierResult.get(unsupervisedItemName);
+        for (int c = 0; c < numOfClass; c++) {
+            if (steps == 0) {
+                directClassifierResult[c] = 0.0f;
+            }
+            for (int b = 0; b < batchSize; b++) {
+                directClassifierResult[c] += scores[numOfClass * b + c];
+            }
+        }
+
+        LOGGER.info("DirectClassifierResult is:" + Arrays.toString(directClassifierResult));
+        return Status.SUCCESS;
+    }
+
 
     private Status calAccuracy() {
         if (targetLabels == null || targetLabels.isEmpty()) {
@@ -93,7 +156,7 @@ public class ClassifierAccuracyCallback extends Callback {
         }
         Map<String, float[]> outputs = getOutputsBySize(batchSize * numOfClass);
         if (outputs.isEmpty()) {
-            LOGGER.severe("cannot find loss tensor");
+            LOGGER.severe("Cannot find outputs tensor for calAccuracy");
             return Status.FAILED;
         }
         Map.Entry<String, float[]> first = outputs.entrySet().iterator().next();
@@ -109,5 +172,4 @@ public class ClassifierAccuracyCallback extends Callback {
         LOGGER.info("steps:" + steps + ",acc is:" + (float) (hitCounts) / batchSize);
         return Status.SUCCESS;
     }
-
 }

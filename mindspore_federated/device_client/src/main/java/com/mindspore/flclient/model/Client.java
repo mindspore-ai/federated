@@ -16,10 +16,6 @@
 
 package com.mindspore.flclient.model;
 
-import com.mindspore.Graph;
-import com.mindspore.config.MSContext;
-import com.mindspore.config.ModelType;
-import com.mindspore.config.TrainCfg;
 import com.mindspore.flclient.*;
 import com.mindspore.flclient.common.FLLoggerGenerater;
 import com.mindspore.MSTensor;
@@ -29,11 +25,9 @@ import mindspore.fl.schema.FeatureMap;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.logging.Logger;
-import java.util.stream.IntStream;
 
 import static mindspore.fl.schema.CompressType.NO_COMPRESS;
 
@@ -70,6 +64,11 @@ public abstract class Client {
      * feature map before train
      */
     private Map<String, float[]> preFeatures = new HashMap<>();
+
+    /**
+     * classifier result for unsupervised evaluation
+     */
+    private Map<String, float[]> unsupervisedEvalData = new HashMap<>();
 
     /**
      * Get callback.
@@ -261,8 +260,25 @@ public abstract class Client {
             logger.severe("train loop failed");
             return Float.NaN;
         }
+        unsupervisedEvalData = genUnsupervisedEvalData(evalCallbacks);
         return getEvalAccuracy(evalCallbacks);
     }
+
+    /**
+     * Gen unsupervised train evaluation data.
+     * Must be called after eval Model
+     *
+     * @return eval accuracy.
+     */
+    public Map<String, float[]> genUnsupervisedEvalData(List<Callback> evalCallbacks) {
+        // default implement, avoid exception while child class not overwrite getUnsupervisedEvalData
+        return new HashMap<String, float[]>();
+    }
+
+    public Map<String, float[]> getUnsupervisedEvalData() {
+        return unsupervisedEvalData;
+    }
+
 
     /**
      * Infer model.
@@ -361,6 +377,15 @@ public abstract class Client {
      */
     public float[] getFeature(String weightName) {
         return curProxy.getFeature(weightName);
+    }
+
+    /**
+     * Get all model features, just used in ut for gen flat-buffer msg.
+     *
+     * @return featureMap
+     */
+    public HashMap<String, MSTensor> getAllFeature() {
+        return curProxy.getAllFeature();
     }
 
     /**

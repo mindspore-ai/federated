@@ -18,6 +18,7 @@ package com.mindspore.flclient;
 
 import com.google.flatbuffers.FlatBufferBuilder;
 
+import com.mindspore.MSTensor;
 import com.mindspore.flclient.common.FLLoggerGenerater;
 import com.mindspore.flclient.model.*;
 import com.mindspore.flclient.compression.EncodeExecutor;
@@ -28,6 +29,8 @@ import mindspore.fl.schema.CompressFeatureMap;
 import mindspore.fl.schema.RequestUpdateModel;
 import mindspore.fl.schema.ResponseCode;
 import mindspore.fl.schema.ResponseUpdateModel;
+import mindspore.fl.schema.UnsupervisedEvalItems;
+import mindspore.fl.schema.UnsupervisedEvalItem;
 
 import static com.mindspore.flclient.EncryptLevel.SIGNDS;
 import static mindspore.fl.schema.CompressType.NO_COMPRESS;
@@ -94,9 +97,11 @@ public class UpdateModel {
      * @param secureProtocol the object that defines encryption and decryption methods.
      * @param trainDataSize  the size of train date set.
      * @param evaAcc  the evaluated Accuracy.
+     * @param unsupervisedEvalData  the unsupervised train evaluation data used for model evaluation.
      * @return the flatBuffer builder of RequestUpdateModel in byte[] format.
      */
-    public byte[] getRequestUpdateFLJob(int iteration, SecureProtocol secureProtocol, int trainDataSize, float evaAcc) {
+    public byte[] getRequestUpdateFLJob(int iteration, SecureProtocol secureProtocol, int trainDataSize, float evaAcc
+            , Map<String, float[]> unsupervisedEvalData) {
         RequestUpdateModelBuilder builder = new RequestUpdateModelBuilder(localFLParameter.getEncryptLevel());
         boolean isPkiVerify = flParameter.isPkiVerify();
         Client client = ClientManager.getClient(flParameter.getFlName());
@@ -108,11 +113,12 @@ public class UpdateModel {
             byte[] signature = CipherClient.signTimeAndIter(dateTime, iteration);
             return builder.flName(flParameter.getFlName()).time(dateTime).id(localFLParameter.getFlID())
                     .featuresMap(secureProtocol, trainDataSize).iteration(iteration)
-                    .signData(signature).uploadLoss(uploadLoss).evalAccuracy(evaAcc).build();
+                    .signData(signature).uploadLoss(uploadLoss).evalAccuracy(evaAcc)
+                    .unsupervisedEvalData(unsupervisedEvalData).build();
         }
         return builder.flName(flParameter.getFlName()).time("null").id(localFLParameter.getFlID())
                 .featuresMap(secureProtocol, trainDataSize).iteration(iteration).uploadLoss(uploadLoss)
-                .evalAccuracy(evaAcc).build();
+                .evalAccuracy(evaAcc).unsupervisedEvalData(unsupervisedEvalData).build();
     }
 
     /**
@@ -163,6 +169,8 @@ public class UpdateModel {
         // evaluate acc
         private float evalAccuracy = 0.0f;
         private int nameVecOffset = 0;
+
+        private int evalItemsOffset = 0;
 
         private RequestUpdateModelBuilder(EncryptLevel encryptLevel) {
             builder = new FlatBufferBuilder();
@@ -510,7 +518,7 @@ public class UpdateModel {
         /**
          * Serialize the element uploadLoss in RequestUpdateModel.
          *
-         * @param upload loss that client train.
+         * @param uploadLoss loss that client train.
          * @return the RequestUpdateModelBuilder object.
          */
         private RequestUpdateModelBuilder uploadLoss(float uploadLoss) {
@@ -521,11 +529,34 @@ public class UpdateModel {
         /**
          * Serialize the element evalAccuracy in RequestUpdateModel.
          *
-         * @param evaluate Accuracy that client eval.
+         * @param evalAccuracy Accuracy that client eval.
          * @return the RequestUpdateModelBuilder object.
          */
         private RequestUpdateModelBuilder evalAccuracy(float evalAccuracy) {
             this.evalAccuracy = evalAccuracy;
+            return this;
+        }
+
+        /***
+         * Serialize unsupervised train evaluation data that used for model evaluation.
+         * @param unsupervisedEvalData unsupervised train evaluation data
+         * @return the RequestUpdateModelBuilder object.
+         */
+        private RequestUpdateModelBuilder unsupervisedEvalData(Map<String, float[]> unsupervisedEvalData) {
+            int index = 0;
+            int[] dataOffsets = new int[unsupervisedEvalData.size()];
+            for (Map.Entry<String, float[]> item : unsupervisedEvalData.entrySet()) {
+                String itemName = item.getKey();
+                float[] itemData = item.getValue();
+                int itemNameOffset = builder.createString(itemName);
+                int weightOffset = UnsupervisedEvalItem.createEvalDataVector(builder, itemData);
+                int itemMapOffset = UnsupervisedEvalItem.createUnsupervisedEvalItem(builder, itemNameOffset,
+                        weightOffset);
+                dataOffsets[index] = itemMapOffset;
+                index += 1;
+            }
+            int itemsOffset = UnsupervisedEvalItems.createEvalItemsVector(builder, dataOffsets);
+            this.evalItemsOffset = UnsupervisedEvalItems.createUnsupervisedEvalItems(builder, itemsOffset);
             return this;
         }
 
@@ -550,6 +581,7 @@ public class UpdateModel {
             RequestUpdateModel.addUploadAccuracy(builder, this.evalAccuracy);
             RequestUpdateModel.addSign(builder, this.sign);
             RequestUpdateModel.addIndexArray(builder, this.indexArrayOffset);
+            RequestUpdateModel.addUnsupervisedEvalItems(builder, this.evalItemsOffset);
             int root = RequestUpdateModel.endRequestUpdateModel(builder);
             builder.finish(root);
             return builder.sizedByteArray();

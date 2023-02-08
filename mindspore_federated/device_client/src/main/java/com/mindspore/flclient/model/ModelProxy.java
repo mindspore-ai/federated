@@ -241,6 +241,15 @@ public class ModelProxy {
     }
 
     /**
+     * Get all model features, just used in ut for gen flat-buffer msg.
+     *
+     * @return featureMap
+     */
+    public HashMap<String, MSTensor> getAllFeature() {
+        return featureMap;
+    }
+
+    /**
      * update model feature
      *
      * @param newFeature new weights.
