@@ -76,7 +76,8 @@ class FollowerTrainer:
                 self.vertical_communicator.send_tensors("leader", follower_embedding)
 
 
-logging.basicConfig(filename='follower_train.log', level=logging.INFO)
+logging.basicConfig(filename='follower_train.log', level=logging.INFO,
+                    format='%(asctime)s %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 context.set_context(mode=context.GRAPH_MODE, device_target=config.device_target)
 ds_train, ds_eval = construct_local_dataset()
 train_iter = ds_train.create_dict_iterator()

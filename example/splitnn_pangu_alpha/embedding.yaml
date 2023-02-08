@@ -65,3 +65,6 @@ hyper_parameters:
   batch_size: 2
   is_eval: False
 ckpt_path: ./checkpoints
+privacy:
+  embedding_dp:
+    eps: 5.0

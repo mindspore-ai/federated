@@ -34,4 +34,4 @@ fi
 
 export PYTHONPATH="${PYTHONPATH}:${WORKPATH}/../"
 echo "Start executing pangu_alpha splitnn with embedding dp demo (standalone simulation mode)."
-python run_pangu_train_local.py --embedding_yaml_file_path="./embedding_edp.yaml"
+python run_pangu_train_local.py --embedding_dp True

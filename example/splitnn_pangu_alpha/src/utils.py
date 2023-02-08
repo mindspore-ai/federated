@@ -467,8 +467,7 @@ def add_retrain_params(opt):
     Add parameters about retrain.
     """
     opt.add_argument("--resume",
-                     type=bool,
-                     default=False,
+                     action='store_true',
                      help="Whether to resume the pretrained model.")
     opt.add_argument("--pre_trained_embedding",
                      type=str,
@@ -516,20 +515,11 @@ def add_retrain_params(opt):
                      help="Steps has been trained before.")
 
 
-def add_yaml_files(opt):
-    """Add yaml files"""
-    opt.add_argument("--embedding_yaml_file_path",
-                     type=str,
-                     default='./embedding.yaml',
-                     help="The yaml file path for the embedding part.")
-    opt.add_argument("--backbone_yaml_file_path",
-                     type=str,
-                     default='./backbone.yaml',
-                     help="The yaml file path for the backbone part.")
-    opt.add_argument("--head_yaml_file_path",
-                     type=str,
-                     default='./head.yaml',
-                     help="The yaml file path for the head part.")
+def add_privacy_params(opt):
+    opt.add_argument("--embedding_dp",
+                     type=bool,
+                     default=False,
+                     help="Whether apply Embedding DP.")
 
 
 def get_args(inference=False):
@@ -627,7 +617,7 @@ def get_args(inference=False):
     add_context_args_mode(parser)
     add_training_params(parser)
     add_retrain_params(parser)
-    add_yaml_files(parser)
+    add_privacy_params(parser)
     if inference:
         add_inference_params(parser)
     args_opt = parser.parse_args()

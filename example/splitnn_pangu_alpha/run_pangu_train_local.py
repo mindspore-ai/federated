@@ -21,7 +21,7 @@ from mindspore.nn.wrap.loss_scale import DynamicLossScaleUpdateCell
 from mindspore.nn.wrap.cell_wrapper import _VirtualDatasetCell
 from mindspore.train.summary import SummaryRecord
 from mindspore_federated import FLModel, FLYamlData
-
+from mindspore_federated.privacy import EmbeddingDP
 from src.split_pangu_alpha import PanguAlphaModel, BackboneLossNet, PanGuHead, HeadLossNet, EmbeddingLayer, \
     EmbeddingLossNet, PPLMetric
 
@@ -45,9 +45,12 @@ if __name__ == '__main__':
     context.set_context(mode=context.GRAPH_MODE, device_target='GPU')
 
     # read, parse and check the .yaml files of sub-networks
-    embedding_yaml = FLYamlData(opt.embedding_yaml_file_path)
-    backbone_yaml = FLYamlData(opt.backbone_yaml_file_path)
-    head_yaml = FLYamlData(opt.head_yaml_file_path)
+    embedding_yaml = FLYamlData('./embedding.yaml')
+    edp = None
+    if hasattr(embedding_yaml, 'embedding_dp_eps') and opt.embedding_dp:
+        edp = EmbeddingDP(embedding_yaml.embedding_dp_eps)
+    backbone_yaml = FLYamlData('./backbone.yaml')
+    head_yaml = FLYamlData('./head.yaml')
 
     # local data iteration for experiment
     ds_train = construct_local_dataset(opt, rank_id, device_num)
@@ -111,8 +114,6 @@ if __name__ == '__main__':
         backbone_fl_model.load_ckpt()
         head_fl_model.load_ckpt()
 
-    edp = embedding_fl_model.embedding_dp
-
     # forward/backward batch by batch
     with SummaryRecord('./summary') as summary_record:
         for epoch in range(50):
@@ -129,6 +130,7 @@ if __name__ == '__main__':
                 head_scale = head_fl_model.backward_one_step(item, backbone_out)
                 backbone_scale = backbone_fl_model.backward_one_step(item, embedding_out, sens=head_scale)
                 embedding_fl_model.backward_one_step(item, sens=backbone_scale)
+
                 if step % 10 == 0:
                     summary_record.add_value('scalar', 'output', logit_out['output'])
                     summary_record.record(step)

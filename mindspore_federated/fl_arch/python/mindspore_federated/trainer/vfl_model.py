@@ -24,7 +24,7 @@ from mindspore import Tensor, Parameter
 from mindspore import nn, context
 from mindspore.ops import PrimitiveWithInfer, prim_attr_register
 from mindspore.context import ParallelMode
-from mindspore_federated.privacy import LabelDP, SimuTEE, EmbeddingDP
+from mindspore_federated.privacy import SimuTEE
 
 from .vfl_optim import PartyOptimizer, PartyGradScaler, _reorganize_input_data
 
@@ -148,23 +148,6 @@ class FLModel:
 
         self.global_step = 0
 
-        self._label_dp = None
-        if hasattr(self._yaml_data, 'privacy_eps'):
-            label_dp_eps = self._yaml_data.privacy_eps
-            self._label_dp = LabelDP(eps=label_dp_eps)
-
-        if self._label_dp is not None and self._role != 'leader':
-            raise AttributeError('FLModel: only a leader can employ the label dp strategy')
-
-        self.embedding_dp = None
-        if hasattr(self._yaml_data, 'embedding_dp_eps'):
-            embedding_dp_eps = self._yaml_data.embedding_dp_eps
-            self.embedding_dp = EmbeddingDP(eps=embedding_dp_eps)
-
-        # init the tee layer
-        if hasattr(self._yaml_data, 'tee_layer'):
-            self.tee_layer = SimuTEE(self._yaml_data.tee_layer)
-
         if optimizers is None:
             self._optimizers = []
             self._build_optimizer()
@@ -174,6 +157,8 @@ class FLModel:
             self._optimizers = [optimizers]
 
         self._grad_scalers = self._build_grad_scaler() if self._yaml_data.grad_scalers else None
+
+        self._config_privacy()
 
     def _build_train_network(self):
         """
@@ -208,6 +193,11 @@ class FLModel:
         for grad_scaler_yaml in self._yaml_data.grad_scalers:
             grad_scalers.append(PartyGradScaler(grad_scaler_yaml, self._train_network, self._train_net_yaml))
         return grad_scalers
+
+    def _config_privacy(self):
+        # init the tee layer
+        if hasattr(self._yaml_data, 'tee_layer'):
+            self.tee_layer = SimuTEE(self._yaml_data.tee_layer)
 
     def eval_one_step(self, local_data_batch: dict = None, remote_data_batch: dict = None):
         """
@@ -335,12 +325,6 @@ class FLModel:
                     remote_data_batch[key] = data_batch[key]
                 else:
                     raise ValueError("FLModel: unmatched key \'%s\'" % key)
-
-        # label dp
-        if self._role == 'leader' and self._label_dp is not None:
-            label = local_data_batch[self._yaml_data.eval_net_gt]
-            dp_label = self._label_dp(label)
-            local_data_batch[self._yaml_data.eval_net_gt] = dp_label
 
         scales = dict()
         if self._grad_scalers:
