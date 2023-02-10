@@ -22,7 +22,8 @@ import sys
 import requests
 from mindspore.fl.schema import (RequestFLJob, ResponseFLJob, ResponseCode,
                                  RequestUpdateModel, ResponseUpdateModel,
-                                 FeatureMap, RequestGetModel, ResponseGetModel, CompressFeatureMap)
+                                 FeatureMap, RequestGetModel, ResponseGetModel, CompressFeatureMap,
+                                 UnsupervisedEvalItems, UnsupervisedEvalItem)
 import flatbuffers
 import numpy as np
 
@@ -126,6 +127,37 @@ def build_compress_feature_map(builder, feature_map_temp, upload_sparse_rate):
     return compress_feature_maps, name_vec
 
 
+def build_unsupervised_eval_items(builder):
+    """
+    build unsupervised eval items
+    """
+    unsupervised_eval_data_size = 160
+    eval_items_size = 10
+    unsupervised_eval_items = []
+    for i in range(0, eval_items_size):
+        eval_name = builder.CreateString("eval_name_" + str(i))
+        UnsupervisedEvalItem.UnsupervisedEvalItemStartEvalDataVector(builder, unsupervised_eval_data_size)
+        eval_data = np.random.random(unsupervised_eval_data_size)
+        for j in range(0, unsupervised_eval_data_size):
+            builder.PrependFloat32(eval_data[j])
+        fbs_eval_data = builder.EndVector()
+        UnsupervisedEvalItem.UnsupervisedEvalItemStart(builder)
+        UnsupervisedEvalItem.UnsupervisedEvalItemAddEvalData(builder, fbs_eval_data)
+        UnsupervisedEvalItem.UnsupervisedEvalItemAddEvalName(builder, eval_name)
+        fbs_unsupervised_eval_item = UnsupervisedEvalItem.UnsupervisedEvalItemEnd(builder)
+        unsupervised_eval_items.append(fbs_unsupervised_eval_item)
+
+    UnsupervisedEvalItems.UnsupervisedEvalItemsStartEvalItemsVector(builder, eval_items_size)
+    for unsupervised_eval_item in unsupervised_eval_items:
+        builder.PrependUOffsetTRelative(unsupervised_eval_item)
+    fbs_unsupervised_eval_items = builder.EndVector()
+
+    UnsupervisedEvalItems.UnsupervisedEvalItemsStart(builder)
+    UnsupervisedEvalItems.UnsupervisedEvalItemsAddEvalItems(builder, fbs_unsupervised_eval_items)
+    unsupervised_end = UnsupervisedEvalItems.UnsupervisedEvalItemsEnd(builder)
+    return unsupervised_end
+
+
 def build_feature_map(builder, feature_map_temp):
     """
     build feature map
@@ -169,6 +201,7 @@ def build_compress_update_model(iteration, feature_map_temp, upload_compress_typ
         builder_update_model.PrependUOffsetTRelative(name)
     fbs_name_vec = builder_update_model.EndVector()
 
+    unsupervised_pos = build_unsupervised_eval_items(builder_update_model)
     RequestUpdateModel.RequestUpdateModelStart(builder_update_model)
     RequestUpdateModel.RequestUpdateModelAddFlName(builder_update_model, fl_name)
     RequestUpdateModel.RequestUpdateModelAddFlId(builder_update_model, fl_id)
@@ -177,6 +210,7 @@ def build_compress_update_model(iteration, feature_map_temp, upload_compress_typ
     RequestUpdateModel.RequestUpdateModelAddTimestamp(builder_update_model, timestamp)
     RequestUpdateModel.RequestUpdateModelAddUploadLoss(builder_update_model, upload_loss)
     RequestUpdateModel.RequestUpdateModelAddUploadAccuracy(builder_update_model, upload_accuracy)
+    RequestUpdateModel.RequestUpdateModelAddUnsupervisedEvalItems(builder_update_model, unsupervised_pos)
 
     RequestUpdateModel.RequestUpdateModelAddNameVec(builder_update_model, fbs_name_vec)
     RequestUpdateModel.RequestUpdateModelAddUploadCompressType(builder_update_model, upload_compress_type)
@@ -201,6 +235,7 @@ def build_update_model(iteration, feature_map_temp):
         builder_update_model.PrependUOffsetTRelative(single_feature_map)
     fbs_feature_map = builder_update_model.EndVector()
 
+    unsupervised_pos = build_unsupervised_eval_items(builder_update_model)
     RequestUpdateModel.RequestUpdateModelStart(builder_update_model)
     RequestUpdateModel.RequestUpdateModelAddFlName(builder_update_model, fl_name)
     RequestUpdateModel.RequestUpdateModelAddFlId(builder_update_model, fl_id)
@@ -209,6 +244,7 @@ def build_update_model(iteration, feature_map_temp):
     RequestUpdateModel.RequestUpdateModelAddTimestamp(builder_update_model, timestamp)
     RequestUpdateModel.RequestUpdateModelAddUploadLoss(builder_update_model, upload_loss)
     RequestUpdateModel.RequestUpdateModelAddUploadAccuracy(builder_update_model, upload_accuracy)
+    RequestUpdateModel.RequestUpdateModelAddUnsupervisedEvalItems(builder_update_model, unsupervised_pos)
     req_update_model = RequestUpdateModel.RequestUpdateModelEnd(builder_update_model)
     builder_update_model.Finish(req_update_model)
     buf = builder_update_model.Output()
@@ -244,17 +280,6 @@ def datetime_to_timestamp(datetime_obj):
     local_timestamp = time.mktime(datetime_obj.timetuple()) * 1000.0 + datetime_obj.microsecond // 1000.0
     return local_timestamp
 
-
-# weight_to_idx = {
-#     "conv1.weight": 0,
-#     "conv2.weight": 1,
-#     "fc1.weight": 2,
-#     "fc2.weight": 3,
-#     "fc3.weight": 4,
-#     "fc1.bias": 5,
-#     "fc2.bias": 6,
-#     "fc3.bias": 7
-# }
 
 session = requests.Session()
 current_iteration = 1

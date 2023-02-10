@@ -36,6 +36,11 @@ uint64_t Timer::iteration_expire_time_in_seconds() {
   return global_time_window_in_seconds() + extra_time_for_iteration;
 }
 
+uint64_t Timer::unsupervised_data_expire_time_in_seconds() {
+  constexpr uint64_t extra_time = 24 * 60 * 60;  // 1 day
+  return global_time_window_in_seconds() + extra_time;
+}
+
 uint64_t Timer::release_expire_time_in_seconds() {
   constexpr uint64_t extra_time_for_release = 30;  // 30s
   return extra_time_for_release;

@@ -74,6 +74,39 @@ void Summary::GetAllSummaries(std::vector<std::string> *summary_pbs) {
   }
 }
 
+void Summary::GetUnsupervisedEvalItems(std::vector<std::string> *unsupervised_eval_item_pbs, size_t start, size_t end) {
+  if (unsupervised_eval_item_pbs == nullptr) {
+    return;
+  }
+  auto client = DistributedCacheLoader::Instance().GetOneClient();
+  if (client == nullptr) {
+    MS_LOG_WARNING << "Get redis client failed";
+    return;
+  }
+  auto name = cache::RedisKeys::GetInstance().ClientUnsupervisedEvalHash();
+  std::vector<std::string> items;
+  auto status = client->LRange(name, start, end, &items);
+  if (status.IsSuccess() && !items.empty()) {
+    for (auto &item : items) {
+      (*unsupervised_eval_item_pbs).push_back(item);
+    }
+  }
+}
+
+void Summary::reset_unsupervised_eval(size_t start, size_t end) {
+  auto client = DistributedCacheLoader::Instance().GetOneClient();
+  if (client == nullptr) {
+    MS_LOG_WARNING << "Get redis client failed";
+    return;
+  }
+  auto name = cache::RedisKeys::GetInstance().ClientUnsupervisedEvalHash();
+  auto status = client->LTrim(name, start, end);
+  if (!status.IsSuccess()) {
+    MS_LOG_WARNING << "Get redis client failed";
+    return;
+  }
+}
+
 bool Summary::TryLockSummary(bool *has_finished, bool *has_locked) {
   if (!has_finished || !has_locked) {
     return false;

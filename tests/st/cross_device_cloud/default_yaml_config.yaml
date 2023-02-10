@@ -27,6 +27,7 @@ summary:
   continuous_failure_times: 10
   data_rate_dir: "."
   participation_time_level: "5,15"
+  unsupervised_clienrt_num: 2000
 
 encrypt:
   encrypt_type: NOT_ENCRYPT

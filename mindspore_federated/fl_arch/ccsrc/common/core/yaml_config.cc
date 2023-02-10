@@ -132,6 +132,7 @@ void YamlConfig::InitSummaryConfig() {
   Get("summary.metrics_file", SET_STR_CXT(set_metrics_file), true);
   Get("summary.failure_event_file", SET_STR_CXT(set_failure_event_file), true);
   Get("summary.data_rate_dir", SET_STR_CXT(set_data_rate_dir), false);
+  Get("summary.unsupervised_client_num", SET_INT_CXT(set_unsupervised_client_num), false, CheckInt(1, GE));
 }
 
 void YamlConfig::InitEncryptConfig() {

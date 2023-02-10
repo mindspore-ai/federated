@@ -30,6 +30,7 @@
 #include "distributed_cache/counter.h"
 #include "distributed_cache/hyper_params.h"
 #include "distributed_cache/summary.h"
+#include "distributed_cache/unsupervised_eval.h"
 
 namespace mindspore {
 namespace fl {
@@ -125,6 +126,8 @@ bool Iteration::ReInitForUpdatingHyperParams(const std::vector<RoundConfig> &upd
 void Iteration::set_loss(float loss) { loss_ = loss; }
 
 void Iteration::set_accuracy(float accuracy) { accuracy_ = accuracy; }
+
+void Iteration::set_unsupervised_eval(float unsupervised_eval) { unsupervised_eval_ = unsupervised_eval; }
 
 void Iteration::StartNewInstance() {
   ModelStore::GetInstance().Reset();
@@ -239,6 +242,42 @@ void Iteration::GetAllSummaries() {
     loss_ = metrics_loss;
     accuracy_ = metrics_accuracy;
   }
+  SummarizeUnsupervisedEval();
+}
+
+void Iteration::SummarizeUnsupervisedEval() {
+  std::vector<std::string> all_eval_items;
+  size_t unsupervised_client_num = FLContext::instance()->unsupervised_client_num();
+  cache::Summary::Instance().GetUnsupervisedEvalItems(&all_eval_items, 0, unsupervised_client_num - 1);
+  if (all_eval_items.empty()) {
+    return;
+  }
+  if (all_eval_items.size() < unsupervised_client_num) {
+    MS_LOG_INFO << "The all unsupervised eval items does not reach the unsupervised client threshold "
+                << unsupervised_client_num << ", which is " << all_eval_items.size();
+    return;
+  }
+
+  std::vector<std::vector<float>> group_ids;
+  std::vector<size_t> labels;
+  for (auto &item : all_eval_items) {
+    UnsupervisedEvalItem unsupervised_eval_item_pb;
+    auto ret = unsupervised_eval_item_pb.ParseFromString(item);
+    if (!ret) {
+      MS_LOG_WARNING << "Parse summary info failed";
+      continue;
+    }
+    std::vector<float> group_id;
+    for (int i = 0; i < unsupervised_eval_item_pb.eval_data_size(); i++) {
+      group_id.push_back(unsupervised_eval_item_pb.eval_data(i));
+    }
+    auto label = cache::UnsupervisedEval::Instance().cluster_argmax(group_id);
+    labels.push_back(label);
+    group_ids.push_back(group_id);
+  }
+  float unsupervised_eval = cache::UnsupervisedEval::Instance().calinski_harabasz_score(group_ids, labels);
+  set_unsupervised_eval(unsupervised_eval);
+  MS_LOG_INFO << "The unsupervised eval computed successfully which value is " << unsupervised_eval_;
 }
 
 bool Iteration::SummarizeIteration() {
@@ -259,6 +298,7 @@ bool Iteration::SummarizeIteration() {
   metrics.set_accuracy(accuracy_);
   metrics.set_round_client_num_map(round_client_num_map_);
   metrics.set_iteration_result(is_iteration_valid_);
+  metrics.set_unsupervised_eval(unsupervised_eval_);
 
   if (complete_time_.time_stamp < start_time_.time_stamp) {
     MS_LOG(ERROR) << "The complete_timestamp_: " << complete_time_.time_stamp
@@ -370,6 +410,9 @@ void Iteration::Reset() {
   round_client_num_map_.clear();
   set_loss(0.0f);
   set_accuracy(0.0f);
+  set_unsupervised_eval(0.0f);
+  size_t unsupervised_client_num = FLContext::instance()->unsupervised_client_num();
+  cache::Summary::reset_unsupervised_eval(0, unsupervised_client_num - 1);
   size_t &total_data_size = LocalMetaStore::GetInstance().mutable_value<size_t>(kCtxFedAvgTotalDataSize);
   total_data_size = 0;
   auto iteration_num = cache::InstanceContext::Instance().iteration_num();

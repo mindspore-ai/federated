@@ -584,6 +584,45 @@ CacheStatus RedisClient::Incr(const std::string &key, uint64_t *new_value) {
   return kCacheSuccess;
 }
 
+CacheStatus RedisClient::LPush(const std::string &key, const std::string &value) {
+  RedisReply reply = RunCommand({"LPUSH", key, value});
+  if (!reply.IsValid()) {
+    MS_LOG(WARNING) << "Reply invalid: " << reply.GetError();
+    return kCacheNetErr;
+  }
+  uint64_t ret_value = 0;
+  if (!reply.GetInteger(&ret_value)) {
+    MS_LOG(WARNING) << "Failed to call LPush key:" << key;
+    return kCacheInnerErr;
+  }
+  if (ret_value == 0) {
+    return kCacheInnerErr;
+  }
+  return kCacheSuccess;
+}
+
+CacheStatus RedisClient::LRange(const std::string &key, size_t start, size_t end, std::vector<std::string> *items) {
+  RedisReply reply = RunCommand({"LRANGE", key, std::to_string(start), std::to_string(end)});
+  if (!reply.IsValid()) {
+    MS_LOG(WARNING) << "Reply invalid: " << reply.GetError();
+    return kCacheNetErr;
+  }
+  if (!reply.GetArray(items)) {
+    MS_LOG(WARNING) << "Failed to call LRange " << key;
+    return kCacheInnerErr;
+  }
+  return kCacheSuccess;
+}
+
+CacheStatus RedisClient::LTrim(const std::string &key, size_t start, size_t end) {
+  RedisReply reply = RunCommand({"LTRIM", key, std::to_string(start), std::to_string(end)});
+  if (!reply.IsValid()) {
+    MS_LOG(WARNING) << "Reply invalid: " << reply.GetError();
+    return kCacheNetErr;
+  }
+  return kCacheSuccess;
+}
+
 RedisDistributedCache::~RedisDistributedCache() {
   client_pool_.clear();
   if (ssl_context_ != nullptr) {

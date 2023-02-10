@@ -94,6 +94,8 @@ class UpdateModelKernel : public RoundKernel {
   void CheckAndTransPara(const std::string &participation_time_level);
 
   bool VerifyUpdateModelRequest(const schema::RequestUpdateModel *update_model_req);
+  bool VerifyUnsupervisedEval(const schema::RequestUpdateModel *update_model_req);
+  bool UpdateClientUnsupervisedEval(const schema::RequestUpdateModel *update_model_req);
 
   // Check upload mode
   bool IsCompress(const schema::RequestUpdateModel *update_model_req);

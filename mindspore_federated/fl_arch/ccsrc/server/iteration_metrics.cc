@@ -59,6 +59,7 @@ bool IterationMetrics::Summarize() {
   js_[kIterExecutionTime] = iteration_time_cost_;
   js_[kClientVisitedInfo] = round_client_num_map_;
   js_[kIterationResult] = iteration_result_ ? "success" : "fail";
+  js_[kMetricsUnsupervisedEval] = unsupervised_eval_;
 
   metrics_file_ << js_ << "\n";
   (void)metrics_file_.flush();
@@ -102,6 +103,8 @@ void IterationMetrics::SetStartTime(const Time &start_time) { start_time_ = star
 void IterationMetrics::SetEndTime(const Time &end_time) { end_time_ = end_time; }
 
 void IterationMetrics::SetInstanceName(const std::string &instance_name) { instance_name_ = instance_name; }
+
+void IterationMetrics::set_unsupervised_eval(const float &unsupervised_eval) { unsupervised_eval_ = unsupervised_eval; }
 }  // namespace server
 }  // namespace fl
 }  // namespace mindspore

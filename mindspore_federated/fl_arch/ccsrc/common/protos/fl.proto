@@ -110,3 +110,8 @@ message IterationSummaryMsg {
   float upload_accuracy = 17;
   uint64 eval_data_size = 18;
 }
+
+message UnsupervisedEvalItem {
+  string fl_id = 1;
+  repeated float eval_data = 2;
+}

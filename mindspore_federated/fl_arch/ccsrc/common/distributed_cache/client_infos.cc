@@ -36,6 +36,11 @@ CacheStatus ClientInfos::AddPbItem(const std::string &name, const std::string &f
   return AddPbItem(name, fl_id, pb_value);
 }
 
+CacheStatus ClientInfos::AddPbItemList(const std::string &name, const google::protobuf::Message &value) {
+  auto pb_value = value.SerializeAsString();
+  return AddPbItemList(name, pb_value);
+}
+
 CacheStatus ClientInfos::AddPbItem(const std::string &name, const std::string &fl_id, const std::string &value) {
   auto client = GetOneClient();
   if (client == nullptr) {
@@ -49,6 +54,21 @@ CacheStatus ClientInfos::AddPbItem(const std::string &name, const std::string &f
     return ret;
   }
   return client->Expire(name, Timer::iteration_expire_time_in_seconds());
+}
+
+CacheStatus ClientInfos::AddPbItemList(const std::string &name, const std::string &value) {
+  auto client = GetOneClient();
+  if (client == nullptr) {
+    THROW_CACHE_UNAVAILABLE;
+  }
+  auto ret = client->LPush(name, value);
+  if (ret == kCacheNetErr) {
+    THROW_CACHE_UNAVAILABLE;
+  }
+  if (!ret.IsSuccess()) {
+    return ret;
+  }
+  return client->Expire(name, Timer::unsupervised_data_expire_time_in_seconds());
 }
 
 bool ClientInfos::HasPbItem(const std::string &name, const std::string &fl_id) {
@@ -375,6 +395,11 @@ CacheStatus ClientInfos::GetClientNoises(ClientNoises *noises) {
   return GetPbValue(key, noises);
 }
 
+CacheStatus ClientInfos::AddUnsupervisedEvalItem(const UnsupervisedEvalItem &unsupervised_eval_item) {
+  auto key = RedisKeys::GetInstance().ClientUnsupervisedEvalHash();
+  return AddPbItemList(key, unsupervised_eval_item);
+}
+
 bool ClientInfos::ResetOnNewIteration() {
   std::vector<std::string> del_keys = {
     RedisKeys::GetInstance().ClientDeviceMetasHash(),    RedisKeys::GetInstance().ClientKeyAttestationHash(),
@@ -383,8 +408,7 @@ bool ClientInfos::ResetOnNewIteration() {
     RedisKeys::GetInstance().ClientExchangeKeysFlSet(),  RedisKeys::GetInstance().ClientGetKeysFlSet(),
     RedisKeys::GetInstance().ClientShareSecretsFlSet(),  RedisKeys::GetInstance().ClientGetSecretsFlSet(),
     RedisKeys::GetInstance().ClientUpdateModelFlSet(),   RedisKeys::GetInstance().ClientGetUpdateModelFlSet(),
-    RedisKeys::GetInstance().ClientReconstructFlSet(),
-  };
+    RedisKeys::GetInstance().ClientReconstructFlSet()};
   auto client = GetOneClient();
   if (client == nullptr) {
     MS_LOG_ERROR << "Get redis client failed";
