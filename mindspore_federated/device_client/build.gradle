@@ -175,7 +175,9 @@ task packFLJarX86(type: Jar, dependsOn: ['compileJava']) {
     from('build/classes/java/main')
     from {
         configurations.compile.collect {
-            it.isDirectory() ? it : zipTree(it)
+            if (!it.name.contains("mindspore-lite-java.jar")) {
+                it.isDirectory() ? it : zipTree(it)
+            }
         }
     }
     destinationDirectory = file('build/libs/jarX86')
@@ -204,12 +206,9 @@ task packFLJarX86UT(type: Jar, dependsOn: ['compileTestJava']) {
     from('../linux_x86/build/classes/java/main')
     from {
         configurations.testCompile.collect {
-            it.isDirectory() ? it : zipTree(it)
-        }
-    }
-    from {
-        configurations.compileOnly.collect {
-            it.isDirectory() ? it : zipTree(it)
+            if (!it.name.contains("mindspore-lite-java.jar")) {
+                it.isDirectory() ? it : zipTree(it)
+            }
         }
     }
     destinationDirectory = file('build/libs/jarX86UT')
