@@ -190,13 +190,13 @@ class TestAdsTagTrain(BaseCase):
                             "network.group_27_0_layer.bias"
 
         start_client_cmd = "cd {}/../client_script ;LD_LIBRARY_PATH={} python fl_client_run.py --jarPath={}  " \
-                           "--case_jarPath={} --train_dataset={} --test_dataset={} --vocal_file={} " \
+                           "--case_jarPath={} --lite_jarPath={} --train_dataset={} --test_dataset={} --vocal_file={} " \
                            "--ids_file={} --flName={} --train_model_path={} --infer_model_path={} " \
                            "--ssl_protocol={}  --deploy_env={} --domain_name={} --cert_path={} " \
                            "--server_num={} --client_num={} --use_elb={} --thread_num={} --server_mode={} " \
                            "--batch_size={} --task={} --train_weight_name={} --infer_weight_name={} " \
                            "--name_regex={}" \
-            .format(self.server_path, self.ld_library_path, self.frame_jar_path, self.case_jar_path,
+            .format(self.server_path, self.ld_library_path, self.frame_jar_path, self.case_jar_path, self.lite_jar_path,
                     self.train_dataset, "null", "null", "null", FLNAME, self.train_model_path,
                     self.infer_model_path, self.ssl_protocol, self.deploy_env, self.domain_name,
                     self.cert_path, self.server_num, self.client_num, self.use_elb, self.thread_num,
@@ -470,13 +470,13 @@ class TestAdsTagInference(BaseCase):
                             "network.group_27_0_layer.bias"
 
         start_client_cmd = "cd {}/../client_script ;LD_LIBRARY_PATH={} python fl_client_run.py --jarPath={}  " \
-                           "--case_jarPath={} --train_dataset={} --test_dataset={} --vocal_file={} " \
+                           "--case_jarPath={} --lite_jarPath={} --train_dataset={} --test_dataset={} --vocal_file={} " \
                            "--ids_file={} --flName={} --train_model_path={} --infer_model_path={} " \
                            "--ssl_protocol={}  --deploy_env={} --domain_name={} --cert_path={} " \
                            "--server_num={} --client_num={} --use_elb={} --thread_num={} --server_mode={} " \
                            "--batch_size={} --task={} --train_weight_name={} --infer_weight_name={} " \
                            "--name_regex={}" \
-            .format(self.server_path, self.ld_library_path, self.frame_jar_path, self.case_jar_path,
+            .format(self.server_path, self.ld_library_path, self.frame_jar_path, self.case_jar_path, self.lite_jar_path,
                     self.train_dataset, self.test_dataset, "null", "null",
                     FLNAME, self.train_model_path, self.infer_model_path, self.ssl_protocol, self.deploy_env,
                     self.domain_name, self.cert_path, self.server_num, self.client_num, self.use_elb, self.thread_num,

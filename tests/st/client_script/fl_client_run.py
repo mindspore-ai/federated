@@ -21,6 +21,7 @@ import shutil
 parser = argparse.ArgumentParser(description="Run TestClient.java case")
 parser.add_argument("--jarPath", type=str, default="mindspore-lite-java-flclient.jar")  # must be absolute path
 parser.add_argument("--case_jarPath", type=str, default="case_jar/flclient_models.jar")  # must be absolute path
+parser.add_argument("--lite_jarPath", type=str, default="case_jar/mindspore-lite-java.jar")  # must be absolute path
 parser.add_argument("--train_dataset", type=str, default="client/train.txt")  # must be absolute path
 parser.add_argument("--test_dataset", type=str, default="client/eval.txt")  # must be absolute path
 parser.add_argument("--vocal_file", type=str, default="client/vocab.txt")  # must be absolute path
@@ -57,6 +58,7 @@ args, _ = parser.parse_known_args()
 
 jar_path = args.jarPath
 case_jar_path = args.case_jarPath
+lite_jar_path = args.lite_jarPath
 
 train_dataset = args.train_dataset
 test_dataset = args.test_dataset
@@ -156,7 +158,7 @@ for i in range(client_num):
     cmd_client += "cd ${execute_path}/client_" + task + str(i) + "/ || exit &&"
 
     MAIN_CLASS_NAME = "com.mindspore.flclient.SyncFLJob"
-    java_class_path = "-cp " + case_jar_path + ":" + jar_path
+    java_class_path = "-cp " + case_jar_path + ":" + lite_jar_path + ":" + jar_path
     cmd_client += "java " + java_class_path + " "
     cmd_client += MAIN_CLASS_NAME + " "
     cmd_client += train_path + " "

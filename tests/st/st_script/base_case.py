@@ -51,6 +51,7 @@ class BaseCase:
 
     # ENV for Client
     lite_lib_path = os.path.join(script_path, "libs")
+    lite_jar_path = os.path.join(script_path, "libs", "mindspore-lite-java.jar")
     ld_library_path = ""
     frame_jar_path = os.path.join(script_path, "frame_jar", os.path.basename(fl_cli_frame_jar))
     case_jar_path = ""
