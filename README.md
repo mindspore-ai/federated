@@ -8,6 +8,5 @@ pip install https://ms-release.obs.cn-north-4.myhuaweicloud.com/{MindSpore-Versi
 
 | MindSpore Federated Version |                          Branch                          | MindSpore version |
 |:---------------------------:|:--------------------------------------------------------:|:-----------------:|
-|            0.1.0            | [r0.1](https://gitee.com/mindspore/federated/tree/r0.1/) |       1.7.0       |
 |            0.1.0            | [r0.1](https://gitee.com/mindspore/federated/tree/r0.1/) |       1.8.0       |
 |            0.1.0            | [r0.1](https://gitee.com/mindspore/federated/tree/r0.1/) |       1.9.0       |
