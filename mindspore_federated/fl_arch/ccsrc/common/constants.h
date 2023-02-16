@@ -174,6 +174,9 @@ constexpr char kDSEncryptType[] = "SIGNDS";
 constexpr char kNoCompressType[] = "NO_COMPRESS";
 constexpr auto kDiffSparseQuant = "DIFF_SPARSE_QUANT";
 constexpr auto kQuant = "QUANT";
+constexpr auto kNotEvalType = "NOT_EVAL";
+constexpr auto kSilhouetteScoreType = "SILHOUETTE_SCORE";
+constexpr auto kCalinskiHarabaszScoreType = "CALINSKI_HARABASZ_SCORE";
 
 constexpr auto kUpdateModelKernel = "updateModel";
 

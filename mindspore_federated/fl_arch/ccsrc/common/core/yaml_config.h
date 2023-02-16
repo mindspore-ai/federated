@@ -56,7 +56,6 @@ struct SummaryConfig {
   std::string metrics_file = "metrics.json";
   std::string failure_event_file = "event.txt";
   std::string data_rate_dir = "";
-  uint64_t unsupervised_client_num = 1000;
 };
 
 enum CompareOp {
@@ -165,6 +164,7 @@ class YamlConfig {
   void InitClientVerifyConfig();
   void InitClientConfig();
   void CheckYamlConfig();
+  void InitUnsupervisedConfig();
 
   std::unordered_map<std::string, YamlConfigItem> items_;
   std::string yaml_config_file_;

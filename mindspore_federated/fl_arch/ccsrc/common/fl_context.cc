@@ -329,9 +329,9 @@ const std::string &FLContext::data_rate_dir() { return data_rate_dir_; }
 void FLContext::set_tcp_server_ip(const std::string &tcp_server_ip) { tcp_server_ip_ = tcp_server_ip; }
 std::string FLContext::tcp_server_ip() const { return tcp_server_ip_; }
 
-void FLContext::set_unsupervised_client_num(uint64_t unsupervised_client_num) {
-  unsupervised_client_num_ = unsupervised_client_num;
+void FLContext::set_unsupervised_config(const UnsupervisedConfig &unsupervised_config) {
+  unsupervised_config_ = unsupervised_config;
 }
-uint64_t FLContext::unsupervised_client_num() const { return unsupervised_client_num_; }
+UnsupervisedConfig FLContext::unsupervised_config() const { return unsupervised_config_; }
 }  // namespace fl
 }  // namespace mindspore

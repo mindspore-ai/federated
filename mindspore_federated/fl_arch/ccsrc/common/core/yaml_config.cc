@@ -30,6 +30,7 @@ void YamlConfig::Load(const std::unordered_map<std::string, YamlConfigItem> &ite
   if (role == kEnvRoleOfServer) {
     InitRoundConfig();
     InitSummaryConfig();
+    InitUnsupervisedConfig();
     InitEncryptConfig();
     InitCompressionConfig();
     InitClientVerifyConfig();
@@ -132,7 +133,21 @@ void YamlConfig::InitSummaryConfig() {
   Get("summary.metrics_file", SET_STR_CXT(set_metrics_file), true);
   Get("summary.failure_event_file", SET_STR_CXT(set_failure_event_file), true);
   Get("summary.data_rate_dir", SET_STR_CXT(set_data_rate_dir), false);
-  Get("summary.unsupervised_client_num", SET_INT_CXT(set_unsupervised_client_num), false, CheckInt(1, GE));
+}
+
+void YamlConfig::InitUnsupervisedConfig() {
+  UnsupervisedConfig unsupervised_config;
+  Get("unsupervised.cluster_client_num", &unsupervised_config.cluster_client_num, false, CheckInt(1, GE));
+  Get("unsupervised.eval_type", &unsupervised_config.eval_type, false,
+      {kNotEvalType, kSilhouetteScoreType, kCalinskiHarabaszScoreType});
+
+  if (unsupervised_config.eval_type != kNotEvalType && unsupervised_config.cluster_client_num <= 0) {
+    MS_LOG(EXCEPTION) << "Cluster client num is <= 0 when unsupervised eval mode is opened.";
+  }
+
+  MS_LOG(INFO) << "cluster_client_num is " << unsupervised_config.cluster_client_num << ", eval_type is "
+               << unsupervised_config.eval_type;
+  FLContext::instance()->set_unsupervised_config(unsupervised_config);
 }
 
 void YamlConfig::InitEncryptConfig() {

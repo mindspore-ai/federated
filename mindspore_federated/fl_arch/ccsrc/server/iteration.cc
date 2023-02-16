@@ -246,18 +246,18 @@ void Iteration::GetAllSummaries() {
 }
 
 void Iteration::SummarizeUnsupervisedEval() {
+  std::string eval_type = FLContext::instance()->unsupervised_config().eval_type;
+  if (eval_type == kNotEvalType) {
+    return;
+  }
   std::vector<std::string> all_eval_items;
-  size_t unsupervised_client_num = FLContext::instance()->unsupervised_client_num();
-  cache::Summary::Instance().GetUnsupervisedEvalItems(&all_eval_items, 0, unsupervised_client_num - 1);
-  if (all_eval_items.empty()) {
-    return;
-  }
-  if (all_eval_items.size() < unsupervised_client_num) {
+  size_t cluster_client_num = FLContext::instance()->unsupervised_config().cluster_client_num;
+  cache::Summary::Instance().GetUnsupervisedEvalItems(&all_eval_items, 0, cluster_client_num - 1);
+  if (all_eval_items.empty() || all_eval_items.size() < cluster_client_num) {
     MS_LOG_INFO << "The all unsupervised eval items does not reach the unsupervised client threshold "
-                << unsupervised_client_num << ", which is " << all_eval_items.size();
+                << cluster_client_num << ", which is " << all_eval_items.size();
     return;
   }
-
   std::vector<std::vector<float>> group_ids;
   std::vector<size_t> labels;
   for (auto &item : all_eval_items) {
@@ -271,13 +271,14 @@ void Iteration::SummarizeUnsupervisedEval() {
     for (int i = 0; i < unsupervised_eval_item_pb.eval_data_size(); i++) {
       group_id.push_back(unsupervised_eval_item_pb.eval_data(i));
     }
-    auto label = cache::UnsupervisedEval::Instance().cluster_argmax(group_id);
+    auto label = cache::UnsupervisedEval::Instance().clusterArgmax(group_id);
     labels.push_back(label);
     group_ids.push_back(group_id);
   }
-  float unsupervised_eval = cache::UnsupervisedEval::Instance().calinski_harabasz_score(group_ids, labels);
+  float unsupervised_eval = cache::UnsupervisedEval::Instance().clusterEvaluate(group_ids, labels, eval_type);
   set_unsupervised_eval(unsupervised_eval);
-  MS_LOG_INFO << "The unsupervised eval computed successfully which value is " << unsupervised_eval_;
+  MS_LOG_INFO << "The unsupervised eval computed successfully and value is " << unsupervised_eval_ << ", eval type is "
+              << eval_type;
 }
 
 bool Iteration::SummarizeIteration() {
@@ -411,8 +412,11 @@ void Iteration::Reset() {
   set_loss(0.0f);
   set_accuracy(0.0f);
   set_unsupervised_eval(0.0f);
-  size_t unsupervised_client_num = FLContext::instance()->unsupervised_client_num();
-  cache::Summary::reset_unsupervised_eval(0, unsupervised_client_num - 1);
+  std::string eval_type = FLContext::instance()->unsupervised_config().eval_type;
+  if (eval_type != kNotEvalType) {
+    size_t cluster_client_num = FLContext::instance()->unsupervised_config().cluster_client_num;
+    cache::Summary::reset_unsupervised_eval(0, cluster_client_num - 1);
+  }
   size_t &total_data_size = LocalMetaStore::GetInstance().mutable_value<size_t>(kCtxFedAvgTotalDataSize);
   total_data_size = 0;
   auto iteration_num = cache::InstanceContext::Instance().iteration_num();
