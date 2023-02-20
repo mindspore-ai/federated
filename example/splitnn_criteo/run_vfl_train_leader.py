@@ -24,9 +24,11 @@ from mindspore import set_seed
 from mindspore import context
 from mindspore_federated import FLModel, FLYamlData
 from mindspore_federated.privacy import LabelDP
-from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig, CompressConfig
-from wide_and_deep import LeaderTopNet, LeaderTopLossNet, LeaderTopEvalNet, LeaderBottomNet, LeaderBottomLossNet, \
-    AUCMetric
+from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, \
+    ServerConfig, CompressConfig
+from wide_and_deep import WideDeepModel, BottomLossNet, LeaderTopNet, LeaderTopLossNet, LeaderTopEvalNet, \
+     LeaderTeeNet, LeaderTeeLossNet, LeaderTopAfterTeeNet, LeaderTopAfterTeeLossNet, LeaderTopAfterTeeEvalNet, \
+     AUCMetric
 
 from network_config import config
 from run_vfl_train_local import construct_local_dataset
@@ -52,27 +54,48 @@ class LeaderTrainer:
                                                                        remote_server_config=remote_server_config)
         self.vertical_communicator.launch()
         logging.info('start vfl trainer success')
-        leader_top_yaml_data = FLYamlData(config.leader_top_yaml_path)
-        self.ldp = None
-        if hasattr(leader_top_yaml_data, 'label_dp_eps') and config.label_dp:
-            self.ldp = LabelDP(leader_top_yaml_data.label_dp_eps)
-        leader_bottom_yaml_data = FLYamlData(config.leader_bottom_yaml_path)
 
-        # Leader Bottom Net
-        leader_bottom_eval_net = leader_bottom_base_net = LeaderBottomNet(config)
-        leader_bottom_train_net = LeaderBottomLossNet(leader_bottom_base_net, config)
-        self.leader_bottom_fl_model = FLModel(yaml_data=leader_bottom_yaml_data,
-                                              network=leader_bottom_train_net,
-                                              eval_network=leader_bottom_eval_net)
-        # Leader Top Net
-        leader_top_base_net = LeaderTopNet(config)
-        leader_top_train_net = LeaderTopLossNet(leader_top_base_net, config)
-        leader_top_eval_net = LeaderTopEvalNet(leader_top_base_net)
+        if config.simu_tee:
+            # parse yaml files
+            leader_bottom_yaml_data = FLYamlData(config.leader_bottom_tee_yaml_path)
+            leader_tee_yaml_data = FLYamlData(config.leader_tee_yaml_path)
+            leader_top_yaml_data = FLYamlData(config.leader_top_tee_yaml_path)
+            # Leader Tee Net
+            leader_tee_eval_net = leader_tee_base_net = LeaderTeeNet()
+            leader_tee_train_net = LeaderTeeLossNet(leader_tee_base_net)
+            self.leader_tee_fl_model = FLModel(yaml_data=leader_tee_yaml_data,
+                                               network=leader_tee_train_net,
+                                               eval_network=leader_tee_eval_net)
+            # Leader Top Net
+            leader_top_base_net = LeaderTopAfterTeeNet()
+            leader_top_train_net = LeaderTopAfterTeeLossNet(leader_top_base_net)
+            leader_top_eval_net = LeaderTopAfterTeeEvalNet(leader_top_base_net)
+        else:
+            # parse yaml files
+            leader_bottom_yaml_data = FLYamlData(config.leader_bottom_yaml_path)
+            leader_top_yaml_data = FLYamlData(config.leader_top_yaml_path)
+            # Leader Top Net
+            leader_top_base_net = LeaderTopNet()
+            leader_top_train_net = LeaderTopLossNet(leader_top_base_net)
+            leader_top_eval_net = LeaderTopEvalNet(leader_top_base_net)
+
         self.eval_metric = AUCMetric()
         self.leader_top_fl_model = FLModel(yaml_data=leader_top_yaml_data,
                                            network=leader_top_train_net,
                                            metrics=self.eval_metric,
                                            eval_network=leader_top_eval_net)
+
+        self.ldp = None
+        if hasattr(leader_top_yaml_data, 'label_dp_eps') and config.label_dp:
+            self.ldp = LabelDP(leader_top_yaml_data.label_dp_eps)
+
+        # Leader Bottom Net
+        leader_bottom_eval_net = leader_bottom_base_net = WideDeepModel(config, config.leader_field_size)
+        leader_bottom_train_net = BottomLossNet(leader_bottom_base_net, config)
+        self.leader_bottom_fl_model = FLModel(yaml_data=leader_bottom_yaml_data,
+                                              network=leader_bottom_train_net,
+                                              eval_network=leader_bottom_eval_net)
+
         logging.info('Init leader trainer finish.')
 
     def start(self):
@@ -83,29 +106,52 @@ class LeaderTrainer:
         if config.resume:
             self.leader_top_fl_model.load_ckpt()
             self.leader_bottom_fl_model.load_ckpt()
+            if config.simu_tee:
+                self.leader_tee_fl_model.load_ckpt()
         for epoch in range(config.epochs):
             for step, item in enumerate(train_iter):
+                if self.ldp:
+                    item['label'] = self.ldp(item['label'])
+
                 leader_embedding = self.leader_bottom_fl_model.forward_one_step(item)
                 item.update(leader_embedding)
                 follower_embedding = self.vertical_communicator.receive("follower")
-                leader_out = self.leader_top_fl_model.forward_one_step(item, follower_embedding)
+
+                if config.simu_tee:
+                    tee_embedding = self.leader_tee_fl_model.forward_one_step(item, follower_embedding)
+                    leader_out = self.leader_top_fl_model.forward_one_step(item, tee_embedding)
+                    grad_scale = self.leader_top_fl_model.backward_one_step(item, tee_embedding)
+                    grad_scale = self.leader_tee_fl_model.backward_one_step(item, follower_embedding, sens=grad_scale)
+                    self.leader_tee_fl_model.save_ckpt()
+                    scale_name = 'tee_embedding'
+                else:
+                    leader_out = self.leader_top_fl_model.forward_one_step(item, follower_embedding)
+                    grad_scale = self.leader_top_fl_model.backward_one_step(item, follower_embedding)
+                    scale_name = 'loss'
+
+                grad_scale_follower = {scale_name: OrderedDict(list(grad_scale[scale_name].items())[2:])}
+                self.vertical_communicator.send_tensors("follower", grad_scale_follower)
+                grad_scale_leader = {scale_name: OrderedDict(list(grad_scale[scale_name].items())[:2])}
+                self.leader_bottom_fl_model.backward_one_step(item, sens=grad_scale_leader)
+
                 if step % 100 == 0:
                     logging.info('epoch %d step %d loss: %f', epoch, step, leader_out['loss'])
-                if self.ldp:
-                    item['label'] = self.ldp(item['label'])
-                grad_scale = self.leader_top_fl_model.backward_one_step(item, follower_embedding)
-                grad_scale_follower = {'loss': OrderedDict(list(grad_scale['loss'].items())[2:])}
-                self.vertical_communicator.send_tensors("follower", grad_scale_follower)
-                grad_scale_leader = {'loss': OrderedDict(list(grad_scale['loss'].items())[:2])}
-                self.leader_bottom_fl_model.backward_one_step(item, sens=grad_scale_leader)
-            self.leader_top_fl_model.save_ckpt()
+
             self.leader_bottom_fl_model.save_ckpt()
+            self.leader_top_fl_model.save_ckpt()
+
             for eval_item in eval_iter:
                 leader_embedding = self.leader_bottom_fl_model.forward_one_step(eval_item)
                 follower_embedding = self.vertical_communicator.receive("follower")
                 embedding = follower_embedding
                 embedding.update(leader_embedding)
-                _ = self.leader_top_fl_model.eval_one_step(eval_item, follower_embedding)
+
+                if config.simu_tee:
+                    tee_embedding = self.leader_tee_fl_model.forward_one_step(eval_item, embedding)
+                    _ = self.leader_top_fl_model.eval_one_step(eval_item, tee_embedding)
+                else:
+                    _ = self.leader_top_fl_model.eval_one_step(eval_item, embedding)
+
             auc = self.eval_metric.eval()
             self.eval_metric.clear()
             logging.info('epoch %d auc: %f', epoch, auc)

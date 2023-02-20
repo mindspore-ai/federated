@@ -23,7 +23,7 @@ from mindspore import set_seed
 from mindspore import context
 from mindspore_federated import FLModel, FLYamlData
 from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig, CompressConfig
-from wide_and_deep import FollowerBottomNet, FollowerBottomLossNet
+from wide_and_deep import WideDeepModel, BottomLossNet
 
 from network_config import config
 from run_vfl_train_local import construct_local_dataset
@@ -49,12 +49,18 @@ class FollowerTrainer:
                                                                        remote_server_config=remote_server_config)
         self.vertical_communicator.launch()
         logging.info('start vfl trainer success')
-        follower_bottom_yaml_data = FLYamlData(config.follower_bottom_yaml_path)
-        follower_bottom_eval_net = follower_base_net = FollowerBottomNet(config)
-        follower_bottom_train_net = FollowerBottomLossNet(follower_base_net, config)
+
+        if config.simu_tee:
+            follower_bottom_yaml_data = FLYamlData(config.follower_bottom_tee_yaml_path)
+        else:
+            follower_bottom_yaml_data = FLYamlData(config.follower_bottom_yaml_path)
+
+        follower_bottom_eval_net = follower_base_net = WideDeepModel(config, config.follower_field_size)
+        follower_bottom_train_net = BottomLossNet(follower_base_net, config)
         self.follower_bottom_fl_model = FLModel(yaml_data=follower_bottom_yaml_data,
                                                 network=follower_bottom_train_net,
                                                 eval_network=follower_bottom_eval_net)
+
         logging.info('Init follower trainer finish.')
 
     def start(self):

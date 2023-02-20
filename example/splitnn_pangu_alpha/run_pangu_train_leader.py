@@ -108,39 +108,38 @@ class LeaderTrainer:
         """
         Run leader trainer
         """
-        while True:
-            # forward/backward batch by batch
-            with SummaryRecord('./summary') as summary_record:
-                for epoch in range(50):
-                    for step, item in enumerate(self.train_iter, start=1):
-                        step = epoch * self.train_size + step
-                        embedding_out = self.embedding_fl_model.forward_one_step(item)
-                        if self.edp:
-                            embedding_out['embedding_table'] = self.edp(embedding_out['embedding_table'])
-                        word_table_ts = embedding_out.pop('word_table')
-                        self.vertical_communicator.send_tensors("follower", embedding_out)
-                        backbone_out = self.vertical_communicator.receive("follower")
-                        backbone_out['word_table'] = word_table_ts
-                        logit_out = self.head_fl_model.forward_one_step(item, backbone_out)
+        # forward/backward batch by batch
+        with SummaryRecord('./summary') as summary_record:
+            for epoch in range(50):
+                for step, item in enumerate(self.train_iter, start=1):
+                    step = epoch * self.train_size + step
+                    embedding_out = self.embedding_fl_model.forward_one_step(item)
+                    if self.edp:
+                        embedding_out['embedding_table'] = self.edp(embedding_out['embedding_table'])
+                    word_table_ts = embedding_out.pop('word_table')
+                    self.vertical_communicator.send_tensors("follower", embedding_out)
+                    backbone_out = self.vertical_communicator.receive("follower")
+                    backbone_out['word_table'] = word_table_ts
+                    logit_out = self.head_fl_model.forward_one_step(item, backbone_out)
 
-                        # backward process
-                        head_scale = self.head_fl_model.backward_one_step(item, backbone_out)
-                        word_table_scale_ts = head_scale['output'].pop('word_table')
-                        self.vertical_communicator.send_tensors("follower", head_scale)
-                        backbone_scale = self.vertical_communicator.receive("follower")
-                        head_scale['output']['word_table'] = word_table_scale_ts
-                        backbone_scale.update(head_scale)
-                        self.embedding_fl_model.backward_one_step(item, sens=backbone_scale)
-                        if step % 10 == 0:
-                            summary_record.add_value('scalar', 'output', logit_out['output'])
-                            summary_record.record(step)
-                            logging.info('epoch %d step %d/%d loss: %f', epoch, step - epoch*self.train_size,
-                                         self.train_size, logit_out['output'])
+                    # backward process
+                    head_scale = self.head_fl_model.backward_one_step(item, backbone_out)
+                    word_table_scale_ts = head_scale['output'].pop('word_table')
+                    self.vertical_communicator.send_tensors("follower", head_scale)
+                    backbone_scale = self.vertical_communicator.receive("follower")
+                    head_scale['output']['word_table'] = word_table_scale_ts
+                    backbone_scale.update(head_scale)
+                    self.embedding_fl_model.backward_one_step(item, sens=backbone_scale)
+                    if step % 10 == 0:
+                        summary_record.add_value('scalar', 'output', logit_out['output'])
+                        summary_record.record(step)
+                        logging.info('epoch %d step %d/%d loss: %f', epoch, step - epoch*self.train_size,
+                                     self.train_size, logit_out['output'])
 
-                        if step % 1000 == 0:
-                            # save checkpoint
-                            self.embedding_fl_model.save_ckpt()
-                            self.head_fl_model.save_ckpt()
+                    if step % 1000 == 0:
+                        # save checkpoint
+                        self.embedding_fl_model.save_ckpt()
+                        self.head_fl_model.save_ckpt()
 
 
 if __name__ == '__main__':

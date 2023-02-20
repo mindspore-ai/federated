@@ -20,9 +20,16 @@ thread_num: 0
 # ==============================================================================
 data_path: "./mindrecord/"
 device_target: GPU
-leader_top_yaml_path: './yaml_files/leader_top.yaml'
-leader_bottom_yaml_path: './yaml_files/leader_bottom.yaml'
+# regular yaml files
 follower_bottom_yaml_path: './yaml_files/follower_bottom.yaml'
+leader_bottom_yaml_path: './yaml_files/leader_bottom.yaml'
+leader_top_yaml_path: './yaml_files/leader_top.yaml'
+
+# yaml files involving tee
+follower_bottom_tee_yaml_path: './yaml_files/follower_bottom_tee.yaml'
+leader_bottom_tee_yaml_path: './yaml_files/leader_bottom_tee.yaml'
+leader_tee_yaml_path: './yaml_files/leader_tee.yaml'
+leader_top_tee_yaml_path: './yaml_files/leader_top_tee.yaml'
 
 # ==============================================================================
 # argparse_init 'WideDeep'
@@ -57,9 +64,12 @@ manual_shape: None
 
 # retrain
 resume: False
-pre_trained_follower: ""
-pre_trained_leader: ""
+pre_trained_follower_bottom: ""
+pre_trained_leader_bottom: ""
+pre_trained_leader_tee: ""
+pre_trained_leader_top: ""
 
 # privacy
 label_dp: False
 embedding_tee: False
+simu_tee: False

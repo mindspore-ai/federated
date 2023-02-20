@@ -15,10 +15,8 @@
 """This module provide mechanisms to protect the privacy of the federated learner"""
 
 from .dp import LabelDP, EmbeddingDP
-from .tee import SimuTEE
 
 __all__ = [
     'LabelDP',
-    'SimuTEE',
     'EmbeddingDP',
 ]

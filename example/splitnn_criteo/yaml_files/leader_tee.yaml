@@ -1,0 +1,64 @@
+role: leader
+model: # define the net of vFL party
+  train_net:
+    name: leader_tee_loss_net
+    inputs:
+      - name: leader_wide_embedding
+        source: local
+      - name: leader_deep_embedding
+        source: local
+      - name: follower_wide_embedding
+        source: remote
+      - name: follower_deep_embedding
+        source: remote
+    outputs:
+      - name: tee_embedding
+        destination: local
+  eval_net:
+    name: leader_tee_eval_net
+    inputs:
+      - name: leader_wide_embedding
+        source: local
+      - name: leader_deep_embedding
+        source: local
+      - name: follower_wide_embedding
+        source: remote
+      - name: follower_deep_embedding
+        source: remote
+    outputs:
+      - name: tee_embedding
+        destination: local
+opts: # define ms optimizer
+  - type: SGD
+    grads:
+      - inputs:
+          - name: leader_wide_embedding
+          - name: leader_deep_embedding
+          - name: follower_wide_embedding
+          - name: follower_deep_embedding
+        output:
+          name: tee_embedding
+        sens: loss
+    hyper_parameters:
+      learning_rate: 3.5e-4
+      momentum: 0.8
+      loss_scale: 1024.0
+grad_scalers: # define the grad scale calculator
+  - inputs:
+      - name: leader_wide_embedding
+      - name: leader_deep_embedding
+      - name: follower_wide_embedding
+      - name: follower_deep_embedding
+    output:
+      name: tee_embedding
+    sens: loss
+dataset:
+  name: criteo
+  features:
+    - id_hldr
+    - wt_hldr
+hyper_parameters:
+  epochs: 20
+  batch_size: 16000
+  is_eval: True
+ckpt_path: ./checkpoints

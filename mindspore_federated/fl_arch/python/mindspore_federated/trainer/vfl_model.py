@@ -24,7 +24,6 @@ from mindspore import Tensor, Parameter
 from mindspore import nn, context
 from mindspore.ops import PrimitiveWithInfer, prim_attr_register
 from mindspore.context import ParallelMode
-from mindspore_federated.privacy import SimuTEE
 
 from .vfl_optim import PartyOptimizer, PartyGradScaler, _reorganize_input_data
 
@@ -158,8 +157,6 @@ class FLModel:
 
         self._grad_scalers = self._build_grad_scaler() if self._yaml_data.grad_scalers else None
 
-        self._config_privacy()
-
     def _build_train_network(self):
         """
         Build the network object using the input loss_fn and network.
@@ -194,11 +191,6 @@ class FLModel:
             grad_scalers.append(PartyGradScaler(grad_scaler_yaml, self._train_network, self._train_net_yaml))
         return grad_scalers
 
-    def _config_privacy(self):
-        # init the tee layer
-        if hasattr(self._yaml_data, 'tee_layer'):
-            self.tee_layer = SimuTEE(self._yaml_data.tee_layer)
-
     def eval_one_step(self, local_data_batch: dict = None, remote_data_batch: dict = None):
         """
         Execute the evaluation network using a data batch.
@@ -225,9 +217,6 @@ class FLModel:
             else:
                 raise ValueError('FLModel: missing input data \'%s\'' % input_data['name'])
         input_data_batch = tuple(input_data_batch.values())
-        # if tee_layer is applied, forward one step in tee and update the input data batch
-        if hasattr(self._yaml_data, 'tee_layer'):
-            input_data_batch = self.tee_layer.forward_one_step(*input_data_batch)
         out_tuple = self._eval_network(*input_data_batch)
         if len(self._yaml_data.eval_net_outs) != len(out_tuple):
             raise ValueError('FLModel: output of %s do not match the description of yaml' % self._eval_network.__name__)
@@ -270,10 +259,6 @@ class FLModel:
             else:
                 raise ValueError("FLModel: missing input data \'%s\'" % input_data['name'])
         input_data_batch = tuple(input_data_batch.values())
-        # if tee_layer is applied, forward one step in tee and update the input data batch
-        if hasattr(self._yaml_data, 'tee_layer'):
-            input_data_batch = self.tee_layer.forward_one_step(*input_data_batch[:-1]) + (input_data_batch[-1],)
-
         out_tuple = self._train_network(*input_data_batch)
         out_length = len(out_tuple) if isinstance(out_tuple, tuple) else 1
         if out_length != len(self._yaml_data.train_net_outs):
@@ -306,26 +291,6 @@ class FLModel:
             is the input of the training network, and the value of the value dict is the sense tensor of corresponding
             input.
         """
-        # if tee_layer is applied, forward one step in tee and update the data batch
-        if hasattr(self._yaml_data, 'tee_layer'):
-            data_batch = OrderedDict()
-            for input_data in self._yaml_data.train_net_ins:
-                if input_data['name'] in local_data_batch:
-                    data_batch[input_data['name']] = local_data_batch[input_data['name']]
-                elif input_data['name'] in remote_data_batch:
-                    data_batch[input_data['name']] = remote_data_batch[input_data['name']]
-                else:
-                    raise ValueError("FLModel: missing input data \'%s\'" % input_data['name'])
-            data_batch = dict(zip(list(data_batch.keys())[:-1],
-                                  self.tee_layer.forward_one_step(*list(data_batch.values())[:-1])))
-            for key, _ in data_batch.items():
-                if key in local_data_batch:
-                    local_data_batch[key] = data_batch[key]
-                elif key in remote_data_batch:
-                    remote_data_batch[key] = data_batch[key]
-                else:
-                    raise ValueError("FLModel: unmatched key \'%s\'" % key)
-
         scales = dict()
         if self._grad_scalers:
             for grad_scaler in self._grad_scalers:
@@ -345,13 +310,6 @@ class FLModel:
                         optimizer(*input_data_batch)
                     else:
                         optimizer(*input_data_batch, sens=sens)
-
-        # if tee_layer is applied, backward one step in tee and update the gradient
-        if hasattr(self._yaml_data, 'tee_layer'):
-            key = list(scales.keys())[0]
-            grad_batch = tuple(scales[key].values())
-            out_grad_batch = self.tee_layer.backward_one_step(*grad_batch)
-            scales[key] = OrderedDict(zip(scales[key].keys(), out_grad_batch))
 
         # increase the global step
         self.global_step += 1
