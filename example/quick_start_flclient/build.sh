@@ -15,22 +15,33 @@
 # ============================================================================
 
 BASEPATH=$(cd "$(dirname $0)" || exit; pwd)
+
+FL_THIRD_PKG_PATH="${BASEPATH}/third/"
+MS_LITE_PKG_VER="1.9.0"
+MS_LITE_PKG_NAME="mindspore-lite-${MS_LITE_PKG_VER}-linux-x64"
+MS_PKG_URL="https://ms-release.obs.cn-north-4.myhuaweicloud.com/${MS_LITE_PKG_VER}/MindSpore/lite/release/linux/x86_64/${MS_LITE_PKG_NAME}.tar.gz"
+USE_CACHED_PKG="on"
 display_usage()
 {
     echo -e "Usage:"
-    echo "bash build.sh -r $FL_CLIENT_PATH"
+    echo "bash build.sh -r $FL_CLIENT_JAR_PATH [-c on|off]"
     echo "Options:"
     echo "    -r Absolute path of mindspore-lite-java-flclient.jar"
+    echo "    -c using the cached mindspore lite package or not, while 'on' check package exist or not before auto download"
 }
 
 checkopts()
 {
   FL_CLIENT_PATH=$(ls ${BASEPATH}/../../mindspore_federated/device_client/build/libs/jarX86/mindspore-lite-java-flclient-*jar)
-  while getopts 'r:' opt
+  while getopts 'r:c:' opt
   do
     case "${opt}" in
       r)
         FL_CLIENT_PATH=$OPTARG
+        ;;
+      c)
+        echo "user opt: -c ""${OPTARG}"
+        USE_CACHED_PKG=${LOW_OPT_ARG}
         ;;
       *)
         echo "Unknown option ${opt}!"
@@ -39,6 +50,28 @@ checkopts()
     esac
   done
 }
+
+load_ms_lite_pkg(){
+  # load mindspore lite pkg
+  mkdir -p "$FL_THIRD_PKG_PATH"
+  echo "start load ${MS_LITE_PKG_NAME}  ..."
+  echo "The lite pkg save path is:${FL_THIRD_PKG_PATH}"
+  if [ "X$USE_CACHED_PKG" == "Xon" ] && [ -e "${FL_THIRD_PKG_PATH}/${MS_LITE_PKG_NAME}.tar.gz" ]; then
+    echo "Find cached lite pkg, don't load again"
+    return
+  fi
+
+  rm -f "$FL_THIRD_PKG_PATH"/${MS_LITE_PKG_NAME}.tar.gz
+  rm -rf "$FL_THIRD_PKG_PATH"/${MS_LITE_PKG_NAME:?}
+  wget --no-check-certificate  -P "$FL_THIRD_PKG_PATH" ${MS_PKG_URL}
+  if [ ! -e "${FL_THIRD_PKG_PATH}/${MS_LITE_PKG_NAME}.tar.gz" ] ; then
+    echo "down load ${FL_THIRD_PKG_PATH}/${MS_LITE_PKG_NAME} failed, please download manually or check your net config
+    ..."
+    exit
+  fi
+  echo "load ${MS_LITE_PKG_NAME} success ..."
+}
+
 
 checkopts "$@"
 
@@ -49,6 +82,13 @@ fi
 
 rm -rf lib
 mkdir -p lib
+
+load_ms_lite_pkg
+
+# copy dependency jar to lib
+tar -zxf "${FL_THIRD_PKG_PATH}"/${MS_LITE_PKG_NAME}.tar.gz -C "${FL_THIRD_PKG_PATH}"/
+cp ${FL_THIRD_PKG_PATH}/${MS_LITE_PKG_NAME}/runtime/lib/mindspore-lite-java.jar ${BASEPATH}/lib/
+
 
 jar_base_name=$(basename ${FL_CLIENT_PATH})
 sed -i "s/mindspore-lite-java-flclient.*.jar/${jar_base_name}/" pom.xml
