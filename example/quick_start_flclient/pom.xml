@@ -13,8 +13,14 @@
         <maven.compiler.target>8</maven.compiler.target>
     </properties>
 
-
     <dependencies>
+        <dependency>
+            <groupId>com.mindspore.lite</groupId>
+            <artifactId>mindspore-lite</artifactId>
+            <version>1.0</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/lib/mindspore-lite-java.jar</systemPath>
+        </dependency>
         <dependency>
             <groupId>com.mindspore.flclient</groupId>
             <artifactId>mindspore-lite-flclient</artifactId>
