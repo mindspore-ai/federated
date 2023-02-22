@@ -82,7 +82,8 @@ class FLDataWorker:
               [int32, int64, float32, float64, string, bytes]
             - primary_key(str): The primary key.
               If leader has set a valid value, the value set by follower will not be used.
-            - main_table_files(str): The raw data paths, which must be set in both leader and follower.
+            - main_table_files(Union(list(str), str)): The raw data paths, which must be set in both leader and
+              follower.
             - mysql_host(str): Host where the database server is located.
             - mysql_port(int): MySQL port to use, usually use 3306
             - mysql_database(str): Database to use, None to not use a particular one.

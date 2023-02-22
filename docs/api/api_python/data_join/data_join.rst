@@ -17,7 +17,7 @@ data_join
             第二级字典的key值为字符串类型的”type“，value值为字段对应数据被导出时所保存的类型。
             当前支持的类型包括：["int32", "int64", "float32", "float64", "string", "bytes"]。
           - primary_key (str): 主键名称。leader侧设置的值被使用，follower设置的值无效。
-          - main_table_files (Union(list(str), str): 原始文件路径，必须在leader和follower上都设置。
+          - main_table_files (Union(list(str), str)): 原始文件路径，必须在leader和follower上都设置。
           - mysql_host (str): MySql 服务器地址。
           - mysql_port (int): MySql 服务端口, 通常使用3306。
           - mysql_database (str): MySql数据库名, None 表示不指定。
