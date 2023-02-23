@@ -127,7 +127,7 @@ bool UpdateModelKernel::VerifyUnsupervisedEval(const schema::RequestUpdateModel 
       for (size_t j = 0; j < eval_data_size; j++) {
         if (std::isnan(eval_data_ptr[j]) || std::isinf(eval_data_ptr[j])) {
           MS_LOG(WARNING) << "The upload unsupervised eval data is nan or inf, client fl id is "
-                          << update_model_req->fl_id()->str();;
+                          << update_model_req->fl_id()->str();
           return false;
         }
       }
@@ -456,7 +456,8 @@ ResultCode UpdateModelKernel::UpdateModel(const schema::RequestUpdateModel *upda
   executor_->HandleModelUpdate(feature_map, data_size);
   UpdateClientUploadLoss(update_model_req->upload_loss(), data_size);
   UpdateClientUploadAccuracy(update_model_req->upload_accuracy(), eval_data_size);
-  if (!UpdateClientUnsupervisedEval(update_model_req)) {
+  std::string eval_type = FLContext::instance()->unsupervised_config().eval_type;
+  if (eval_type != kNotEvalType && !UpdateClientUnsupervisedEval(update_model_req)) {
     std::string reason = "Updating client unsupervised eval failed for fl id " + update_model_fl_id;
     MS_LOG(WARNING) << reason;
     BuildUpdateModelRsp(
@@ -755,7 +756,6 @@ bool UpdateModelKernel::UpdateClientUnsupervisedEval(const schema::RequestUpdate
       unsupervised_eval_item_pb.add_eval_data(eval_data_ptr[j]);
     }
   }
-
   auto ret = cache::ClientInfos::GetInstance().AddUnsupervisedEvalItem(unsupervised_eval_item_pb);
   if (!ret.IsSuccess()) {
     return false;

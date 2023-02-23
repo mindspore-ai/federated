@@ -315,9 +315,7 @@ void StartFLJobKernel::StartFLJob(const std::shared_ptr<FBBuilder> &fbb, const D
 }
 
 std::vector<flatbuffers::Offset<schema::FeatureMap>> StartFLJobKernel::BuildParamsRsp(
-  const ModelItemPtr &model_item,
-  const std::string &server_mode,
-  const std::shared_ptr<FBBuilder> &fbb) {
+  const ModelItemPtr &model_item, const std::string &server_mode, const std::shared_ptr<FBBuilder> &fbb) {
   auto aggregation_type = FLContext::instance()->aggregation_type();
   std::vector<flatbuffers::Offset<schema::FeatureMap>> fbs_feature_maps;
   // No need to send weights in cross silo mode if aggregation type is not Scaffold during start fl job stage
@@ -381,6 +379,13 @@ void StartFLJobKernel::BuildStartFLJobRsp(const std::shared_ptr<FBBuilder> &fbb,
     upload_compress_type = schema::CompressType_NO_COMPRESS;
   }
 
+  schema::UnsupervisedEvalFlg fbs_unsupervised_eval_flg;
+  auto eval_type = FLContext::instance()->unsupervised_config().eval_type;
+  if (eval_type != kNotEvalType) {
+    fbs_unsupervised_eval_flg = schema::UnsupervisedEvalFlg_EVAL_ENABLE;
+  } else {
+    fbs_unsupervised_eval_flg = schema::UnsupervisedEvalFlg_EVAL_DISABLE;
+  }
   schema::FLPlanBuilder fl_plan_builder(*(fbb.get()));
   fl_plan_builder.add_fl_name(fbs_fl_name);
   fl_plan_builder.add_server_mode(fbs_server_mode);
@@ -435,6 +440,7 @@ void StartFLJobKernel::BuildStartFLJobRsp(const std::shared_ptr<FBBuilder> &fbb,
   rsp_fl_job_builder.add_compress_feature_map(fbs_compress_feature_maps_vector);
   rsp_fl_job_builder.add_upload_compress_type(upload_compress_type);
   rsp_fl_job_builder.add_upload_sparse_rate(FLContext::instance()->compression_config().upload_sparse_rate);
+  rsp_fl_job_builder.add_unsupervised_eval_flg(fbs_unsupervised_eval_flg);
   auto rsp_fl_job = rsp_fl_job_builder.Finish();
   fbb->Finish(rsp_fl_job);
   return;

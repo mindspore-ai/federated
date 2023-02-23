@@ -27,9 +27,15 @@ class UnsupervisedEval {
     static UnsupervisedEval instance;
     return instance;
   }
-  static size_t cluster_argmax(const std::vector<float> &group_id);
-  static float calinski_harabasz_score(const std::vector<std::vector<float>> &group_ids,
-                                       const std::vector<size_t> &labels);
+
+  static size_t clusterArgmax(const std::vector<float> &group_id);
+  static float calinskiHarabaszScore(const std::vector<std::vector<float>> &group_ids,
+                                     const std::vector<size_t> &labels);
+
+  std::vector<std::vector<float>> euclideanDistanceMatrix(const std::vector<std::vector<float>> &group_ids);
+  float silhouetteScore(const std::vector<std::vector<float>> &data, const std::vector<size_t> &labels);
+  float clusterEvaluate(const std::vector<std::vector<float>> &group_ids, const std::vector<size_t> &labels,
+                        const std::string &eval_type);
 };
 }  // namespace cache
 }  // namespace fl

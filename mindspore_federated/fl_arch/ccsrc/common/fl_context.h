@@ -91,6 +91,13 @@ struct ClientVerifyConfig {
   uint64_t replay_attack_time_diff = 600000;
 };
 
+struct UnsupervisedConfig {
+  // unsupervised cluster client number of federeated learning. Default:1000.
+  uint64_t cluster_client_num = 0;
+  // unsupervised eval type of federeated learning. Default:silhouette_score.
+  std::string eval_type = kNotEvalType;
+};
+
 constexpr char kEnvRole[] = "MS_ROLE";
 constexpr char kEnvRoleOfServer[] = "MS_SERVER";
 constexpr char kEnvRoleOfWorker[] = "MS_WORKER";
@@ -244,8 +251,8 @@ class MS_EXPORT FLContext {
   void set_data_rate_dir(const std::string &data_rate_dir);
   const std::string &data_rate_dir();
 
-  void set_unsupervised_client_num(uint64_t unsupervised_client_num);
-  uint64_t unsupervised_client_num() const;
+  void set_unsupervised_config(const UnsupervisedConfig &unsupervised_config);
+  UnsupervisedConfig unsupervised_config() const;
 
  private:
   FLContext() = default;
@@ -350,9 +357,6 @@ class MS_EXPORT FLContext {
   // The times of iteration continuous failure
   uint32_t continuous_failure_times_ = 10;
 
-  // unsupervised client number of federeated learning.
-  uint64_t unsupervised_client_num_ = 1000;
-
   DistributedCacheConfig distributed_cache_config_;
   SslConfig ssl_config_;
   // server config
@@ -360,6 +364,7 @@ class MS_EXPORT FLContext {
   CompressionConfig compression_config_;
   ClientVerifyConfig client_verify_config_;
   AggregationConfig aggregation_config_;
+  UnsupervisedConfig unsupervised_config_;
 
   std::string metrics_file_ = "metrics.json";
   std::string failure_event_file_ = "event.txt";
