@@ -300,6 +300,28 @@ class WideDeepModel(nn.Cell):
         return wide_out, deep_out
 
 
+class BottomLossNet(nn.Cell):
+    """
+    Train net of the bottom net.
+    Args:
+        net (class): WideDeepModel, which is the bottom net of follower or leader party.
+        config (class): default config info.
+    """
+
+    def __init__(self, net: WideDeepModel, config):
+        super(BottomLossNet, self).__init__(auto_prefix=False)
+        self.net = net
+        self.l2_coef = config.l2_coef
+        self.square = ops.Square()
+        self.reduce_mean_false = ops.ReduceMean(keep_dims=False)
+
+    def construct(self, id_hldr, wt_hldr):
+        wide_embedding, deep_embedding = self.net(id_hldr, wt_hldr)
+        l2_regu = self.reduce_mean_false(
+            self.square(self.net.deep_embeddinglookup.embedding_table)) / 2 * self.l2_coef
+        return wide_embedding, deep_embedding, l2_regu
+
+
 class LeaderTopNet(nn.Cell):
     """
     Top net of the leader party.
@@ -307,11 +329,9 @@ class LeaderTopNet(nn.Cell):
         config (class): default config info.
     """
 
-    def __init__(self, config):
+    def __init__(self, output_dim=1):
         super(LeaderTopNet, self).__init__()
-        self.dense_layer = DenseLayer(4, 1,
-                                      config.weight_bias_init, config.deep_layer_act,
-                                      use_activation=False, convert_dtype=True, drop_out=False)
+        self.dense_layer = nn.Dense(4, output_dim)
         self.concat = ops.Concat(axis=1)
 
     def construct(self, leader_wide_embedding, leader_deep_embedding, follower_wide_embedding, follower_deep_embedding):
@@ -319,6 +339,20 @@ class LeaderTopNet(nn.Cell):
                              follower_wide_embedding, follower_deep_embedding))
         return self.dense_layer(in_ts)
 
+
+class LeaderTopAfterTeeNet(nn.Cell):
+    """
+    Top net behind tee of the leader party.
+    Args:
+        config (class): default config info.
+    """
+
+    def __init__(self):
+        super(LeaderTopAfterTeeNet, self).__init__()
+        self.dense_layer = nn.Dense(2, 1)
+
+    def construct(self, tee_embedding):
+        return self.dense_layer(tee_embedding)
 
 class LeaderTopLossNet(nn.Cell):
     """
@@ -336,6 +370,54 @@ class LeaderTopLossNet(nn.Cell):
     def construct(self, leader_wide_embedding, leader_deep_embedding,
                   follower_wide_embedding, follower_deep_embedding, label):
         out = self.net(leader_wide_embedding, leader_deep_embedding, follower_wide_embedding, follower_deep_embedding)
+        log_loss = self.loss(out, label)
+        loss = self.reduce_mean_false(log_loss)
+        return out, loss
+
+
+class LeaderTeeNet(LeaderTopNet):
+    """
+    Tee simulation net of the leader party.
+    Args:
+        config (class): default config info.
+    """
+    def __init__(self, output_dim=2):
+        super(LeaderTeeNet, self).__init__(output_dim)
+
+
+class LeaderTeeLossNet(nn.Cell):
+    """
+    Train net of the leader party's tee net.
+    Args:
+        net (class): LeaderTeeNet, which is the top tee net of leader party.
+    """
+
+    def __init__(self, net: LeaderTeeNet, auto_prefix=True, flags=None):
+        super().__init__(auto_prefix, flags)
+        self.net = net
+
+    def construct(self, leader_wide_embedding, leader_deep_embedding,
+                  follower_wide_embedding, follower_deep_embedding):
+        tee_embedding = self.net(leader_wide_embedding, leader_deep_embedding,
+                                 follower_wide_embedding, follower_deep_embedding)
+        return tee_embedding
+
+
+class LeaderTopAfterTeeLossNet(nn.Cell):
+    """
+    Train net of the leader party's top net that behind tee.
+    Args:
+        net (class): LeaderTopAfterTeeNet, which is the top net behind tee of leader party.
+    """
+
+    def __init__(self, net: LeaderTopAfterTeeNet, auto_prefix=True, flags=None):
+        super().__init__(auto_prefix, flags)
+        self.net = net
+        self.loss = ops.SigmoidCrossEntropyWithLogits()
+        self.reduce_mean_false = ops.ReduceMean(keep_dims=False)
+
+    def construct(self, tee_embedding, label):
+        out = self.net(tee_embedding)
         log_loss = self.loss(out, label)
         loss = self.reduce_mean_false(log_loss)
         return out, loss
@@ -366,67 +448,25 @@ class LeaderTopEvalNet(nn.Cell):
         return logits, pred_probs
 
 
-class LeaderBottomNet(WideDeepModel):
+class LeaderTopAfterTeeEvalNet(nn.Cell):
     """
-    Bottom net of the leader party.
+    Eval net of the leader party's top net that behind tee, which warps LeaderTopAfterTeeNet.
     Args:
-        config (class): default config info.
+        net (class): LeaderTopAfterTeeNet, which is the top net behind tee of leader party.
     """
 
-    def __init__(self, config):
-        super(LeaderBottomNet, self).__init__(config, config.leader_field_size)
-
-
-class LeaderBottomLossNet(nn.Cell):
-    """
-    Train net of the leader party's bottom net.
-    Args:
-        net (class): WideDeepModel, which is the bottom net of follower party.
-        config (class): default config info.
-    """
-
-    def __init__(self, net: WideDeepModel, config):
-        super(LeaderBottomLossNet, self).__init__(auto_prefix=False)
+    def __init__(self, net: LeaderTopAfterTeeNet):
+        super(LeaderTopAfterTeeEvalNet, self).__init__(auto_prefix=False)
         self.net = net
-        self.l2_coef = config.l2_coef
-        self.square = ops.Square()
-        self.reduce_mean_false = ops.ReduceMean(keep_dims=False)
+        self.sigmoid = ops.Sigmoid()
+        parallel_mode = context.get_auto_parallel_context("parallel_mode")
+        full_batch = context.get_auto_parallel_context("full_batch")
+        is_auto_parallel = parallel_mode in (
+            ParallelMode.SEMI_AUTO_PARALLEL, ParallelMode.AUTO_PARALLEL)
+        if is_auto_parallel and full_batch:
+            self.sigmoid.shard(((1, 1),))
 
-    def construct(self, id_hldr, wt_hldr):
-        leader_wide_embedding, leader_deep_embedding = self.net(id_hldr, wt_hldr)
-        leader_l2_regu = self.reduce_mean_false(
-            self.square(self.net.deep_embeddinglookup.embedding_table)) / 2 * self.l2_coef
-        return leader_wide_embedding, leader_deep_embedding, leader_l2_regu
-
-
-class FollowerBottomNet(WideDeepModel):
-    """
-    Bottom net of the follower party.
-    Args:
-        config (class): default config info.
-    """
-
-    def __init__(self, config):
-        super(FollowerBottomNet, self).__init__(config, config.follower_field_size)
-
-
-class FollowerBottomLossNet(nn.Cell):
-    """
-    Train net of the follower party's bottom net.
-    Args:
-        net (class): WideDeepModel, which is the bottom net of follower party.
-        config (class): default config info.
-    """
-
-    def __init__(self, net: WideDeepModel, config):
-        super(FollowerBottomLossNet, self).__init__(auto_prefix=False)
-        self.net = net
-        self.l2_coef = config.l2_coef
-        self.square = ops.Square()
-        self.reduce_mean_false = ops.ReduceMean(keep_dims=False)
-
-    def construct(self, id_hldr0, wt_hldr0):
-        follower_wide_embedding, follower_deep_embedding = self.net(id_hldr0, wt_hldr0)
-        follower_l2_regu = self.reduce_mean_false(
-            self.square(self.net.deep_embeddinglookup.embedding_table)) / 2 * self.l2_coef
-        return follower_wide_embedding, follower_deep_embedding, follower_l2_regu
+    def construct(self, tee_embedding):
+        logits = self.net(tee_embedding)
+        pred_probs = self.sigmoid(logits)
+        return logits, pred_probs

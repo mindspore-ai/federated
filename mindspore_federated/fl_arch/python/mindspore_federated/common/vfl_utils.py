@@ -166,13 +166,9 @@ class FLYamlData:
                         self.label_dp_eps = eps
                     else:
                         raise ValueError(f'FLYamlData init failed: the value of eps is missing.')
-                if 'TEE' in privacy:
-                    if 'tee_layer' in privacy['TEE']:
-                        self.tee_layer = privacy['TEE']['tee_layer']
                 for scheme in privacy.keys():
-                    if scheme not in ['embedding_dp', 'label_dp', 'TEE']:
-                        raise ValueError(f'FLYamlData init failed: unknown privacy scheme {scheme}. Currently \
-                                            support: label_dp, embedding_dp and TEE')
+                    if scheme not in ('embedding_dp', 'label_dp'):
+                        raise ValueError(f'FLYamlData init failed: unknown privacy scheme {scheme}.')
 
     def _check_opts(self):
         """Verify configurations of optimizers defined in the yaml file."""
@@ -185,7 +181,7 @@ class FLYamlData:
                 if grad_out not in self.train_net_out_names:
                     raise ValueError('optimizer %s config error: contains undefined output %s'
                                      % (opt_config['type'], grad_out))
-                if not isinstance('sens', (str, int, float)):
+                if 'sens' in grad_config and not isinstance(grad_config['sens'], (str, int, float)):
                     raise ValueError('optimizer %s config error: unsupported sens type of grads' % opt_config['type'])
 
     def _check_grad_scalers(self):
