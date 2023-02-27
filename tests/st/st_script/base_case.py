@@ -94,6 +94,9 @@ class BaseCase:
         lib_cp_cmd = "cp {}/mindspore-lite*/runtime/third_party/libjpeg-turbo/lib/* {}" \
             .format(self.temp_path, self.lite_lib_path)
         os.system(lib_cp_cmd)
+        lib_cp_cmd = "cp {}/mindspore-lite*/runtime/third_party/glog/* {}" \
+            .format(self.temp_path, self.lite_lib_path)
+        os.system(lib_cp_cmd)
 
         os.system('rm -rf {}/frame_jar; mkdir -p {}/frame_jar'.format(self.script_path, self.script_path))
         cp_frame_jar = "cp {} {}/frame_jar" \
