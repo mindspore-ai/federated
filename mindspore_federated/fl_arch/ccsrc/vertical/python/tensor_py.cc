@@ -42,5 +42,17 @@ float TensorItemPy::min_val() const { return min_val_; }
 
 void TensorItemPy::set_max_val(const float &max_val) { max_val_ = max_val; }
 float TensorItemPy::max_val() const { return max_val_; }
+
+void TensorItemPy::set_size(const size_t &size) { size_ = size; }
+size_t TensorItemPy::size() const { return size_; }
+
+void TensorItemPy::set_bit_num(const size_t &bit_num) { bit_num_ = bit_num; }
+size_t TensorItemPy::bit_num() const { return bit_num_; }
+
+void TensorItemPy::set_offset(const float &offset) { offset_ = offset; }
+float TensorItemPy::offset() const { return offset_; }
+
+size_t TensorItemPy::raw_data_size() const { return raw_data_.size(); }
+
 }  // namespace fl
 }  // namespace mindspore

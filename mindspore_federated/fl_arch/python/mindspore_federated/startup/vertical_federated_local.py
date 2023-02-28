@@ -1,4 +1,4 @@
-# Copyright 2022 Huawei Technologies Co., Ltd
+# Copyright 2023 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,14 +13,11 @@
 # limitations under the License.
 # ============================================================================
 """Interface for start up vertical federated communicator"""
-from collections import OrderedDict
-
 from mindspore_federated._mindspore_federated import VerticalFederated_
 from mindspore_federated.common import tensor_utils, data_join_utils
 from mindspore_federated.data_join.context import _WorkerRegister
 
 from .server_config import ServerConfig, init_server_config
-from .compress_config import CompressConfig, init_compress_config
 from .ssl_config import SSLConfig, init_vertical_ssl_config, init_vertical_enable_ssl
 
 
@@ -33,7 +30,7 @@ class VerticalFederatedCommunicator:
         remote_server_config (ServerConfig): Configuration of remote http server.
         enable_ssl (bool): whether to enable ssl communication. Default: False.
         ssl_config (SSLConfig): Configuration of ssl encryption. Default: None.
-        compress_config (CompressConfig): Configuration of compress communication. Default: None.
+        compress_configs (dict): Configuration of communication compression. Default: None.
 
     Examples:
         >>> from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
@@ -45,8 +42,8 @@ class VerticalFederatedCommunicator:
         >>> vertical_communicator.data_join_wait_for_start()
     """
 
-    def __init__(self, http_server_config: ServerConfig, remote_server_config: ServerConfig, enable_ssl=False,
-                 ssl_config=None, compress_config=None):
+    def __init__(self, http_server_config: ServerConfig, remote_server_config, enable_ssl=False,
+                 ssl_config=None, compress_configs=None):
         if http_server_config is not None and not isinstance(http_server_config, ServerConfig):
             raise RuntimeError(
                 f"Parameter 'http_server_config' should be instance of ServerConfig,"
@@ -60,19 +57,18 @@ class VerticalFederatedCommunicator:
         if ssl_config is not None and not isinstance(ssl_config, SSLConfig):
             raise RuntimeError(
                 f"Parameter 'ssl_config' should be None or instance of SSLConfig, but got {type(ssl_config)}")
-        if compress_config is not None and not isinstance(compress_config, CompressConfig):
+        if compress_configs is not None and not isinstance(compress_configs, dict):
             raise RuntimeError(
-                f"Parameter 'compress_config' should be None or instance of CompressConfig,"
-                f"but got {type(compress_config)}")
+                f"Parameter 'compress_configs' should be None or instance of dict, but got {type(compress_configs)}")
+
         self._http_server_config = http_server_config
         self._remote_server_config = remote_server_config
         self._enable_ssl = enable_ssl
         self._ssl_config = ssl_config
-        self._compress_config = compress_config
         init_vertical_enable_ssl(self._enable_ssl)
         init_vertical_ssl_config(self._ssl_config)
         init_server_config(self._http_server_config, self._remote_server_config)
-        init_compress_config(self._compress_config)
+        self._compress_configs = compress_configs
 
     def launch(self):
         """
@@ -80,7 +76,7 @@ class VerticalFederatedCommunicator:
         """
         VerticalFederated_.start_vertical_communicator()
 
-    def send_tensors(self, target_server_name: str, tensor_dict: OrderedDict):
+    def send_tensors(self, target_server_name, tensor_dict):
         """
         Send distributed training sensor data.
 
@@ -88,8 +84,8 @@ class VerticalFederatedCommunicator:
             target_server_name (str): Specifies the name of the remote server.
             tensor_dict (OrderedDict): The dict of Tensors to be sent.
         """
-        tensor_list_item_py = tensor_utils.tensor_dict_to_tensor_list_pybind_obj(ts_dict=tensor_dict, name="",
-                                                                                 compress_config=self._compress_config)
+        tensor_list_item_py = tensor_utils.tensor_dict_to_tensor_list_pybind_obj(
+            ts_dict=tensor_dict, name="", compress_configs=self._compress_configs)
         return VerticalFederated_.send_tensor_list(target_server_name, tensor_list_item_py)
 
     def send_register(self, target_server_name: str, worker_register: _WorkerRegister):

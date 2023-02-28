@@ -23,8 +23,7 @@ from mindspore.common.initializer import initializer
 from mindspore.ops import operations as P
 from mindspore.ops import functional as F
 from mindspore.nn import Cell
-from mindspore.nn.transformer.transformer import VocabEmbedding, TransformerEncoder, TransformerEncoderLayer, \
-    AttentionMask
+from mindspore.nn.transformer import VocabEmbedding, TransformerEncoder, TransformerEncoderLayer, AttentionMask
 from mindspore.nn.transformer import MoEConfig
 from mindspore.nn.transformer.layers import _LayerNorm, _Dropout
 from mindspore.nn.metrics import Metric

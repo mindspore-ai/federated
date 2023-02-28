@@ -1,4 +1,4 @@
-# Copyright 2021 Huawei Technologies Co., Ltd
+# Copyright 2023 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,33 +13,36 @@
 # limitations under the License.
 # ============================================================================
 """Compress config for vertical fl communication"""
-from ..common import check_type
+from mindspore._checkparam import Validator, Rel
+from mindspore_federated._mindspore_federated import run_min_max_compress, run_min_max_decompress
+from mindspore_federated._mindspore_federated import run_bit_pack, run_bit_unpack
 
-# pylint: disable=redefined-builtin
+COMPRESS_TYPE_FUNC_DICT = {
+    "min_max": run_min_max_compress,
+    "bit_pack": run_bit_pack,
+}
+
+DECOMPRESS_TYPE_FUNC_DICT = {
+    "min_max": run_min_max_decompress,
+    "bit_pack": run_bit_unpack,
+}
+
+COMPRESS_SUPPORT_NPTYPES = ("double", "float16", "float32", "float64")
+
+NO_COMPRESS_TYPE = "no_compress"
+
+
 class CompressConfig:
     """
     Define the vertical server compress config.
 
     Args:
-        type (str): Compress type for vertical fl communication
-        quant_bits (int): Bits num of quant algorithm
+        compress_type (str): Compress type for vertical fl communication
+        bit_num (int): Bits num of quant algorithm. Default: 8.
     """
 
-    def __init__(self, type, quant_bits):
-        check_type.check_str("type", type)
-        check_type.check_int("quant_bits", quant_bits)
-        self.type = type
-        self.quant_bits = quant_bits
-
-
-def init_compress_config(compress_config):
-    """
-    Initialize vertical communication compress config.
-
-    Args:
-        compress_config (CompressConfig): Compress config of vertical communication.
-    """
-    if compress_config is not None:
-        if not isinstance(compress_config, CompressConfig):
-            raise RuntimeError(f"Parameter 'compress_config' should be instance of CompressConfig,"
-                               f"but got {type(compress_config)}")
+    def __init__(self, compress_type, bit_num=8):
+        Validator.check_string(compress_type, COMPRESS_TYPE_FUNC_DICT.keys(), arg_name="compress_type")
+        Validator.check_int_range(bit_num, 1, 8, Rel.INC_BOTH, arg_name="bit_num")
+        self.compress_type = compress_type
+        self.bit_num = bit_num

@@ -26,7 +26,6 @@ from .trainer.vfl_optim import PartyGradOperation, PartyOptimizer, PartyGradScal
 from .common import vfl_utils, tensor_utils
 from .common.vfl_utils import FLYamlData
 from . import privacy
-from . import compress
 from .data_join.worker import FLDataWorker
 
 __all__ = [
@@ -48,6 +47,5 @@ __all__ = [
     "VerticalFederatedCommunicator",
     "ServerConfig",
     "CompressConfig",
-    "compress",
     "FLDataWorker"
 ]

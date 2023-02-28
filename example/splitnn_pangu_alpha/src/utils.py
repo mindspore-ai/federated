@@ -467,7 +467,8 @@ def add_retrain_params(opt):
     Add parameters about retrain.
     """
     opt.add_argument("--resume",
-                     action='store_true',
+                     type=ast.literal_eval,
+                     default=False,
                      help="Whether to resume the pretrained model.")
     opt.add_argument("--pre_trained_embedding",
                      type=str,

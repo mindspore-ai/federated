@@ -35,6 +35,9 @@ TensorListItemPy ParseTensorListProto(const TensorListProto &tensorListProto) {
     tensor.set_compress_type(item.compress_type());
     tensor.set_min_val(item.min_val());
     tensor.set_max_val(item.max_val());
+    tensor.set_size(item.size());
+    tensor.set_bit_num(item.bit_num());
+    tensor.set_offset(item.offset());
     std::vector<size_t> shape;
     int dims_size = item.dims_size();
     for (int i = 0; i < dims_size; i++) {
@@ -71,6 +74,9 @@ void CreateTensorProto(TensorProto *tensor_proto, const TensorItemPy &tensor, st
   tensor_proto->set_compress_type(tensor.compress_type());
   tensor_proto->set_min_val(tensor.min_val());
   tensor_proto->set_max_val(tensor.max_val());
+  tensor_proto->set_size(tensor.size());
+  tensor_proto->set_bit_num(tensor.bit_num());
+  tensor_proto->set_offset(tensor.offset());
 }
 
 void CreateTensorListProto(TensorListProto *tensor_list_proto, const TensorListItemPy &tensorListItemPy) {

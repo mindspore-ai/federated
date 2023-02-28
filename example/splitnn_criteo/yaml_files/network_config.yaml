@@ -1,7 +1,6 @@
 # communicator
 http_server_address: "127.0.0.1:1086"
 remote_server_address: "127.0.0.1:1087"
-compress: False
 
 # ==============================================================================
 # data join

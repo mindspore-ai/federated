@@ -5,18 +5,28 @@ model: # define the net of vFL party
     inputs:
       - name: embedding_table
         source: remote
+        compress_type: min_max
+        bit_num: 6
       - name: attention_mask
         source: remote
+        compress_type: bit_pack
+        bit_num: 1
     outputs:
       - name: hidden_states
         destination: remote
+        compress_type: min_max
+        bit_num: 6
   eval_net:
     name: leader_eval_net
     inputs:
       - name: embedding_table
         source: remote
+        compress_type: min_max
+        bit_num: 6
       - name: word_table
         source: remote
+        compress_type: min_max
+        bit_num: 6
       - name: input_ids
         source: remote
       - name: current_index

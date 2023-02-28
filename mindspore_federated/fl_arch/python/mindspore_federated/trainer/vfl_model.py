@@ -24,6 +24,7 @@ from mindspore import Tensor, Parameter
 from mindspore import nn, context
 from mindspore.ops import PrimitiveWithInfer, prim_attr_register
 from mindspore.context import ParallelMode
+from ..startup.compress_config import CompressConfig, NO_COMPRESS_TYPE
 
 from .vfl_optim import PartyOptimizer, PartyGradScaler, _reorganize_input_data
 
@@ -125,7 +126,7 @@ class FLModel:
             raise TypeError('FLModel: type of \'network\' is not nn.Cell')
         self._train_network = network
         self._loss_fn = loss_fn
-        if  self._loss_fn is not None:
+        if self._loss_fn is not None:
             self._train_network = self._build_train_network()
 
         if eval_network and not isinstance(eval_network, nn.Cell):
@@ -184,7 +185,7 @@ class FLModel:
 
     def _build_grad_scaler(self):
         """
-        Building the grad scale calulator of the party using the information parsed from the yaml file.
+        Building the grad scale calculator of the party using the information parsed from the yaml file.
         """
         grad_scalers = []
         for grad_scaler_yaml in self._yaml_data.grad_scalers:
@@ -221,7 +222,7 @@ class FLModel:
         if len(self._yaml_data.eval_net_outs) != len(out_tuple):
             raise ValueError('FLModel: output of %s do not match the description of yaml' % self._eval_network.__name__)
         if self._yaml_data.eval_net_gt not in data_batch:
-            raise ValueError('FLModel: the label \'%s\'descripped in the yaml do not exist'
+            raise ValueError('FLModel: the label \'%s\'described in the yaml do not exist'
                              % self._yaml_data.eval_net_gt)
         if self._metrics is None:
             raise AttributeError('FLModel: try to execute eval_one_step but not specify eval_metric')
@@ -232,6 +233,34 @@ class FLModel:
             out[output_data['name']] = out_tuple[idx]
             idx += 1
         return out
+
+    @staticmethod
+    def _get_compress_config(items):
+        """get compress config"""
+        compress_configs = dict()
+        for item in items:
+            if 'name' in item:
+                name = item['name']
+            else:
+                raise ValueError("Field 'name' is missing.")
+            if 'compress_type' in item:
+                compress_type = item['compress_type']
+                if compress_type != NO_COMPRESS_TYPE:
+                    bit_num = item.get('bit_num', 8)
+                    compress_config = CompressConfig(compress_type, bit_num)
+                    compress_configs[name] = compress_config
+        return compress_configs
+
+    def get_compress_configs(self):
+        """get compress configs"""
+        train_in_compress_configs = self._get_compress_config(self._yaml_data.train_net_ins)
+        train_out_compress_configs = self._get_compress_config(self._yaml_data.train_net_outs)
+        eval_in_compress_configs = self._get_compress_config(self._yaml_data.eval_net_ins)
+        eval_out_compress_configs = self._get_compress_config(self._yaml_data.eval_net_outs)
+
+        compress_configs = {**train_in_compress_configs, **train_out_compress_configs,
+                            **eval_in_compress_configs, **eval_out_compress_configs}
+        return compress_configs
 
     def forward_one_step(self, local_data_batch: dict = None, remote_data_batch: dict = None):
         """
