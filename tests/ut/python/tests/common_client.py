@@ -16,9 +16,9 @@
 import requests
 import numpy as np
 from mindspore_fl.schema import (RequestFLJob, ResponseFLJob, ResponseCode, RequestUpdateModel, ResponseUpdateModel,
-                                 FeatureMap, RequestGetModel, ResponseGetModel)
+                                 FeatureMap, RequestGetModel, ResponseGetModel, UnsupervisedEvalItems,
+                                 UnsupervisedEvalItem)
 import flatbuffers
-
 
 server_safemode_rsp = "The cluster is in safemode."
 server_disabled_finished_rsp = "The server's training job is disabled or finished."
@@ -77,8 +77,37 @@ def build_feature_map(builder, feature_map):
         fb_feature_list.append(fb_feature)
 
 
+def build_unsupervised_eval_items(builder, eval_data):
+    """
+    build unsupervised eval items
+    """
+    unsupervised_eval_data_size = len(eval_data)
+    unsupervised_eval_items = []
+    eval_name = builder.CreateString("eval_data")
+    UnsupervisedEvalItem.UnsupervisedEvalItemStartEvalDataVector(builder, unsupervised_eval_data_size)
+    for j in range(0, unsupervised_eval_data_size):
+        builder.PrependFloat32(eval_data[j])
+    fbs_eval_data = builder.EndVector()
+    UnsupervisedEvalItem.UnsupervisedEvalItemStart(builder)
+    UnsupervisedEvalItem.UnsupervisedEvalItemAddEvalData(builder, fbs_eval_data)
+    UnsupervisedEvalItem.UnsupervisedEvalItemAddEvalName(builder, eval_name)
+    fbs_unsupervised_eval_item = UnsupervisedEvalItem.UnsupervisedEvalItemEnd(builder)
+    unsupervised_eval_items.append(fbs_unsupervised_eval_item)
+
+    UnsupervisedEvalItems.UnsupervisedEvalItemsStartEvalItemsVector(builder, 1)
+    for unsupervised_eval_item in unsupervised_eval_items:
+        builder.PrependUOffsetTRelative(unsupervised_eval_item)
+    fbs_unsupervised_eval_items = builder.EndVector()
+
+    UnsupervisedEvalItems.UnsupervisedEvalItemsStart(builder)
+    UnsupervisedEvalItems.UnsupervisedEvalItemsAddEvalItems(builder, fbs_unsupervised_eval_items)
+    unsupervised_end = UnsupervisedEvalItems.UnsupervisedEvalItemsEnd(builder)
+    return unsupervised_end
+
+
 # feature_map: feature_name: np.ndarray
-def build_update_model(fl_name, fl_id, iteration, feature_map, timestamp="2020/11/16/19/18", upload_loss=0.0):
+def build_update_model(fl_name, fl_id, iteration, feature_map, timestamp="2020/11/16/19/18", upload_loss=0.0,
+                       unsupervised_eval_data=None):
     """build update model"""
     builder = flatbuffers.Builder(1024)
     fb_feature_list = []
@@ -101,6 +130,8 @@ def build_update_model(fl_name, fl_id, iteration, feature_map, timestamp="2020/1
     for feature in fb_feature_list:
         builder.PrependUOffsetTRelative(feature)
     fb_feature_map = builder.EndVector()
+    if unsupervised_eval_data:
+        unsupervised_pos = build_unsupervised_eval_items(builder, unsupervised_eval_data)
 
     fb_fl_name = builder.CreateString(fl_name)
     fb_fl_id = builder.CreateString(fl_id)
@@ -112,6 +143,8 @@ def build_update_model(fl_name, fl_id, iteration, feature_map, timestamp="2020/1
     RequestUpdateModel.RequestUpdateModelAddFeatureMap(builder, fb_feature_map)
     RequestUpdateModel.RequestUpdateModelAddTimestamp(builder, fb_timestamp)
     RequestUpdateModel.RequestUpdateModelAddUploadLoss(builder, upload_loss)
+    if unsupervised_eval_data:
+        RequestUpdateModel.RequestUpdateModelAddUnsupervisedEvalItems(builder, unsupervised_pos)
     update_model_req = RequestUpdateModel.RequestUpdateModelEnd(builder)
     builder.Finish(update_model_req)
     return builder.Output()
@@ -119,6 +152,7 @@ def build_update_model(fl_name, fl_id, iteration, feature_map, timestamp="2020/1
 
 class ExceptionPost:
     """ExceptionPost"""
+
     def __init__(self, text):
         self.text = text
 
@@ -158,9 +192,11 @@ def post_start_fl_job(http_address, fl_name, fl_id, data_size=32, enable_ssl=Non
     return feature_map, fl_job_rsp
 
 
-def post_update_model(http_address, fl_name, fl_id, iteration, feature_map, upload_loss=0.0, enable_ssl=None):
+def post_update_model(http_address, fl_name, fl_id, iteration, feature_map, upload_loss=0.0, enable_ssl=None,
+                      unsupervised_eval_data=None):
     """post update model"""
-    buffer = build_update_model(fl_name, fl_id, iteration, feature_map, upload_loss=upload_loss)
+    buffer = build_update_model(fl_name, fl_id, iteration, feature_map, upload_loss=upload_loss,
+                                unsupervised_eval_data=unsupervised_eval_data)
     result = post_msg(http_address, "updateModel", buffer, enable_ssl)
     if isinstance(result, Exception):
         raise result

@@ -111,7 +111,7 @@ def test_fl_server_one_server_one_client_multi_iterations_success():
         expect_feature_map = {"feature_conv": update_feature_map["feature_conv"] / data_size,
                               "feature_bn": update_feature_map["feature_bn"] / data_size,
                               "feature_bn2": update_feature_map["feature_bn2"] / data_size}
-                              # "feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
+        # "feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
         # get model
         client_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
         check_feature_map(expect_feature_map, client_feature_map)
@@ -947,3 +947,53 @@ def test_fl_server_connect_to_killed_server_start_success():
     http_server_address = "127.0.0.1:3002"
     start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address,
                     max_time_sec_wait=20)
+
+
+@fl_test
+def test_fl_server_one_server_two_client_unsupervised_eval_success():
+    """
+    Feature: test fl server one server two client unsupervised eval success
+    Description: Test the unsupervised eval of one server with two client.
+    Expectation: Metrics json file meet the unsupervised eval data.
+    """
+    fl_name = fl_name_with_idx("FlTest")
+    http_server_address = "127.0.0.1:3001"
+    yaml_config_file = f"temp/yaml_{fl_name}_config.yaml"
+    make_yaml_config(fl_name, {}, output_yaml_file=yaml_config_file, start_fl_job_threshold=3, cluster_client_num=3,
+                     eval_type="SILHOUETTE_SCORE")
+
+    np.random.seed(0)
+    feature_map = FeatureMap()
+    init_feature_map = create_default_feature_map()
+    feature_map.add_feature("feature_conv", init_feature_map["feature_conv"], require_aggr=True)
+    feature_map.add_feature("feature_bn", init_feature_map["feature_bn"], require_aggr=True)
+    feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], require_aggr=True)
+    feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
+
+    start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address)
+
+    iteration = 1
+    # start fl job for first fl_id
+    data_size = 10
+    fl_id = "fl_id_xxxx"
+    fl_id2 = "fl_id_xxxx2"
+    fl_id3 = "fl_id_xxxx3"
+
+    start_fl_job_expect_success(http_server_address, fl_name, fl_id, data_size)
+    start_fl_job_expect_success(http_server_address, fl_name, fl_id2, data_size)
+    start_fl_job_expect_success(http_server_address, fl_name, fl_id3, data_size)
+
+    update_feature_map = create_default_feature_map()
+    update_model_expect_success(http_server_address, fl_name, fl_id, iteration, update_feature_map,
+                                unsupervised_eval_data=[3, 2, 1])
+    update_model_expect_success(http_server_address, fl_name, fl_id2, iteration, update_feature_map,
+                                unsupervised_eval_data=[4, 3, 2])
+    update_model_expect_success(http_server_address, fl_name, fl_id3, iteration, update_feature_map,
+                                unsupervised_eval_data=[3, 4, 5])
+
+    _, _ = get_model_expect_success(http_server_address, fl_name, iteration)
+    metrics = read_metrics()
+    assert metrics is not None
+    last_metrics = metrics[-1]
+    print(f"unsupervisedEval :{last_metrics['unsupervisedEval']}")
+    assert "unsupervisedEval" in last_metrics and abs(last_metrics["unsupervisedEval"] - 0.363489) <= 1e-6

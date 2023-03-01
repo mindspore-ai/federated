@@ -56,7 +56,7 @@ class RequestUpdateModel(object):
             x = self._tab.Vector(o)
             x += flatbuffers.number_types.UOffsetTFlags.py_type(j) * 4
             x = self._tab.Indirect(x)
-            from mindspore_fl.schema.FeatureMap import FeatureMap
+            from mindspore.fl.schema.FeatureMap import FeatureMap
             obj = FeatureMap()
             obj.Init(self._tab.Bytes, x)
             return obj
@@ -208,7 +208,25 @@ class RequestUpdateModel(object):
         o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(28))
         return o == 0
 
-def Start(builder): builder.StartObject(13)
+    # RequestUpdateModel
+    def UploadAccuracy(self):
+        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(30))
+        if o != 0:
+            return self._tab.Get(flatbuffers.number_types.Float32Flags, o + self._tab.Pos)
+        return 0.0
+
+    # RequestUpdateModel
+    def UnsupervisedEvalItems(self):
+        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(32))
+        if o != 0:
+            x = self._tab.Indirect(o + self._tab.Pos)
+            from mindspore_fl.schema.UnsupervisedEvalItems import UnsupervisedEvalItems
+            obj = UnsupervisedEvalItems()
+            obj.Init(self._tab.Bytes, x)
+            return obj
+        return None
+
+def Start(builder): builder.StartObject(15)
 def RequestUpdateModelStart(builder):
     """This method is deprecated. Please switch to Start."""
     return Start(builder)
@@ -284,6 +302,14 @@ def StartNameVecVector(builder, numElems): return builder.StartVector(4, numElem
 def RequestUpdateModelStartNameVecVector(builder, numElems):
     """This method is deprecated. Please switch to Start."""
     return StartNameVecVector(builder, numElems)
+def AddUploadAccuracy(builder, uploadAccuracy): builder.PrependFloat32Slot(13, uploadAccuracy, 0.0)
+def RequestUpdateModelAddUploadAccuracy(builder, uploadAccuracy):
+    """This method is deprecated. Please switch to AddUploadAccuracy."""
+    return AddUploadAccuracy(builder, uploadAccuracy)
+def AddUnsupervisedEvalItems(builder, unsupervisedEvalItems): builder.PrependUOffsetTRelativeSlot(14, flatbuffers.number_types.UOffsetTFlags.py_type(unsupervisedEvalItems), 0)
+def RequestUpdateModelAddUnsupervisedEvalItems(builder, unsupervisedEvalItems):
+    """This method is deprecated. Please switch to AddUnsupervisedEvalItems."""
+    return AddUnsupervisedEvalItems(builder, unsupervisedEvalItems)
 def End(builder): return builder.EndObject()
 def RequestUpdateModelEnd(builder):
     """This method is deprecated. Please switch to End."""
