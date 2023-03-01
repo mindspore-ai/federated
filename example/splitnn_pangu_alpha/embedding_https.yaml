@@ -12,10 +12,14 @@ model: # define the net of vFL party
     outputs:
       - name: embedding_table
         destination: remote
+        compress_type: min_max
+        bit_num: 6
       - name: word_table
         destination: local
       - name: attention_mask
         destination: remote
+        compress_type: bit_pack
+        bit_num: 1
   eval_net:
     name: follower_net
     inputs:
@@ -28,6 +32,8 @@ model: # define the net of vFL party
     outputs:
       - name: embedding_table
         destination: remote
+        compress_type: min_max
+        bit_num: 6
 opts: # define ms optimizer
   - type: CustomizedAdam
     grads:

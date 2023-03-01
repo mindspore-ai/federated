@@ -27,7 +27,6 @@ HTTP_SERVER_ADDRESS=$1
 REMOTE_SERVER_ADDRESS=$2
 DATA_PATH=$3
 RESUME=$4
-COMPRESS=$5
 
 export GLOG_v=1
 export PYTHONPATH="${PYTHONPATH}:${WORKPATH}/../"
@@ -40,5 +39,4 @@ nohup python run_vfl_train_follower.py \
   --data_path=$DATA_PATH \
   --resume=$RESUME \
   --http_server_address=$HTTP_SERVER_ADDRESS \
-  --remote_server_address=$REMOTE_SERVER_ADDRESS \
-  --compress=$COMPRESS >> $WORKPATH/vfl_train_follower.log 2>&1 &
+  --remote_server_address=$REMOTE_SERVER_ADDRESS >> $WORKPATH/vfl_train_follower.log 2>&1 &

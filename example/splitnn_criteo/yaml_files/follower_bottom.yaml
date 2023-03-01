@@ -10,8 +10,12 @@ model: # define the net of vFL party
     outputs:
       - name: follower_wide_embedding
         destination: remote
+        compress_type: min_max
+        bit_num: 6
       - name: follower_deep_embedding
         destination: remote
+        compress_type: min_max
+        bit_num: 6
       - name: follower_l2_regu
         destination: local
   eval_net:
@@ -24,8 +28,12 @@ model: # define the net of vFL party
     outputs:
       - name: follower_wide_embedding
         destination: remote
+        compress_type: min_max
+        bit_num: 6
       - name: follower_deep_embedding
         destination: remote
+        compress_type: min_max
+        bit_num: 6
 opts: # define ms optimizer
   - type: FTRL
     grads: # define ms grad operation

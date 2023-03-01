@@ -9,8 +9,12 @@ model: # define the net of vFL party
         source: local
       - name: follower_wide_embedding
         source: remote
+        compress_type: min_max
+        bit_num: 6
       - name: follower_deep_embedding
         source: remote
+        compress_type: min_max
+        bit_num: 6
       - name: label
         source: local
     outputs:
@@ -27,8 +31,12 @@ model: # define the net of vFL party
         source: local
       - name: follower_wide_embedding
         source: remote
+        compress_type: min_max
+        bit_num: 6
       - name: follower_deep_embedding
         source: remote
+        compress_type: min_max
+        bit_num: 6
     outputs:
       - name: logits
         destination: local

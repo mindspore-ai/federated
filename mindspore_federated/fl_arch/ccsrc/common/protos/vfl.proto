@@ -43,6 +43,9 @@ message TensorProto {
   string compress_type = 10;
   float min_val = 11;
   float max_val = 12;
+  int64 size = 13;
+  int64 bit_num = 14;
+  int64 offset = 15;
 }
 
 //encapsulate embeddings and grad-scales

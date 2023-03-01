@@ -30,6 +30,10 @@
 #include "vertical/python/vertical_federated_job.h"
 #include "vertical/python/tensor_list_py.h"
 #include "vertical/python/tensor_py.h"
+#include "compression/bit_pack.h"
+#include "compression/bit_unpack.h"
+#include "compression/min_max_compress.h"
+#include "compression/min_max_decompress.h"
 
 namespace py = pybind11;
 using FLContext = mindspore::fl::FLContext;
@@ -132,6 +136,9 @@ void InitTensorItemPy(const py::module &m) {
     .def("set_compress_type", &TensorItemPy::set_compress_type, "Set compress type.")
     .def("set_min_val", &TensorItemPy::set_min_val, "Set min val with quant compress.")
     .def("set_max_val", &TensorItemPy::set_max_val, "Set max val with quant compress.")
+    .def("set_bit_num", &TensorItemPy::set_bit_num, "Set bit number with quant compress.")
+    .def("set_size", &TensorItemPy::set_size, "Set size.")
+    .def("set_offset", &TensorItemPy::set_offset, "Set offset for compress.")
     .def("name", &TensorItemPy::name, "Get name.")
     .def("ref_key", &TensorItemPy::ref_key, "Get ref_key.")
     .def("shape", &TensorItemPy::shape, "Get shape.")
@@ -139,7 +146,11 @@ void InitTensorItemPy(const py::module &m) {
     .def("raw_data", &TensorItemPy::raw_data, "Get tensor raw data.")
     .def("compress_type", &TensorItemPy::compress_type, "Get compress type.")
     .def("min_val", &TensorItemPy::min_val, "Get min val.")
-    .def("max_val", &TensorItemPy::max_val, "Get max val.");
+    .def("max_val", &TensorItemPy::max_val, "Get max val.")
+    .def("bit_num", &TensorItemPy::bit_num, "Get bit number.")
+    .def("size", &TensorItemPy::size, "Get size.")
+    .def("offset", &TensorItemPy::offset, "Get offset.")
+    .def("raw_data_size", &TensorItemPy::raw_data_size, "Get raw data size.");
 }
 
 void InitTensorListItemPy(const py::module &m) {
@@ -190,6 +201,13 @@ PYBIND11_MODULE(_mindspore_federated, m) {
   m.def("secure_forward_tee_cut_layer", &mindspore::fl::TEE::secure_forward_tee_cut_layer,
         "secure forward tee cutlayer");
   m.def("free_tee_cut_layer", &mindspore::fl::TEE::free_tee_cut_layer, "free tee cutlayer");
+  m.def("run_bit_pack", &mindspore::fl::compression::run_bit_pack, "run bit pack", py::arg("real_vec"),
+    py::arg("bit_num"));
+  m.def("run_bit_unpack", &mindspore::fl::compression::run_bit_unpack, "run bit unpack", py::arg("tensor_item_py"));
+  m.def("run_min_max_compress", &mindspore::fl::compression::run_min_max_compress, "run run_min_max_compress",
+    py::arg("origin_data"), py::arg("bit_num"));
+  m.def("run_min_max_decompress", &mindspore::fl::compression::run_min_max_decompress, "run run_min_max_decompress",
+    py::arg("tensor_item_py"));
 
   (void)py::class_<FederatedJob, std::shared_ptr<FederatedJob>>(m, "Federated_")
     .def_static("start_federated_server", &FederatedJob::StartFederatedServer)

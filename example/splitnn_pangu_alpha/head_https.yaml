@@ -5,10 +5,14 @@ model: # define the net of vFL party
     inputs:
       - name: hidden_states
         source: remote
+        compress_type: min_max
+        bit_num: 6
       - name: input_ids
         source: local
       - name: word_table
         source: remote
+        compress_type: min_max
+        bit_num: 6
       - name: position_id
         source: local
       - name: attention_mask
@@ -21,14 +25,20 @@ model: # define the net of vFL party
     inputs:
       - name: hidden_states
         source: remote
+        compress_type: min_max
+        bit_num: 6
       - name: input_ids
         source: remote
       - name: word_table
         source: remote
+        compress_type: min_max
+        bit_num: 6
       - name: position_id
         source: remote
       - name: attention_mask
         source: remote
+        compress_type: bit_pack
+        bit_num: 1
     outputs:
       - name: log_probs
         destination: local

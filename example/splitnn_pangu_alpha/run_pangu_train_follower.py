@@ -37,14 +37,6 @@ class FollowerTrainer:
     def __init__(self):
         super(FollowerTrainer).__init__()
 
-        # build vertical communicator
-        http_server_config = ServerConfig(server_name='follower', server_address=opt.http_server_address)
-        remote_server_config = ServerConfig(server_name='leader', server_address=opt.remote_server_address)
-
-        self.vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
-                                                                   remote_server_config=remote_server_config)
-        self.vertical_communicator.launch()
-
         # read, parse and check the .yaml files of sub-networks
         backbone_yaml = FLYamlData('./backbone_https.yaml')
 
@@ -70,6 +62,18 @@ class FollowerTrainer:
         # load ckpt
         if opt.resume:
             self.backbone_fl_model.load_ckpt()
+
+        # get compress config
+        compress_configs = self.backbone_fl_model.get_compress_configs()
+
+        # build vertical communicator
+        http_server_config = ServerConfig(server_name='follower', server_address=opt.http_server_address)
+        remote_server_config = ServerConfig(server_name='leader', server_address=opt.remote_server_address)
+
+        self.vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+                                                                   remote_server_config=remote_server_config,
+                                                                   compress_configs=compress_configs)
+        self.vertical_communicator.launch()
 
     def start(self):
         """
