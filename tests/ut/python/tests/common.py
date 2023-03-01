@@ -90,25 +90,27 @@ def fl_test(func):
     return wrap_test
 
 
+def clean_fl_temp_files():
+    cwd_dir = os.getcwd()
+    temp_dir = os.path.join(cwd_dir, "temp")
+    os.system(f"rm -rf {temp_dir}")
+
+
+def mkdir(directory):
+    try:
+        os.mkdir(directory)
+    except FileExistsError:
+        pass
+
+
 def vfl_data_test(func):
     """vfl data test"""
-
-    def clean_temp_files():
-        cwd_dir = os.getcwd()
-        temp_dir = os.path.join(cwd_dir, "temp")
-        os.system(f"rm -rf {temp_dir}")
-
-    def mkdir(directory):
-        try:
-            os.mkdir(directory)
-        except FileExistsError:
-            pass
 
     @wraps(func)
     def wrap_test(*args, **kwargs):
         try:
-            stop_data_join()
-            clean_temp_files()
+            stop_fl_process()
+            clean_fl_temp_files()
             mkdir("temp")
             mkdir("temp/leader")
             mkdir("temp/follower")
@@ -119,15 +121,43 @@ def vfl_data_test(func):
             raise
         finally:
             logger.info("VFl data test begin to clear")
-            stop_data_join()
-            clean_temp_files()
+            stop_fl_process()
+            clean_fl_temp_files()
             logger.info("VFl data test end clear")
 
     return wrap_test
 
 
-def stop_data_join():
-    """kill data join related processes by ip and port"""
+def communication_compression_test(func):
+    """communication compression test"""
+
+    @wraps(func)
+    def wrap_test(*args, **kwargs):
+        try:
+            stop_fl_process()
+            clean_fl_temp_files()
+            mkdir("temp")
+            mkdir("temp/leader")
+            mkdir("temp/leader/send")
+            mkdir("temp/leader/recv")
+            mkdir("temp/follower")
+            mkdir("temp/follower/send")
+            mkdir("temp/follower/recv")
+            func(*args, **kwargs)
+        except Exception:
+            logger.error("communication compression test catch exception")
+            raise
+        finally:
+            logger.info("communication compression test begin to clear")
+            stop_fl_process()
+            clean_fl_temp_files()
+            logger.info("communication compression test end clear")
+
+    return wrap_test
+
+
+def stop_fl_process():
+    """kill fl related processes by ip and port"""
     cmd = "pid=`netstat -anp | grep 127.0.0.1:6969 | grep -v grep | awk '{print $7}'` &&"
     cmd += " for id in $pid;"
     cmd += " do"

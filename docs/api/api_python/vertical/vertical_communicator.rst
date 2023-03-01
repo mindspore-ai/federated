@@ -1,7 +1,7 @@
 纵向联邦学习通信器
 ======================
 
-.. py:class:: mindspore_federated.VerticalFederatedCommunicator(http_server_config: ServerConfig, remote_server_config: ServerConfig, enable_ssl=False, ssl_config=None, compress_config=None)
+.. py:class:: mindspore_federated.VerticalFederatedCommunicator(http_server_config, remote_server_config, enable_ssl=False, ssl_config=None, compress_configs=None)
 
     定义纵向联邦学习通信器。
 
@@ -10,7 +10,7 @@
         - **remote_server_config** (ServerConfig) - 远程服务器配置。
         - **enable_ssl** (bool) - 是否开启SSL加密通信。默认值：False。
         - **ssl_config** (SSLConfig) - SSL加密通信配置，默认值：None。
-        - **compress_config** (CompressConfig) - 通信压缩配置。默认值：None。
+        - **compress_configs** (dict) - 通信压缩配置。默认值：None。
 
     .. py:method:: data_join_wait_for_start()
 
@@ -43,7 +43,7 @@
             - **target_server_name** (str) - 指定远程服务器名字。
             - **worker_register** (_WorkerRegister) - 需要发送的worker注册信息。
 
-    .. py:method:: send_tensors(target_server_name: str, tensor_dict: OrderedDict)
+    .. py:method:: send_tensors(target_server_name, tensor_dict)
 
         发送分布式训练Tensor数据。
 
@@ -73,10 +73,10 @@
         - **cipher_list** (str) - 服务器支持ssl通信的默认加密套件。默认为default_cipher_list。
         - **cert_expire_warning_time_in_day** (int) - 证书在过期前多少时间开始打印警告信息。默认为90。
 
-.. py:class:: mindspore_federated.CompressConfig(type, quant_bits)
+.. py:class:: mindspore_federated.CompressConfig(compress_type, bit_num=8)
 
     定义纵向联邦服务器通信压缩配置。
 
     参数：
-        - **type** (str) - 通信压缩类型，比如"quant"，用户可自定义。
-        - **quant_bits** (int) - 量化压缩的比特数目，比如8,16,32，用户可自定义。
+        - **compress_type** (str) - 纵向联邦通信压缩类型。支持["min_max", "bit_pack"]。
+        - **bit_num** (int) - 量化算法的比特数，取值范围在[1, 8]内。默认值：8。

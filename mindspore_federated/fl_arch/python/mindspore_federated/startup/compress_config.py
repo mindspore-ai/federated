@@ -38,7 +38,7 @@ class CompressConfig:
 
     Args:
         compress_type (str): Compress type for vertical fl communication
-        bit_num (int): Bits num of quant algorithm. Default: 8.
+        bit_num (int): Bits num of quant algorithm. The value range is within [1, 8]. Default: 8.
     """
 
     def __init__(self, compress_type, bit_num=8):

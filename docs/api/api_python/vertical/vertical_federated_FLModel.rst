@@ -66,6 +66,11 @@
         参数：
             - **path** (str) - 保存checkpoint的路径。如果未定义 `path` ，则将使用yaml文件中定义的 `ckpt_path` 作为checkpoint保存路径。默认值：None。
 
+
+    .. py:method:: get_compress_configs()
+
+        获取压缩配置。
+
 .. py:class:: mindspore_federated.FLYamlData(yaml_path: str)
 
     储存纵向联邦学习流程相关的配置信息，包括网络、优化器、算子等模块的输入/输出和超参数。上述信息从开发者提供的yaml文件（参见 `纵向联邦学习yaml详细配置项 <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python/vertical/vertical_federated_yaml.md>`_ ）中解析上述配置信息。在解析过程中，将会校验yaml文件的合法性。

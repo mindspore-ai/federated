@@ -28,7 +28,7 @@ REMOTE_SERVER_ADDRESS=$2
 RESUME=$3
 
 
-#export GLOG_v=1
+export GLOG_v=1
 export PYTHONPATH="${PYTHONPATH}:${WORKPATH}/../"
 pid=`ps -ef|grep http_server_address=$HTTP_SERVER_ADDRESS |grep -v "grep" |awk '{print $2}'` && for id in $pid; do kill -9 $id && echo "killed $id"; done
 
