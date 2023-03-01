@@ -197,7 +197,7 @@ def make_yaml_config(fl_name, update_configs, output_yaml_file, enable_ssl=False
                      server_mode=None, distributed_cache_address=None, fl_iteration_num=None,
                      start_fl_job_threshold=None, update_model_ratio=None,
                      start_fl_job_time_window=None, update_model_time_window=None, global_iteration_time_window=None,
-                     pki_verify=None, rmv_configs=None):
+                     pki_verify=None, rmv_configs=None, cluster_client_num=None, eval_type=None):
     """make yaml config"""
     if rmv_configs is None:
         rmv_configs = []
@@ -232,6 +232,9 @@ def make_yaml_config(fl_name, update_configs, output_yaml_file, enable_ssl=False
     set_when_not_none(update_configs, "round.start_fl_job_time_window", start_fl_job_time_window)
     set_when_not_none(update_configs, "round.update_model_time_window", update_model_time_window)
     set_when_not_none(update_configs, "round.global_iteration_time_window", global_iteration_time_window)
+
+    set_when_not_none(update_configs, "unsupervised.cluster_client_num", cluster_client_num)
+    set_when_not_none(update_configs, "unsupervised.eval_type", eval_type)
 
     if pki_verify is not None:
         update_configs["client_verify.pki_verify"] = pki_verify
@@ -577,10 +580,11 @@ def start_fl_job_expect_success(http_server_address, fl_name, fl_id, data_size, 
 
 
 def update_model_expect_success(http_server_address, fl_name, fl_id, iteration, update_feature_map, upload_loss=0.0,
-                                enable_ssl=None):
+                                enable_ssl=None, unsupervised_eval_data=None):
     """update model expect success"""
     result, update_model_rsp = post_update_model(http_server_address, fl_name, fl_id, iteration, update_feature_map,
-                                                 upload_loss=upload_loss, enable_ssl=enable_ssl)
+                                                 upload_loss=upload_loss, enable_ssl=enable_ssl,
+                                                 unsupervised_eval_data=unsupervised_eval_data)
     if result is None:
         if isinstance(update_model_rsp, str):
             raise RuntimeError(f"Failed to post updateModel: {update_model_rsp}")

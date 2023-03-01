@@ -145,7 +145,14 @@ class RequestFLJob(object):
         o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(24))
         return o == 0
 
-def Start(builder): builder.StartObject(11)
+    # RequestFLJob
+    def EvalDataSize(self):
+        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(26))
+        if o != 0:
+            return self._tab.Get(flatbuffers.number_types.Int32Flags, o + self._tab.Pos)
+        return 0
+
+def Start(builder): builder.StartObject(12)
 def RequestFLJobStart(builder):
     """This method is deprecated. Please switch to Start."""
     return Start(builder)
@@ -201,6 +208,10 @@ def StartDownloadCompressTypesVector(builder, numElems): return builder.StartVec
 def RequestFLJobStartDownloadCompressTypesVector(builder, numElems):
     """This method is deprecated. Please switch to Start."""
     return StartDownloadCompressTypesVector(builder, numElems)
+def AddEvalDataSize(builder, evalDataSize): builder.PrependInt32Slot(11, evalDataSize, 0)
+def RequestFLJobAddEvalDataSize(builder, evalDataSize):
+    """This method is deprecated. Please switch to AddEvalDataSize."""
+    return AddEvalDataSize(builder, evalDataSize)
 def End(builder): return builder.EndObject()
 def RequestFLJobEnd(builder):
     """This method is deprecated. Please switch to End."""

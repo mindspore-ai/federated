@@ -152,7 +152,14 @@ class ResponseFLJob(object):
         o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(26))
         return o == 0
 
-def Start(builder): builder.StartObject(12)
+    # ResponseFLJob
+    def UnsupervisedEvalFlg(self):
+        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(28))
+        if o != 0:
+            return self._tab.Get(flatbuffers.number_types.Int8Flags, o + self._tab.Pos)
+        return 0
+
+def Start(builder): builder.StartObject(13)
 def ResponseFLJobStart(builder):
     """This method is deprecated. Please switch to Start."""
     return Start(builder)
@@ -212,6 +219,10 @@ def StartCompressFeatureMapVector(builder, numElems): return builder.StartVector
 def ResponseFLJobStartCompressFeatureMapVector(builder, numElems):
     """This method is deprecated. Please switch to Start."""
     return StartCompressFeatureMapVector(builder, numElems)
+def AddUnsupervisedEvalFlg(builder, unsupervisedEvalFlg): builder.PrependInt8Slot(12, unsupervisedEvalFlg, 0)
+def ResponseFLJobAddUnsupervisedEvalFlg(builder, unsupervisedEvalFlg):
+    """This method is deprecated. Please switch to AddUnsupervisedEvalFlg."""
+    return AddUnsupervisedEvalFlg(builder, unsupervisedEvalFlg)
 def End(builder): return builder.EndObject()
 def ResponseFLJobEnd(builder):
     """This method is deprecated. Please switch to End."""
