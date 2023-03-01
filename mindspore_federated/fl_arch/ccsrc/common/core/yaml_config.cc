@@ -139,7 +139,7 @@ void YamlConfig::InitUnsupervisedConfig() {
   UnsupervisedConfig unsupervised_config;
   Get("unsupervised.cluster_client_num", &unsupervised_config.cluster_client_num, false, CheckInt(1, GE));
   Get("unsupervised.eval_type", &unsupervised_config.eval_type, false,
-      {kNotEvalType, kSilhouetteScoreType, kCalinskiHarabaszScoreType});
+      {kNotEvalType, kSilhouetteScoreType, kCalinskiHarabaszScoreType, kDaviesBouldinScoreType});
 
   if (unsupervised_config.eval_type != kNotEvalType && unsupervised_config.cluster_client_num <= 0) {
     MS_LOG(EXCEPTION) << "Cluster client num is <= 0 when unsupervised eval mode is opened.";

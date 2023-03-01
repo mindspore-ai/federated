@@ -36,6 +36,19 @@ class UnsupervisedEval {
   float silhouetteScore(const std::vector<std::vector<float>> &data, const std::vector<size_t> &labels);
   float clusterEvaluate(const std::vector<std::vector<float>> &group_ids, const std::vector<size_t> &labels,
                         const std::string &eval_type);
+
+  static float daviesBouldinScore(const std::vector<std::vector<float>> &group_ids, const std::vector<size_t> &labels);
+  static std::vector<std::vector<float>> getCentroid(const std::vector<std::vector<float>> &group_ids,
+                                                     const std::vector<size_t> &labels);
+  static std::vector<float> getIntra(const std::vector<std::vector<float>> &group_ids,
+                                     const std::vector<std::vector<float>> &centroid,
+                                     const std::vector<size_t> &labels);
+  static std::vector<std::vector<float>> getOutra(const std::vector<std::vector<float>> &centroid);
+  static std::vector<std::vector<float>> getCombined(const std::vector<float> intra,
+                                                     const std::vector<std::vector<float>> &outra);
+  static float euclideanDistance(const std::vector<float> &id1, const std::vector<float> &id2);
+  static std::vector<size_t> findPosition(const size_t i, const size_t j);
+  static std::vector<float> dbMatrix(const std::vector<std::vector<float>> &Rij);
 };
 }  // namespace cache
 }  // namespace fl
