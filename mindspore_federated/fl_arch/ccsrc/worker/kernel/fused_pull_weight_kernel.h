@@ -115,6 +115,35 @@ class FusedPullWeightKernelMod : public AbstractKernel {
       }
     }
 
+    if (!VerifyFeatureMaps(pull_weight_rsp)) {
+      MS_LOG(WARNING) << "Verify feature maps failed. Use the initial model instead.";
+      auto initial_model = fl::worker::HybridWorker::GetInstance().initial_model();
+      for (const auto &item : initial_model) {
+        std::string weight_fullname = item.first;
+        dict_data[py::str(weight_fullname)] = item.second;
+      }
+    } else {
+      auto feature_map_fbs = pull_weight_rsp->feature_map();
+      for (size_t i = 0; i < feature_map_fbs->size(); i++) {
+        const auto &feature_fbs = feature_map_fbs->Get(i);
+        const auto &feature_data_fbs = feature_fbs->data();
+
+        std::string weight_fullname = feature_fbs->weight_fullname()->str();
+        float *weight_data = const_cast<float *>(feature_data_fbs->data());
+        std::vector<float> weight_data_vec(weight_data, weight_data + feature_data_fbs->size());
+        dict_data[py::str(weight_fullname)] = weight_data_vec;
+      }
+    }
+
+    MS_LOG(INFO) << "Pull weights for iteration: " << fl_iteration_ << " success.";
+    fl::worker::HybridWorker::GetInstance().SetIterationRunning();
+    return dict_data;
+  }
+
+  void Init() override { instance_name_ = fl::worker::HybridWorker::GetInstance().instance_name(); }
+
+ private:
+  bool VerifyFeatureMaps(const schema::ResponsePullWeight *pull_weight_rsp) {
     auto feature_map_fbs = pull_weight_rsp->feature_map();
     if (feature_map_fbs->size() == 0) {
       MS_LOG(EXCEPTION) << "Feature map fbs size is empty.";
@@ -129,19 +158,13 @@ class FusedPullWeightKernelMod : public AbstractKernel {
       for (const auto &data : weight_data_vec) {
         if (std::isnan(data) || std::isinf(data)) {
           MS_LOG(WARNING) << "The aggregation weight:" << weight_fullname << " is nan or inf.";
-          continue;
+          return false;
         }
       }
-      dict_data[py::str(weight_fullname)] = weight_data_vec;
     }
-    MS_LOG(INFO) << "Pull weights for iteration: " << fl_iteration_ << " success.";
-    fl::worker::HybridWorker::GetInstance().SetIterationRunning();
-    return dict_data;
+    return true;
   }
 
-  void Init() override { instance_name_ = fl::worker::HybridWorker::GetInstance().instance_name(); }
-
- private:
   void BuildPullWeightReq(fl::FBBuilder *fbb, const std::vector<std::string> &pull_weight_names) {
     MS_EXCEPTION_IF_NULL(fbb);
     std::vector<flatbuffers::Offset<flatbuffers::String>> fbs_weight_names;

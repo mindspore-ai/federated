@@ -31,6 +31,9 @@ void ModelStore::Initialize(const std::vector<InputWeight> &feature_map, uint32_
   max_model_count_ = max_count;
   InitModel(feature_map);
   MS_EXCEPTION_IF_NULL(initial_model_);
+  if (!LocalMetaStore::GetInstance().verifyAggregationFeatureMap(initial_model_)) {
+    MS_LOG(EXCEPTION) << "Verify feature map failed for initial model.";
+  }
   iteration_to_model_[latest_iteration_num] = initial_model_;
   for (const auto &item : mindspore::fl::compression::kCompressTypeMap) {
     iteration_to_compress_model_[latest_iteration_num][item.first] =

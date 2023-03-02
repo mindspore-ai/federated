@@ -84,13 +84,13 @@ void FederatedJob::StartFederatedScheduler() {
   Scheduler::GetInstance().Run();
 }
 
-void FederatedJob::InitFederatedWorker() {
+void FederatedJob::InitFederatedWorker(const std::map<std::string, std::vector<float>> &initial_model) {
   FLContext::instance()->set_ms_role(kEnvRoleOfWorker);
   auto server_mode = FLContext::instance()->server_mode();
   if (server_mode == kServerModeCloud) {
     worker::CloudWorker::GetInstance().Init();
   } else if (server_mode == kServerModeHybrid) {
-    worker::HybridWorker::GetInstance().Init();
+    worker::HybridWorker::GetInstance().Init(initial_model);
   } else {
     MS_LOG(EXCEPTION) << server_mode << " is invalid, init federated worker failed.";
   }
@@ -101,9 +101,7 @@ void FederatedJob::StopFederatedWorker() {
   worker::CloudWorker::GetInstance().Stop();
 }
 
-py::dict FederatedJob::StartFLJob(size_t data_size) {
-  return StartFLJobKernelMod::GetInstance()->Launch(data_size);
-}
+py::dict FederatedJob::StartFLJob(size_t data_size) { return StartFLJobKernelMod::GetInstance()->Launch(data_size); }
 
 py::dict FederatedJob::UpdateAndGetModel(std::map<std::string, std::vector<float>> weight_datas) {
   py::dict dict_data;

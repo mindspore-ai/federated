@@ -84,6 +84,9 @@ FlStatus PushWeightKernel::OnReceiveModelWeight(const uint8_t *req_data, size_t 
     MS_LOG(ERROR) << reason;
     return {kRequestError, reason};
   }
+  if (!LocalMetaStore::GetInstance().verifyAggregationFeatureMap(upload_feature_map)) {
+    MS_LOG(WARNING) << "Verify feature map failed for worker pushing weight.";
+  }
   if (!Executor::GetInstance().HandlePushWeight(upload_feature_map)) {
     reason = "Pushing weight failed.";
     MS_LOG(ERROR) << reason;

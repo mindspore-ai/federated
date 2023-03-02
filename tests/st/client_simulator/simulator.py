@@ -19,15 +19,19 @@ import time
 import datetime
 import random
 import sys
+import os
 import requests
-from mindspore.fl.schema import (RequestFLJob, ResponseFLJob, ResponseCode,
+import flatbuffers
+import numpy as np
+from mindspore import load_checkpoint
+
+mindspore_fl_path = os.path.abspath(os.path.join(os.getcwd(), "../../ut/python/tests/"))
+sys.path.append(mindspore_fl_path)
+
+from mindspore_fl.schema import (RequestFLJob, ResponseFLJob, ResponseCode,
                                  RequestUpdateModel, ResponseUpdateModel,
                                  FeatureMap, RequestGetModel, ResponseGetModel, CompressFeatureMap,
                                  UnsupervisedEvalItems, UnsupervisedEvalItem)
-import flatbuffers
-import numpy as np
-
-sys.path.append("../../../ut/python/tests")
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--pid", type=int, default=0)
@@ -37,6 +41,7 @@ parser.add_argument("--data_size", type=int, default=32)
 parser.add_argument("--eval_data_size", type=int, default=32)
 parser.add_argument("--upload_loss", type=float, default=1)
 parser.add_argument("--upload_accuracy", type=float, default=1)
+parser.add_argument("--checkpoint_path", type=str, default="")
 
 args, _ = parser.parse_known_args()
 pid = args.pid
@@ -46,6 +51,7 @@ data_size = args.data_size
 eval_data_size = args.eval_data_size
 upload_loss = args.upload_loss
 upload_accuracy = args.upload_accuracy
+checkpoint_path = args.checkpoint_path
 
 alphabet = 'abcdefghijklmnopqrstuvwxyz'
 random_fl_id = str(random.sample(alphabet, 8))
@@ -54,6 +60,11 @@ server_not_available_rsp = ["The cluster is in safemode.",
                             "The server's training job is disabled or finished."]
 
 compress_type_str_map = {0: "NO_COMPRESS", 1: "DIFF_SPARSE_QUANT", 2: "QUANT"}
+
+param_dict = {}
+if os.path.exists(checkpoint_path):
+    param_dict = load_checkpoint(checkpoint_path)
+print(param_dict)
 
 
 def build_start_fl_job():
@@ -86,6 +97,21 @@ def build_start_fl_job():
     return buf
 
 
+def quant_compress(data_list, quant_bits):
+    """quant compression"""
+    min_val = min(data_list)
+    max_val = max(data_list)
+
+    quant_p1 = ((1 << quant_bits) - 1) / (max_val - min_val + 1e-10)
+    quant_p2 = int(round(quant_p1 * min_val))
+
+    compress_data_list = []
+    for data in data_list:
+        compress_data = round(quant_p1 * data) - quant_p2
+        compress_data_list.append(compress_data)
+    return min_val, max_val, compress_data_list
+
+
 def construct_mask_array(param_num, upload_sparse_rate):
     retain_num = int(param_num * upload_sparse_rate)
     return [1 for _ in range(retain_num)] + [0 for _ in range(param_num - retain_num)]
@@ -105,21 +131,26 @@ def build_compress_feature_map(builder, feature_map_temp, upload_sparse_rate):
     mask_array = construct_mask_array(param_num, upload_sparse_rate)
 
     index = 0
-    for name, compress_feature_map in feature_map_temp.items():
-        length = len(compress_feature_map)
+    for name, value in feature_map_temp.items():
+        length = len(value)
+        if name in param_dict:
+            param_value = param_dict[name]
+        else:
+            param_value = np.random.rand(length) * 32
         weight_full_name = builder.CreateString(name)
         CompressFeatureMap.CompressFeatureMapStartCompressDataVector(builder, length)
-        weight = np.ones(length, dtype=np.int8)
+        min_val, max_val, compress_data_list = quant_compress(param_value, 8)
+        compress_weight = np.array(compress_data_list, dtype=np.int8)
         for idx in range(length - 1, -1, -1):
             if mask_array[index] == 1:
-                builder.PrependInt8(weight[idx])
+                builder.PrependInt8(compress_weight[idx])
             index += 1
         data = builder.EndVector()
         CompressFeatureMap.CompressFeatureMapStart(builder)
         CompressFeatureMap.CompressFeatureMapAddCompressData(builder, data)
         CompressFeatureMap.CompressFeatureMapAddWeightFullname(builder, weight_full_name)
-        CompressFeatureMap.CompressFeatureMapAddMaxVal(builder, 1)
-        CompressFeatureMap.CompressFeatureMapAddMinVal(builder, 1)
+        CompressFeatureMap.CompressFeatureMapAddMaxVal(builder, max_val)
+        CompressFeatureMap.CompressFeatureMapAddMinVal(builder, min_val)
         compress_feature_map = CompressFeatureMap.CompressFeatureMapEnd(builder)
         compress_feature_maps.append(compress_feature_map)
         feature_name = builder.CreateString(name)
@@ -165,19 +196,22 @@ def build_feature_map(builder, feature_map_temp):
     if not feature_map_temp:
         return None
     feature_maps = []
-    for name, data in feature_map_temp.items():
-        length = len(data)
+    for name, value in feature_map_temp.items():
+        length = len(value)
+        if name in param_dict:
+            param_value = param_dict[name]
+        else:
+            param_value = np.random.rand(length) * 32
         weight_full_name = builder.CreateString(name)
         FeatureMap.FeatureMapStartDataVector(builder, length)
-        weight = np.random.rand(length) * 32
         for idx in range(length - 1, -1, -1):
-            builder.PrependFloat32(weight[idx])
+            builder.PrependFloat32(param_value[idx])
         data = builder.EndVector()
         FeatureMap.FeatureMapStart(builder)
         FeatureMap.FeatureMapAddData(builder, data)
         FeatureMap.FeatureMapAddWeightFullname(builder, weight_full_name)
-        feature_map = FeatureMap.FeatureMapEnd(builder)
-        feature_maps.append(feature_map)
+        fbs_feature_map = FeatureMap.FeatureMapEnd(builder)
+        feature_maps.append(fbs_feature_map)
     return feature_maps
 
 

@@ -20,6 +20,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <map>
 #include "common/protos/comm.pb.h"
 #include "schema/fl_job_generated.h"
 #include "schema/cipher_generated.h"
@@ -55,7 +56,7 @@ namespace worker {
 class MS_EXPORT HybridWorker {
  public:
   static HybridWorker &GetInstance();
-  void Init();
+  void Init(const std::map<std::string, std::vector<float>> &initial_model);
   void Stop();
   bool SendToServer(const void *data, size_t size, fl::TcpUserCommand command, VectorPtr *output = nullptr);
 
@@ -72,6 +73,7 @@ class MS_EXPORT HybridWorker {
   std::string fl_name() const;
   std::string fl_id() const;
   std::string instance_name() const;
+  const std::map<std::string, std::vector<float>> &initial_model() const;
 
  private:
   HybridWorker() = default;
@@ -95,6 +97,7 @@ class MS_EXPORT HybridWorker {
   std::atomic<IterationState> worker_iteration_state_;
   std::string fl_name_;
   std::string instance_name_;
+  std::map<std::string, std::vector<float>> initial_model_;
 };
 }  // namespace worker
 }  // namespace fl
