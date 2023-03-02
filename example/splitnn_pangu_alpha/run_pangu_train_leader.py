@@ -157,7 +157,7 @@ if __name__ == '__main__':
                         format='%(asctime)s %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
     logging.info("config is:")
     logging.info(opt)
-    context.set_context(mode=context.GRAPH_MODE, device_target='GPU')
+    context.set_context(mode=context.GRAPH_MODE, device_target=opt.device_target, device_id=opt.device_id)
 
     leader_trainer = LeaderTrainer()
     leader_trainer.start()

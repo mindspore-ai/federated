@@ -45,7 +45,7 @@ Wide&Deep网络原理特性的详细介绍，可参考[MindSpore ModelZoo - Wide
    tar -zxvf criteo-research-kaggle-display-advertising-challenge-dataset.tar.gz
    ```
 
-3. 使用此脚本预处理数据。预处理过程可能需要一小时，生成的MindRecord数据存放在data/mindrecord路径下。预处理过程内存消耗巨大，建议使用服务器。
+3. 使用此脚本预处理数据。预处理过程可能需要一小时，生成的MindRecord数据存放在data/mindrecord路径下。预处理过程内存消耗巨大，建议在服务器上执行。
 
    ```shell
    cd ../..
@@ -58,7 +58,7 @@ Wide&Deep网络原理特性的详细介绍，可参考[MindSpore ModelZoo - Wide
 
 1. 参考[MindSpore官网指引](https://www.mindspore.cn/install) ，安装MindSpore 1.8.1或更高版本。
 
-2. 采用安装MindSpore Federated所依赖Python库。
+2. 安装MindSpore Federated所依赖Python库。
 
    ```shell
    cd federated
@@ -121,7 +121,7 @@ Wide&Deep网络原理特性的详细介绍，可参考[MindSpore ModelZoo - Wide
 
 ## 深度体验
 
-在启动纵向联邦学习训练之前，用户需要和使用MindSpore做普通深度学习训练一样，构造数据集迭代器和网络结构。
+在启动纵向联邦学习训练之前，用户需要使用MindSpore，像做普通深度学习训练一样，构造数据集迭代器和建模网络结构。
 
 ### 构造数据集
 

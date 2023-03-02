@@ -106,7 +106,7 @@ if __name__ == '__main__':
     logging.info("config is:")
     logging.info(opt)
 
-    context.set_context(mode=context.GRAPH_MODE, device_target='GPU')
+    context.set_context(mode=context.GRAPH_MODE, device_target=opt.device_target, device_id=opt.device_id)
 
     follower_trainer = FollowerTrainer()
     follower_trainer.start()

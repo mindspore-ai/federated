@@ -8,7 +8,7 @@ MindSpore Federated提供基于拆分学习的纵向联邦学习基础功能组�
 
 ![实现盘古α大模型跨域训练](../../docs/splitnn_pangu_alpha.png)
 
-如上图所示，该案例中， 盘古α模型被依次切分为Embedding、Backbone、Head等3个子网络。其中，前级子网络Embedding和末级子网络Head部署在的参与方A网络域内，包含多级Transformer模块的Backbone子网络部署在参与方B网络域内。Embedding子网络和Head子网络读取参与方A所持有的数据，主导执行盘古α模型的训练和推理任务。
+如上图所示，该案例中， 盘古α模型被依次切分为Embedding、Backbone、Head等3个子网络。其中，前级子网络Embedding和末级子网络Head部署在参与方A网络域内，包含多级Transformer模块的Backbone子网络部署在参与方B网络域内。Embedding子网络和Head子网络读取参与方A所持有的数据，主导执行盘古α模型的训练和推理任务。
 
 * 前向推理阶段，参与方A采用Embedding子网络处理原始数据后，将输出的Embedding Feature特征张量和Attention Mask特征张量传输给参与方B，作为参与方B Backbone子网络的输入。然后，参与方A读取Backbone子网络输出的Hide State特征张量，作为参与方A Head子网络的输入，最终由Head子网络输出预测结果或损失值。
 
