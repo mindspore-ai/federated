@@ -42,7 +42,7 @@ if __name__ == '__main__':
     set_parse(opt)
     logging.basicConfig(filename='splitnn_pangu_local.txt', level=logging.INFO,
                         format='%(asctime)s %(levelname)s: %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-    context.set_context(mode=context.GRAPH_MODE, device_target='GPU')
+    context.set_context(mode=context.GRAPH_MODE, device_target=opt.device_target, device_id=opt.device_id)
 
     # read, parse and check the .yaml files of sub-networks
     embedding_yaml = FLYamlData('./embedding.yaml')
