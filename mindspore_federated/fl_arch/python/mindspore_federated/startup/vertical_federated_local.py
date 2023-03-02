@@ -42,7 +42,7 @@ class VerticalFederatedCommunicator:
         >>> vertical_communicator.data_join_wait_for_start()
     """
 
-    def __init__(self, http_server_config: ServerConfig, remote_server_config, enable_ssl=False,
+    def __init__(self, http_server_config, remote_server_config, enable_ssl=False,
                  ssl_config=None, compress_configs=None):
         if http_server_config is not None and not isinstance(http_server_config, ServerConfig):
             raise RuntimeError(

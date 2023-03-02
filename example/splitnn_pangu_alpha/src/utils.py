@@ -1,4 +1,4 @@
-# Copyright 2021 Huawei Technologies Co., Ltd
+# Copyright 2023 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,16 +28,16 @@ from mindspore.ops import operations as P
 from mindspore.ops import composite as C
 from mindspore.ops import functional as F
 import mindspore.communication.management as D
-from mindspore.nn.transformer import TransformerOpParallelConfig, CrossEntropyLoss, TransformerRecomputeConfig
 from mindspore.nn.learning_rate_schedule import LearningRateSchedule, PolynomialDecayLR, WarmUpLR, CosineDecayLR
 from mindspore.communication.management import get_rank, get_group_size
 from mindspore.train.callback import ModelCheckpoint, CheckpointConfig
 from mindspore.parallel._auto_parallel_context import auto_parallel_context
 from mindspore.parallel import set_algo_parameters
 from mindspore.parallel._cost_model_context import _set_multi_subgraphs
-
 from src.dataset import create_dataset
 from src.pangu_alpha_config import PanguAlphaConfig
+from src.ms_transformer import TransformerOpParallelConfig, TransformerRecomputeConfig, CrossEntropyLoss
+
 
 get_square_sum = C.MultitypeFuncGraph("get_square_sum")
 
