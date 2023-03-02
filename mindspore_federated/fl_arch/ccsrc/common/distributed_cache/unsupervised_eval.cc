@@ -20,6 +20,7 @@
 #include <unordered_map>
 #include <limits>
 #include "common/common.h"
+#include "common/parallel_for.h"
 
 namespace mindspore {
 namespace fl {
@@ -116,17 +117,22 @@ std::vector<std::vector<float>> UnsupervisedEval::euclideanDistanceMatrix(
   for (size_t i = 0; i < n_samples; i++) {
     distance_matrix[i].resize(i);
   }
-
-  for (size_t i = 0; i < n_samples; ++i) {
-    for (size_t j = i + 1; j < n_samples; ++j) {
-      float distance = 0.0f;
-      for (size_t k = 0; k < group_ids[i].size(); ++k) {
-        float diff = group_ids[i][k] - group_ids[j][k];
-        distance += diff * diff;
+  size_t chunk_size = 32;
+  size_t thread_num = 32;
+  ParallelSync parallel_sync(thread_num);
+  parallel_sync.parallel_for(0, n_samples, chunk_size, [&](size_t begin, size_t end) {
+    MS_LOG(DEBUG) << "begin is:" << begin << ", end is:" << end;
+    for (size_t i = begin; i < end; i++) {
+      for (size_t j = i + 1; j < n_samples; ++j) {
+        float distance = 0.0f;
+        for (size_t k = 0; k < group_ids[i].size(); ++k) {
+          float diff = group_ids[i][k] - group_ids[j][k];
+          distance += diff * diff;
+        }
+        distance_matrix[j][i] = std::sqrt(distance);
       }
-      distance_matrix[j][i] = std::sqrt(distance);
     }
-  }
+  });
   return distance_matrix;
 }
 
