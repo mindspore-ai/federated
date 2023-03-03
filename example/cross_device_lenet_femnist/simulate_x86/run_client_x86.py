@@ -96,6 +96,7 @@ def build_args_parser():
     parser = argparse.ArgumentParser(description="Run SyncFLJob.java case")
     parser.add_argument("--fl_jar_path", type=str, default="./fl_jar/minspore-lite-java-flclient.jar")
     parser.add_argument("--case_jar_path", type=str, default="./case_jar/quick-start-flclient.jar")
+    parser.add_argument("--lite_jar_path", type=str, default="./case_jar/mindspore-lite-java.jar")  # must be absolute path
     parser.add_argument("--train_data_dir", type=str, default="../../datasets/3500_client_bin/")
     parser.add_argument("--eval_data_dir", type=str, default="null")
     parser.add_argument("--infer_data_dir", type=str, default="null")
@@ -132,6 +133,8 @@ def main():
 
     fl_jar_path = os.path.abspath(args.fl_jar_path)
     case_jar_path = os.path.abspath(args.case_jar_path)
+    lite_jar_path = os.path.abspath(args.lite_jar_path)
+    main_class_name = "com.mindspore.flclient.SyncFLJob"
     train_data_dir = args.train_data_dir if args.train_data_dir == "null" else os.path.abspath(args.train_data_dir)
     eval_data_dir = args.eval_data_dir if args.eval_data_dir == "null" else os.path.abspath(args.eval_data_dir)
     infer_data_dir = args.infer_data_dir if args.infer_data_dir == "null" else os.path.abspath(args.infer_data_dir)
@@ -166,8 +169,6 @@ def main():
     batch_size = args.batch_size
     input_shape = args.input_shape
     client_num = args.client_num
-    fl_jar_dir = os.path.abspath(os.path.dirname(fl_jar_path))
-    case_jar_dir = os.path.abspath(os.path.dirname(case_jar_path))
     copy_ms(origin_train_model_path, origin_infer_model_path, client_num, train_model_dir, infer_model_dir)
     data_path_list = DataPathConstructor(fl_name, train_data_dir, eval_data_dir, infer_data_dir, vocab_path, ids_path)
     for i in range(client_num):
@@ -175,8 +176,8 @@ def main():
         cmd_client += "rm -rf ${execute_path}/client_" + str(i) + "/ &&"
         cmd_client += "mkdir ${execute_path}/client_" + str(i) + "/ &&"
         cmd_client += "cd ${execute_path}/client_" + str(i) + "/ || exit &&"
-        cmd_client += "java -Xms2048m -Xmx2048m -XX:+UseG1GC --module-path={}:{} -jar ".format(fl_jar_dir, case_jar_dir)
-        cmd_client += fl_jar_path + " "
+        cmd_client += "java -Xms2048m -Xmx2048m -XX:+UseG1GC -cp {}:{}:{} {} ". \
+            format(lite_jar_path, case_jar_path, fl_jar_path, main_class_name)
         train_path = data_path_list.get_train_path(i)
         eval_path = data_path_list.get_eval_path(i)
         infer_path = data_path_list.get_infer_path(i)
