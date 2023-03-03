@@ -131,7 +131,7 @@ MindSpore Federated纵向联邦学习框架采用FLModel（参见 [纵向联邦�
 
     ```yaml
     opts:
-      - type: PanguAlphaAdam
+      - type: CustomizedAdam
         grads:
           - inputs:
               - name: input_ids
@@ -168,26 +168,26 @@ MindSpore Federated纵向联邦学习框架采用FLModel（参见 [纵向联邦�
 
 根据梯度计算的链式法则，位于全局网络后级的子网络，需要计算其输出张量相对于输入张量的梯度值，即梯度加权系数或灵敏度，传递给位于全局网络前级的子网络，用于其训练参数更新。
 
-MindSpore Federated采用`GradOperation`算子，完成上述梯度加权系数或灵敏度计算过程。开发者需在yaml配置文件中，描述用于计算梯度加权系数的`GradOperation`算子。以本应用实践中参与方A的Head为例，[示例代码](https://gitee.com/mindspore/federated/tree/master/example/splitnn_pangu_alpha/Head.yaml)如下：
+MindSpore Federated采用`GradOperation`算子，完成上述梯度加权系数或灵敏度计算过程。开发者需在yaml配置文件中，描述用于计算梯度加权系数的`GradOperation`算子。以本应用实践中参与方A的Head为例，[示例代码](https://gitee.com/mindspore/federated/tree/master/example/splitnn_pangu_alpha/head.yaml)如下：
 
 ```yaml
 grad_scalers:
-      - inputs:
-          - name: hidden_states
-          - name: input_ids
-          - name: word_table
-          - name: position_id
-          - name: attention_mask
-        output:
-          name: output
-        sens: 1024.0
+  - inputs:
+      - name: hidden_states
+      - name: input_ids
+      - name: word_table
+      - name: position_id
+      - name: attention_mask
+    output:
+      name: output
+    sens: 1024.0
 ```
 
 其中，`inputs`和`output`字段为`GradOperation`算子的输入和输出张量列表，其元素分别为一个输入/输出张量名称。`sens`字段为该`GradOperation`算子的梯度加权系数或灵敏度（参考[mindspore.ops.GradOperation](https://mindspore.cn/docs/zh-CN/master/api_python/ops/mindspore.ops.GradOperation.html?highlight=gradoperation) ），如果为`float`或`int`型数值，则将构造一个常量张量作为梯度加权系数，如果为`str`型字符串，则将从其它参与方经网络传输的加权系数中，解析名称与其对应的张量作为加权系数。
 
 ### 执行训练
 
-1. 完成上述Python编程开发和yaml配置文件编写后，采用MindSpore Federated提供的`FLModel`类和`FLYamlData`类，构建纵向联邦学习流程。以本应用实践中参与方A的Embedding子网络为例，[示例代码](https://gitee.com/mindspore/federated/tree/master/example/splitnn_pangu_alpha/src/split_pangu_alpha.py)如下：
+1. 完成上述Python编程开发和yaml配置文件编写后，采用MindSpore Federated提供的`FLModel`类和`FLYamlData`类，构建纵向联邦学习流程。以本应用实践中参与方A的Embedding子网络为例，[示例代码](https://gitee.com/mindspore/federated/tree/master/example/splitnn_pangu_alpha/run_pangu_train_local.py)如下：
 
     ```python
     embedding_yaml = FLYamlData('./embedding.yaml')
@@ -207,10 +207,12 @@ grad_scalers:
 
 其中，`FLYamlData`类主要完成yaml配置文件的解析和校验，`FLModel`类主要提供纵向联邦学习训练、推理等流程的控制接口。
 
-2. 调用`FLModel`类的接口方法，执行纵向联邦学习训练。以本应用实践中参与方A的Embedding子网络为例，[示例代码](https://gitee.com/mindspore/federated/tree/master/example/splitnn_pangu_alpha/src/split_pangu_alpha.py)如下：
+2. 调用`FLModel`类的接口方法，执行纵向联邦学习训练。以本应用实践中参与方A的Embedding子网络为例，[示例代码](https://gitee.com/mindspore/federated/tree/master/example/splitnn_pangu_alpha/run_pangu_train_local.py)如下：
 
     ```python
-    embedding_fl_model.load_ckpt()
+    if opt.resume:
+        embedding_fl_model.load_ckpt()
+        ...
     for epoch in range(50):
         for step, item in enumerate(train_iter, start=1):
             # forward process
@@ -218,9 +220,9 @@ grad_scalers:
             embedding_out = embedding_fl_model.forward_one_step(item)
             ...
             # backward process
-            head_scale = head_fl_model.backward_one_step(item, backbone_out)
+            embedding_fl_model.backward_one_step(item, sens=backbone_scale)
             ...
-            if step % 10 == 0:
+            if step % 1000 == 0:
                 embedding_fl_model.save_ckpt()
     ```
 
