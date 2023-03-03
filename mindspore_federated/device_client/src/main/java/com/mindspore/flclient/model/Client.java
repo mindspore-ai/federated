@@ -150,6 +150,11 @@ public abstract class Client {
     }
 
 
+    /***
+     * Initialize client runtime model.
+     * @param flParameter  Global parameters of federated learning.
+     * @return Whether the Initialization is successful.
+     */
     public Status initModel(FLParameter flParameter) {
         String trainModelPath = flParameter.getTrainModelPath();
         String inferModelPath = flParameter.getInferModelPath();
@@ -176,6 +181,11 @@ public abstract class Client {
         return initRet;
     }
 
+    /***
+     * Switch model between training and infer mode.
+     * @param enableFlg Switch to training mode while enableFlg is true,  switch to infer mode while enableFlg is false.
+     * @return Whether the switch is successful.
+     */
     public boolean EnableTrain(boolean enableFlg) {
         if (enableFlg == true && trainModelProxy != null) {
             curProxy = trainModelProxy;
@@ -192,7 +202,7 @@ public abstract class Client {
     }
 
     /***
-     * cache prev features for compress or encrypt.
+     * Cache feature data that before compress or encrypt
      * @param level encrypt level
      * @param uploadCompressType compress type
      * @param secureProtocol the secureProtocol instance.
@@ -275,6 +285,12 @@ public abstract class Client {
         return new HashMap<String, float[]>();
     }
 
+    /**
+     * Get unsupervised train evaluation data.
+     * Must be called after eval Model
+     *
+     * @return eval accuracy.
+     */
     public Map<String, float[]> getUnsupervisedEvalData() {
         return unsupervisedEvalData;
     }
@@ -341,7 +357,7 @@ public abstract class Client {
 
 
     /**
-     * calculate Weight normal for dp.
+     * Calculate l2 norm of Weight for dp ecrypte.
      *
      * @return model weights.
      */
