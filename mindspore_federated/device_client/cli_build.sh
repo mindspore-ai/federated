@@ -8,6 +8,7 @@ ENABLE_GITEE="on"
 MS_LITE_PKG_VER="1.9.0"
 MS_LITE_PKG_NAME="mindspore-lite-${MS_LITE_PKG_VER}-linux-x64"
 MS_PKG_URL="https://ms-release.obs.cn-north-4.myhuaweicloud.com/${MS_LITE_PKG_VER}/MindSpore/lite/release/linux/x86_64/${MS_LITE_PKG_NAME}.tar.gz"
+LENET_MS_URL="https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/notebook/models/lenet_train.ms"
 export FLAT_EXE_PATH="$FL_THIRD_PKG_PATH/flatbuffers-v2.0.0/build/flatc"
 
 # print usage message
@@ -136,6 +137,7 @@ build_mindspore_federated_client()
   rm -rf "${PROJECT_PATH}"/libs/*
   tar -zxf "${FL_THIRD_PKG_PATH}"/${MS_LITE_PKG_NAME}.tar.gz -C "${FL_THIRD_PKG_PATH}"/
   cp "${FL_THIRD_PKG_PATH}"/${MS_LITE_PKG_NAME}/runtime/lib/mindspore-lite-java.jar "${PROJECT_PATH}"/libs
+  cp "${FL_THIRD_PKG_PATH}"/${MS_LITE_PKG_NAME}/runtime/third_party/libjpeg-turbo/lib/* "${FL_THIRD_PKG_PATH}"/${MS_LITE_PKG_NAME}/runtime/lib/
   cd "${PROJECT_PATH}"
 
   rm -rf gradle .gradle gradlew gradlew.bat
@@ -150,10 +152,32 @@ build_mindspore_federated_client()
 
   ${gradle_command} clean
   ${gradle_command} createFlatBuffers
+  # compile flclient
   ${gradle_command} build -x test
   ${gradle_command} packFLJarAAR --rerun-tasks
   ${gradle_command} packFLJarX86 --rerun-tasks
+
+  # compile ut depend jar
+  cd ${PROJECT_PATH}/../../example/quick_start_flclient/
+  bash build.sh
+  cp ${PROJECT_PATH}/../../example/quick_start_flclient/build/libs/quick_start_flclient.jar ${PROJECT_PATH}/libs/
+  cd "${PROJECT_PATH}"
+
+  # do ut test
+  ${gradle_command} packFLJarX86UT --rerun-tasks
+  export LD_LIBRARY_PATH=${FL_THIRD_PKG_PATH}/${MS_LITE_PKG_NAME}/runtime/lib/:${LD_LIBRARY_PATH}
+  export MS_FL_UT_BASE_PATH=${PROJECT_PATH}/ut_data
+  mkdir -p ${PROJECT_PATH}/ut_data/test_data/lenet/f0178_39/
+  cd ${PROJECT_PATH}/ut_data
+  # the ci build server can't run gen_lenet_data
+  # python gen_lenet_data.py
+  cd ${PROJECT_PATH}/
+  wget --no-check-certificate ${LENET_MS_URL} -P ${PROJECT_PATH}/ut_data/test_data/lenet/
+  ${gradle_command} test
 }
+
+java -version
+echo "JAVA_HOM is ${JAVA_HOME}"
 
 build_mindspore_federated_client
 

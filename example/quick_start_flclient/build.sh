@@ -16,7 +16,7 @@
 
 BASEPATH=$(cd "$(dirname $0)" || exit; pwd)
 
-FL_THIRD_PKG_PATH="${BASEPATH}/third/"
+FL_THIRD_PKG_PATH="${BASEPATH}/../../mindspore_federated/device_client/third/"
 MS_LITE_PKG_VER="1.9.0"
 MS_LITE_PKG_NAME="mindspore-lite-${MS_LITE_PKG_VER}-linux-x64"
 MS_PKG_URL="https://ms-release.obs.cn-north-4.myhuaweicloud.com/${MS_LITE_PKG_VER}/MindSpore/lite/release/linux/x86_64/${MS_LITE_PKG_NAME}.tar.gz"
@@ -89,10 +89,14 @@ load_ms_lite_pkg
 tar -zxf "${FL_THIRD_PKG_PATH}"/${MS_LITE_PKG_NAME}.tar.gz -C "${FL_THIRD_PKG_PATH}"/
 cp ${FL_THIRD_PKG_PATH}/${MS_LITE_PKG_NAME}/runtime/lib/mindspore-lite-java.jar ${BASEPATH}/lib/
 
-
-jar_base_name=$(basename ${FL_CLIENT_PATH})
-sed -i "s/mindspore-lite-java-flclient.*.jar/${jar_base_name}/" pom.xml
-
 cp $FL_CLIENT_PATH ${BASEPATH}/lib/
 
-mvn package -Dmaven.test.skip=true
+gradle_version=$(gradle --version | grep Gradle | awk '{print$2}')
+if [[ ${gradle_version} == '6.6.1' ]]; then
+  gradle_command=gradle
+else
+  gradle wrapper --gradle-version 6.6.1 --distribution-type all
+  gradle_command="${PROJECT_PATH}"/gradlew
+fi
+${gradle_command} clean
+${gradle_command} build

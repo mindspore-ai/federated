@@ -48,9 +48,10 @@ bash cli_build.sh
 ```
 
 ### 单元测试指导
+
 #### gradle工具执行单元测试
-- 将工程外部依赖包(编译时自动下载)路径下的mindspore-lite-$version-linux-x64/runtime/lib和$third/mindspore-lite-$version-linux-x64/runtime/third_party/libjpeg-turbo/libs
-添加到LD_LIBRARY_PATH
+
+- 将工程外部依赖包(编译时自动下载)路径下的mindspore-lite-$version-linux-x64/runtime/lib和$third/mindspore-lite-$version-linux-x64/runtime/third_party/libjpeg-turbo/libs添加到LD_LIBRARY_PATH
   >export LD_LIBRARY_PATH=$third/mindspore-lite-$version-linux-x64/runtime/lib:$third/mindspore-lite-$version-linux-x64/runtime/third_party/libjpeg-turbo/libs:${LD_LIBRARY_PATH}
 - 准备好单元测试数据，并设置环境变量MS_FL_UT_BASE_PATH为单元测试数据目录, 单元测试数据位于内部仓。
   >export MS_FL_UT_BASE_PATH=$UT_DATA
@@ -58,14 +59,16 @@ bash cli_build.sh
 - 执行`gradle test` 完成单元测试执行
 
 #### 命令行执行单元测试
-- 将工程外部依赖包(编译时自动下载)路径下的mindspore-lite-$version-linux-x64/runtime/lib和$third/mindspore-lite-$version-linux-x64/runtime/third_party/libjpeg-turbo/libs
-  添加到LD_LIBRARY_PATH
+
+- 将工程外部依赖包(编译时自动下载)路径下的mindspore-lite-$version-linux-x64/runtime/lib和$third/mindspore-lite-$version-linux-x64/runtime/third_party/libjpeg-turbo/libs添加到LD_LIBRARY_PATH
   >export LD_LIBRARY_PATH=$third/mindspore-lite-$version-linux-x64/runtime/lib:$third/mindspore-lite-$version-linux-x64/runtime/third_party/libjpeg-turbo/libs:${LD_LIBRARY_PATH}
 - 准备好单元测试数据，并设置环境变量MS_FL_UT_BASE_PATH为单元测试数据目录, 单元测试数据位于内部仓。
   >export MS_FL_UT_BASE_PATH=$UT_DATA
 - 将$MS_FL_UT_BASE_PATH/test_data/jar目录下的quick_start_flclient.jar，flclient_models.jar 复制到libs目录
 - 执行`grade flUTJarX86` 生成单元测试包， 然后执行如下指令：
-  > java -javaagent:build/libs/jarX86UT/jmockit-1.49.jar -cp build/libs/jarX86UT/mindspore-lite-java-flclient.jar org.junit.runner.JUnitCore com.mindspore.flclient.FLFrameUTRun
-  > 
-  > java -javaagent:build/libs/jarX86UT/jmockit-1.49.jar -cp build/libs/jarX86UT/mindspore-lite-java-flclient.jar org.junit.runner.JUnitCore com.mindspore.flclient.FLFrameUTInfer
+  > java -javaagent:build/libs/jarX86UT/jmockit-1.49.jar -cp build/libs/jarX86UT/mindspore-lite-java-flclient.jar
+  > org.junit.runner.JUnitCore com.mindspore.flclient.FLTrainTest
+  >
+  > java -javaagent:build/libs/jarX86UT/jmockit-1.49.jar -cp build/libs/jarX86UT/mindspore-lite-java-flclient.jar
+  > org.junit.runner.JUnitCore com.mindspore.flclient.FLInferTest
 
