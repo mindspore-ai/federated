@@ -37,6 +37,8 @@ float UnsupervisedEval::clusterEvaluate(const std::vector<std::vector<float>> &g
     score = silhouetteScore(group_ids, labels);
   } else if (eval_type == kCalinskiHarabaszScoreType) {
     score = calinskiHarabaszScore(group_ids, labels);
+  } else if (eval_type == kDaviesBouldinScoreType) {
+    score = daviesBouldinScore(group_ids, labels);
   } else {
     MS_LOG(EXCEPTION) << "Eval type:" << eval_type << " is not valid.";
   }
@@ -189,6 +191,130 @@ float UnsupervisedEval::silhouetteScore(const std::vector<std::vector<float>> &g
     }
   }
   return std::accumulate(s_i.begin(), s_i.end(), 0.0) / n_samples;
+}
+
+float UnsupervisedEval::euclideanDistance(const std::vector<float> &id1, const std::vector<float> &id2) {
+  if (id1.size() != id2.size()) {
+    MS_LOG(WARNING) << "Group-IDs has different data dimensions.";
+    return 0.0f;
+  }
+  float sum = 0.0f;
+  for (size_t i = 0; i < id1.size(); i++) {
+    sum += (id1[i] - id2[i]) * (id1[i] - id2[i]);
+  }
+  return sqrt(sum);
+}
+
+std::vector<std::vector<float>> UnsupervisedEval::getCentroid(const std::vector<std::vector<float>> &group_ids,
+                                                              const std::vector<size_t> &labels) {
+  size_t n_samples = group_ids.size();
+  std::unordered_set<size_t> nhash_labels(labels.begin(), labels.end());
+  size_t n_labels = nhash_labels.size();
+  size_t n_feature = group_ids[0].size();
+  std::vector<std::vector<float>> centroid(n_labels);
+  for (size_t i = 0; i < n_labels; i++) {
+    centroid[i].resize(n_feature);
+  }
+  for (size_t i = 0; i < n_samples; i++) {
+    size_t labeli = labels[i];
+    for (size_t j = 0; j < n_feature; j++) {
+      centroid[labeli][j] += group_ids[i][j];
+    }
+  }
+  for (size_t i = 0; i < n_labels; i++) {
+    size_t n_samples_i = std::count(labels.begin(), labels.end(), i);
+    for (size_t j = 0; j < n_feature; j++) {
+      centroid[i][j] /= n_samples_i;
+    }
+  }
+  return centroid;
+}
+
+std::vector<float> UnsupervisedEval::getIntra(const std::vector<std::vector<float>> &group_ids,
+                                              const std::vector<std::vector<float>> &centroid,
+                                              const std::vector<size_t> &labels) {
+  size_t n_samples = group_ids.size();
+  size_t n_labels = centroid.size();
+  std::vector<float> intra(n_labels);
+  for (size_t i = 0; i < n_samples; i++) {
+    size_t labeli = labels[i];
+    intra[labeli] += euclideanDistance(group_ids[i], centroid[labeli]);
+  }
+  for (size_t i = 0; i < n_labels; i++) {
+    size_t n_samples_i = std::count(labels.begin(), labels.end(), i);
+    intra[i] /= n_samples_i;
+  }
+  return intra;
+}
+
+std::vector<std::vector<float>> UnsupervisedEval::getOutra(const std::vector<std::vector<float>> &centroid) {
+  size_t n_labels = centroid.size();
+  std::vector<std::vector<float>> outra(n_labels - 1);
+  for (size_t i = 0; i < n_labels - 1; i++) {
+    outra[i].resize(n_labels - 1 - i);
+  }
+  for (size_t i = 0; i < n_labels - 1; i++) {
+    for (size_t j = 0; j < n_labels - 1 - i; j++) {
+      outra[i][j] = euclideanDistance(centroid[i], centroid[i + 1 + j]);
+    }
+  }
+  return outra;
+}
+
+std::vector<std::vector<float>> UnsupervisedEval::getCombined(const std::vector<float> intra,
+                                                              const std::vector<std::vector<float>> &outra) {
+  size_t n_labels = intra.size();
+  std::vector<std::vector<float>> combined(n_labels - 1);
+  for (size_t i = 0; i < n_labels - 1; i++) {
+    combined[i].resize(n_labels - 1 - i);
+  }
+  for (size_t i = 0; i < n_labels - 1; i++) {
+    for (size_t j = 0; j < n_labels - 1 - i; j++) {
+      combined[i][j] = (intra[i] + intra[j + i + 1]) / outra[i][j];
+    }
+  }
+  return combined;
+}
+
+std::vector<size_t> UnsupervisedEval::findPosition(const size_t i, const size_t j) {
+  std::vector<size_t> pos(2);
+  if (i < j) {
+    pos[0] = i;
+    pos[1] = j - 1 - i;
+  } else {
+    pos[0] = j;
+    pos[1] = i - 1 - j;
+  }
+  return pos;
+}
+
+float UnsupervisedEval::daviesBouldinScore(const std::vector<std::vector<float>> &group_ids,
+                                           const std::vector<size_t> &labels) {
+  size_t n_samples = group_ids.size();
+  std::unordered_set<size_t> nhash_labels(labels.begin(), labels.end());
+  size_t n_labels = nhash_labels.size();
+  if (n_labels < 2 || n_labels > n_samples - 1) {
+    MS_LOG(WARNING) << "Number of n_labels: " << n_labels << " is invalid, valid values are 2 to n_samples - 1.";
+    return 0.0f;
+  }
+  auto centroid = getCentroid(group_ids, labels);
+  auto intra = getIntra(group_ids, centroid, labels);
+  auto outra = getOutra(centroid);
+  auto combined = getCombined(intra, outra);
+  std::vector<float> score(n_labels);
+  for (size_t i = 0; i < n_labels; i++) {
+    size_t row = (i < 1) ? i : (i - 1);
+    float max = combined[row][0];
+    for (size_t j = 0; j < n_labels; j++) {
+      if (i == j) continue;
+      auto pos = findPosition(i, j);
+      if (combined[pos[0]][pos[1]] > max) {
+        max = combined[pos[0]][pos[1]];
+      }
+    }
+    score[i] = max;
+  }
+  return std::accumulate(score.begin(), score.end(), 0.0f) / n_labels;
 }
 }  // namespace cache
 }  // namespace fl

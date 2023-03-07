@@ -177,6 +177,7 @@ constexpr auto kQuant = "QUANT";
 constexpr auto kNotEvalType = "NOT_EVAL";
 constexpr auto kSilhouetteScoreType = "SILHOUETTE_SCORE";
 constexpr auto kCalinskiHarabaszScoreType = "CALINSKI_HARABASZ_SCORE";
+constexpr auto kDaviesBouldinScoreType = "DAVIES_BOULDIN_SCORE";
 
 constexpr auto kUpdateModelKernel = "updateModel";
 
