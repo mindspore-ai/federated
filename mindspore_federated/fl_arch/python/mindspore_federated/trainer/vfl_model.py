@@ -24,6 +24,7 @@ from mindspore import Tensor, Parameter
 from mindspore import nn, context
 from mindspore.ops import PrimitiveWithInfer, prim_attr_register
 from mindspore.context import ParallelMode
+from mindspore.common.api import _pynative_executor
 from ..startup.compress_config import CompressConfig, NO_COMPRESS_TYPE
 
 from .vfl_optim import PartyOptimizer, PartyGradScaler, _reorganize_input_data
@@ -342,6 +343,9 @@ class FLModel:
 
         # increase the global step
         self.global_step += 1
+        # clean pynative cache to avoid memory leaks
+        if self.global_step % 100 == 0:
+            _pynative_executor.sync()
 
         return scales
 
