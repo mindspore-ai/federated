@@ -53,6 +53,7 @@ def parse_cmdline_with_yaml(parser, cfg, helper=None, choices=None, cfg_path="de
 def parse_yaml(yaml_path):
     """
     Parse the yaml config file.
+
     Args:
         yaml_path: Path to the yaml config.
     """
@@ -78,7 +79,24 @@ def parse_yaml(yaml_path):
 
 def get_config(cfg_file):
     """
-    Get default config from yaml file
+    Parse yaml file to get configuration information.
+
+    Args:
+        cfg_file(str):the directory of yaml file.
+
+    Returns:
+        argparse, the configuration information parsed from yaml file.
+
+    Note:
+        Using this function get configuration information to construct FLDataWorker.
+
+    Examples:
+        >>> current_dir = os.path.dirname(os.path.abspath(__file__))
+        >>> args = get_config(os.path.join(current_dir, "vfl/vfl_data_join_config.yaml"))
+        >>> dict_cfg = args.__dict__
+        >>>
+        >>> worker = FLDataWorker(config=dict_cfg)
+        ...
     """
     parser = argparse.ArgumentParser(description="default name", add_help=False)
     default, helper, choices = parse_yaml(cfg_file)

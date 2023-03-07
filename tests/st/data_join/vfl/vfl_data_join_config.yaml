@@ -61,19 +61,19 @@ mysql_table_name:
 # config for communicator
 server_name:
   def_val: "leader_node"
-  help: "Local http server name, used for communication."
+  help: "Name of local http server that used for communication."
 http_server_address:
   def_val: "127.0.0.1:1086"
   help: "Local IP and Port Address, which must be set in both leader and follower."
 remote_server_name:
   def_val: "follower_node"
-  help: "Remote http server name, used for communication."
+  help: "Name of remote http server that used for communication"
 remote_server_address:
   def_val: "127.0.0.1:1087"
   help: "Peer IP and Port Address, which must be set in both leader and follower."
 # arguments for ssl
 enable_ssl:
-  def_val: True
+  def_val: False
   help: "SSL mode enabled or disabled for communication."
   choices: [ True, False ]
 server_password:

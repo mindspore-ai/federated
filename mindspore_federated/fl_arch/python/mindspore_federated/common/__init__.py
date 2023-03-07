@@ -13,10 +13,12 @@
 # limitations under the License.
 # ============================================================================
 """common"""
+from .config import get_config
 from . import data_join_utils
 from . import tensor_utils
 
 __all__ = [
     "data_join_utils",
     "tensor_utils",
+    "get_config"
 ]

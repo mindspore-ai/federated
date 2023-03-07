@@ -70,3 +70,16 @@ data_join
     .. note::
         该接口将 `kwargs` 透传给MindDataset。
         有关 `kwargs` 中更多超参数的详细信息，请参见MindDataset。
+
+.. py:function:: mindspore_federated.common.config.get_config(cfg_file)
+
+    解析yaml文件获取配置信息。
+
+    参数：
+        - **cfg_file** (str) - yaml配置文件的路径。
+
+    返回：
+        - **args** (argparse) - 解析yaml得到的配置信息。
+
+    .. note::
+        通过该接口获取字典格式的参数列表构造FLDataWorker。
