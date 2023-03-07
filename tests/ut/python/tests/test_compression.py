@@ -151,8 +151,8 @@ def test_vfl_communication_compression():
     follower_process.start()
 
     # start and stop processes
-    leader_process.join(timeout=20)
-    follower_process.join(timeout=20)
+    leader_process.join(timeout=200)
+    follower_process.join(timeout=200)
     leader_process.terminate()
     follower_process.terminate()
     leader_process.kill()
@@ -183,6 +183,8 @@ def test_vfl_communication_compression():
     # check results
     rtol = 1.e-2
     atol = 1.e-2
+    assert len(leader_send_outputs) == len(follower_recv_outputs) == 7
+    assert len(leader_recv_outputs) == len(follower_send_outputs) == 2
     for output1, output2 in zip(leader_send_outputs, follower_recv_outputs):
         assert np.allclose(output1, output2, rtol, atol)
     for output1, output2 in zip(leader_recv_outputs, follower_send_outputs):
