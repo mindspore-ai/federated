@@ -185,6 +185,10 @@ void YamlConfig::InitCompressionConfig() {
   Get("compression.download_compress_type", &compression_config.download_compress_type, false,
       {kNoCompressType, kQuant});
   FLContext::instance()->set_compression_config(compression_config);
+
+  MS_LOG(INFO) << "upload_compress_type is " << compression_config.upload_compress_type << ", upload_sparse_rate is "
+               << compression_config.upload_sparse_rate << ", download_compress_type is "
+               << compression_config.download_compress_type;
 }
 
 void YamlConfig::InitClientVerifyConfig() {

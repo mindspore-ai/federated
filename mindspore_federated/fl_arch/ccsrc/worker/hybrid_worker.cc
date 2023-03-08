@@ -18,6 +18,7 @@
 #include <string>
 #include <vector>
 #include <utility>
+#include <map>
 #include "common/exit_handler.h"
 #include "worker/hybrid_worker.h"
 #include "armour/secure_protocol/key_agreement.h"
@@ -33,7 +34,7 @@ HybridWorker &HybridWorker::GetInstance() {
   return instance;
 }
 
-void HybridWorker::Init() {
+void HybridWorker::Init(const std::map<std::string, std::vector<float>> &initial_model) {
   if (running_.load()) {
     MS_LOG_EXCEPTION << "Worker has been inited";
   }
@@ -45,6 +46,7 @@ void HybridWorker::Init() {
   MS_EXCEPTION_IF_NULL(worker_node_);
   fl_name_ = FLContext::instance()->fl_name();
   MS_LOG(INFO) << "Fl name is " << fl_name_;
+  initial_model_ = initial_model;
   if (!worker_node_->Start()) {
     MS_LOG(EXCEPTION) << "Starting worker node failed.";
   }
@@ -192,6 +194,8 @@ std::string HybridWorker::fl_id() const {
 }
 
 std::string HybridWorker::instance_name() const { return instance_name_; }
+
+const std::map<std::string, std::vector<float>> &HybridWorker::initial_model() const { return initial_model_; }
 }  // namespace worker
 }  // namespace fl
 }  // namespace mindspore

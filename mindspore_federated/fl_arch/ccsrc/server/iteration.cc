@@ -379,9 +379,9 @@ void Iteration::SaveModel() {
       if (model == nullptr || model->weight_data.empty() || model->weight_items.empty() ||
           !LocalMetaStore::GetInstance().verifyAggregationFeatureMap(model)) {
         MS_LOG(WARNING) << "Verify feature maps failed, iteration " << store_iteration_num
-                        << " will not be stored. Use the previous iteration model instead";
-        const auto &model_pair = ModelStore::GetInstance().GetLatestModel();
-        ModelStore::GetInstance().StoreModelByIterNum(store_iteration_num, model_pair.second);
+                        << " will not be stored. Use the initial iteration model instead.";
+        const auto &initial_model = ModelStore::GetInstance().AssignNewModelMemory();
+        ModelStore::GetInstance().StoreModelByIterNum(store_iteration_num, initial_model);
         is_iteration_valid_ = false;
         return;
       }

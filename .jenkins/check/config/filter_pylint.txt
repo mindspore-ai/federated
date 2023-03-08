@@ -4,3 +4,4 @@
 "federated/tests/ut/python/tests/mindspore_fl/schema"                                   "useless-object-inheritance"
 "federated/tests/ut/python/tests/mindspore_fl/schema"                                   "multiple-statements"
 "federated/tests/ut/python/tests/mindspore_fl/schema"                                   "line-too-long"
+"federated/tests/st/client_simulator/"                                                  "wrong-import-position"

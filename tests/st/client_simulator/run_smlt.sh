@@ -18,9 +18,10 @@ export PYTHONPATH=../../../../:$PYTHONPATH
 client_num=$1
 http_type=$2
 http_server_address=$3
+checkpoint_path=$4
 
 for((i=0;i<client_num;i++));
 do
   echo $http_server_address
-  python simulator.py --pid=$i --http_type=$http_type --http_server_address=$http_server_address> simulator_$i.log 2>&1 &
+  python simulator.py --pid=$i --http_type=$http_type --http_server_address=$http_server_address --checkpoint_path=$checkpoint_path> simulator_$i.log 2>&1 &
 done

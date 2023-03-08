@@ -231,7 +231,11 @@ class FederatedLearningManager(Callback):
         encrypt_type = ctx.encrypt_type()
         ctx.set_http_server_address(http_server_address)
 
-        Federated_.init_federated_worker()
+        initial_model = {}
+        for param in model.trainable_params():
+            param_data = np.reshape(param.asnumpy(), -1)
+            initial_model[param.name] = param_data
+        Federated_.init_federated_worker(initial_model)
 
         Validator.check_isinstance('model', model, nn.Cell)
         Validator.check_positive_int(sync_frequency)
