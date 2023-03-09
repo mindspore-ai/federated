@@ -49,6 +49,9 @@
         返回：
             Dict，评估网络的输出。key为训练网络输出的变量名称，value为对应的Tensor张量。
 
+    .. py:method:: get_compress_configs()
+
+        获取压缩配置。
 
     .. py:method:: load_ckpt(phrase: str = 'eval', path: str = None)
 
@@ -65,11 +68,6 @@
 
         参数：
             - **path** (str) - 保存checkpoint的路径。如果未定义 `path` ，则将使用yaml文件中定义的 `ckpt_path` 作为checkpoint保存路径。默认值：None。
-
-
-    .. py:method:: get_compress_configs()
-
-        获取压缩配置。
 
 .. py:class:: mindspore_federated.FLYamlData(yaml_path: str)
 
