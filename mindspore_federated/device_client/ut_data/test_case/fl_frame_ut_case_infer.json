@@ -1,0 +1,23 @@
+[
+{
+  'caseName':'New_Frame_Lenet_inference',
+  'trainDataPath':'/test_data/lenet/f0178_39/f0178_39_bn_9_train_data.bin,/test_data/lenet/f0178_39/f0178_39_bn_9_train_label.bin',
+  'evalDataPath':'/test_data/lenet/f0178_39/f0178_39_bn_1_test_data.bin,/test_data/lenet/f0178_39/f0178_39_bn_1_test_label.bin',
+  'inferDataPath':'/test_data/lenet/f0178_39/f0178_39_bn_1_test_data.bin,/test_data/lenet/f0178_39/f0178_39_bn_1_test_label.bin',
+  'pathRegex':',',
+  'flName':'com.mindspore.flclient.demo.lenet.LenetClient',
+  'trainModelPath':'/test_data/lenet/lenet_train.ms',
+  'inferModelPath':'/test_data/lenet/lenet_train.ms',
+  'deployEnv':'x86',
+  'domainName':'http://127.0.0.1:6668',
+  'sslProtocol':'TLSv1.2',
+  'useSSL':'false',
+  'serverNum':'2',
+  'certPath':'CARoot.pem',
+  'task':'inference',
+  'serverMod':'FEDERATED_LEARNING',
+  'cpuBindMode':'NOT_BINDING_CORE',
+  'httpRes':[],
+  'resultCode':0
+}
+]
