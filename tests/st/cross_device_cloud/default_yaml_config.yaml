@@ -34,6 +34,7 @@ unsupervised:
 
 encrypt:
   encrypt_type: NOT_ENCRYPT
+  privacy_eval_type: LAPLACE
   pw_encrypt:
     share_secrets_ratio: 1.0
     cipher_time_window: 3000
@@ -48,6 +49,8 @@ encrypt:
     sign_thr_ratio: 0.6
     sign_global_lr: 0.1
     sign_dim_out: 0
+  laplace_eval:
+    laplace_eval_eps: 230260
 
 compression:
   upload_compress_type: NO_COMPRESS

@@ -163,6 +163,13 @@ constexpr int64_t kLength = 100;
 constexpr int64_t kMaxPort = 65535;
 constexpr int64_t kSecurityLevel = 3;
 
+// encrypt
+constexpr float kSignKUpper = 0.25;
+constexpr float kSignEpsUpper = 100;
+constexpr float kSignThrRatioBound = 0.5;
+constexpr int kSignDimOutUpper = 50;
+constexpr float kLaplaceEvalEpsUpper = 500000;
+
 constexpr char kServerModeFL[] = "FEDERATED_LEARNING";
 constexpr char kServerModeHybrid[] = "HYBRID_TRAINING";
 constexpr char kServerModeCloud[] = "CLOUD_TRAINING";
@@ -178,6 +185,8 @@ constexpr auto kNotEvalType = "NOT_EVAL";
 constexpr auto kSilhouetteScoreType = "SILHOUETTE_SCORE";
 constexpr auto kCalinskiHarabaszScoreType = "CALINSKI_HARABASZ_SCORE";
 constexpr auto kDaviesBouldinScoreType = "DAVIES_BOULDIN_SCORE";
+constexpr auto kLaplacePrivacyEvalType = "LAPLACE";
+constexpr auto kNotPrivacyEvalType = "NOT_ENCRYPT";
 
 constexpr auto kUpdateModelKernel = "updateModel";
 

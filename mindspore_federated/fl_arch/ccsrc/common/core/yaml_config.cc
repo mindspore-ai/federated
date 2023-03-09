@@ -174,6 +174,12 @@ void YamlConfig::InitEncryptConfig() {
     Get("encrypt.signds.sign_global_lr", &encrypt_config.sign_global_lr, false, CheckFloat(0, GT));      // >0
     Get("encrypt.signds.sign_dim_out", &encrypt_config.sign_dim_out, false, CheckInt(0, 50, INC_BOTH));  // [0, 50]
   }
+  Get("encrypt.privacy_eval_type", &encrypt_config.privacy_eval_type, false,
+      {kNotPrivacyEvalType, kLaplacePrivacyEvalType});
+  if (encrypt_config.privacy_eval_type == kLaplacePrivacyEvalType) {
+    Get("encrypt.laplace_eval.laplace_eval_eps", &encrypt_config.laplace_eval_eps, false,
+        CheckFloat(0, 500000, INC_RIGHT));  // (0, 500000]
+  }
   FLContext::instance()->set_encrypt_config(encrypt_config);
 }
 

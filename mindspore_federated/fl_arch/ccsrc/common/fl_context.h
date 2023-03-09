@@ -46,6 +46,8 @@ struct AggregationConfig {
 
 struct EncryptConfig {
   std::string encrypt_type = kNotEncryptType;
+  // the type of privacy-preserving unsupervised-eval for client data. Default: not encrypt
+  std::string privacy_eval_type = kNotPrivacyEvalType;
   // pw encrypt
   float share_secrets_ratio = 1.0f;
   uint64_t cipher_time_window = 1;
@@ -60,6 +62,8 @@ struct EncryptConfig {
   float sign_thr_ratio = 0.6f;
   float sign_global_lr = 0.1f;
   uint64_t sign_dim_out = 0;
+  // laplace eval epsilon
+  float laplace_eval_eps = 100.0f;
 };
 
 struct CompressionConfig {
@@ -372,6 +376,7 @@ class MS_EXPORT FLContext {
   void CheckDPEncrypt(const EncryptConfig &config) const;
   void CheckSignDsEncrypt(const EncryptConfig &config) const;
   void CheckPWEncrypt(const EncryptConfig &config) const;
+  void CheckLaplaceEvalEps(const EncryptConfig &config) const;
 };
 }  // namespace fl
 }  // namespace mindspore

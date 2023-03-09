@@ -26,6 +26,8 @@ import java.security.SecureRandom;
 import java.util.*;
 import java.util.logging.Logger;
 
+import static java.lang.Math.log;
+
 /**
  * Defines encryption and decryption methods.
  *
@@ -34,6 +36,8 @@ import java.util.logging.Logger;
 public class SecureProtocol {
     private static final Logger LOGGER = FLLoggerGenerater.getModelLogger(SecureProtocol.class.toString());
     private static double deltaError = 1e-6d;
+    private static float laplaceEpsUpper = 500000f;
+
     private static Map<String, float[]> modelMap;
 
     private FLParameter flParameter = FLParameter.getInstance();
@@ -485,7 +489,7 @@ public class SecureProtocol {
      * @param eps           the privacy budget of SignDS alg.
      * @return the optimum output dimension.
      */
-    private static int findOptOutputDim(float thrInterRatio, int topkDim, int inputDim, float eps) {
+    public static int findOptOutputDim(float thrInterRatio, int topkDim, int inputDim, float eps) {
         int outputDim = 1;
         while (true) {
             int thr = calcOptThr(topkDim, inputDim, outputDim, eps);
@@ -546,7 +550,7 @@ public class SecureProtocol {
      */
     private static void randomSelect(SecureRandom secureRandom, int[] inputList, int inStartPos, int inRang, int selectNums,
                                      int[] outputList, int outStartPos) {
-        if (selectNums <= 0) {
+        if (selectNums < 0) {
             LOGGER.severe("[SignDS] The number to be selected is set incorrectly!");
             return;
         }
@@ -671,6 +675,7 @@ public class SecureProtocol {
             return new int[0];
         }
         int numInter = countInters(thrDim, denominator, topkDim, inputDim, signDimOut, signEps);
+        LOGGER.info("[SignDS] numInter is " + numInter);
         int numOuter = signDimOut - numInter;
         if (topkDim < numInter || signDimOut <= 0) {
             LOGGER.severe("[SignDS] topkDim or signDimOut is ERROR! please check");
@@ -699,5 +704,48 @@ public class SecureProtocol {
         Arrays.sort(outputDimensionIndexList);
         LOGGER.info("[SignDS] outputDimension size is " + outputDimensionIndexList.length);
         return outputDimensionIndexList;
+    }
+
+    /**
+     * generate laplace noise.
+     *
+     * @param secureRandom
+     * @param beta
+     * @return
+     */
+    float genLaplaceNoise(SecureRandom secureRandom, float beta) {
+        float u1 = secureRandom.nextFloat();
+        float u2 = secureRandom.nextFloat();
+        if (u1 <= 0.5f) {
+            return (float) (-beta * log(1. - u2));
+        } else {
+            return (float) (beta * log(u2));
+        }
+    }
+
+    /**
+     * add laplace noise to input data.
+     *
+     * @param data input data.
+     * @param eps  privacy budget/
+     * @return float list.
+     */
+    float[] addLaplaceNoise(float[] data, float eps) {
+        if (eps <= 0 || eps > laplaceEpsUpper) {
+            LOGGER.severe("eps for laplace is out of range.");
+            return data;
+        }
+        if (data.length <= 0) {
+            LOGGER.warning("The input data of laplace is empty, please check.");
+            return data;
+        }
+        LOGGER.info("laplace eps is " + eps);
+        float globalSensitivity = 1f;
+        float beta = globalSensitivity / eps;
+        SecureRandom secureRandom = Common.getSecureRandom();
+        for (int i = 0; i < data.length; i++) {
+            data[i] += genLaplaceNoise(secureRandom, beta);
+        }
+        return data;
     }
 }

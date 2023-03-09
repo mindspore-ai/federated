@@ -33,7 +33,9 @@ import mindspore.fl.schema.ResponseUpdateModel;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -72,6 +74,7 @@ public class FLLiteClient {
     private float signGlobalLr = 1f;
     private int signDimOut = 0;
     private float evaAcc = 0.0f;
+    private float laplaceEps = 230260f;
 
     public float getEvaAcc() {
         return evaAcc;
@@ -162,6 +165,18 @@ public class FLLiteClient {
                 break;
             default:
                 LOGGER.info("[startFLJob] NOT_ENCRYPT, do not set parameter for Encrypt");
+        }
+        // Device does Eval regardless of whether the cloud side flag is "NOT_EVAL" or "NOT_ENCRYPT".
+        if (localFLParameter.getUnsupervisedEvalFlg().equals(localFLParameter.NOT_EVAL) ||
+                localFLParameter.getUnsupervisedEvalFlg().equals(localFLParameter.NOT_ENCRYPT)) {
+            LOGGER.info("[startFLJob] UnsupervisedEvalFlg from server: " + localFLParameter.getUnsupervisedEvalFlg());
+        } else if (localFLParameter.getUnsupervisedEvalFlg().equals(localFLParameter.LAPLACE_EVAL_TYPE)) {
+            laplaceEps = cipherPublicParams.laplaceParams();
+            LOGGER.info("[startFLJob] UnsupervisedEvalFlg from server: " + localFLParameter.getUnsupervisedEvalFlg() +
+                    ", GlobalParameters <laplaceEps> from server: " + laplaceEps);
+        } else {
+            LOGGER.warning("[startFLJob] GlobalParameters <laplaceEps> is Unknown: " +
+                    localFLParameter.getUnsupervisedEvalFlg());
         }
         return 0;
     }
@@ -315,7 +330,7 @@ public class FLLiteClient {
 
     private FLClientStatus trainLoop() {
         Client client = ClientManager.getClient(flParameter.getFlName());
-        if(!client.EnableTrain(true)){
+        if (!client.EnableTrain(true)) {
             retCode = ResponseCode.RequestError;
             return FLClientStatus.FAILED;
         }
@@ -368,6 +383,19 @@ public class FLLiteClient {
                 flParameter.getDomainName());
         UpdateModel updateModelBuf = UpdateModel.getInstance();
         Map<String, float[]> unsupervisedEvalData = client.getUnsupervisedEvalData();
+        if (localFLParameter.getUnsupervisedEvalFlg().equals(localFLParameter.LAPLACE_EVAL_TYPE)) {
+            String directClassifierResult;
+            if (unsupervisedEvalData.size() == 1) {
+                List<String> unsupervisedEvalDataList = new ArrayList<>(unsupervisedEvalData.keySet());
+                directClassifierResult = unsupervisedEvalDataList.get(0);
+                unsupervisedEvalData.put(directClassifierResult,
+                        secureProtocol.addLaplaceNoise(unsupervisedEvalData.get(directClassifierResult), laplaceEps));
+                LOGGER.info("LAPLACE execution completed.");
+            } else {
+                LOGGER.warning("unsupervisedEvalData map size is not 1, but get " + unsupervisedEvalData.size() +
+                        ". The LAPLACE cannot be used.");
+            }
+        }
         byte[] updateModelBuffer = updateModelBuf.getRequestUpdateFLJob(iteration, secureProtocol, trainDataSize,
                 evaAcc, unsupervisedEvalData);
         if (updateModelBuf.getStatus() == FLClientStatus.FAILED) {

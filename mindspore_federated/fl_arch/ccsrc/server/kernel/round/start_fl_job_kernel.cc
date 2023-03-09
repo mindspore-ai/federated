@@ -365,12 +365,14 @@ void StartFLJobKernel::BuildStartFLJobRsp(const std::shared_ptr<FBBuilder> &fbb,
   float sign_thr_ratio = param->sign_thr_ratio;
   float sign_global_lr = param->sign_global_lr;
   int sign_dim_out = param->sign_dim_out;
+  auto privacy_eval_type = param->privacy_eval_type;
+  float laplace_eval_eps = param->laplace_eval_eps;
 
   auto pw_params = schema::CreatePWParams(*fbb.get(), t, p, g, prime);
   auto dp_params = schema::CreateDPParams(*fbb.get(), dp_eps, dp_delta, dp_norm_clip);
   auto ds_params = schema::CreateDSParams(*fbb.get(), sign_k, sign_eps, sign_thr_ratio, sign_global_lr, sign_dim_out);
   auto cipher_public_params =
-    schema::CreateCipherPublicParams(*fbb.get(), encrypt_type, pw_params, dp_params, ds_params);
+    schema::CreateCipherPublicParams(*fbb.get(), encrypt_type, pw_params, dp_params, ds_params, laplace_eval_eps);
 
   schema::CompressType upload_compress_type;
   if (FLContext::instance()->compression_config().upload_compress_type == kDiffSparseQuant) {
@@ -379,13 +381,16 @@ void StartFLJobKernel::BuildStartFLJobRsp(const std::shared_ptr<FBBuilder> &fbb,
     upload_compress_type = schema::CompressType_NO_COMPRESS;
   }
 
-  schema::UnsupervisedEvalFlg fbs_unsupervised_eval_flg;
+  std::string unsupervised_eval_flg;
   auto eval_type = FLContext::instance()->unsupervised_config().eval_type;
-  if (eval_type != kNotEvalType) {
-    fbs_unsupervised_eval_flg = schema::UnsupervisedEvalFlg_EVAL_ENABLE;
+  // There are only three cases of unsupervised_eval_flg: kNotEvalType, eval with no encryption, and eval with
+  // encryption.
+  if (eval_type == kNotEvalType) {
+    unsupervised_eval_flg = kNotEvalType;
   } else {
-    fbs_unsupervised_eval_flg = schema::UnsupervisedEvalFlg_EVAL_DISABLE;
+    unsupervised_eval_flg = param->privacy_eval_type;
   }
+  auto fbs_unsupervised_eval_flg = fbb->CreateString(unsupervised_eval_flg);
   schema::FLPlanBuilder fl_plan_builder(*(fbb.get()));
   fl_plan_builder.add_fl_name(fbs_fl_name);
   fl_plan_builder.add_server_mode(fbs_server_mode);

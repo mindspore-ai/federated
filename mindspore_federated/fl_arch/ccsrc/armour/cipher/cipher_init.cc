@@ -54,7 +54,18 @@ bool CipherInit::Init(const CipherPublicPara &param, size_t time_out_mutex, cons
   publicparam_.sign_thr_ratio = param.sign_thr_ratio;
   publicparam_.sign_global_lr = param.sign_global_lr;
   publicparam_.sign_dim_out = param.sign_dim_out;
+  publicparam_.privacy_eval_type = param.privacy_eval_type;
+  publicparam_.laplace_eval_eps = param.laplace_eval_eps;
 
+  if (param.encrypt_type == kNotEncryptType) {
+    MS_LOG(INFO)
+      << "The privacy protection algorithm is not used to process the uploaded model, preventing user privacy leakage.";
+  }
+
+  if (param.privacy_eval_type == kNotPrivacyEvalType) {
+    MS_LOG(INFO) << "The privacy protection algorithm is not used to process the uploaded inference result, preventing "
+                    "user privacy leakage.";
+  }
   if (param.encrypt_type == kDPEncryptType) {
     MS_LOG(INFO) << "DP parameters init, dp_eps: " << param.dp_eps << ", dp_delta: " << param.dp_delta
                  << ", dp_norm_clip: " << param.dp_norm_clip;

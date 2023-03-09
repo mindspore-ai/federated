@@ -42,6 +42,7 @@ table CipherPublicParams {
   pw_params:PWParams;
   dp_params:DPParams;
   ds_params:DSParams;
+  laplace_params:float;
 }
 
 table ClientPublicKeys {

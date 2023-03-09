@@ -167,6 +167,9 @@ const DistributedCacheConfig &FLContext::distributed_cache_config() const { retu
 
 void FLContext::set_encrypt_config(const EncryptConfig &config) {
   encrypt_config_ = config;
+  if (encrypt_config_.privacy_eval_type == kLaplacePrivacyEvalType) {
+    CheckLaplaceEvalEps(config);
+  }
   auto &encrypt_type = encrypt_config_.encrypt_type;
   if (encrypt_type != kNotEncryptType && encrypt_type != kDPEncryptType && encrypt_type != kPWEncryptType &&
       encrypt_type != kStablePWEncryptType && encrypt_type != kDSEncryptType) {
@@ -181,6 +184,7 @@ void FLContext::set_encrypt_config(const EncryptConfig &config) {
   CheckSignDsEncrypt(config);
   CheckPWEncrypt(config);
 }
+
 void FLContext::CheckPWEncrypt(const EncryptConfig &config) const {
   if (config.share_secrets_ratio <= 0 || config.share_secrets_ratio > 1) {
     MS_LOG(EXCEPTION) << config.share_secrets_ratio << " is invalid, share_secrets_ratio must be in range of (0, 1].";
@@ -195,17 +199,14 @@ void FLContext::CheckPWEncrypt(const EncryptConfig &config) const {
 }
 
 void FLContext::CheckSignDsEncrypt(const EncryptConfig &config) const {
-  const float sign_k_upper = 0.25;
-  if (config.sign_k <= 0 || config.sign_k > sign_k_upper) {
+  if (config.sign_k <= 0 || config.sign_k > kSignKUpper) {
     MS_LOG(EXCEPTION) << config.sign_k << " is invalid, sign_k must be in range of (0, 0.25], 0.01 is used by default.";
   }
-  const float sign_eps_upper = 100;
-  if (config.sign_eps <= 0 || config.sign_eps > sign_eps_upper) {
+  if (config.sign_eps <= 0 || config.sign_eps > kSignEpsUpper) {
     MS_LOG(EXCEPTION) << config.sign_eps
                       << " is invalid, sign_eps must be in range of (0, 100], 100 is used by default.";
   }
-  const float sign_thr_ratio_bound = 0.5;
-  if (config.sign_thr_ratio < sign_thr_ratio_bound || config.sign_thr_ratio > 1) {
+  if (config.sign_thr_ratio < kSignThrRatioBound || config.sign_thr_ratio > 1) {
     MS_LOG(EXCEPTION) << config.sign_thr_ratio
                       << " is invalid, sign_thr_ratio must be in range of [0.5, 1], 0.6 is used by default.";
   }
@@ -213,10 +214,17 @@ void FLContext::CheckSignDsEncrypt(const EncryptConfig &config) const {
     MS_LOG(EXCEPTION) << config.sign_global_lr
                       << " is invalid, sign_global_lr must be larger than 0, 1 is used by default.";
   }
-  const int sign_dim_out_upper = 50;
-  if (config.sign_dim_out < 0 || config.sign_dim_out > sign_dim_out_upper) {
+  if (config.sign_dim_out < 0 || config.sign_dim_out > kSignDimOutUpper) {
     MS_LOG(EXCEPTION) << config.sign_dim_out
                       << " is invalid, sign_dim_out must be in range of [0, 50], 0 is used by default.";
+  }
+}
+
+void FLContext::CheckLaplaceEvalEps(const EncryptConfig &config) const {
+  MS_LOG(INFO) << "laplace eval eps is " << config.laplace_eval_eps;
+  if (config.laplace_eval_eps <= 0 || config.laplace_eval_eps > kLaplaceEvalEpsUpper) {
+    MS_LOG(EXCEPTION) << config.laplace_eval_eps
+                      << " is invalid, laplace_eval_eps must be in range of (0, 500000], 230260 is used by default.";
   }
 }
 

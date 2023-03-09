@@ -490,6 +490,8 @@ void Server::InitCipher() {
   param.sign_thr_ratio = encrypt_config.sign_thr_ratio;
   param.sign_global_lr = encrypt_config.sign_global_lr;
   param.sign_dim_out = static_cast<int>(encrypt_config.sign_dim_out);
+  param.privacy_eval_type = encrypt_config.privacy_eval_type;
+  param.laplace_eval_eps = encrypt_config.laplace_eval_eps;
 
   BIGNUM *prim = BN_new();
   if (prim == NULL) {

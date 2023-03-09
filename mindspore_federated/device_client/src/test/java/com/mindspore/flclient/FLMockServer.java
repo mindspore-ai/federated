@@ -19,8 +19,6 @@ import java.util.*;
 import java.util.logging.Logger;
 
 import static mindspore.fl.schema.CompressType.NO_COMPRESS;
-import static mindspore.fl.schema.UnsupervisedEvalFlg.EVAL_DISABLE;
-import static mindspore.fl.schema.UnsupervisedEvalFlg.EVAL_ENABLE;
 
 /**
  * Using this class to Mock the FL server node
@@ -163,6 +161,8 @@ class FLMockServer {
         int flPlanConfigOffset = genFLPlan(builder);
         int reasonOffset = builder.createString("Success.");
 
+        int evalFlgOffset = builder.createString("NOT_ENCRYPT.");
+
         builder.startTable(13);
         ResponseFLJob.addCompressFeatureMap(builder, 0);
         ResponseFLJob.addUploadSparseRate(builder, 0.0f);
@@ -173,7 +173,7 @@ class FLMockServer {
         ResponseFLJob.addIteration(builder, 1);
         ResponseFLJob.addReason(builder, reasonOffset);
         ResponseFLJob.addRetcode(builder, 200);
-        ResponseFLJob.addUnsupervisedEvalFlg(builder, EVAL_ENABLE);
+        ResponseFLJob.addUnsupervisedEvalFlg(builder, evalFlgOffset);
         ResponseFLJob.addDownloadCompressType(builder, NO_COMPRESS);
         ResponseFLJob.addUploadCompressType(builder, NO_COMPRESS);
         ResponseFLJob.addIsSelected(builder, true);

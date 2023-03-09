@@ -73,6 +73,8 @@ struct CipherPublicPara {
   float sign_thr_ratio;
   float sign_global_lr;
   int sign_dim_out;
+  std::string privacy_eval_type;
+  float laplace_eval_eps;
 };
 
 class CipherMetaStorage {
