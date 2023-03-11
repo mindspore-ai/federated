@@ -23,11 +23,12 @@ from mindspore import set_seed
 from mindspore import context
 from mindspore_federated import FLModel, FLYamlData
 from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig
+
+from mindspore_federated.startup.ssl_config import SSLConfig
 from wide_and_deep import WideDeepModel, BottomLossNet
 
 from network_config import config
 from run_vfl_train_local import construct_local_dataset
-
 
 set_seed(0)
 
@@ -54,11 +55,24 @@ class FollowerTrainer:
         compress_configs = self.follower_bottom_fl_model.get_compress_configs()
 
         # build vertical communicator
+        enable_ssl = config.enable_ssl
         http_server_config = ServerConfig(server_name='follower', server_address=config.http_server_address)
         remote_server_config = ServerConfig(server_name='leader', server_address=config.remote_server_address)
-        self.vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
-                                                                   remote_server_config=remote_server_config,
-                                                                   compress_configs=compress_configs)
+        if enable_ssl:
+            ssl_config = SSLConfig(server_password=config.server_password, client_password=config.client_password,
+                                   server_cert_path=config.server_cert_path,
+                                   client_cert_path=config.client_cert_path,
+                                   ca_cert_path=config.ca_cert_path)
+
+            self.vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+                                                                       remote_server_config=remote_server_config,
+                                                                       enable_ssl=True,
+                                                                       ssl_config=ssl_config,
+                                                                       compress_configs=compress_configs)
+        else:
+            self.vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+                                                                       remote_server_config=remote_server_config,
+                                                                       compress_configs=compress_configs)
         self.vertical_communicator.launch()
         logging.info('Init follower trainer finish.')
 
@@ -91,7 +105,6 @@ train_size = ds_train.get_dataset_size()
 eval_size = ds_eval.get_dataset_size()
 logging.info("train_size is: %d", train_size)
 logging.info("eval_size is: %d", eval_size)
-
 
 if __name__ == '__main__':
     follower_trainer = FollowerTrainer()

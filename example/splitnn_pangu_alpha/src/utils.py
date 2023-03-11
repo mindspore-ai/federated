@@ -38,7 +38,6 @@ from src.dataset import create_dataset
 from src.pangu_alpha_config import PanguAlphaConfig
 from src.ms_transformer import TransformerOpParallelConfig, TransformerRecomputeConfig, CrossEntropyLoss
 
-
 get_square_sum = C.MultitypeFuncGraph("get_square_sum")
 
 
@@ -390,67 +389,58 @@ def add_training_params(opt):
                      type=str, default="adam",
                      choices=["adam", "lamb"],
                      help="select which optimizer to be used, default adam")
-    opt.add_argument("--opt_offload",
-                     type=int, default=0,
+    opt.add_argument("--opt_offload", type=int, default=0,
                      help="Enable optimizer status offload to host CPU, default is 0")
-    opt.add_argument("--use_moe",
-                     type=int, default=0,
+    opt.add_argument("--use_moe", type=int, default=0,
                      help="Use moe, default is 0")
-    opt.add_argument("--expert_num",
-                     type=int, default=1,
+    opt.add_argument("--expert_num", type=int, default=1,
                      help="Expert number, only effective when applying moe, Default is 1")
-    opt.add_argument("--per_token_num_experts_chosen",
-                     type=int, default=1,
+    opt.add_argument("--per_token_num_experts_chosen", type=int, default=1,
                      help="Expert nums chosen by each token, only effective when applying moe, default is 1")
-    opt.add_argument("--eod_id",
-                     type=int, default=6,
+    opt.add_argument("--eod_id", type=int, default=6,
                      help="The id of end of document")
-    opt.add_argument("--padding_id",
-                     type=int, default=6,
+    opt.add_argument("--padding_id", type=int, default=6,
                      help="The padding id of dataset")
-    opt.add_argument("--epoch_size",
-                     type=int, default=1,
+    opt.add_argument("--epoch_size", type=int, default=1,
                      help="The training epoch")
-    opt.add_argument("--sink_size",
-                     type=int, default=2,
+    opt.add_argument("--sink_size", type=int, default=2,
                      help="The sink size of the training. default is 2")
-    opt.add_argument("--full_batch",
-                     default=1, type=int,
+    opt.add_argument("--full_batch", default=1, type=int,
                      help="Import the full size of a batch for each card, default is 1")
-    opt.add_argument("--optimizer_shard",
-                     type=int, default=0,
+    opt.add_argument("--optimizer_shard", type=int, default=0,
                      help="Enable optimizer parallel, default is 0")
-    opt.add_argument("--per_batch_size",
-                     type=int, default=2,
+    opt.add_argument("--per_batch_size", type=int, default=2,
                      help="The batch size for each data parallel way. default 0")
-    opt.add_argument("--start_lr",
-                     type=float, default=5e-5,
+    opt.add_argument("--start_lr", type=float, default=5e-5,
                      help="The start learning rate. default 5e-5")
-    opt.add_argument("--end_lr",
-                     type=float, default=1e-6,
+    opt.add_argument("--end_lr", type=float, default=1e-6,
                      help="The end learning rate. default 1e-6")
-    opt.add_argument("--op_level_model_parallel_num",
-                     type=int, default=8,
+    opt.add_argument("--op_level_model_parallel_num", type=int, default=8,
                      help="The model parallel way. default 8")
-    opt.add_argument("--expert_parallel_num",
-                     type=int, default=1,
+    opt.add_argument("--expert_parallel_num", type=int, default=1,
                      help="The expert parallel way, only effective when applying moe. Default 1")
-    opt.add_argument("--word_emb_dp",
-                     type=int, default=1,
-                     choices=[0, 1],
+    opt.add_argument("--word_emb_dp", type=int, default=1, choices=[0, 1],
                      help="Whether do data parallel in word embedding. default 1")
-    opt.add_argument("--gradient_aggregation_group",
-                     type=int, default=4,
+    opt.add_argument("--gradient_aggregation_group", type=int, default=4,
                      help="The gradient communication fusion group. default 4")
-    opt.add_argument("--data_column_name",
-                     type=str, default="input_ids",
+    opt.add_argument("--data_column_name", type=str, default="input_ids",
                      help="Column name of datasets")
-    opt.add_argument("--micro_batch_interleaved",
-                     type=int, default=1,
+    opt.add_argument("--micro_batch_interleaved", type=int, default=1,
                      help="Parallel split num of batch size. default 2")
-    opt.add_argument("--recompute_slice_activation",
-                     type=int, default=0,
+    opt.add_argument("--recompute_slice_activation", type=int, default=0,
                      help="Enable slice the recompute activation state. default 0")
+    opt.add_argument("--enable_ssl", type=ast.literal_eval, default=False,
+                     help="Enable ssl communication. default False")
+    opt.add_argument("--server_password", type=str, default="",
+                     help="The server cert password. default "" ")
+    opt.add_argument("--client_password", type=str, default="",
+                     help="The client cert password. default "" ")
+    opt.add_argument("--server_cert_path", type=str, default="",
+                     help="The server cert path. default "" ")
+    opt.add_argument("--client_cert_path", type=str, default="",
+                     help="The client cert path. default "" ")
+    opt.add_argument("--ca_cert_path", type=str, default="",
+                     help="The ca cert path. default "" ")
 
 
 def add_context_args_mode(opt):

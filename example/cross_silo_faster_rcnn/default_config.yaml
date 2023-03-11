@@ -162,7 +162,6 @@ num_classes: 81
 prefix: ""
 
 # train.py FasterRcnn training
-run_distribute: False
 dataset: "coco"
 device_num: 1
 rank_id: 0
@@ -201,7 +200,6 @@ width: 'input width'
 height: 'input height'
 enable_profiling: 'Whether enable profiling while training, default: False'
 only_create_dataset: 'If set it true, only create Mindrecord, default is false.'
-run_distribute: 'Run distribute, default is false.'
 do_train: 'Do train or not, default is true.'
 do_eval: 'Do eval or not, default is false.'
 device_num: 'Use device nums, default is 1.'

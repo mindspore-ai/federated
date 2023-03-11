@@ -28,6 +28,7 @@ from mindspore.train import Model
 from mindspore.train.callback import TimeMonitor
 from mindspore.train.serialization import load_checkpoint, load_param_into_net
 from mindspore.train.serialization import save_checkpoint
+from mindspore.communication.management import get_rank
 from mindspore_federated import FederatedLearningManager
 
 from src.FasterRcnn.faster_rcnn_resnet50v1 import Faster_Rcnn_Resnet
@@ -168,24 +169,25 @@ def start_one_worker():
     opt = SGD(params=net.trainable_params(), learning_rate=lr, momentum=config.momentum,
               weight_decay=config.weight_decay, loss_scale=config.loss_scale)
     net_with_loss = WithLossCell(net, loss)
-    if config.run_distribute:
-        net = TrainOneStepCell(net_with_loss, opt, scale_sense=config.loss_scale)
-    else:
-        net = TrainOneStepCell(net_with_loss, opt, scale_sense=config.loss_scale)
+    net = TrainOneStepCell(net_with_loss, opt, scale_sense=config.loss_scale)
     time_cb = TimeMonitor(data_size=num_batches)
     loss_cb = LossCallBack(rank_id=rank, lr=lr.asnumpy())
     cb = [federated_learning_manager, time_cb, loss_cb]
 
     model = Model(net)
-    ckpt_path1 = os.path.join("ckpt", user)
-
-    os.makedirs(ckpt_path1)
+    rank_id = get_rank()
+    ckpt_dir = os.path.join("ckpt", user)
+    if rank_id == 0:
+        os.makedirs(ckpt_dir)
     print("====================", config.client_epoch_num, fl_iteration_num, flush=True)
     for iter_num in range(fl_iteration_num):
         model.train(config.client_epoch_num, dataset, callbacks=cb, dataset_sink_mode=True, sink_size=sink_size)
         ckpt_name = user + "-fast-rcnn-" + str(iter_num) + "-epoch.ckpt"
-        ckpt_path = os.path.join(ckpt_path1, ckpt_name)
-        save_checkpoint(net, ckpt_path)
+        ckpt_path = os.path.join(ckpt_dir, ckpt_name)
+        if rank_id == 0:
+            save_checkpoint(net, ckpt_path)
+        else:
+            save_checkpoint(net, ckpt_path)
 
 
 if __name__ == "__main__":

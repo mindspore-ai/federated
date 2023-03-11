@@ -140,7 +140,7 @@ class PanguAlphaAdam(TrainOneStepWithLossScaleCell):
         self.is_data_parallel = context.get_auto_parallel_context("parallel_mode") == context.ParallelMode.DATA_PARALLEL
         self.config = config
         self.group_size = 1
-        self.merge_op = P.identity()
+        self.merge_op = P.Identity()
         self.group_size = 1
         self.allreduce_group_size = ()
         self.allreduce_group_size = self._get_scale_for_gradient_norm(params)
