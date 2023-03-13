@@ -17,7 +17,7 @@
 from copy import deepcopy
 import numpy as np
 import mindspore.ops as ops
-from mindspore import nn, ms_function
+from mindspore import nn
 from mindspore.nn import Cell
 from mindspore import load_param_into_net
 from mindspore.communication.management import init, get_rank
@@ -124,9 +124,8 @@ class BroadcastNet(Cell):
         super().__init__()
         self._broadcast = ops.Broadcast(0)
 
-    @ms_function
     def construct(self, input_x):
-        return self._broadcast(input_x)
+        return self._broadcast((input_x,))
 
 
 def _get_fl_param_names(network, fl_param_names, requires_aggr=False):
@@ -468,34 +467,24 @@ class FederatedLearningManager(Callback):
                 raise ValueError("Feature map from getting model is empty!")
 
             parameter_dict = {}
-            ts_list = []
             for key, weight_info in weight_infos.items():
                 if not feature_map[key]:
                     continue
                 value = feature_map[key]
                 shape, dtype = weight_info[0], weight_info[1]
                 param_data = np.reshape(value, shape).astype(dtype)
-                ts_data = Tensor(param_data)
-                ts_list.append(ts_data)
-                parameter_dict[key] = Parameter(ts_data, name=key)
-
-            self._broadcast(tuple(ts_list))
+                tensor = Tensor(param_data)
+                parameter_dict[key] = Parameter(tensor, name=key)
+                self._broadcast(tensor)
             load_param_into_net(self._model, parameter_dict)
         else:
-            ts_list = []
-            for key, weight_info in weight_infos.items():
-                shape, dtype = weight_info[0], weight_info[1]
-                param_data = np.reshape(weights[key], shape).astype(dtype)
-                ts_list.append(Tensor(param_data))
-
-            output = self._broadcast(tuple(ts_list))
-            if len(output) != len(weights):
-                raise ValueError("Broadcast tensor is failed!")
             parameter_dict = {}
-            index = 0
-            for key, value in weights.items():
-                parameter_dict[key] = Parameter(output[index], name=key)
-                index += 1
+            for key, weight_info in weight_infos.items():
+                value = weights[key]
+                shape, dtype = weight_info[0], weight_info[1]
+                param_data = np.reshape(value, shape).astype(dtype)
+                received_tensor = self._broadcast(Tensor(param_data))
+                parameter_dict[key] = Parameter(received_tensor[0], name=key)
             load_param_into_net(self._model, parameter_dict)
 
     def _update_model(self, weights, weight_infos):
