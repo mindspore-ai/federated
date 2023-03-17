@@ -19,7 +19,7 @@ import ast
 from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
 from mindspore_federated._mindspore_federated import RunPSI
 from mindspore_federated._mindspore_federated import PlainIntersection
-#from mindspore_federated.startup.ssl_config import SSLConfig
+from mindspore_federated.startup.ssl_config import SSLConfig
 
 
 def get_parser():
@@ -42,6 +42,12 @@ def get_parser():
     parser.add_argument("--thread_num", type=int, default=0)
     parser.add_argument("--need_check", type=ast.literal_eval, default=False)
     parser.add_argument("--plain_intersection", type=ast.literal_eval, default=False)
+    parser.add_argument("--enable_ssl", type=ast.literal_eval, default=False)
+    parser.add_argument("--server_password", type=str, default="")
+    parser.add_argument("--client_password", type=str, default="")
+    parser.add_argument("--server_cert_path", type=str, default="")
+    parser.add_argument("--client_cert_path", type=str, default="")
+    parser.add_argument("--ca_cert_path", type=str, default="")
     return parser
 
 
@@ -63,6 +69,12 @@ bucket_size = args.bucket_size
 thread_num = args.thread_num
 need_check = args.need_check
 plain_intersection = args.plain_intersection
+enable_ssl = args.enable_ssl
+server_password = args.server_password
+client_password = args.client_password
+server_cert_path = args.server_cert_path
+client_cert_path = args.client_cert_path
+ca_cert_path = args.ca_cert_path
 
 
 def compute_right_result(self_input, peer_input):
@@ -97,18 +109,20 @@ if __name__ == "__main__":
     http_server_config = ServerConfig(server_name=comm_role, server_address=http_server_address)
     remote_server_config = ServerConfig(server_name=peer_comm_role, server_address=remote_server_address)
     # support ssl communication
-    # ssl_config = SSLConfig(server_password="server_password_12345", client_password="client_password_12345",
-    #                        server_cert_path="",
-    #                        client_cert_path="",
-    #                        ca_cert_path="")
-    #
-    # vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
-    #                                                       remote_server_config=remote_server_config,
-    #                                                       enable_ssl=True,
-    #                                                       ssl_config=ssl_config)
+    if enable_ssl:
+        ssl_config = SSLConfig(server_password=server_password, client_password=client_password,
+                               server_cert_path=server_cert_path,
+                               client_cert_path=client_cert_path,
+                               ca_cert_path=ca_cert_path)
 
-    vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
-                                                          remote_server_config=remote_server_config)
+        vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+                                                              remote_server_config=remote_server_config,
+                                                              enable_ssl=True,
+                                                              ssl_config=ssl_config)
+    else:
+
+        vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+                                                              remote_server_config=remote_server_config)
 
     vertical_communicator.launch()
     input_data = generate_input_data(input_begin, input_end, read_file, file_name)

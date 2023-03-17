@@ -24,6 +24,7 @@ from mindspore_federated import FLModel, FLYamlData
 from mindspore_federated.privacy import EmbeddingDP
 from mindspore_federated.startup.vertical_federated_local import VerticalFederatedCommunicator, ServerConfig
 
+from mindspore_federated.startup.ssl_config import SSLConfig
 from src.split_pangu_alpha import PanGuHead, HeadLossNet, EmbeddingLayer, EmbeddingNecessaryLossNet, PPLMetric
 from src.utils import LearningRate, get_args, construct_local_dataset, load_train_net, set_weight_decay, \
     set_embedding_weight_decay
@@ -105,9 +106,22 @@ class LeaderTrainer:
         # build vertical communicator
         http_server_config = ServerConfig(server_name='leader', server_address=opt.http_server_address)
         remote_server_config = ServerConfig(server_name='follower', server_address=opt.remote_server_address)
-        self.vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
-                                                                   remote_server_config=remote_server_config,
-                                                                   compress_configs=compress_configs)
+        enable_ssl = opt.enable_ssl
+        if enable_ssl:
+            ssl_config = SSLConfig(server_password=opt.server_password, client_password=opt.client_password,
+                                   server_cert_path=opt.server_cert_path,
+                                   client_cert_path=opt.client_cert_path,
+                                   ca_cert_path=opt.ca_cert_path)
+
+            self.vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+                                                                       remote_server_config=remote_server_config,
+                                                                       enable_ssl=True,
+                                                                       ssl_config=ssl_config,
+                                                                       compress_configs=compress_configs)
+        else:
+            self.vertical_communicator = VerticalFederatedCommunicator(http_server_config=http_server_config,
+                                                                       remote_server_config=remote_server_config,
+                                                                       compress_configs=compress_configs)
         self.vertical_communicator.launch()
 
     def start(self):
@@ -139,7 +153,7 @@ class LeaderTrainer:
                     if step % 10 == 0:
                         summary_record.add_value('scalar', 'output', logit_out['output'])
                         summary_record.record(step)
-                        logging.info('epoch %d step %d/%d loss: %f', epoch, step - epoch*self.train_size,
+                        logging.info('epoch %d step %d/%d loss: %f', epoch, step - epoch * self.train_size,
                                      self.train_size, logit_out['output'])
 
                     if step % 1000 == 0:

@@ -25,8 +25,12 @@ WORKPATH=$(
 
 HTTP_SERVER_ADDRESS=$1
 REMOTE_SERVER_ADDRESS=$2
-RESUME=$3
-
+ENABLE_SSL=$3
+SERVER_PASSWORD=$4
+CLIENT_PASSWORD=$5
+SERVER_CERT_PATH=$6
+CLIENT_CERT_PATH=$7
+CA_CERT_PATH=$8
 
 export GLOG_v=1
 export PYTHONPATH="${PYTHONPATH}:${WORKPATH}/../"
@@ -37,4 +41,9 @@ rm -rf $WORKPATH/run_pangu_train_follower.log
 nohup python run_pangu_train_follower.py \
   --http_server_address=$HTTP_SERVER_ADDRESS \
   --remote_server_address=$REMOTE_SERVER_ADDRESS \
-  --resume=$RESUME >> $WORKPATH/run_pangu_train_follower.log 2>&1 &
+  --enable_ssl=$ENABLE_SSL \
+  --server_password=$SERVER_PASSWORD \
+  --client_password=$CLIENT_PASSWORD \
+  --client_cert_path=$CLIENT_CERT_PATH\
+  --server_cert_path=$SERVER_CERT_PATH \
+  --ca_cert_path=$CA_CERT_PATH >> $WORKPATH/run_pangu_train_follower.log 2>&1 &

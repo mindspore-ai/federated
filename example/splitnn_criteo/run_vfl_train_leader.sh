@@ -26,7 +26,12 @@ WORKPATH=$(
 HTTP_SERVER_ADDRESS=$1
 REMOTE_SERVER_ADDRESS=$2
 DATA_PATH=$3
-RESUME=$4
+ENABLE_SSL=$4
+SERVER_PASSWORD=$5
+CLIENT_PASSWORD=$6
+SERVER_CERT_PATH=$7
+CLIENT_CERT_PATH=$8
+CA_CERT_PATH=$9
 
 export GLOG_v=1
 export PYTHONPATH="${PYTHONPATH}:${WORKPATH}/../"
@@ -37,6 +42,11 @@ echo "run_vfl_train_leader.py is started."
 rm -rf $WORKPATH/vfl_train_leader.log
 nohup python run_vfl_train_leader.py \
   --data_path=$DATA_PATH \
-  --resume=$RESUME \
   --http_server_address=$HTTP_SERVER_ADDRESS \
-  --remote_server_address=$REMOTE_SERVER_ADDRESS >> $WORKPATH/vfl_train_leader.log 2>&1 &
+  --remote_server_address=$REMOTE_SERVER_ADDRESS \
+  --enable_ssl=$ENABLE_SSL \
+  --server_password=$SERVER_PASSWORD \
+  --client_password=$CLIENT_PASSWORD \
+  --client_cert_path=$CLIENT_CERT_PATH\
+  --server_cert_path=$SERVER_CERT_PATH \
+  --ca_cert_path=$CA_CERT_PATH >> $WORKPATH/vfl_train_leader.log 2>&1 &

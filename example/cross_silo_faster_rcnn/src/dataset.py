@@ -29,7 +29,7 @@ import mindspore.dataset as de
 import mindspore.dataset.vision as C
 from mindspore import version
 from mindspore.mindrecord import FileWriter
-
+from mindspore.communication.management import init, get_rank, get_group_size
 
 def bbox_overlaps(bboxes1, bboxes2, mode='iou'):
     """Calculate the ious between each bbox of bboxes1 and bboxes2.
@@ -552,12 +552,19 @@ def data_to_mindrecord_byte_image(config, dataset="coco", is_training=True, pref
 
 
 def create_fasterrcnn_dataset(config, mindrecord_file, batch_size=2, device_num=1, rank_id=0, is_training=True,
-                              num_parallel_workers=8, python_multiprocessing=False):
+                              num_parallel_workers=8, python_multiprocessing=False, distributed=False):
     """Create FasterRcnn dataset with MindDataset."""
     cv2.setNumThreads(0)
     de.config.set_prefetch_size(8)
-    ds = de.MindDataset(mindrecord_file, columns_list=["image", "annotation"], num_shards=device_num, shard_id=rank_id,
-                        num_parallel_workers=4, shuffle=is_training)
+    if distributed:
+        ds = de.MindDataset(mindrecord_file, columns_list=["image", "annotation"], num_shards=device_num,
+                            shard_id=rank_id, num_parallel_workers=4, shuffle=is_training)
+    else:
+        init()
+        device_num = get_group_size()
+        rank_id = get_rank()
+        ds = de.MindDataset(mindrecord_file, columns_list=["image", "annotation"], num_shards=device_num,
+                            shard_id=rank_id, num_parallel_workers=4, shuffle=is_training)
     decode = C.Decode()
     ds = ds.map(input_columns=["image"], operations=decode)
     compose_map_func = (lambda image, annotation: preprocess_fn(image, annotation, is_training, config=config))

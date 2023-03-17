@@ -13,15 +13,16 @@
 # limitations under the License.
 # ============================================================================
 """start running lenet network of cross silo mode"""
-
-import os
-import time
-import sys
 import argparse
+import ast
+import os
+import sys
+import time
+
 import numpy as np
-
+import mindspore as ms
+from mindspore.communication.management import get_rank
 from mindspore_federated.startup.ssl_config import SSLConfig
-
 from mindspore_federated.trainer.hfl_model import HFLModel
 
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -55,10 +56,13 @@ parser.add_argument("--client_batch_size", type=int, default=32)
 parser.add_argument("--client_learning_rate", type=float, default=0.01)
 parser.add_argument("--fl_iteration_num", type=int, default=25)
 parser.add_argument("--device_id", type=int, default=0)
+parser.add_argument("--device_num", type=int, default=1)
+parser.add_argument("--run_distribute", type=ast.literal_eval, default=False)
 
 args, _ = parser.parse_known_args()
 
 ssl_config = SSLConfig(server_password="server_password_12345", client_password="client_password_12345")
+
 
 def get_trainable_params(network):
     """get trainable params"""
@@ -113,15 +117,22 @@ def start_one_worker():
     device_target = args.device_target
     http_server_address = args.http_server_address
     device_id = args.device_id
+    run_distribute = args.run_distribute
+    device_num = args.device_num
 
     from mindspore import nn, save_checkpoint, context
     from mindspore_federated import FederatedLearningManager
+    from mindspore.communication.management import init
     from network.lenet import LeNet5, ds, create_dataset_from_folder, LossGet, evalute_process
     epoch = 20
     network = LeNet5(62, 3)
     from mindspore.nn.metrics import Accuracy
     context.set_context(mode=context.GRAPH_MODE, device_target=device_target, device_id=device_id)
 
+    if run_distribute:
+        context.set_auto_parallel_context(device_num=device_num, parallel_mode=ms.ParallelMode.DATA_PARALLEL,
+                                          gradients_mean=True)
+        init()
     # construct dataset
     ds.config.set_seed(1)
     data_root_path = dataset_path
@@ -146,7 +157,8 @@ def start_one_worker():
         http_server_address=http_server_address,
         data_size=data_size,
         sync_type=sync_type,
-        ssl_config=ssl_config
+        ssl_config=ssl_config,
+        run_distribute=run_distribute
     )
     print('epoch: {}, num_batches: {}, data_size: {}'.format(epoch, num_batches, data_size),
           flush=True)
@@ -158,15 +170,19 @@ def start_one_worker():
     cbs = list()
     cbs.append(federated_learning_manager)
     cbs.append(loss_cb)
-    ckpt_path = "ckpt"
-    os.makedirs(ckpt_path)
+    rank_id = get_rank()
+    ckpt_dir = "ckpt"
+    if rank_id == 0:
+        os.makedirs(ckpt_dir)
 
     for iter_num in range(fl_iteration_num):
         model.train(epoch, dataset, callbacks=cbs, dataset_sink_mode=False)
-
         ckpt_name = user_id + "-fl-ms-bs32-" + str(iter_num) + "epoch.ckpt"
-        ckpt_name = os.path.join(ckpt_path, ckpt_name)
-        save_checkpoint(network, ckpt_name)
+        ckpt_path = os.path.join(ckpt_dir, ckpt_name)
+        if rank_id == 0:
+            save_checkpoint(network, ckpt_path)
+        else:
+            save_checkpoint(network, ckpt_path)
 
         train_acc, _ = evalute_process(model, train_path, img_size, client_batch_size)
         test_acc, _ = evalute_process(model, test_path, img_size, client_batch_size)

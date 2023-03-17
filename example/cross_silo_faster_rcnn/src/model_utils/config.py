@@ -145,6 +145,7 @@ def get_config():
     parser.add_argument("--fl_iteration_num", type=int, default=5000)
     parser.add_argument("--device_id", type=int, default=0)
     parser.add_argument("--pre_trained", type=str, default="")
+    parser.add_argument("--run_distribute", type=ast.literal_eval, default=False)
     path_args, _ = parser.parse_known_args()
     default, helper, choices = parse_yaml(path_args.config_path)
     args = parse_cli_to_yaml(parser=parser, cfg=default, helper=helper, choices=choices, cfg_path=path_args.config_path)

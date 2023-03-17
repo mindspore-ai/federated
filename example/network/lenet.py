@@ -26,6 +26,7 @@ import mindspore.nn as nn
 from mindspore import Tensor
 from mindspore.common.initializer import TruncatedNormal
 from mindspore.train.callback import Callback
+from mindspore.communication.management import init, get_rank, get_group_size
 import numpy as np
 
 
@@ -58,6 +59,7 @@ def weight_variable():
 
 class LeNet5(nn.Cell):
     """LeNet5"""
+
     def __init__(self, num_class=10, channel=3):
         super(LeNet5, self).__init__()
         self.num_class = num_class
@@ -90,6 +92,7 @@ class LeNet5(nn.Cell):
 
 class LossGet(Callback):
     """# define loss callback for packaged network"""
+
     def __init__(self, per_print_times, data_size):
         super(LossGet, self).__init__()
         self._per_step_mseconds = None
@@ -155,18 +158,25 @@ def count_id(path):
     return ids
 
 
-def create_dataset_from_folder(data_path, img_size, batch_size=32, repeat_size=1, shuffle=False):
+def create_dataset_from_folder(data_path, img_size, batch_size=32, repeat_size=1, shuffle=False, distributed=False):
     """ create dataset for train or test
     Args:
         data_path: Data path
         batch_size: The number of data records in each group
         repeat_size: The number of replicated data records
-        num_parallel_workers: The number of parallel workers
-        :param shuffle:
+        shuffle: If shuffled the dataset
+        distributed: If opened the distributed training
     """
     # define dataset
     ids = count_id(data_path)
-    mnist_ds = ds.ImageFolderDataset(dataset_dir=data_path, decode=False, class_indexing=ids)
+    if distributed:
+        mnist_ds = ds.ImageFolderDataset(dataset_dir=data_path, decode=False, class_indexing=ids)
+    else:
+        init()
+        device_num = get_group_size()
+        rank_id = get_rank()
+        mnist_ds = ds.ImageFolderDataset(dataset_dir=data_path, decode=False, class_indexing=ids,
+                                         num_shards=device_num, shard_id=rank_id)
     # define operation parameters
     resize_height, resize_width = img_size[0], img_size[1]
 

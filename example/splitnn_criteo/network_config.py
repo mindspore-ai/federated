@@ -117,6 +117,12 @@ def get_config():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     parser.add_argument("--config_path", type=str, default=os.path.join(current_dir, "yaml_files/network_config.yaml"),
                         help="Config file path")
+    parser.add_argument("--enable_ssl", type=ast.literal_eval, default=False)
+    parser.add_argument("--server_password", type=str, default="")
+    parser.add_argument("--client_password", type=str, default="")
+    parser.add_argument("--server_cert_path", type=str, default="")
+    parser.add_argument("--client_cert_path", type=str, default="")
+    parser.add_argument("--ca_cert_path", type=str, default="")
     path_args, _ = parser.parse_known_args()
     default, helper, choices = parse_yaml(path_args.config_path)
     args = parse_cli_to_yaml(parser=parser, cfg=default, helper=helper,
