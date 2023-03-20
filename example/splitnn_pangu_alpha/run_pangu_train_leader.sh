@@ -33,6 +33,7 @@ CLIENT_PASSWORD=$7
 SERVER_CERT_PATH=$8
 CLIENT_CERT_PATH=$9
 CA_CERT_PATH=${10}
+EMBEDDING_DP=${11}
 
 export GLOG_v=1
 export PYTHONPATH="${PYTHONPATH}:${WORKPATH}/../"
@@ -50,4 +51,5 @@ nohup python run_pangu_train_leader.py \
   --client_password=$CLIENT_PASSWORD \
   --client_cert_path=$CLIENT_CERT_PATH\
   --server_cert_path=$SERVER_CERT_PATH \
-  --ca_cert_path=$CA_CERT_PATH >> $WORKPATH/run_pangu_train_leader.log 2>&1 &
+  --ca_cert_path=$CA_CERT_PATH \
+  --embedding_dp=$EMBEDDING_DP >> $WORKPATH/run_pangu_train_leader.log 2>&1 &

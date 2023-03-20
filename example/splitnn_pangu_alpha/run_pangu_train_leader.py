@@ -102,6 +102,11 @@ class LeaderTrainer:
         embedding_fl_compress_configs = self.embedding_fl_model.get_compress_configs()
         head_fl_compress_configs = self.head_fl_model.get_compress_configs()
         compress_configs = {**embedding_fl_compress_configs, **head_fl_compress_configs}
+        if self.edp and "embedding_table" in compress_configs and \
+                compress_configs["embedding_table"].compress_type == "min_max":
+            logging.warning(
+                'The "min_max" and "edp" are conflicted, and no compress method is used.')
+            del compress_configs["embedding_table"]
 
         # build vertical communicator
         http_server_config = ServerConfig(server_name='leader', server_address=opt.http_server_address)

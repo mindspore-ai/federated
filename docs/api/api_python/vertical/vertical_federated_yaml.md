@@ -10,17 +10,25 @@ MindSpore-Federated纵向联邦学习框架采用yaml配置文件，配置纵向
 |                  | train_net.inputs              | list                   |                             | 是    |
 |                  | train_net.inputs.name         | str                    |                             | 是    |
 |                  | train_net.inputs.source       | str                    | 'remote' or 'local'         | 是    |
+|                  | train_net.inputs.compress_type | str                   | 'min_max' or 'bit_pack' or 'no_compress'        | 否    |
+|                  | train_net.inputs.bit_num      | int                    | [1, 8]                      | 否    |
 |                  | train_net.outputs             | list                   |                             | 是    |
 |                  | train_net.outputs.name        | str                    |                             | 是    |
 |                  | train_net.outputs.destination | str                    | 'remote' or 'local'         | 是    |
+|                  | train_net.outputs.compress_type | str                  | 'min_max' or 'bit_pack' or 'no_compress'        | 否    |
+|                  | train_net.outputs.bit_num     | int                    | [1, 8]                      | 否    |
 |                  | eval_net                      | dict                   |                             | 是    |
 |                  | eval_net.name                 | str                    |                             | 否    |
 |                  | eval_net.inputs               | list                   |                             | 是    |
 |                  | eval_net.inputs.name          | str                    |                             | 是    |
 |                  | eval_net.inputs.source        | str                    | 'remote' or 'local'         | 是    |
+|                  | eval_net.inputs.compress_type | str                   | 'min_max' or 'bit_pack' or 'no_compress'        | 否    |
+|                  | eval_net.inputs.bit_num       | int                    | [1, 8]                      | 否    |
 |                  | eval_net.outputs              | list                   |                             | 是    |
 |                  | eval_net.output.name          | str                    |                             | 是    |
 |                  | eval_net.output.destination   | str                    | 'remote' or 'local'         | 是    |
+|                  | eval_net.outputs.compress_type | str                   | 'min_max' or 'bit_pack' or 'no_compress'        | 否    |
+|                  | eval_net.outputs.bit_num      | int                    | [1, 8]                      | 否    |
 |                  | eval_net.gt                   | str                    |                             | 否    |
 | opts             | type                          | str                    | mindspore.nn.optim内定义的优化器名称 | 是    |
 |                  | grads                         | list                   |                             | 是    |
@@ -57,17 +65,25 @@ MindSpore-Federated纵向联邦学习框架采用yaml配置文件，配置纵向
 - **train_net.inputs** (list) - 训练网络输入张量列表，每个元素均为描述一个输入张量的字典。元素的排列顺序和名称，必须与MindSpore建模的训练网络（nn.Cell）construct方法的输入张量顺序和名称保持一致。默认值：[]。
 - **train_net.inputs.name** (str) - 训练网络输入张量名称，必须与MindSpore建模的训练网络（nn.Cell）的输入张量名称保持一致。默认值：""。
 - **train_net.inputs.source**(str) - 训练网络输入张量的数据来源，必须是"remote"或"local"，"remote"代表数据来源于其它参与方的网络传输，"local"代表数据来源于本地。默认值： "local"
+- **train_net.inputs.compress_type**(str) - 压缩类型，必须是"min_max"或"bit_pack"或"no_compress"，"min_max"代表采用最小最大量化通信压缩方法，"bit_pack"代表采用比特打包通信压缩方法，"no_compress"代表不采用通信压缩方法。
+- **train_net.inputs.bit_num**(int) - 通信压缩算法中的比特数。
 - **train_net.outputs**  - (list) - 训练网络输出张量列表，每个元素均为描述一个输出张量的字典。元素的排列顺序和名称，必须与MindSpore建模的训练网络（nn.Cell）的construct方法的返回值张量顺序和名称保持一致。默认值：[]。
 - **train_net.outputs.name** (str) - 训练网络输出张量名称，必须与MindSpore建模的训练网络（nn.Cell）的输出张量名称保持一致。默认值：""。
 - **train_net.outputs.destination**(str) - 训练网络输出张量的数据去向，必须是"remote"或"local"，"remote"代表数据将通过网络传输给其它参与方，"local"代表数据本地使用，不进行网络传输。默认值： "local"。
+- **train_net.outputs.compress_type**(str) - 压缩类型，必须是"min_max"或"bit_pack"或"no_compress"，"min_max"代表采用最小最大量化通信压缩方法，"bit_pack"代表采用比特打包通信压缩方法，"no_compress"代表不采用通信压缩方法。
+- **train_net.outputs.bit_num**(int) - 通信压缩算法中的比特数。
 - **eval_net** (dict) - 描述评估网络输入、输出等信息的数据结构。默认值：""。
 - **eval_net.name** (str) - 评估网络名称标识符。默认值：""。
 - **eval_net.inputs** (list) - 评估网络输入张量列表，每个元素均为描述一个输入张量的字典。元素的排列顺序和名称，必须与MindSpore建模的评估网络（nn.Cell）construct方法的输入张量顺序和名称保持一致。默认值：[]。
 - **eval_net.inputs.name** (str) - 评估网络输入张量名称，必须与MindSpore建模的训练网络（nn.Cell）的输入张量名称保持一致。默认值：""。
 - **eval_net.inputs.source**(str) - 评估网络输入张量的数据来源，必须是"remote"或"local"，"remote"代表数据来源于其它参与方的网络传输，"local"代表数据来源于本地。默认值： "local"。
+- **eval_net.inputs.compress_type**(str) - 压缩类型，必须是"min_max"或"bit_pack"或"no_compress"，"min_max"代表采用最小最大量化通信压缩方法，"bit_pack"代表采用比特打包通信压缩方法，"no_compress"代表不采用通信压缩方法。
+- **eval_net.inputs.bit_num**(int) - 通信压缩算法中的比特数。
 - **eval_net.outputs**  - (list) - 评估网络输出张量列表，每个元素均为描述一个输出张量的字典。元素的排列顺序和名称，必须与MindSpore建模的评估网络（nn.Cell）的construct方法的返回值张量顺序和名称保持一致。默认值：[]。
 - **eval_net.outputs.name** (str) - 评估网络输出张量名称，必须与MindSpore建模的评估网络（nn.Cell）的输出张量名称保持一致。默认值：""。
 - **eval_net.outputs.destination**(str) - 评估网络输出张量的数据去向，必须是"remote"或"local"，"remote"代表数据将通过网络传输给其它参与方，"local"代表数据本地使用，不进行网络传输。默认值： "local"。
+- **eval_net.outputs.compress_type**(str) - 压缩类型，必须是"min_max"或"bit_pack"或"no_compress"，"min_max"代表采用最小最大量化通信压缩方法，"bit_pack"代表采用比特打包通信压缩方法，"no_compress"代表不采用通信压缩方法。默认值： "min_max"。
+- **eval_net.outputs.bit_num**(int) - 通信压缩算法中的比特数。
 - **eval_net.gt**(str) - 评估网络输出对应的ground truth标签名称。默认值： ""。
 - **type** (str) - 优化器类型，需采用mindspore.nn.optim内定义的优化器，如"Adam"，参考[优化器](https://mindspore.cn/docs/zh-CN/master/api_python/mindspore.nn.html#%E4%BC%98%E5%8C%96%E5%99%A8)。默认值：""。
 - **grads** (list) - 优化器关联的GradOperation列表，每个元素均为描述一个GradOperation算子的字典。默认值：[]。
@@ -110,8 +126,12 @@ model: # define the net of vFL party
         source: local
       - name: wide_embedding
         source: remote
+        compress_type: min_max
+        bit_num: 6
       - name: deep_embedding
         source: remote
+        compress_type: min_max
+        bit_num: 6
       - name: label
         source: local
     outputs:
@@ -130,8 +150,12 @@ model: # define the net of vFL party
         source: local
       - name: wide_embedding
         source: remote
+        compress_type: min_max
+        bit_num: 6
       - name: deep_embedding
         source: remote
+        compress_type: min_max
+        bit_num: 6
     outputs:
       - name: logits
         destination: local
