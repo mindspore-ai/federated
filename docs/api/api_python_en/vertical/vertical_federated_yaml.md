@@ -10,17 +10,25 @@ MindSpore-Federated adopts a yaml file to configure the training and predicting 
 |                  | train_net.inputs              | list                   |                                           | Required          |
 |                  | train_net.inputs.name         | str                    |                                           | Required          |
 |                  | train_net.inputs.source       | str                    | 'remote' or 'local'                       | Required          |
+|                  | train_net.inputs.compress_type | str                   | 'min_max' or 'bit_pack' or 'no_compress'  | Optional          |
+|                  | train_net.inputs.bit_num      | int                    | [1, 8]                                    | Optional          |
 |                  | train_net.outputs             | list                   |                                           | Required          |
 |                  | train_net.outputs.name        | str                    |                                           | Required          |
 |                  | train_net.outputs.destination | str                    | 'remote' or 'local'                       | Required          |
+|                  | train_net.outputs.compress_type | str                  | 'min_max' or 'bit_pack' or 'no_compress'  | Optional          |
+|                  | train_net.outputs.bit_num     | int                    | [1, 8]                                    | Optional          |
 |                  | eval_net                      | dict                   |                                           | Required          |
 |                  | eval_net.name                 | str                    |                                           | Optional          |
 |                  | eval_net.inputs               | list                   |                                           | Required          |
 |                  | eval_net.inputs.name          | str                    |                                           | Required          |
 |                  | eval_net.inputs.source        | str                    | 'remote' or 'local'                       | Required          |
+|                  | eval_net.inputs.compress_type | str                    | 'min_max' or 'bit_pack' or 'no_compress'  | Optional          |
+|                  | eval_net.inputs.bit_num       | int                    | [1, 8]                                    | Optional          |
 |                  | eval_net.outputs              | list                   |                                           | Required          |
 |                  | eval_net.output.name          | str                    |                                           | Required          |
 |                  | eval_net.output.destination   | str                    | 'remote' or 'local'                       | Required          |
+|                  | eval_net.outputs.compress_type | str                   | 'min_max' or 'bit_pack' or 'no_compress'  | Optional          |
+|                  | eval_net.outputs.bit_num      | int                    | [1, 8]                                    | Optional          |
 |                  | eval_net.gt                   | str                    |                                           | Optional          |
 | opts             | type                          | str                    | names of optimizers in mindspore.nn.optim | Required          |
 |                  | grads                         | list                   |                                           | Required          |
@@ -57,17 +65,25 @@ Parameters:
 - **train_net.inputs** (list) - Input tensor list of the training network. Each item of the list is a dict describing an input tensor. The sequence and names of items shall be the same as the input variables of the "construct" function of the training network (derived from mindspore.nn.Cell). Default: [].
 - **train_net.inputs.name** (str) - Name of an input tensor of the training network. Shall be the same as the corresponding input of the training network modeled with mindspore.nn.Cell. Default: "".
 - **train_net.inputs.source**(str) - Source of an input tensor of the training network. Shall be either "remote" or "local". "remote" indicates that the input tensor is received from another party through network. "local" indicates that the input tensor is loaded locally. Default: "local".
+- **train_net.inputs.compress_type**(str) - Compress type. Shall be either "min_max" or "bit_pack" or "no_compress". "min_max" indicates min max communication compress method is used. "bit_pack" indicates bit pack communication compress method is used. "no_compress" indicates communication compress method is not used.
+- **train_net.inputs.bit_num**(int) - The bit number in communication compression.
 - **train_net.outputs**  - (list) - Output tensor list of the training network. Each item of the list is a dict describing an output tensor. The sequence and names of items shall be the same as the returning values of the "construct" function of the training network (derived from mindspore.nn.Cell). Default: [].
 - **train_net.outputs.name** (str) - Name of an output tensor of the training network. Shall be the same as the corresponding output of the training network modeled with mindspore.nn.Cell. Default: "".
 - **train_net.outputs.destination**(str) - Indicating where the output tensor is going. Shall be either "remote" or "local". "remote" indicates that the output tensor will be sending to another party through network. "local" indicates that the output tensor will be used locally. Default:  "local".
+- **train_net.outputs.compress_type**(str) - Compress type. Shall be either "min_max" or "bit_pack" or "no_compress". "min_max" indicates min max communication compress method is used. "bit_pack" indicates bit pack communication compress method is used. "no_compress" indicates communication compress method is used.
+- **train_net.outputs.bit_num**(int) - The bit number in communication compression.
 - **eval_net** (dict) - Data structure describing information on the evaluation network, including inputs, outputs, etc. Default: "".
 - **eval_net.name** (str) - Name of the evaluation network. Default: "".
 - **eval_net.inputs** (list) - Input tensor list of the evaluation network. Each item of the list is a dict describing an input tensor. The sequence and names of items shall be the same as the input variables of the "construct" function of the evaluation network (derived from mindspore.nn.Cell). Default: [].
 - **eval_net.inputs.name** (str) - Name of an input tensor of the evaluation network. Shall be the same as the corresponding input of the evaluation network modeled with mindspore.nn.Cell. Default: "".
 - **eval_net.inputs.source**(str) - Source of an input tensor of the evaluation network. Shall be either "remote" or "local". "remote" indicates that the input tensor is received from another party through network. "local" indicates that the input tensor is loaded locally. Default: "local".
+- **eval_net.inputs.compress_type**(str) - Compress type. Shall be either "min_max" or "bit_pack" or "no_compress". "min_max" indicates min max communication compress method is used. "bit_pack" indicates bit pack communication compress method is used. "no_compress" indicates communication compress method is used.
+- **eval_net.inputs.bit_num**(int) - The bit number in communication compression.
 - **eval_net.outputs**  - (list) - Output tensor list of the evaluation network. Each item of the list is a dict describing an output tensor. The sequence and names of items shall be the same as the returning values of the "construct" function of the evaluation network (derived from mindspore.nn.Cell). Default: [].
 - **eval_net.outputs.name** (str) - Name of an output tensor of the evaluation network. Shall be the same as the corresponding output of the evaluation network modeled with mindspore.nn.Cell. Default: "".
 - **eval_net.outputs.destination**(str) - Indicating where the output tensor is going. Shall be either "remote" or "local". "remote" indicates that the output tensor will be sending to another party through network. "local" indicates that the output tensor will be used locally. Default:  "local".
+- **eval_net.outputs.compress_type**(str) - Compress type. Shall be either "min_max" or "bit_pack" or "no_compress". "min_max" indicates min max communication compress method is used. "bit_pack" indicates bit pack communication compress method is used. "no_compress" indicates communication compress method is used.
+- **eval_net.outputs.bit_num**(int) - The bit number in communication compression.
 - **eval_net.gt**(str) - Name of ground truth which will be compared with the prediction of the evaluation network. Default:  "".
 - **type** (str) - Type of optimizer. Shall be the name of an optimizer in mindspore.nn.optim, like "Adam". Please refer to [Optimizer](https://mindspore.cn/docs/en/master/api_python/mindspore.nn.html#optimizer). Default: "".
 - **grads** (list) - List of GradOperation operators related to the optimizer. Each item of the list is a dict describing a GradOperation operator. Default: [].
@@ -110,8 +126,12 @@ model: # define the net of vFL party
         source: local
       - name: wide_embedding
         source: remote
+        compress_type: min_max
+        bit_num: 6
       - name: deep_embedding
         source: remote
+        compress_type: min_max
+        bit_num: 6
       - name: label
         source: local
     outputs:
@@ -130,8 +150,12 @@ model: # define the net of vFL party
         source: local
       - name: wide_embedding
         source: remote
+        compress_type: min_max
+        bit_num: 6
       - name: deep_embedding
         source: remote
+        compress_type: min_max
+        bit_num: 6
     outputs:
       - name: logits
         destination: local

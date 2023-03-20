@@ -508,7 +508,7 @@ def add_retrain_params(opt):
 
 def add_privacy_params(opt):
     opt.add_argument("--embedding_dp",
-                     type=bool,
+                     type=ast.literal_eval,
                      default=False,
                      help="Whether apply Embedding DP.")
 
