@@ -121,18 +121,21 @@ def start_one_worker():
     device_num = args.device_num
 
     from mindspore import nn, save_checkpoint, context
+    context.set_context(mode=context.GRAPH_MODE, device_target=device_target, device_id=device_id)
+
     from mindspore_federated import FederatedLearningManager
     from mindspore.communication.management import init
     from network.lenet import LeNet5, ds, create_dataset_from_folder, LossGet, evalute_process
     epoch = 20
     network = LeNet5(62, 3)
     from mindspore.nn.metrics import Accuracy
-    context.set_context(mode=context.GRAPH_MODE, device_target=device_target, device_id=device_id)
-
+    print("device_id is {}".format(device_id))
+    rank_id = 0
     if run_distribute:
         context.set_auto_parallel_context(device_num=device_num, parallel_mode=ms.ParallelMode.DATA_PARALLEL,
                                           gradients_mean=True)
         init()
+        rank_id = get_rank()
     # construct dataset
     ds.config.set_seed(1)
     data_root_path = dataset_path
@@ -170,7 +173,6 @@ def start_one_worker():
     cbs = list()
     cbs.append(federated_learning_manager)
     cbs.append(loss_cb)
-    rank_id = get_rank()
     ckpt_dir = "ckpt"
     if rank_id == 0:
         os.makedirs(ckpt_dir)
@@ -180,8 +182,6 @@ def start_one_worker():
         ckpt_name = user_id + "-fl-ms-bs32-" + str(iter_num) + "epoch.ckpt"
         ckpt_path = os.path.join(ckpt_dir, ckpt_name)
         if rank_id == 0:
-            save_checkpoint(network, ckpt_path)
-        else:
             save_checkpoint(network, ckpt_path)
 
         train_acc, _ = evalute_process(model, train_path, img_size, client_batch_size)

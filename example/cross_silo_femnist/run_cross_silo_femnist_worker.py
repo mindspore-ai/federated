@@ -52,8 +52,7 @@ for i in range(local_worker_num):
     cmd_worker = "execute_path=$(pwd) && self_path=$(dirname \"${script_self}\") && "
     cmd_worker += "rm -rf ${execute_path}/logs/worker_" + str(i) + "/ &&"
     cmd_worker += "mkdir -p ${execute_path}/logs/worker_" + str(i) + "/ &&"
-    cmd_worker += "cd ${execute_path}/logs/worker_" + str(i) + "/ || exit && export GLOG_v=1 && export DEVICE_ID=" +\
-                  str(i) + " && "
+    cmd_worker += "cd ${execute_path}/logs/worker_" + str(i) + "/ || exit && export GLOG_v=1 && "
     cmd_worker += "python ${self_path}/../../test_cross_silo_femnist.py"
     cmd_worker += " --ms_role=MS_WORKER"
     cmd_worker += " --yaml_config=" + str(yaml_config)
@@ -64,7 +63,7 @@ for i in range(local_worker_num):
     cmd_worker += " --dataset_path=" + str(dataset_path)
     cmd_worker += " --user_id=" + str(i)
     cmd_worker += " --sync_type=" + sync_type
-    cmd_worker += " --device_id=" + str(device_id)
+    cmd_worker += " --device_id=" + str(int(device_id) + i)
     cmd_worker += " --http_server_address=" + http_server_address
     cmd_worker += " > worker.log 2>&1 &"
 

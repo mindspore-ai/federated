@@ -2,8 +2,8 @@
 
 现有联邦学习的参数配置基于yaml配置文件，在特定角色的上需要设置不同配置，详细信息参见下表：
 
-| 功能分类              | 配置参数                                 | 联邦学习角色 |
-|-------------------| ---------------------------------------- | ------------ |
+| 功能分类              | 配置参数                                     | 联邦学习角色 |
+|-------------------|------------------------------------------| ------------ |
 | global            | checkpoint_dir                           | server       |
 |                   | fl_name                                  | server       |
 |                   | fl_iteration_num                         | server       |
@@ -27,6 +27,8 @@
 |                   | continuous_failure_times                 | server       |
 |                   | data_rate_dir                            | server       |
 |                   | participation_time_level                 | server       |
+| unsupervised      | cluster_client_num                       | server       |
+|                   | eval_type                                | server       |
 | encrypt           | encrypt_type                             | server       |
 |                   | pw_encrypt.share_secrets_ratio           | server       |
 |                   | pw_encrypt.cipher_time_window            | server       |
@@ -64,7 +66,7 @@
 - **checkpoint_dir** (str) - server读取和保存模型文件的目录。默认值：'./fl_ckpt/'。
 - **fl_name** (str) - 联邦学习作业名称。默认值：”Lenet”。
 - **fl_iteration_num** (int) - 联邦学习的迭代次数，即客户端和服务器的交互次数。默认值：20。
-- **server_mode** (str) - 描述服务器模式，它必须是’FEDERATED_LEARNING’和’HYBRID_TRAINING’中的一个。
+- **server_mode** (str) - 描述服务器模式，它必须是’FEDERATED_LEARNING’，’CLOUD_TRAINING’和’HYBRID_TRAINING’中的一个。
 - **enable_ssl** (bool) - 设置联邦学习开启SSL安全通信。默认值：False。
 - **type**(str) - 使用的分布式缓存数据库，默认值：redis。
 - **address**  - (str) - 设置分布式缓存数据库的地址，格式为ip:port，默认值：127.0.0.1：2345。
@@ -114,6 +116,8 @@
 - **client_batch_size** (int) - 客户端训练数据batch数。默认值：32。
 - **client_learning_rate** (float) - 客户端训练学习率。默认值：0.001。
 - **connection_num** (int) - 云侧可建立的tcp链接最大值，默认值：10000。
+- **cluster_client_num** (int) - 云侧进行无监督聚类指标评价的group id数目，默认值：1000。
+- **eval_type** (str) - 云侧进行无监督聚类指标评价的算法类型，默认值："NOT_EVAL"。
 
 如下提供Lenet的yaml配置做为实例参考：
 
@@ -141,6 +145,10 @@ summary:
   continuous_failure_times: 10
   data_rate_dir: ".."
   participation_time_level: "5,15"
+
+unsupervised:
+  cluster_client_num: 1000
+  eval_type: SILHOUETTE_SCORE
 
 encrypt:
   encrypt_type: NOT_ENCRYPT

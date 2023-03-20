@@ -169,7 +169,7 @@ def create_dataset_from_folder(data_path, img_size, batch_size=32, repeat_size=1
     """
     # define dataset
     ids = count_id(data_path)
-    if distributed:
+    if not distributed:
         mnist_ds = ds.ImageFolderDataset(dataset_dir=data_path, decode=False, class_indexing=ids)
     else:
         init()
