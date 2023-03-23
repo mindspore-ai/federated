@@ -10,11 +10,11 @@ MindSpore Federated提供基于拆分学习的纵向联邦学习基础功能组�
 
 如上图所示，该案例中， 盘古α模型被依次切分为Embedding、Backbone、Head等3个子网络。其中，前级子网络Embedding和末级子网络Head部署在参与方A网络域内，包含多级Transformer模块的Backbone子网络部署在参与方B网络域内。Embedding子网络和Head子网络读取参与方A所持有的数据，主导执行盘古α模型的训练和推理任务。
 
-* 前向推理阶段，参与方A采用Embedding子网络处理原始数据后，将输出的Embedding Feature特征张量和Attention Mask特征张量传输给参与方B，作为参与方B Backbone子网络的输入。然后，参与方A读取Backbone子网络输出的Hide State特征张量，作为参与方A Head子网络的输入，最终由Head子网络输出预测结果或损失值。
+* 前向推理阶段，参与方A采用Embedding子网络处理原始数据后，将输出的Embedding Feature特征Tensor和Attention Mask特征Tensor传输给参与方B，作为参与方B Backbone子网络的输入。然后，参与方A读取Backbone子网络输出的Hide State特征Tensor，作为参与方A Head子网络的输入，最终由Head子网络输出预测结果或损失值。
 
-* 反向传播阶段，参与方A在完成Head子网络的梯度计算和参数更新后，将Hide State特征张量所关联的梯度张量，传输给参与方B，用于Backbone子网络的梯度计算和参数更新。然后，参与方B在完成Backbone子网络的梯度计算和参数更新后，将Embedding Feature特征张量所关联的梯度张量，传输给参与方A，用于Embedding子网络的梯度计算和参数更新。
+* 反向传播阶段，参与方A在完成Head子网络的梯度计算和参数更新后，将Hide State特征Tensor所关联的梯度Tensor，传输给参与方B，用于Backbone子网络的梯度计算和参数更新。然后，参与方B在完成Backbone子网络的梯度计算和参数更新后，将Embedding Feature特征Tensor所关联的梯度Tensor，传输给参与方A，用于Embedding子网络的梯度计算和参数更新。
 
-上述前向推理和反向传播过程中，参与方A和参与方B交换的特征张量和梯度张量，均采用隐私安全机制和加密算法进行处理，从而无需将参与方A所持有的数据传输给参与方B，即可实现两个参与方对网络模型的协同训练。由于Embedding子网络和Head子网络参数量较少，而Backbone子网络参数量巨大，该应用样例适用于业务方（对应参与方A）与计算中心（对应参与方B）的大模型协同训练或部署。
+上述前向推理和反向传播过程中，参与方A和参与方B交换的特征Tensor和梯度Tensor，均采用隐私安全机制和加密算法进行处理，从而无需将参与方A所持有的数据传输给参与方B，即可实现两个参与方对网络模型的协同训练。由于Embedding子网络和Head子网络参数量较少，而Backbone子网络参数量巨大，该应用样例适用于业务方（对应参与方A）与计算中心（对应参与方B）的大模型协同训练或部署。
 
 盘古α模型原理的详细介绍，可参考[MindSpore ModelZoo - pangu_alpha](https://gitee.com/mindspore/models/tree/master/official/nlp/Pangu_alpha)、[鹏程·盘古α介绍](https://git.openi.org.cn/PCL-Platform.Intelligence/PanGu-Alpha)，及其[研究论文](https://arxiv.org/pdf/2104.12369.pdf)。
 
@@ -97,13 +97,13 @@ MindSpore Federated纵向联邦学习框架采用FLModel（参见 [纵向联邦�
            destination: remote
    ```
 
-其中，`name`字段为训练网络名称，将用于命名训练过程中保存的checkpoints文件。`inputs`字段为训练网络输入张量列表，`outputs`字段为训练网络输入张量列表。
+其中，`name`字段为训练网络名称，将用于命名训练过程中保存的checkpoints文件。`inputs`字段为训练网络输入Tensor列表，`outputs`字段为训练网络输入Tensor列表。
 
-`inputs`和`outputs`字段下的`name`字段，为输入/输出张量名称。输入/输出张量的名称和顺序，需要与训练网络对应Python代码中`construct`方法的输入/输出严格对应。
+`inputs`和`outputs`字段下的`name`字段，为输入/输出Tensor名称。输入/输出Tensor的名称和顺序，需要与训练网络对应Python代码中`construct`方法的输入/输出严格对应。
 
-`inputs`字段下的`source`字段标识输入张量的数据来源，`local`代表输入张量来源于本地数据加载，`remote`代表输入张量来源于其它参与方网络传输。
+`inputs`字段下的`source`字段标识输入Tensor的数据来源，`local`代表输入Tensor来源于本地数据加载，`remote`代表输入Tensor来源于其它参与方网络传输。
 
-`outputs`字段下的`destination`字段标识输出张量的数据去向，`local`代表输出张量仅用于本地，`remote`代表输出张量将通过网络传输给其它参与方。
+`outputs`字段下的`destination`字段标识输出Tensor的数据去向，`local`代表输出Tensor仅用于本地，`remote`代表输出Tensor将通过网络传输给其它参与方。
 
 3. 可选的，采用类似方法建模本参与方待参与纵向联邦学习的评估网络。
 
@@ -125,7 +125,7 @@ MindSpore Federated纵向联邦学习框架采用FLModel（参见 [纵向联邦�
             ...
     ```
 
-开发者可自定义优化器类的`__init__`方法的输入输出，但优化器类的`__call__`方法的输入需仅包含`inputs`和`sens`。其中，`inputs`为`list`类型，对应训练网络的输入张量列表，其元素为`mindspore.Tensor`类型。`sens`为`dict`类型，保存用于计算训练网络参数梯度值的加权系数，其key为`str`类型的梯度加权系数标识符；value为`dict`类型，其key为`str`类型，是训练网络输出张量名称，value为`mindspore.Tensor`类型，是该输出张量对应的训练网络参数梯度值的加权系数。
+开发者可自定义优化器类的`__init__`方法的输入输出，但优化器类的`__call__`方法的输入需仅包含`inputs`和`sens`。其中，`inputs`为`list`类型，对应训练网络的输入Tensor列表，其元素为`mindspore.Tensor`类型。`sens`为`dict`类型，保存用于计算训练网络参数梯度值的加权系数，其key为`str`类型的梯度加权系数标识符；value为`dict`类型，其key为`str`类型，是训练网络输出Tensor名称，value为`mindspore.Tensor`类型，是该输出Tensor对应的训练网络参数梯度值的加权系数。
 
 2. 在yaml配置文件中，描述优化器对应的梯度计算、参数更新等信息。[示例代码](https://gitee.com/mindspore/federated/tree/master/example/splitnn_pangu_alpha/embedding.yaml)如下：
 
@@ -158,7 +158,7 @@ MindSpore Federated纵向联邦学习框架采用FLModel（参见 [纵向联邦�
 
 其中，`type`字段为优化器类型，此处为开发者自定义优化器。
 
-`grads`字段为优化器关联的`GradOperation`列表，优化器将使用列表中`GradOperation`算子计算输出的梯度值，更新训练网络参数。`inputs`和`output`字段为`GradOperation`算子的输入和输出张量列表，其元素分别为一个输入/输出张量名称。`sens`字段为`GradOperation`算子的梯度加权系数或灵敏度（参考[mindspore.ops.GradOperation](https://mindspore.cn/docs/zh-CN/master/api_python/ops/mindspore.ops.GradOperation.html?highlight=gradoperation) ）的标识符。
+`grads`字段为优化器关联的`GradOperation`列表，优化器将使用列表中`GradOperation`算子计算输出的梯度值，更新训练网络参数。`inputs`和`output`字段为`GradOperation`算子的输入和输出Tensor列表，其元素分别为一个输入/输出Tensor名称。`sens`字段为`GradOperation`算子的梯度加权系数或灵敏度（参考[mindspore.ops.GradOperation](https://mindspore.cn/docs/zh-CN/master/api_python/ops/mindspore.ops.GradOperation.html?highlight=gradoperation) ）的标识符。
 
 `params`字段为优化器即将更新的训练网络参数名称列表，其元素分别为一个训练网络参数名称。本示例中，自定义优化器将更新名称中包含`word_embedding`字符串和`position_embedding`字符串的网络参数。
 
@@ -166,7 +166,7 @@ MindSpore Federated纵向联邦学习框架采用FLModel（参见 [纵向联邦�
 
 ### 定义梯度加权系数计算
 
-根据梯度计算的链式法则，位于全局网络后级的子网络，需要计算其输出张量相对于输入张量的梯度值，即梯度加权系数或灵敏度，传递给位于全局网络前级的子网络，用于其训练参数更新。
+根据梯度计算的链式法则，位于全局网络后级的子网络，需要计算其输出Tensor相对于输入Tensor的梯度值，即梯度加权系数或灵敏度，传递给位于全局网络前级的子网络，用于其训练参数更新。
 
 MindSpore Federated采用`GradOperation`算子，完成上述梯度加权系数或灵敏度计算过程。开发者需在yaml配置文件中，描述用于计算梯度加权系数的`GradOperation`算子。以本应用实践中参与方A的Head为例，[示例代码](https://gitee.com/mindspore/federated/tree/master/example/splitnn_pangu_alpha/head.yaml)如下：
 
@@ -183,7 +183,7 @@ grad_scalers:
     sens: 1024.0
 ```
 
-其中，`inputs`和`output`字段为`GradOperation`算子的输入和输出张量列表，其元素分别为一个输入/输出张量名称。`sens`字段为该`GradOperation`算子的梯度加权系数或灵敏度（参考[mindspore.ops.GradOperation](https://mindspore.cn/docs/zh-CN/master/api_python/ops/mindspore.ops.GradOperation.html?highlight=gradoperation) ），如果为`float`或`int`型数值，则将构造一个常量张量作为梯度加权系数，如果为`str`型字符串，则将从其它参与方经网络传输的加权系数中，解析名称与其对应的张量作为加权系数。
+其中，`inputs`和`output`字段为`GradOperation`算子的输入和输出Tensor列表，其元素分别为一个输入/输出Tensor名称。`sens`字段为该`GradOperation`算子的梯度加权系数或灵敏度（参考[mindspore.ops.GradOperation](https://mindspore.cn/docs/zh-CN/master/api_python/ops/mindspore.ops.GradOperation.html?highlight=gradoperation) ），如果为`float`或`int`型数值，则将构造一个常量Tensor作为梯度加权系数，如果为`str`型字符串，则将从其它参与方经网络传输的加权系数中，解析名称与其对应的Tensor作为加权系数。
 
 ### 执行训练
 
@@ -232,9 +232,9 @@ grad_scalers:
 
 本样例提供2个示例程序，均以Shell脚本拉起Python程序的形式运行。
 
-1. `run_pangu_train_local.sh`：单进程示例程序，参与方A和参与方B同一进程训练，其以程序内变量的方式，直接传输特征张量和梯度张量至另一参与方。
+1. `run_pangu_train_local.sh`：单进程示例程序，参与方A和参与方B同一进程训练，其以程序内变量的方式，直接传输特征Tensor和梯度Tensor至另一参与方。
 
-2. `run_pangu_train_leader.sh`和`run_pangu_train_follower.sh`：多进程示例程序，参与方A和参与方B分别运行一个进程，其分别将特征张量和梯度张量封装为protobuf消息后，通过https通信接口传输至另一参与方。`run_pangu_train_leader.sh`和`run_pangu_train_follower.sh`可分别在两台服务器上运行，实现跨域协同训练。
+2. `run_pangu_train_leader.sh`和`run_pangu_train_follower.sh`：多进程示例程序，参与方A和参与方B分别运行一个进程，其分别将特征Tensor和梯度Tensor封装为protobuf消息后，通过https通信接口传输至另一参与方。`run_pangu_train_leader.sh`和`run_pangu_train_follower.sh`可分别在两台服务器上运行，实现跨域协同训练。
 
 ### 运行单进程样例
 

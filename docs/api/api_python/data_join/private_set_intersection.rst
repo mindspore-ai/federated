@@ -13,8 +13,8 @@ psi
         - **input_data** (list[string]) - 己方的输入数据。
         - **comm_role** (string) - 该进程的通信角色，"server" 或 "client"。
         - **peer_comm_role** (string) - 对方的通信角色，"server" 或 "client"。
-        - **bucket_id** (int) - 外部分桶，传入桶的序号；双进程通信时，若双方该值不同，server 报错退出，client 阻塞等待。
-        - **thread_num** (int) - 线程数目，自然数，0 表示使用机器最大可用线程数目减 5，其他值会限定在 1 到机器最大可使用值。
+        - **bucket_id** (int) - 桶序号。双进程通信时，若双方该值不同，server 报错退出，client 阻塞等待。
+        - **thread_num** (int) - 线程数目。0 表示使用机器最大可用线程数目减 5，其他值会限定在 1 到机器最大可使用值。
 
     返回：
         - **result** (list[string]) - 交集结果。
@@ -33,7 +33,6 @@ psi
         ...                                                       remote_server_config=remote_server_config)
         >>> vertical_communicator.launch()
         >>> result = RunPSI(['1', '2', '3'], 'server', 'client', 0, 0)
-        >>> print(result)
 
 
 .. py:function:: PlainIntersection(input_data, comm_role, peer_comm_role, bucket_id, thread_num)
@@ -48,8 +47,8 @@ psi
         - **input_data** (list[string]) - 己方的输入数据。
         - **comm_role** (string) - 该进程的通信角色，"server" 或 "client"。
         - **peer_comm_role** (string) - 对方的通信角色，"server" 或 "client"。
-        - **bucket_id** (int) - 外部分桶，传入桶的序号；双进程通信时，若双方该值不同，server 报错退出，client 阻塞等待。
-        - **thread_num** (int) - 线程数目，自然数，0 表示使用机器最大可用线程数目减 5，其他值会限定在 1 到机器最大可使用值。
+        - **bucket_id** (int) - 桶序号。双进程通信时，若双方该值不同，server 报错退出，client 阻塞等待。
+        - **thread_num** (int) - 线程数目。0 表示使用机器最大可用线程数目减 5，其他值会限定在 1 到机器最大可使用值。
 
     返回：
         - **result** (list[string]) - 交集结果。
@@ -68,4 +67,3 @@ psi
         ...                                                       remote_server_config=remote_server_config)
         >>> vertical_communicator.launch()
         >>> result = PlainIntersection(['1', '2', '3'], 'server', 'client', 0, 0)
-        >>> print(result)

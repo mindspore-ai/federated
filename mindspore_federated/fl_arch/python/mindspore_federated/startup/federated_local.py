@@ -1,3 +1,4 @@
+# pylint: disable=missing-docstring
 # Copyright 2022 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -126,6 +127,11 @@ class FLServerJob:
         tcp_server_ip (str): The tcp server ip used for communicating. Default: "127.0.0.1".
         checkpoint_dir (str): Path of checkpoint. Default: "./fl_ckpt/".
         ssl_config (Union(None, SSLConfig)) : Config of ssl. Default: None.
+
+    Examples:
+        >>> job = FLServerJob(yaml_config=yaml_config, http_server_address=http_server_address,
+        ...                   tcp_server_ip=tcp_server_ip, checkpoint_dir=checkpoint_dir)
+        >>> job.run()
     """
 
     def __init__(self, yaml_config, http_server_address, tcp_server_ip="127.0.0.1",
@@ -179,9 +185,6 @@ class FLServerJob:
                                           self.before_stopped_callback, self.on_iteration_end_callback)
 
     def after_started_callback(self):
-        """
-        Define callback after fl job is started.
-        """
         logger.info("after started callback")
         if self.callback is not None:
             try:
@@ -190,9 +193,6 @@ class FLServerJob:
                 logger.warning(f"Catch exception when invoke callback after started: {str(e)}.")
 
     def before_stopped_callback(self):
-        """
-        Define callback before fl job is stopped.
-        """
         logger.info("before stopped callback")
         if self.callback is not None:
             try:
@@ -202,17 +202,6 @@ class FLServerJob:
 
     def on_iteration_end_callback(self, feature_list, fl_name, instance_name, iteration_num,
                                   iteration_valid, iteration_reason):
-        """
-        Define the callback function after the iteration ends.
-
-        Args:
-            feature_list (list): Feature list. Default: None.
-            fl_name (str): The name of current federated learning.
-            instance_name (str): The name of current instance name.
-            iteration_num (int): The number of iterations.
-            iteration_valid (int): The number of iterations to enable validation.
-            iteration_reason (str): The reason for enabling verification.
-        """
         logger.info("on iteration end callback.")
         feature_map = {}
         checkpoint_file = ""
@@ -328,6 +317,7 @@ class FLServerJob:
         logger.info(f"Recovery iteration num is: {recovery_iteration}.")
         return recovery_iteration
 
+
 class FlSchedulerJob:
     """
     Define federated scheduler job.
@@ -336,6 +326,10 @@ class FlSchedulerJob:
         yaml_config (str): The yaml file path. More detail see `federated_server_yaml <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python_en/horizontal/federated_server_yaml.md>`_.
         manage_address (str): The management address.
         ssl_config (Union(None, SSLConfig)): Config of ssl. Default: None.
+
+    Examples:
+        >>> job = FlSchedulerJob(yaml_config=yaml_config, manage_address=scheduler_manage_address)
+        >>> job.run()
     """
 
     def __init__(self, yaml_config, manage_address, ssl_config=None):

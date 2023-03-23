@@ -37,7 +37,12 @@ class CompressConfig:
     Define the vertical server compress config.
 
     Args:
-        compress_type (str): Compress type for vertical fl communication
+        compress_type (str): Compress type for vertical fl communication. Supports ["min_max", "bit_pack"].
+
+                             - min_max: The min max quantization compress method.
+
+                             - bit_pack: The bit pack compress method.
+
         bit_num (int): Bits num of quant algorithm. The value range is within [1, 8]. Default: 8.
     """
 

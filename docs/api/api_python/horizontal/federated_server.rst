@@ -12,33 +12,9 @@
         - **checkpoint_dir** (str) - 存储权重的路径。默认值："./fl_ckpt/"。
         - **ssl_config** (Union(None, SSLConfig)) - ssl配置项。默认值：None。
 
-    .. py:method:: after_started_callback()
+    .. py:method:: run()
 
-        定义联邦任务开始后的回调函数。
-
-    .. py:method:: before_stopped_callback()
-
-        定义联邦任务结束后的回调函数。
-
-    .. py:method:: on_iteration_end_callback(feature_list, fl_name, instance_name, iteration_num, iteration_valid, iteration_reason)
-
-        定义迭代结束前的回调函数。
-
-        参数：
-            - **feature_list** (list) - 特征集。
-            - **fl_name** (str) - 当前联邦学习的名称。
-            - **instance_name** (str) - 当前实例名称。
-            - **iteration_num** (int) - 迭代数。
-            - **iteration_valid** (int) - 开启验证的迭代数。
-            - **iteration_reason** (str) - 开启验证原因。
-
-    .. py:method:: run(feature_map=None, callback=None)
-
-        运行云侧任务。
-
-        参数：
-            - **feature_map** (Union(dict, FeatureMap, str)) - 特征集。默认值：None。
-            - **callback** (Union(None, Callback)) - 回调函数。默认值：None。
+        运行联邦学习服务器任务。
 
 .. py:class:: mindspore_federated.FlSchedulerJob(yaml_config, manage_address, ssl_config=None)
 
