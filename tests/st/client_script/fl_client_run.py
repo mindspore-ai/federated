@@ -140,6 +140,11 @@ for i in range(client_num):
         train_path = train_dataset
         eval_path = train_dataset
         infer_path = train_dataset
+    elif "VaeV2Client" in fl_name:
+        print("VaeV2Client")
+        train_path = os.path.join(train_dataset, os.listdir(train_dataset)[i])
+        eval_path = os.path.join(train_dataset, os.listdir(train_dataset)[i])
+        infer_path = os.path.join(train_dataset, os.listdir(train_dataset)[i])
     elif "TagClient" in fl_name:
         print("TagClient")
         train_path = train_dataset

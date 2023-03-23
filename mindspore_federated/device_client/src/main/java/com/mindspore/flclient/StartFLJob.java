@@ -41,8 +41,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.logging.Logger;
 
-import static mindspore.fl.schema.UnsupervisedEvalFlg.EVAL_ENABLE;
-
 /**
  * StartFLJob
  *
@@ -315,6 +313,7 @@ public class StartFLJob {
         LOGGER.info("[startFLJob] next request time: " + flJob.nextReqTime());
         nextRequestTime = flJob.nextReqTime();
         LOGGER.info("[startFLJob] timestamp: " + flJob.timestamp());
+        LOGGER.info("[startFLJob] unsupervised type: " + flJob.unsupervisedEvalFlg());
         FLClientStatus status;
         int responseRetCode = flJob.retcode();
 
@@ -334,7 +333,7 @@ public class StartFLJob {
                             "will use the default value 0.1");
                 }
                 localFLParameter.setLr(lr);
-                localFLParameter.setUnsupervisedEvalFlg(flJob.unsupervisedEvalFlg() == EVAL_ENABLE);
+                localFLParameter.setUnsupervisedEvalFlg(flJob.unsupervisedEvalFlg());
                 batchSize = flPlanConfig.miniBatch();
                 LOGGER.info("[startFLJob] into <parseResponseFeatures>");
                 status = parseResponseFeatures(flJob);

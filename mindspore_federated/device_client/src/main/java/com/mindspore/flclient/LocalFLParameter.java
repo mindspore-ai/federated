@@ -56,6 +56,21 @@ public class LocalFLParameter {
     public static final String ANDROID = "android";
 
     /**
+     * the type of the privacy protection scheme used in the eval result
+     */
+    public static final String NOT_EVAL = "NOT_EVAL";
+
+    /**
+     * the type of the privacy protection scheme used in the eval result
+     */
+    public static final String NOT_ENCRYPT = "NOT_ENCRYPT";
+
+    /**
+     * the type of the privacy protection scheme used in the eval result
+     */
+    public static final String LAPLACE_EVAL_TYPE = "LAPLACE";
+
+    /**
      * The deployment environment supported by federated learning tasks: "x86".
      */
     public static final String X86 = "x86";
@@ -82,7 +97,8 @@ public class LocalFLParameter {
     private boolean enableFp16 = false;
 
     // default unsupervised train evaluate enable/disable flg.
-    private boolean unsupervisedEvalFlg = false;
+    private String unsupervisedEvalFlg = NOT_ENCRYPT;
+
     private LocalFLParameter() {
     }
 
@@ -256,11 +272,11 @@ public class LocalFLParameter {
         this.uploadSparseRatio = uploadSparseRatio;
     }
 
-    public boolean getUnsupervisedEvalFlg() {
+    public String getUnsupervisedEvalFlg() {
         return unsupervisedEvalFlg;
     }
 
-    public void setUnsupervisedEvalFlg(boolean unsupervisedEvalFlg) {
+    public void setUnsupervisedEvalFlg(String unsupervisedEvalFlg) {
         this.unsupervisedEvalFlg = unsupervisedEvalFlg;
     }
 }

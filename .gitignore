@@ -50,6 +50,7 @@ logs/
 # Editor
 .vscode
 .idea/
+.gradle/
 
 # Cquery
 .cquery_cached_index/
