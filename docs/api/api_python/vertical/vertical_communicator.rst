@@ -35,14 +35,6 @@
 
        返回远端服务器配置。
 
-    .. py:method:: send_register(target_server_name: str, worker_register: _WorkerRegister)
-
-        发送worker注册消息。
-
-        参数：
-            - **target_server_name** (str) - 指定远程服务器名字。
-            - **worker_register** (_WorkerRegister) - 需要发送的worker注册信息。
-
     .. py:method:: send_tensors(target_server_name, tensor_dict)
 
         发送分布式训练Tensor数据。
@@ -61,7 +53,7 @@
 
 .. py:class:: mindspore_federated.SSLConfig(server_password, client_password, server_cert_path=None, client_cert_path=None, ca_cert_path=None, crl_path=None, cipher_list=default_cipher_list, cert_expire_warning_time_in_day=90)
 
-    定义纵向联邦服务器SSL通信配置。
+    定义纵向联邦服务器SSL通信配置。若用户想开启SSL需要配置如下参数。返回值给 `mindspore_federated.VerticalFederatedCommunicator` 的第三个入参使用。
 
     参数：
         - **server_password** (str) - 服务器证书的密码。默认为None。
@@ -70,8 +62,8 @@
         - **client_cert_path** (str) - 客户端证书在服务器上的绝对路径。默认为None。
         - **ca_cert_path** (str) - 根证书在服务器上的绝对路径。默认为None。
         - **crl_path** (str) - CRL证书在服务器上的绝对路径。默认为None。
-        - **cipher_list** (str) - 服务器支持ssl通信的默认加密套件。默认为default_cipher_list。
-        - **cert_expire_warning_time_in_day** (int) - 证书在过期前多少时间开始打印警告信息。默认为90。
+        - **cipher_list** (str) - 服务器支持ssl通信的默认加密套件。默认为"ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-PSK-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-CCM:ECDHE-ECDSA-AES256-CCM:ECDHE-ECDSA-CHACHA20-POLY1305"。
+        - **cert_expire_warning_time_in_day** (int) - 证书在过期前多少天开始打印警告信息。默认为90。
 
 .. py:class:: mindspore_federated.CompressConfig(compress_type, bit_num=8)
 
@@ -79,4 +71,8 @@
 
     参数：
         - **compress_type** (str) - 纵向联邦通信压缩类型。支持["min_max", "bit_pack"]。
+
+          - min_max：最小最大量化压缩方法。
+          - bit_pack：比特打包压缩方法。
+
         - **bit_num** (int) - 量化算法的比特数，取值范围在[1, 8]内。默认值：8。

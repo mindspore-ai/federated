@@ -3,7 +3,7 @@ data_join
 
 .. py:class:: mindspore_federated.FLDataWorker(config: dict)
 
-    数据接入进程。
+    和横向联邦学习不同，纵向联邦学习训练或推理时，两个参与方（leader和follower）拥有相同样本空间。因此，在纵向联邦学习的双方发起训练或推理之前，必须协同完成数据求交。双方必须读取各自的原始数据，并提取出每条数据对应的ID（每条数据的唯一标识符，且都不相同）进行求交（即求取交集）。然后，双方根据求交后的ID从原始数据中获得特征或标签等数据。最后各自导出持久化文件，并在后续训练或推理之前保序地读取数据。数据接入进程被用来导出数据。
 
     参数：
         - **config** (dict) - 输入参数字典，详细说明见下面各参数介绍。
@@ -48,7 +48,7 @@ data_join
 
     .. py:method:: communicator()
 
-        数据求交和训练模型使用同一个communicator, 提供接口返回communicator供训练使用。
+        如果用户希望在数据接入和纵向联邦模型训练中使用同一个通信器，可以使用这个函数获得通信器实例。
 
 
     .. py:method:: do_worker()
@@ -62,14 +62,13 @@ data_join
 
     参数：
         - **input_dir** (str) - 输入的MindRecord相关文件的目录。
-        - **seed** (int) - 随机种子。
+        - **seed** (int) - 随机种子。默认值：0。
 
     返回：
         - **dataset** (MindDataset) - 保序的数据集。
 
     .. note::
-        该接口将 `kwargs` 透传给MindDataset。
-        有关 `kwargs` 中更多超参数的详细信息，请参见MindDataset。
+        该接口将 `kwargs` 透传给MindDataset。有关 `kwargs` 中更多超参数的详细信息，参见 `mindspore.dataset.MindDataset` 。
 
 .. py:function:: mindspore_federated.common.config.get_config(cfg_file)
 
@@ -79,7 +78,7 @@ data_join
         - **cfg_file** (str) - yaml配置文件的路径。
 
     返回：
-        - **args** (argparse) - 解析yaml得到的配置信息。
+        argparse，解析yaml文件得到的配置信息。
 
     .. note::
         通过该接口获取字典格式的参数列表构造FLDataWorker。

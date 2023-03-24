@@ -1,3 +1,4 @@
+# pylint: disable=missing-docstring
 # Copyright 2022 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -155,17 +156,18 @@ class FederatedLearningManager(Callback):
     Manage Federated Learning during training.
 
     Args:
-        yaml_config (str): The yaml file path. More detail see `federated_server_yaml <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python_en/horizontal/federated_server_yaml.md>`_.
+        yaml_config (str): The yaml file path. For more detail see `federated_server_yaml <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python_en/horizontal/federated_server_yaml.md>`_.
         model (nn.Cell): A model for Federated Training.
         sync_frequency (int): Synchronization frequency of parameters in Federated Learning. Indicating the number
-                              of steps between two adjacent synchronization operations when dataset_sink_mode is
-                              set to False. If sync_type is set to "fixed", it serves as a fixed number of steps.
-                              If sync_type is set to "adaptive", it serves as the initial value of the adaptive
+                              of steps between two adjacent synchronization operations when `dataset_sink_mode` is
+                              set to False. If `sync_type` is set to "fixed", it serves as a fixed number of steps.
+                              If `sync_type` is set to "adaptive", it serves as the initial value of the adaptive
                               synchronization frequency. Note that its function is changed in dataset sink mode.
-                              If dataset_sink_mode is set to True and sink_size is set to a non-positive value,
-                              the synchronization operation will execute once every sync_frequency epochs. If
-                              dataset_sink_mode is set to True and sink_size is set to a positive value, the
-                              synchronization operation will execute once every sink_size*sync_frequency steps.
+                              If `dataset_sink_mode` is set to True and `sink_size` is set to a non-positive value,
+                              the synchronization operation will execute once every `sync_frequency` epochs. If
+                              `dataset_sink_mode` is set to True and `sink_size` is set to a positive value, the
+                              synchronization operation will execute once every `sink_size` * `sync_frequency` steps.
+                              The `dataset_sink_mode` and the `sink_size` is set by users in `mindspore.train.Model` .
         http_server_address (str): The http server address used for communicating. Default: "".
         data_size (int): The data size to be reported to the worker. Default: 1.
         sync_type (str): The synchronization type of parameter in Federated Learning.
@@ -616,12 +618,6 @@ class FederatedLearningManager(Callback):
             weights[local_param.name] = param_np.reshape(-1).tolist()
 
     def on_train_step_begin(self, run_context):
-        """
-        At the beginning of step, the cloud federation accesses the federated learning task.
-
-        Args:
-            run_context (RunContext): Include some information of the model.
-        """
         self._global_step += 1
         is_cloud = self._server_mode == _fl_context.SERVER_MODE_CLOUD
         is_sync = self._global_step == self._next_begin_sync_iter
@@ -640,13 +636,6 @@ class FederatedLearningManager(Callback):
         logger.debug("run_context is %r", run_context)
 
     def on_train_step_end(self, run_context):
-        """
-        Synchronization parameters at the end of step. If sync_type is "adaptive", the synchronous frequency is
-        adaptively adjusted here.
-
-        Args:
-            run_context (RunContext): Include some information of the model.
-        """
         lr = 0.0
         if self._is_scaffold():
             cb_params = run_context.original_args()

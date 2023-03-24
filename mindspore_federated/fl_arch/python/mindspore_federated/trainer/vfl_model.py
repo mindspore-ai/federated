@@ -88,13 +88,13 @@ class FLModel:
         yaml_data (class): Data class containing information on the vertical federated learning process, including
             optimizers, gradient calculators, etc. The information mentioned above is parsed from the yaml file
             provided by the developer.
-        network (Cell): Training network of the party, which outputs the loss. If loss_fn is not specified, the
-            network will be used as the training network directly. If loss_fn is specified, the training network
-            will be constructed on the basis of network and loss_fn.
-        loss_fn (Cell): Loss function to construct the training network on the basis of the input network. If not
-            specified, the input network will be used as the training network. Default: None.
-        optimizers (Cell): Customized optimizer for training the train_network. If not specified, FLModel will try
-            to use standard optimizers of MindSpore specified in the yaml file. Default: None.
+        network (Cell): Training network, which outputs the loss. If loss_fn is not specified, the
+            network will be used as the training network directly. If `loss_fn` is specified, the training network
+            will be constructed on the basis of `network` and `loss_fn`.
+        loss_fn (Cell): Loss function. If not specified, the input network will be used as the training network.
+            Default: None.
+        optimizers (Cell): Customized optimizer for training the train_network. If `optimizers` is None, FLModel will
+            try to use standard optimizers of MindSpore specified in the yaml file. Default: None.
         metrics (Metric): Metrics to evaluate the evaluation network. Default: None.
         eval_network (Cell): Evaluation network of the party, which outputs the predict value. Default: None.
 
@@ -198,13 +198,16 @@ class FLModel:
         Execute the evaluation network using a data batch.
 
         Args:
-            local_data_batch (dict): Data batch read from local server. key is the name of the data item, value
+            local_data_batch (dict): Data batch read from local server. Key is the name of the data item, Value
                 is the corresponding tensor.
-            remote_data_batch (dict): Data batch read from remote server of other parties. key is the name of
-                the data item, value is the corresponding tensor.
+            remote_data_batch (dict): Data batch read from remote server of other parties. Key is the name of
+                the data item, Value is the corresponding tensor.
 
         Returns:
-            Dict, outputs of the evaluation network. key is the name of output, value is tensors.
+            Dict, outputs of the evaluation network. Key is the name of output, Value is tensors.
+
+        Examples:
+            >>> party_fl_model.eval_one_step(eval_item, embedding)
         """
         item_list = []
         if isinstance(local_data_batch, dict):
@@ -253,7 +256,18 @@ class FLModel:
         return compress_configs
 
     def get_compress_configs(self):
-        """get compress configs"""
+        """
+        Load the communication compression configs set in `yaml_data`, and return the configs for communicator.
+
+        Note:
+            Cannot use different compress methods if the names of tensors are the same.
+
+        Returns:
+            Dict, Key is the name of tensor, Value is the tensor.
+
+        Examples:
+            >>> compress_configs = party_fl_model.get_compress_configs()
+        """
         train_in_compress_configs = self._get_compress_config(self._yaml_data.train_net_ins)
         train_out_compress_configs = self._get_compress_config(self._yaml_data.train_net_outs)
         eval_in_compress_configs = self._get_compress_config(self._yaml_data.eval_net_ins)
@@ -268,13 +282,16 @@ class FLModel:
         Forward the training network using a data batch.
 
         Args:
-            local_data_batch (dict): Data batch read from local server.  key is the name of the data item, value
+            local_data_batch (dict): Data batch read from local server. Key is the name of the data item, Value
                 is the corresponding tensor.
-            remote_data_batch (dict): Data batch read from remote server of other parties. key is the name of
-                the data item, value is the corresponding tensor.
+            remote_data_batch (dict): Data batch read from remote server of other parties. Key is the name of
+                the data item, Value is the corresponding tensor.
 
         Returns:
-            Dict, outputs of the training network. key is the name of output, value is the tensor.
+            Dict, outputs of the training network. Key is the name of output, Value is the tensor.
+
+        Examples:
+            >>> logit_out = party_fl_model.forward_one_step(item, backbone_out)
         """
         item_list = []
         if isinstance(local_data_batch, dict):
@@ -306,20 +323,23 @@ class FLModel:
         Backward the training network using a data batch.
 
         Args:
-            local_data_batch (dict): Data batch read from local server.  key is the name of the data item, value
+            local_data_batch (dict): Data batch read from local server. Key is the name of the data item, Value
                 is the corresponding tensor.
-            remote_data_batch (dict): Data batch read from remote server of other parties. key is the name of
-                the data item, value is the corresponding tensor.
-            sens (dict): Sense parameters or scale values to calculate the gradient values of the traning network.
-                key is the label name specified in the yaml file. value is the dict of sense parameters
-                or gradient scale values. the key of the value dict is the name of the output of
-                the training network, and the value of the value dict is the sense tensor of corresponding output.
+            remote_data_batch (dict): Data batch read from remote server of other parties. Key is the name of
+                the data item, Value is the corresponding tensor.
+            sens (dict): Sense parameters or scale values to calculate the gradient values of the training network.
+                Key is the label name specified in the yaml file. Value is the dict of sense parameters
+                or gradient scale values. the Key of the Value dict is the name of the output of
+                the training network, and the Value of the Value dict is the sense tensor of corresponding output.
 
         Returns:
-            Dict, sense parameters or gradient scale values sending to other parties. key is the label name specified
-            in the yaml file. value is the dict of sense parameters or gradient scale values. the key of the value dict
-            is the input of the training network, and the value of the value dict is the sense tensor of corresponding
+            Dict, sense parameters or gradient scale values sending to other parties. Key is the label name specified
+            in the yaml file. Value is the dict of sense parameters or gradient scale values. the Key of the Value dict
+            is the input of the training network, and the Value of the Value dict is the sense tensor of corresponding
             input.
+
+        Examples:
+            >>> head_scale = party_fl_model.backward_one_step(item, backbone_out)
         """
         scales = dict()
         if self._grad_scalers:
@@ -356,6 +376,9 @@ class FLModel:
         Args:
             path (str): Path to save the checkpoint. If not specified, using the ckpt_path specified in the
                 yaml file. Default: None.
+
+        Examples:
+            >>> party_fl_model.save_ckpt("party_fl_model.ckpt")
         """
         if path is not None:
             abs_path = os.path.abspath(path)
@@ -380,6 +403,9 @@ class FLModel:
                 'train').  Default: 'eval'.
             path (str): Path to load the checkpoint. If not specified, using the ckpt_path specified in the
                 yaml file. Default: None.
+
+        Examples:
+            >>> party_fl_model.load_ckpt(phrase="eval", path="party_fl_model.ckpt")
         """
         need_load_ckpt = None
         if path is None:

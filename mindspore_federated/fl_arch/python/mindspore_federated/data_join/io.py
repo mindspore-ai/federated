@@ -81,14 +81,14 @@ def load_mindrecord(input_dir, seed=0, **kwargs):
 
     Args:
         input_dir (str): Input directory for storing MindRecord-related files.
-        seed (int): The seed of loading dataset. Default: 0.
+        seed (int): The random seed. Default: 0.
 
     Returns:
         MindDataset, Order-preserving datasets.
 
     Note:
         This API transparently transfers the `kwargs` to MindDataset.
-        For details about more hyper parameters in `kwargs`, see the MindDataset.
+        For details about more hyper parameters in `kwargs`, refer to `mindspore.dataset.MindDataset` .
 
     Examples:
         >>> dataset = load_mindrecord(input_dir="input_dir", seed=0, shuffle=True)

@@ -34,7 +34,8 @@ class FLYamlData:
     Data class storing configuration information on the vertical federated learning process, including
     inputs, outputs, and hyper-parameters of networks, optimizers, operators, etc. The information
     mentioned above is parsed from the yaml file provided by the developer of the vertical federated
-    learning system. The class will verify the yaml file in the parsing process.
+    learning system. The class will verify the yaml file in the parsing process. The return value is
+    used for the first input of FLModel.
 
     Args:
         yaml_path (str): Path of the yaml file.
