@@ -23,7 +23,8 @@ default_cipher_list = "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256
 
 class SSLConfig:
     """
-    Define the ssl certificate config.
+    Define the ssl certificate config. If you want to start SSL, you need to configure the following parameters.
+    The return value is used for the third input of `mindspore_federated.VerticalFederatedCommunicator` .
 
     Args:
         server_password (str): The password of the server certificate. Default: None.
@@ -34,7 +35,7 @@ class SSLConfig:
         crl_path (str): The absolute path of the CRL certificate on the server. Default: None.
         cipher_list (str): The server supports the default encryption suite for ssl communication.
                            Default: default_cipher_list.
-        cert_expire_warning_time_in_day (int): How long before the certificate expires to start printing warning
+        cert_expire_warning_time_in_day (int): How many days before the certificate expires to start printing warning
                                                messages. Default: 90.
     """
     def __init__(self, server_password, client_password, server_cert_path=None, client_cert_path=None,
