@@ -28,9 +28,9 @@ class VerticalFederatedCommunicator:
     Args:
         http_server_config (ServerConfig): Configuration of local http server.
         remote_server_config (ServerConfig): Configuration of remote http server.
-        enable_ssl (bool): whether to enable ssl communication. Default: False.
-        ssl_config (SSLConfig): Configuration of ssl encryption. Default: None.
-        compress_configs (dict): Configuration of communication compression. Default: None.
+        enable_ssl (bool, optional): whether to enable ssl communication. Default: False.
+        ssl_config (SSLConfig, optional): Configuration of ssl encryption. Default: None.
+        compress_configs (dict, optional): Configuration of communication compression. Default: None.
 
     Examples:
         >>> from mindspore_federated import VerticalFederatedCommunicator, ServerConfig
@@ -68,7 +68,7 @@ class VerticalFederatedCommunicator:
         init_vertical_enable_ssl(self._enable_ssl)
         init_vertical_ssl_config(self._ssl_config)
         init_server_config(self._http_server_config, self._remote_server_config)
-        self._compress_configs = compress_configs
+        self._compress_configs = compress_configs if compress_configs is not None else {}
 
     def launch(self):
         """
@@ -83,19 +83,18 @@ class VerticalFederatedCommunicator:
         Args:
             target_server_name (str): Specifies the name of the remote server.
             tensor_dict (OrderedDict): The dict of Tensors to be sent.
+
+        Examples:
+            >>> from mindspore import Tensor
+            >>> backbone_out = OrderedDict()
+            >>> backbone_out["hidden_states"] = Tensor(np.random.random(size=(2, 2048, 1280)).astype(np.float16))
+            >>> vertical_communicator.send_tensors("leader", backbone_out)
         """
         tensor_list_item_py = tensor_utils.tensor_dict_to_tensor_list_pybind_obj(
             ts_dict=tensor_dict, name="", compress_configs=self._compress_configs)
         return VerticalFederated_.send_tensor_list(target_server_name, tensor_list_item_py)
 
     def send_register(self, target_server_name: str, worker_register: _WorkerRegister):
-        r"""
-        Send worker registration message.
-
-        Args:
-            target_server_name (str): Specifies the name of the remote server.
-            worker_register (_\WorkerRegister): The worker registration information to be sent.
-        """
         worker_register_item_py = data_join_utils.worker_register_to_pybind_obj(worker_register)
         worker_config_item_py = VerticalFederated_.send_worker_register(target_server_name, worker_register_item_py)
         return data_join_utils.pybind_obj_to_worker_config(worker_config_item_py)
