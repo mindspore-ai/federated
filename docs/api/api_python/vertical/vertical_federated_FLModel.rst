@@ -56,6 +56,9 @@
         .. note::
             无法给名字相同的tensors使用不同的压缩方法。
 
+        返回：
+            Dict, Key是tensor的名字, Value是tensor。
+
     .. py:method:: load_ckpt(phrase: str = 'eval', path: str = None)
 
         加载checkpoint至训练网络和评估网络。

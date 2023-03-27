@@ -68,7 +68,7 @@ class VerticalFederatedCommunicator:
         init_vertical_enable_ssl(self._enable_ssl)
         init_vertical_ssl_config(self._ssl_config)
         init_server_config(self._http_server_config, self._remote_server_config)
-        self._compress_configs = compress_configs
+        self._compress_configs = compress_configs if compress_configs is not None else {}
 
     def launch(self):
         """
