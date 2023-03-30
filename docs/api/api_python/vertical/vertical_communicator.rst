@@ -8,9 +8,9 @@
     参数：
         - **http_server_config** (ServerConfig) - 本地服务器配置。
         - **remote_server_config** (ServerConfig) - 远程服务器配置。
-        - **enable_ssl** (bool) - 是否开启SSL加密通信。默认值：False。
-        - **ssl_config** (SSLConfig) - SSL加密通信配置，默认值：None。
-        - **compress_configs** (dict) - 通信压缩配置。默认值：None。
+        - **enable_ssl** (bool, optional) - 是否开启SSL加密通信。默认值：False。
+        - **ssl_config** (SSLConfig, optional) - SSL加密通信配置，默认值：None。
+        - **compress_configs** (dict, optional) - 通信压缩配置。默认值：None。
 
     .. py:method:: data_join_wait_for_start()
 
