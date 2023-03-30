@@ -18,7 +18,7 @@
 
         参数：
             - **feature_map** (Union(dict, FeatureMap, str)) - 特征图。默认值：None。
-            - **callback** (Callback) - 回调函数。默认值：None。
+            - **callback** (Union(None, Callback)) - 回调函数。默认值：None。
 
 .. py:class:: mindspore_federated.FlSchedulerJob(yaml_config, manage_address, ssl_config=None)
 
