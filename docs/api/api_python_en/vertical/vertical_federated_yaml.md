@@ -85,7 +85,7 @@ Parameters:
 - **eval_net.outputs.compress_type**(str) - Compress type. Shall be either "min_max" or "bit_pack" or "no_compress". "min_max" indicates min max communication compress method is used. "bit_pack" indicates bit pack communication compress method is used. "no_compress" indicates communication compress method is used.
 - **eval_net.outputs.bit_num**(int) - The bit number in communication compression.
 - **eval_net.gt**(str) - Name of ground truth which will be compared with the prediction of the evaluation network. Default:  "".
-- **type** (str) - Type of optimizer. Shall be the name of an optimizer in mindspore.nn.optim, like "Adam". Please refer to [Optimizer](https://mindspore.cn/docs/en/master/api_python/mindspore.nn.html#optimizer). Default: "".
+- **type** (str) - Type of optimizer. Shall be the name of an optimizer in mindspore.nn.optim, like "Adam". Please refer to [Optimizer](https://mindspore.cn/docs/en/r2.0/api_python/mindspore.nn.html#optimizer). Default: "".
 - **grads** (list) - List of GradOperation operators related to the optimizer. Each item of the list is a dict describing a GradOperation operator. Default: [].
 - **grads.inputs** (list) - List of input tensors related to the GradOperation operator. Each item of the list is a dict describing an input tensor. Default: [].
 - **grads.inputs.name** (str) - Name of an input tensor related to the GradOperation operator. Default: "".
@@ -93,7 +93,7 @@ Parameters:
 - **grads.output.name** (str) - Name of the output tensor related to the GradOperation operator. Default: "".
 - **grads.params** (list) - List of weights of the training network, gradients of which will be calculated by the GradOperation operator. Each item is a name of weights. If the list is empty, gradients of weights defined in opts.params will be calculated. Default: [].
 - **grads.params.name** (str) - Name of weights of the training network, gradients of which will be calculated by the GradOperation operator. Default: "".
-- **grads.sens** (union(float, int, str)) - Sensitivity (gradient with respect to output) of the GradOperation operator used for calculating the gradients of weights of the training network. (Please refer to [mindspore.ops.GradOperation](https://mindspore.cn/docs/en/master/api_python/ops/mindspore.ops.GradOperation.html)). If it is a float or int value, the sensitivity will be set to a constant tensor. If it is a str value, the sensitivity will be parsed from variable data received from other parties. Default: "".
+- **grads.sens** (union(float, int, str)) - Sensitivity (gradient with respect to output) of the GradOperation operator used for calculating the gradients of weights of the training network. (Please refer to [mindspore.ops.GradOperation](https://mindspore.cn/docs/en/r2.0/api_python/ops/mindspore.ops.GradOperation.html)). If it is a float or int value, the sensitivity will be set to a constant tensor. If it is a str value, the sensitivity will be parsed from variable data received from other parties. Default: "".
 - **params** (list) - List of weights of the training network will be updated by the optimizer. Each item is a name of weights. If the list is empty, the optimizer will update all trainable weights of the training network. Default: [].
 - **params.name** (str) - Name of weights of the training network will be updated by the optimizer. Default: "".
 - **hyper_parameters** (dict) - Hyper-parameters of the optimizer. Please refer to the API of the optimizer operator. Default: {}.
@@ -101,7 +101,7 @@ Parameters:
 - **grad_scalers.inputs.name** (str) - Name of an input tensor related to the GradOperation operator used for calculating the sensitivity. Default: "".
 - **grad_scalers.output** (list) - Dict describing the output tensor related to the GradOperation operator used for calculating the sensitivity. Default: {}.
 - **grad_scalers.output.name** (str) - Name of the output tensor related to the GradOperation operator used for calculating the sensitivity. Default: "".
-- **grad_scalers.sens** (str) - Sensitivity (gradient with respect to output) of the GradOperation operator used for calculating the sensitivity. (Please refer to [mindspore.ops.GradOperation](https://mindspore.cn/docs/en/master/api_python/ops/mindspore.ops.GradOperation.html)). If it is of type float or int, the sensitivity will be set to a constant tensor. If it is of type str, the sensitivity will be parsed from variable data received from other parties. Default: "".
+- **grad_scalers.sens** (str) - Sensitivity (gradient with respect to output) of the GradOperation operator used for calculating the sensitivity. (Please refer to [mindspore.ops.GradOperation](https://mindspore.cn/docs/en/r2.0/api_python/ops/mindspore.ops.GradOperation.html)). If it is of type float or int, the sensitivity will be set to a constant tensor. If it is of type str, the sensitivity will be parsed from variable data received from other parties. Default: "".
 - **dataset.name** (str) - Name of dataset. Default: "".
 - **dataset.features** (list) - Feature list of the dataset. Each item of the list is a feature name of type str. Default: [].
 - **dataset.labels** (list) - Label list of the dataset. Each item of the list is a label name of type str. Default: [].
@@ -112,7 +112,7 @@ Parameters:
 - **label_dp.eps** (float) - eps of the difference privacy algorithm. Default: 1.0.
 - **ckpt_path** (str) - Path to save checkpoints files保存训练网络checkpoint文件的路径. Default: "./checkpoints".
 
-MindSpore Federated provides a demo project of [Vertical Federated Learning - Wide&Deep-based Recommendation Application](https://gitee.com/mindspore/federated/tree/master/example/splitnn_criteo), which adopts the Wide&Deep model and the Criteo Dataset. Take the demo project as an example, the yaml configuration of the leader party of the vertical federated learning system is as follows:
+MindSpore Federated provides a demo project of [Vertical Federated Learning - Wide&Deep-based Recommendation Application](https://gitee.com/mindspore/federated/tree/r0.1/example/splitnn_criteo), which adopts the Wide&Deep model and the Criteo Dataset. Take the demo project as an example, the yaml configuration of the leader party of the vertical federated learning system is as follows:
 
 ```yaml
 role: leader

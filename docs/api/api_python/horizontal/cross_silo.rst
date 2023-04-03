@@ -6,7 +6,7 @@
     在训练过程中管理联邦学习。
 
     参数：
-        - **yaml_config** (str) - yaml文件路径。更多细节见 `yaml配置说明 <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python/horizontal/federated_server_yaml.md>`_。
+        - **yaml_config** (str) - yaml文件路径。更多细节见 `yaml配置说明 <https://gitee.com/mindspore/federated/blob/r0.1/docs/api/api_python/horizontal/federated_server_yaml.md>`_。
         - **model** (nn.Cell) - 一个用于联邦训练的模型。
         - **sync_frequency** (int) - 联邦学习中的参数同步频率。若 `dataset_sink_mode` 设置为False，表示两个相邻同步操作之间的step数量。此时，若 `sync_type` 设置为"fixed"，其为固定的step数量。若 `sync_type` 设置为"adaptive"，其为动态同步频率的初始值。需要注意在数据下沉模式中，该参数的功能会改变。若 `dataset_sink_mode` 设置为True，且 `sink_size` 设置为一个非正数，同步操作将每间隔 `sync_frequency` 个epoch执行一次。若 `dataset_sink_mode` 设置为True，且 `sink_size` 设置为一个正数，同步操作将每间隔 `sink_size` * `sync_frequency` 个step执行一次。 `dataset_sink_mode` 和 `sink_size` 由用户在 `mindspore.train.Model` 中设置。
         - **http_server_address** (str) - 用于通信的http服务器地址。默认值：“”。

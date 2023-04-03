@@ -1,2 +1,5 @@
 https://github.com/google/googletestcd
 http://maven.apache.org/POM/4.0.0
+
+https://mindspore.cn*/r2.0/*
+https://www.mindspore.cn*/r2.0/*

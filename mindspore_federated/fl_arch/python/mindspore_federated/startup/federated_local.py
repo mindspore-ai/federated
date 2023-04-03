@@ -122,7 +122,7 @@ class FLServerJob:
     Define Federated Learning cloud-side tasks.
 
     Args:
-        yaml_config (str): The yaml file path. More detail see `federated_server_yaml <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python_en/horizontal/federated_server_yaml.md>`_.
+        yaml_config (str): The yaml file path. More detail see `federated_server_yaml <https://gitee.com/mindspore/federated/blob/r0.1/docs/api/api_python_en/horizontal/federated_server_yaml.md>`_.
         http_server_address (str): The http server address used for communicating.
         tcp_server_ip (str): The tcp server ip used for communicating. Default: "127.0.0.1".
         checkpoint_dir (str): Path of checkpoint. Default: "./fl_ckpt/".
@@ -323,7 +323,7 @@ class FlSchedulerJob:
     Define federated scheduler job.
 
     Args:
-        yaml_config (str): The yaml file path. More detail see `federated_server_yaml <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python_en/horizontal/federated_server_yaml.md>`_.
+        yaml_config (str): The yaml file path. More detail see `federated_server_yaml <https://gitee.com/mindspore/federated/blob/r0.1/docs/api/api_python_en/horizontal/federated_server_yaml.md>`_.
         manage_address (str): The management address.
         ssl_config (Union(None, SSLConfig)): Config of ssl. Default: None.
 
