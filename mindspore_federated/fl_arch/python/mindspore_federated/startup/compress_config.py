@@ -13,7 +13,7 @@
 # limitations under the License.
 # ============================================================================
 """Compress config for vertical fl communication"""
-from mindspore._checkparam import Validator, Rel
+from mindspore_federated.common import _checkparam as validator
 from mindspore_federated._mindspore_federated import run_min_max_compress, run_min_max_decompress
 from mindspore_federated._mindspore_federated import run_bit_pack, run_bit_unpack
 
@@ -47,7 +47,7 @@ class CompressConfig:
     """
 
     def __init__(self, compress_type, bit_num=8):
-        Validator.check_string(compress_type, COMPRESS_TYPE_FUNC_DICT.keys(), arg_name="compress_type")
-        Validator.check_int_range(bit_num, 1, 8, Rel.INC_BOTH, arg_name="bit_num")
+        validator.check_string(compress_type, COMPRESS_TYPE_FUNC_DICT.keys(), arg_name="compress_type")
+        validator.check_int_range(bit_num, 1, 8, validator.INC_BOTH, arg_name="bit_num")
         self.compress_type = compress_type
         self.bit_num = bit_num
