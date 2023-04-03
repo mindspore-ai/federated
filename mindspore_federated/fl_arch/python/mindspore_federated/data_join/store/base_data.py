@@ -1,4 +1,4 @@
-# Copyright 2022 Huawei Technologies Co., Ltd
+# Copyright 2023 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 # ============================================================================
 """base data processing"""
 
-from mindspore._checkparam import Validator
+from mindspore_federated.common import _checkparam as validator
 from mindspore_federated.common.check_type import check_str
 from mindspore_federated.data_join.store.data_source_mgr import DataSourceMete
 
@@ -64,8 +64,8 @@ class BaseData(metaclass=DataSourceMete):
 
                 if data_type is not None:
                     if len(shape) == 1:
-                        Validator.check_string(data_type, SUPPORT_TYPES, arg_name="data type")
+                        validator.check_string(data_type, SUPPORT_TYPES, arg_name="data type")
                     else:
-                        Validator.check_string(data_type, SUPPORT_ARRAY_TYPES, arg_name="array data type")
+                        validator.check_string(data_type, SUPPORT_ARRAY_TYPES, arg_name="array data type")
         else:
             raise TypeError("schema must be dict, but get {}".format(type(self._schema)))
