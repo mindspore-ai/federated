@@ -1,5 +1,5 @@
 # pylint: disable=missing-docstring
-# Copyright 2022 Huawei Technologies Co., Ltd
+# Copyright 2023 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ from mindspore.communication.management import init, get_rank
 from mindspore.common.tensor import Tensor
 from mindspore.common.parameter import Parameter, ParameterTuple
 from mindspore.train.callback import Callback
-from mindspore._checkparam import Validator, Rel
+from mindspore_federated.common import _checkparam as validator
 from mindspore_federated._mindspore_federated import Federated_, FLContext
 from mindspore_federated import log as logger
 
@@ -238,9 +238,9 @@ class FederatedLearningManager(Callback):
             initial_model[param.name] = param_data
         Federated_.init_federated_worker(initial_model)
 
-        Validator.check_isinstance('model', model, nn.Cell)
-        Validator.check_positive_int(sync_frequency)
-        Validator.check_string(sync_type, ["fixed", "adaptive"])
+        validator.check_isinstance('model', model, nn.Cell)
+        validator.check_positive_int(sync_frequency)
+        validator.check_string(sync_type, ["fixed", "adaptive"])
         self._server_mode = server_mode
         self._model = model
         self._sync_frequency = sync_frequency
@@ -326,17 +326,17 @@ class FederatedLearningManager(Callback):
         self._as_prefix = "as_abs_grad."
 
         self._min_consistent_rate = kwargs.get("min_consistent_rate", 1.1)
-        Validator.check_non_negative_float(self._min_consistent_rate)
+        validator.check_non_negative_float(self._min_consistent_rate)
         self._min_consistent_rate_at_round = kwargs.get("min_consistent_rate_at_round", 0)
-        Validator.check_non_negative_int(self._min_consistent_rate_at_round)
+        validator.check_non_negative_int(self._min_consistent_rate_at_round)
         self._ema_alpha = kwargs.get("ema_alpha", 0.5)
-        Validator.check_float_range(self._ema_alpha, 0.0, 1.0, Rel.INC_NEITHER)
+        validator.check_float_range(self._ema_alpha, 0.0, 1.0, validator.INC_NEITHER)
         self._observation_window_size = kwargs.get("observation_window_size", 5)
-        Validator.check_positive_int(self._observation_window_size)
+        validator.check_positive_int(self._observation_window_size)
         self._frequency_increase_ratio = kwargs.get("frequency_increase_ratio", 2)
-        Validator.check_positive_int(self._frequency_increase_ratio)
+        validator.check_positive_int(self._frequency_increase_ratio)
         self._unchanged_round = kwargs.get("unchanged_round", 0)
-        Validator.check_non_negative_int(self._unchanged_round)
+        validator.check_non_negative_int(self._unchanged_round)
 
         self._round_id = 0
         self._last_param = {_.name: deepcopy(_.asnumpy()) for _ in self._model.trainable_params()
