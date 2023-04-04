@@ -1,4 +1,4 @@
-# Copyright 2022 Huawei Technologies Co., Ltd
+# Copyright 2023 Huawei Technologies Co., Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ import os
 import logging
 import yaml
 import mmh3
-from mindspore._checkparam import Validator, Rel
+from mindspore_federated.common import _checkparam as validator
 from mindspore_federated.data_join.server import _DataJoinServer
 from mindspore_federated.data_join.client import _DataJoinClient
 from mindspore_federated.data_join.context import _WorkerRegister, _WorkerConfig
@@ -214,12 +214,12 @@ class FLDataWorker:
         """
         verify worker config
         """
-        Validator.check_string(self._worker_config.join_type, SUPPORT_JOIN_TYPES, arg_name="join_type")
-        Validator.check_int_range(self._worker_config.bucket_num, 1, 1000000, Rel.INC_BOTH, arg_name="bucket_num")
-        Validator.check_string(self._worker_config.store_type, SUPPORT_STORE_TYPES, arg_name="store_type")
+        validator.check_string(self._worker_config.join_type, SUPPORT_JOIN_TYPES, arg_name="join_type")
+        validator.check_int_range(self._worker_config.bucket_num, 1, 1000000, validator.INC_BOTH, arg_name="bucket_num")
+        validator.check_string(self._worker_config.store_type, SUPPORT_STORE_TYPES, arg_name="store_type")
         check_str(arg_name="primary_key", str_val=self._worker_config.primary_key)
-        Validator.check_non_negative_int(self._worker_config.thread_num, arg_name="thread_num")
-        Validator.check_int_range(self._worker_config.shard_num, 1, 1000, Rel.INC_BOTH, arg_name="shard_num")
+        validator.check_non_negative_int(self._worker_config.thread_num, arg_name="thread_num")
+        validator.check_int_range(self._worker_config.shard_num, 1, 1000, validator.INC_BOTH, arg_name="shard_num")
         if self._worker_config.shard_num * self._worker_config.bucket_num > 4096:
             logging.warning('The maximum number of files read by MindData is 4096. It is recommended that the value of '
                             'shard_num * bucket_num be smaller than 4096. Actually, the value is: %d',
