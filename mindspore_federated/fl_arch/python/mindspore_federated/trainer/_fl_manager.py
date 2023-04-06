@@ -156,7 +156,7 @@ class FederatedLearningManager(Callback):
     Manage Federated Learning during training.
 
     Args:
-        yaml_config (str): The yaml file path. For more detail see `federated_server_yaml <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python_en/horizontal/federated_server_yaml.md>`_.
+        yaml_config (str): The yaml file path. For more detail see `federated_server_yaml <https://gitee.com/mindspore/federated/blob/r0.1/docs/api/api_python_en/horizontal/federated_server_yaml.md>`_.
         model (nn.Cell): A model for Federated Training.
         sync_frequency (int): Synchronization frequency of parameters in Federated Learning. Indicating the number
                               of steps between two adjacent synchronization operations when `dataset_sink_mode` is

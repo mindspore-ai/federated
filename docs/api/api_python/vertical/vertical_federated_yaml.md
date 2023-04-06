@@ -85,7 +85,7 @@ MindSpore-Federated纵向联邦学习框架采用yaml配置文件，配置纵向
 - **eval_net.outputs.compress_type**(str) - 压缩类型，必须是"min_max"或"bit_pack"或"no_compress"，"min_max"代表采用最小最大量化通信压缩方法，"bit_pack"代表采用比特打包通信压缩方法，"no_compress"代表不采用通信压缩方法。默认值： "min_max"。
 - **eval_net.outputs.bit_num**(int) - 通信压缩算法中的比特数。
 - **eval_net.gt**(str) - 评估网络输出对应的ground truth标签名称。默认值： ""。
-- **type** (str) - 优化器类型，需采用mindspore.nn.optim内定义的优化器，如"Adam"，参考[优化器](https://mindspore.cn/docs/zh-CN/master/api_python/mindspore.nn.html#%E4%BC%98%E5%8C%96%E5%99%A8)。默认值：""。
+- **type** (str) - 优化器类型，需采用mindspore.nn.optim内定义的优化器，如"Adam"，参考[优化器](https://mindspore.cn/docs/zh-CN/r2.0/api_python/mindspore.nn.html#%E4%BC%98%E5%8C%96%E5%99%A8)。默认值：""。
 - **grads** (list) - 优化器关联的GradOperation列表，每个元素均为描述一个GradOperation算子的字典。默认值：[]。
 - **grads.inputs** (list) - GradOperation算子的输入Tensor列表，每个元素均为描述一个输入Tensor的字典。默认值：[]。
 - **grads.inputs.name** (str) - GradOperation算子的输入Tensor名称。默认值：""。
@@ -93,7 +93,7 @@ MindSpore-Federated纵向联邦学习框架采用yaml配置文件，配置纵向
 - **grads.output.name** (str) - GradOperation算子对应的网络输出Tensor名称。默认值：""。
 - **grads.params** (list) - GradOperation算子计算梯度值的训练网络参数列表，每个元素对应一个网络参数名称。如果为空，则将计算关联优化器所更新参数的梯度值。默认值：[]。
 - **grads.params.name** (str) - GradOperation算子计算梯度值的训练网络参数名称。默认值：""。
-- **grads.sens** (union(float, int, str)) - GradOperation算子计算网络参数梯度的加权系数，对应GradOperation算子的"灵敏度"（参考[mindspore.ops.GradOperation](https://mindspore.cn/docs/zh-CN/master/api_python/ops/mindspore.ops.GradOperation.html?highlight=gradoperation)）。如果是float或int类型，则采用常量作为加权系数；如果是str类型，则从其它参与方经网络传输的加权系数中，解析名称与其对应的Tensor作为加权系数。默认值：""。
+- **grads.sens** (union(float, int, str)) - GradOperation算子计算网络参数梯度的加权系数，对应GradOperation算子的"灵敏度"（参考[mindspore.ops.GradOperation](https://mindspore.cn/docs/zh-CN/r2.0/api_python/ops/mindspore.ops.GradOperation.html?highlight=gradoperation)）。如果是float或int类型，则采用常量作为加权系数；如果是str类型，则从其它参与方经网络传输的加权系数中，解析名称与其对应的Tensor作为加权系数。默认值：""。
 - **params** (list) - 优化器根据梯度计算结果，更新的训练网络参数列表，每个元素对应一个网络参数名称。如果为空，则优化器将更新训练为例的所有可训练参数。默认值：[]。
 - **params.name** (str) - 优化器更新的训练网络的参数名称。默认值：""。
 - **hyper_parameters** (dict) - 优化器超参数字典，参考type所指定的MindSpore优化器算子的超参数。默认值：{}。
@@ -101,7 +101,7 @@ MindSpore-Federated纵向联邦学习框架采用yaml配置文件，配置纵向
 - **grad_scalers.inputs.name** (str) - 用于计算梯度加权系数的GradOperation算子的输入Tensor名称。默认值：""。
 - **grad_scalers.output** (list) - 描述用于计算梯度加权系数的GradOperation算子对应的网络输出Tensor的字典.默认值：{}。
 - **grad_scalers.output.name** (str) - 描述用于计算梯度加权系数的GradOperation算子对应的网络输出Tensor名称。默认值：""。
-- **grad_scalers.sens** (str) - 描述用于计算梯度加权系数的GradOperation算子计算网络参数梯度的加权系数，对应GradOperation算子的"灵敏度"（参考[mindspore.ops.GradOperation](https://mindspore.cn/docs/zh-CN/master/api_python/ops/mindspore.ops.GradOperation.html?highlight=gradoperation)）。如果是float或int类型，则采用常量作为加权系数；如果是str类型，则从其它参与方经网络传输的数据中，解析名称与其对应的Tensor作为加权系数。默认值：""。
+- **grad_scalers.sens** (str) - 描述用于计算梯度加权系数的GradOperation算子计算网络参数梯度的加权系数，对应GradOperation算子的"灵敏度"（参考[mindspore.ops.GradOperation](https://mindspore.cn/docs/zh-CN/r2.0/api_python/ops/mindspore.ops.GradOperation.html?highlight=gradoperation)）。如果是float或int类型，则采用常量作为加权系数；如果是str类型，则从其它参与方经网络传输的数据中，解析名称与其对应的Tensor作为加权系数。默认值：""。
 - **dataset.name** (str) - 数据集名称。默认值：""。
 - **dataset.features** (list) - 数据集特征列表，每个元素均为一个str类型的特征名称。默认值：[]。
 - **dataset.labels** (list) - 数据集标签列表，每个元素均为一个str类型的标签名称。默认值：[]。
@@ -112,7 +112,7 @@ MindSpore-Federated纵向联邦学习框架采用yaml配置文件，配置纵向
 - **label_dp.eps** (float) - 差分隐私机制的eps参数。默认值：1.0。
 - **ckpt_path** (str) - 保存训练网络checkpoint文件的路径。默认值："./checkpoints"。
 
-以本项目所提供的[纵向联邦学习模型训练 - Wide&Deep推荐应用](https://gitee.com/mindspore/federated/tree/master/example/splitnn_criteo)为例，其基于Wide&Deep模型和Criteo数据集，进行纵向联邦学习模型训练，其纵向联邦Leader参与方的yaml如下：
+以本项目所提供的[纵向联邦学习模型训练 - Wide&Deep推荐应用](https://gitee.com/mindspore/federated/tree/r0.1/example/splitnn_criteo)为例，其基于Wide&Deep模型和Criteo数据集，进行纵向联邦学习模型训练，其纵向联邦Leader参与方的yaml如下：
 
 ```yaml
 role: leader

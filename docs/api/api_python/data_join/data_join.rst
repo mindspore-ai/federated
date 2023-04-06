@@ -43,7 +43,7 @@ data_join
           - output_dir (str): 输出目录，必须在leader和follower上都设置。
           - shard_num (int): 每个桶导出的文件个数。leader侧设置的值被使用，follower设置的值无效。
 
-          更多细节请参考 `vfl_data_join_config <https://e.gitee.com/mind_spore/repos/mindspore/federated/tree/master/tests/st/data_join/vfl/vfl_data_join_config.yaml>`_。
+          更多细节请参考 `vfl_data_join_config <https://e.gitee.com/mind_spore/repos/mindspore/federated/tree/r0.1/tests/st/data_join/vfl/vfl_data_join_config.yaml>`_。
 
 
     .. py:method:: communicator()

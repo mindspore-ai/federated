@@ -6,7 +6,7 @@
     定义联邦学习云侧任务。
 
     参数：
-        - **yaml_config** (str) - yaml文件路径。更多细节见 `yaml配置说明 <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python/horizontal/federated_server_yaml.md>`_。
+        - **yaml_config** (str) - yaml文件路径。更多细节见 `yaml配置说明 <https://gitee.com/mindspore/federated/blob/r0.1/docs/api/api_python/horizontal/federated_server_yaml.md>`_。
         - **http_server_address** (str) - 用于通信的http服务器地址。
         - **tcp_server_ip** (str) - 用于通信的tcp服务器地址。默认值：127.0.0.1。
         - **checkpoint_dir** (str) - 存储权重的路径。默认值："./fl_ckpt/"。
@@ -25,7 +25,7 @@
     定义联邦学习调度任务。
 
     参数：
-        - **yaml_config** (str) - yaml文件路径。更多细节见 `yaml配置说明 <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python/horizontal/federated_server_yaml.md>`_。
+        - **yaml_config** (str) - yaml文件路径。更多细节见 `yaml配置说明 <https://gitee.com/mindspore/federated/blob/r0.1/docs/api/api_python/horizontal/federated_server_yaml.md>`_。
         - **manage_address** (str) - 管理地址。
         - **ssl_config** (Union(None, SSLConfig)) - ssl配置项。默认值：None。
 

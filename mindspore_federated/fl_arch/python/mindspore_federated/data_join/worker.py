@@ -127,7 +127,7 @@ class FLDataWorker:
             - shard_num(int): The output number of each bucket when export.
               If leader has set a valid value, the value set by follower will not be used. Default: 1.
 
-            More details refer to `vfl_data_join_config <https://e.gitee.com/mind_spore/repos/mindspore/federated/tree/master/tests/st/data_join/vfl/vfl_data_join_config.yaml>`_.
+            More details refer to `vfl_data_join_config <https://e.gitee.com/mind_spore/repos/mindspore/federated/tree/r0.1/tests/st/data_join/vfl/vfl_data_join_config.yaml>`_.
 
 
     Examples:
