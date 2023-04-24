@@ -1,9 +1,9 @@
 if(ENABLE_GITEE)
-    set(REQ_URL "https://gitee.com/mirrors/abseil-cpp/repository/archive/20200923.3.tar.gz")
-    set(SHA256 "ebe2ad1480d27383e4bf4211e2ca2ef312d5e6a09eba869fd2e8a5c5d553ded2")
+    set(REQ_URL "https://gitee.com/mirrors/abseil-cpp/repository/archive/20210324.2.tar.gz")
+    set(SHA256 "59b862f50e710277f8ede96f083a5bb8d7c9595376146838b9580be90374ee1f")
 else()
-    set(REQ_URL "https://github.com/abseil/abseil-cpp/archive/20200923.3.tar.gz")
-    set(SHA256 "ebe2ad1480d27383e4bf4211e2ca2ef312d5e6a09eba869fd2e8a5c5d553ded2")
+    set(REQ_URL "https://github.com/abseil/abseil-cpp/archive/20210324.2.tar.gz")
+    set(SHA256 "59b862f50e710277f8ede96f083a5bb8d7c9595376146838b9580be90374ee1f")
 endif()
 
 if(NOT ENABLE_GLIBCXX)
@@ -11,7 +11,7 @@ if(NOT ENABLE_GLIBCXX)
 endif()
 
 mindspore_add_pkg(absl
-        VER 20200923.3
+        VER 20210324.2
         LIBS absl_strings absl_throw_delegate absl_raw_logging_internal absl_int128 absl_bad_optional_access
         URL ${REQ_URL}
         SHA256 ${SHA256}
