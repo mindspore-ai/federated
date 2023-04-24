@@ -27,16 +27,16 @@ class SSLConfig:
     The return value is used for the third input of `mindspore_federated.VerticalFederatedCommunicator` .
 
     Args:
-        server_password (str): The password of the server certificate. Default: None.
-        client_password (str): The password of the client certificate. Default: None.
-        server_cert_path (str): The absolute path of the server certificate on the server. Default: None.
-        client_cert_path (str): The absolute path of the client certificate on the server. Default: None.
-        ca_cert_path (str): The absolute path of the root certificate on the server. Default: None.
-        crl_path (str): The absolute path of the CRL certificate on the server. Default: None.
+        server_password (str): The password of the server certificate. Default: ``None``.
+        client_password (str): The password of the client certificate. Default: ``None``.
+        server_cert_path (str): The absolute path of the server certificate on the server. Default: ``None``.
+        client_cert_path (str): The absolute path of the client certificate on the server. Default: ``None``.
+        ca_cert_path (str): The absolute path of the root certificate on the server. Default: ``None``.
+        crl_path (str): The absolute path of the CRL certificate on the server. Default: ``None``.
         cipher_list (str): The server supports the default encryption suite for ssl communication.
-                           Default: default_cipher_list.
+                           Default: ``default_cipher_list``.
         cert_expire_warning_time_in_day (int): How many days before the certificate expires to start printing warning
-                                               messages. Default: 90.
+                                               messages. Default: ``90``.
     """
     def __init__(self, server_password, client_password, server_cert_path=None, client_cert_path=None,
                  ca_cert_path=None, crl_path=None, cipher_list=default_cipher_list,

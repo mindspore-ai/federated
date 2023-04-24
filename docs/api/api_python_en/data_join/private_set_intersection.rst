@@ -11,10 +11,10 @@ Private Set Intersection
 
     Parameters
         - **input_data** (list[string]) - Self input dataset.
-        - **comm_role** (string) - Self communication role, "server" or "client".
-        - **peer_comm_role** (string) - The peer communication role, "server" or "client".
+        - **comm_role** (string) - Self communication role, ``"server"`` or ``"client"``.
+        - **peer_comm_role** (string) - The peer communication role, ``"server"`` or ``"client"``.
         - **bucket_id** (int) - Bucket index. During the running of the protocol, the parties' bucket index must be consistent, otherwise the server will abort and the client will be blocked.
-        - **thread_num** (int) - Thread number. Set to 0 means the maximum available thread number of the machine minus 5. The final value will be restrict to the range of 1 to the maximum available thread number.
+        - **thread_num** (int) - Thread number. Set to ``0`` means the maximum available thread number of the machine minus 5. The final value will be restrict to the range of 1 to the maximum available thread number.
 
     Returns
         - **result** (list[string]) - The intersection set.
@@ -46,10 +46,10 @@ Private Set Intersection
 
     Parameters
         - **input_data** (list[string]) - Self input dataset.
-        - **comm_role** (string) - Self communication role, "server" or "client".
-        - **peer_comm_role** (string) - The peer communication role, "server" or "client".
+        - **comm_role** (string) - Self communication role, ``"server"`` or ``"client"``.
+        - **peer_comm_role** (string) - The peer communication role, ``"server"`` or ``"client"``.
         - **bucket_id** (int) - Bucket index. During the running of the protocol, the parties' bucket index must be consistent, otherwise the server will abort and the client will be blocked.
-        - **thread_num** (int) - Thread number. Set to 0 means the maximum available thread number of the machine minus 5. The final value will be restrict to the range of 1 to the maximum available thread number.
+        - **thread_num** (int) - Thread number. Set to ``0`` means the maximum available thread number of the machine minus 5. The final value will be restrict to the range of 1 to the maximum available thread number.
 
     Returns
         - **result** (list[string]) - The intersection set.

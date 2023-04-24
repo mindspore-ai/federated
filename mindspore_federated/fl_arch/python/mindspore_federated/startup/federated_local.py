@@ -124,9 +124,9 @@ class FLServerJob:
     Args:
         yaml_config (str): The yaml file path. More detail see `federated_server_yaml <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python_en/horizontal/federated_server_yaml.md>`_.
         http_server_address (str): The http server address used for communicating.
-        tcp_server_ip (str): The tcp server ip used for communicating. Default: "127.0.0.1".
-        checkpoint_dir (str): Path of checkpoint. Default: "./fl_ckpt/".
-        ssl_config (Union(None, SSLConfig)) : Config of ssl. Default: None.
+        tcp_server_ip (str): The tcp server ip used for communicating. Default: ``"127.0.0.1"``.
+        checkpoint_dir (str): Path of checkpoint. Default: ``"./fl_ckpt/"``.
+        ssl_config (Union(None, SSLConfig)) : Config of ssl. Default: ``None``.
 
     Examples:
         >>> job = FLServerJob(yaml_config=yaml_config, http_server_address=http_server_address,
@@ -161,8 +161,8 @@ class FLServerJob:
         Run fl server job.
 
         Args:
-            feature_map (Union(dict, FeatureMap, str)): Feature map. Default: None.
-            callback (Union(None, Callback)): Callback function. Default: None.
+            feature_map (Union(dict, FeatureMap, str)): Feature map. Default: ``None``.
+            callback (Union(None, Callback)): Callback function. Default: ``None``.
         """
         if callback is not None and not isinstance(callback, Callback):
             raise RuntimeError("Parameter 'callback' is expected to be instance of Callback when it's not None, but"
@@ -325,7 +325,7 @@ class FlSchedulerJob:
     Args:
         yaml_config (str): The yaml file path. More detail see `federated_server_yaml <https://gitee.com/mindspore/federated/blob/master/docs/api/api_python_en/horizontal/federated_server_yaml.md>`_.
         manage_address (str): The management address.
-        ssl_config (Union(None, SSLConfig)): Config of ssl. Default: None.
+        ssl_config (Union(None, SSLConfig)): Config of ssl. Default: ``None``.
 
     Examples:
         >>> job = FlSchedulerJob(yaml_config=yaml_config, manage_address=scheduler_manage_address)
