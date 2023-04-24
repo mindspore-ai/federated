@@ -25,8 +25,8 @@ class ServerConfig:
     Define the vertical server configuration.
 
     Args:
-        server_name (str): Name of server, such as "leader_server", user defined.
-        server_address (str): Address of server, such as 127.0.0.1:1086, user defined.
+        server_name (str): Name of server, such as ``"leader_server"``, user defined.
+        server_address (str): Address of server, such as ``"127.0.0.1:1086"``, user defined.
     """
     def __init__(self, server_name, server_address):
         check_type.check_str("server_name", server_name)

@@ -76,56 +76,57 @@ class FLDataWorker:
     Args:
         config (dict): the key/value of dict defined as below
 
-            - role(str): Role of the worker, which must be set in both leader and follower. Supports [leader, follower].
-              Default: "leader".
+            - role(str): Role of the worker, which must be set in both leader and follower. Supports ``"leader"``,
+              ``"follower"``. Default: ``"leader"``.
             - bucket_num(int): The number of buckets.
-              If leader has set a valid value, the value set by follower will not be used. Default: 5.
-            - store_type(str): The origin data store type. Now only support csv/mysql. Supports [csv, mysql].
-              Default: "csv".
+              If leader has set a valid value, the value set by follower will not be used. Default: ``5``.
+            - store_type(str): The origin data store type. Now only support csv/mysql. Supports ``"csv"``, ``"mysql"``.
+              Default: ``"csv"``.
             - data_schema_path(str): Path of data schema file, which must be set in both leader and follower. User need
               to provide the column name and type of the data to be exported in the schema. The schema needs to be
               parsed as a two-level key-value dictionary. The key of the first-level dictionary is the column name, and
               the value is the second-level dictionary. The key of the second-level dictionary must be a string: type,
               and the value is the type of the exported data. Currently, the types support
-              [int32, int64, float32, float64, string, bytes].  Default: "vfl/leader_schemal.yaml".
+              [int32, int64, float32, float64, string, bytes].  Default: ``"vfl/leader_schemal.yaml"``.
             - primary_key(str): The primary key.
-              If leader has set a valid value, the value set by follower will not be used. Default: "oaid".
+              If leader has set a valid value, the value set by follower will not be used. Default: ``"oaid"``.
             - main_table_files(Union(list(str), str)): The raw data paths, which must be set in both leader and
-              follower.  Default: "vfl/input/leader/".
-            - mysql_host(str): Host where the database server is located. Default: "127.0.0.1".
-            - mysql_port(int): MySQL port to use, usually use 3306. Default: 3306.
-            - mysql_database(str): Database to use, None to not use a particular one. Default: "".
-            - mysql_charset(str): Charset you want to use. Default: "".
-            - mysql_user(str): Username to login mysql. Default: "test".
-            - mysql_password(str): Password to login mysql. Default: "1234".
-            - mysql_table_name(str): The table that contains origin data. Default: "test_data".
-            - server_name(str): Local http server name, used for communication. Default: "leader_node".
+              follower.  Default: ``"vfl/input/leader/"``.
+            - mysql_host(str): Host where the database server is located. Default: ``"127.0.0.1"``.
+            - mysql_port(int): MySQL port to use, usually use ``3306``. Default: ``3306``.
+            - mysql_database(str): Database to use, None to not use a particular one. Default: ``""``.
+            - mysql_charset(str): Charset you want to use. Default: ``""``.
+            - mysql_user(str): Username to login mysql. Default: ``"test"``.
+            - mysql_password(str): Password to login mysql. Default: ``"1234"``.
+            - mysql_table_name(str): The table that contains origin data. Default: ``"test_data"``.
+            - server_name(str): Local http server name, used for communication. Default: ``"leader_node"``.
             - http_server_address(str): Local IP and Port Address, which must be set in both leader and follower.
-              Default: "127.0.0.1:1086".
-            - remote_server_name(str): Remote http server name, used for communication. Default: "follower_node".
+              Default: ``"127.0.0.1:1086"``.
+            - remote_server_name(str): Remote http server name, used for communication. Default: ``"follower_node"``.
             - remote_server_address(str): Peer IP and Port Address, which must be set in both leader and follower.
-              Default: "127.0.0.1:1087".
+              Default: ``"127.0.0.1:1087"``.
             - enable_ssl(bool): SSL mode enabled or disabled for communication. Supports [True, False]. Default: False.
             - server_password(str): The server password to decode the p12 file.
-              For security please giving it in start command line. Default: "123456".
+              For security please giving it in start command line. Default: ``"123456"``.
             - client_password(str): The client password to decode the p12 file.
-              For security please giving it in start command line. Default: "123456".
-            - server_cert_path(str): Certificate file path for server. Default: "server.p12".
-            - client_cert_path(str): Certificate file path for client. Default: "client.p12".
-            - ca_cert_path(str): CA server certificate file path. Default: "cacert.pem".
-            - crl_path(str): CRL certificate file path. Default: "".
-            - cipher_list(str): Encryption suite supported by ssl. Default: "ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-
+              For security please giving it in start command line. Default: ``"123456"``.
+            - server_cert_path(str): Certificate file path for server. Default: ``"server.p12"``.
+            - client_cert_path(str): Certificate file path for client. Default: ``"client.p12"``.
+            - ca_cert_path(str): CA server certificate file path. Default: "``cacert.pem"``.
+            - crl_path(str): CRL certificate file path. Default: ``""``.
+            - cipher_list(str): Encryption suite supported by ssl. Default: ``"ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-
               AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-CHACHA20-POLY1305:
-              ECDHE-PSK-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-CCM:ECDHE-ECDSA-AES256-CCM:ECDHE-ECDSA-CHACHA20-POLY1305".
-            - cert_expire_warning_time_in_day(str): Warning time before the certificate expires. Default: 90.
+              ECDHE-PSK-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-CCM:ECDHE-ECDSA-AES256-CCM:
+              ECDHE-ECDSA-CHACHA20-POLY1305"``.
+            - cert_expire_warning_time_in_day(str): Warning time before the certificate expires. Default: ``90``.
             - join_type(str): The data join type.
               If leader has set a valid value, the value set by follower will not be used.
-              Now only support "psi". Default: "psi".
-            - thread_num(int): The thread number of psi. Default: 0.
+              Now only support ``"psi"``. Default: ``"psi"``.
+            - thread_num(int): The thread number of psi. Default: ``0``.
             - output_dir(str): The output directory, which must be set in both leader and follower.
-              Default: "vfl/output/leader/".
+              Default: ``"vfl/output/leader/"``.
             - shard_num(int): The output number of each bucket when export.
-              If leader has set a valid value, the value set by follower will not be used. Default: 1.
+              If leader has set a valid value, the value set by follower will not be used. Default: ``1``.
 
             More details refer to `vfl_data_join_config <https://e.gitee.com/mind_spore/repos/mindspore/federated/tree/master/tests/st/data_join/vfl/vfl_data_join_config.yaml>`_.
 

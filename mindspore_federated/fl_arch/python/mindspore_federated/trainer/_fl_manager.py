@@ -168,38 +168,38 @@ class FederatedLearningManager(Callback):
                               `dataset_sink_mode` is set to True and `sink_size` is set to a positive value, the
                               synchronization operation will execute once every `sink_size` * `sync_frequency` steps.
                               The `dataset_sink_mode` and the `sink_size` is set by users in `mindspore.train.Model` .
-        http_server_address (str): The http server address used for communicating. Default: "".
-        data_size (int): The data size to be reported to the worker. Default: 1.
+        http_server_address (str): The http server address used for communicating. Default: ``""``.
+        data_size (int): The data size to be reported to the worker. Default: ``1``.
         sync_type (str): The synchronization type of parameter in Federated Learning.
-                         Supports ["fixed", "adaptive"]. Default: "fixed".
+                         Supports ``"fixed"``, ``"adaptive"``. Default: ``"fixed"``.
 
-                         - fixed: The frequency of parameter synchronization is fixed.
+                         - ``fixed``: The frequency of parameter synchronization is fixed.
 
-                         - adaptive: The frequency of parameter synchronization changes adaptively.
+                         - ``adaptive``: The frequency of parameter synchronization changes adaptively.
 
-        run_distribute (bool): Whether to open distribute training. Default: False.
-        ssl_config (Union(None, SSLConfig)): Config of ssl. Default: None.
+        run_distribute (bool): Whether to open distribute training. Default: ``False``.
+        ssl_config (Union(None, SSLConfig)): Config of ssl. Default: ``None``.
         min_consistent_rate (float): Minimum consistency ratio threshold. The greater the value, the more
                                      difficult it is to improve the synchronization frequency.
-                                     Value range: greater than or equal to 0.0. Default: 1.1.
+                                     Value range: greater than or equal to 0.0. Default: ``1.1``.
         min_consistent_rate_at_round (int): The number of rounds of the minimum consistency ratio threshold.
                                             The greater the value, the more difficult it is to improve the
                                             synchronization frequency.
-                                            Value range: greater than or equal to 0. Default: 0.
+                                            Value range: greater than or equal to 0. Default: ``0``.
         ema_alpha (float): Gradient consistency smoothing coefficient. The smaller the value, the more the
                            frequency will be judged according to the gradient bifurcation of the current round
                            more. Otherwise it will be judged according to the historical gradient bifurcation
                            more.
-                           Value range: (0.0, 1.0). Default: 0.5.
+                           Value range: (0.0, 1.0). Default: ``0.5``.
         observation_window_size (int): The number of rounds in the observation time window. The greater the
                                        value, the more difficult it is to reduce the synchronization frequency.
-                                       Value range: greater than 0. Default: 5.
+                                       Value range: greater than 0. Default: ``5``.
         frequency_increase_ratio (int): Frequency increase amplitude. The greater the value, the greater the
                                         frequency increase amplitude.
-                                        Value range: greater than 0. Default: 2.
+                                        Value range: greater than 0. Default: ``2``.
         unchanged_round (int): The number of rounds whose frequency does not change. The frequency is unchanged
                                before unchanged_round rounds.
-                               Value range: greater than or equal to 0. Default: 0.
+                               Value range: greater than or equal to 0. Default: ``0``.
 
     Examples:
         >>> from mindspore_federated import FederatedLearningManager

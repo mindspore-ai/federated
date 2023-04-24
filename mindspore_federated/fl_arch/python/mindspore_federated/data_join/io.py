@@ -81,7 +81,7 @@ def load_mindrecord(input_dir, seed=0, **kwargs):
 
     Args:
         input_dir (str): Input directory for storing MindRecord-related files.
-        seed (int): The random seed. Default: 0.
+        seed (int): The random seed. Default: ``0``.
 
     Returns:
         MindDataset, Order-preserving datasets.

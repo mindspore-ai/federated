@@ -8,19 +8,19 @@ data_join
     参数：
         - **config** (dict) - 输入参数字典，详细说明见下面各参数介绍。
 
-          - role (str): 进程的角色类型。支持["leader", "follower"]。
+          - role (str): 进程的角色类型。支持 ``"leader"``、 ``"follower"``。
           - bucket_num (int): 桶的数目。leader侧设置的值被使用，follower设置的值无效。
-          - store_type (str): 数据的存储类型。当前仅支持csv和mysql。
+          - store_type (str): 数据的存储类型。当前仅支持 ``'csv'`` 和 ``'mysql'``。
           - data_schema_path (str): 数据的schema的路径，必须在leader和follower上都设置。
             用户需要在schema中提供要导出的数据的列名和类型。schema需要被解析为key-value形式的双层字典。
             第一级字典的key值为列名，value值为第二级字典。
-            第二级字典的key值为字符串类型的”type“，value值为字段对应数据被导出时所保存的类型。
+            第二级字典的key值为字符串类型的 "type"，value值为字段对应数据被导出时所保存的类型。
             当前支持的类型包括：["int32", "int64", "float32", "float64", "string", "bytes"]。
           - primary_key (str): 主键名称。leader侧设置的值被使用，follower设置的值无效。
           - main_table_files (Union(list(str), str)): 原始文件路径，必须在leader和follower上都设置。
           - mysql_host (str): MySql 服务器地址。
-          - mysql_port (int): MySql 服务端口, 通常使用3306。
-          - mysql_database (str): MySql数据库名, None 表示不指定。
+          - mysql_port (int): MySql 服务端口, 通常使用 ``3306``。
+          - mysql_database (str): MySql数据库名, ``None`` 表示不指定。
           - mysql_charset (str): 使用的字符集。
           - mysql_user (str): 登录数据库的用户名。
           - mysql_password (str): 登录数据库的密码。
@@ -29,7 +29,7 @@ data_join
           - http_server_address (str): 通信时本地使用的IP和端口，主/从节点均需要配置。
           - remote_server_name (str): 通信时对端使用的http(s)服务名字。
           - remote_server_address (str): 通信时对端使用的IP和端口，主/从节点均需要配置。
-          - enable_ssl (bool): 通信模块是否开启SSL。 取值[True, False]。
+          - enable_ssl (bool): 通信模块是否开启SSL。 取值 ``True``、``False``。
           - server_password (str): 服务端P12证书文件保护口令，安全考虑请在命令行使用该密码。
           - client_password (str): 客户端P12证书文件保护口令，安全考虑请在命令行使用该密码。
           - server_cert_path (str): 服务端证书文件路径。
@@ -38,7 +38,7 @@ data_join
           - crl_path (str): CRL 证书文件路径。
           - cipher_list (str): SSL加密算法清单。
           - cert_expire_warning_time_in_day (str): 证书过期预警时间。
-          - join_type (str): 求交类型。leader侧设置的值被使用，follower设置的值无效。当前只支持psi。
+          - join_type (str): 求交类型。leader侧设置的值被使用，follower设置的值无效。当前只支持 ``'psi'``。
           - thread_num (int): psi中的线程数目。
           - output_dir (str): 输出目录，必须在leader和follower上都设置。
           - shard_num (int): 每个桶导出的文件个数。leader侧设置的值被使用，follower设置的值无效。
@@ -62,7 +62,7 @@ data_join
 
     参数：
         - **input_dir** (str) - 输入的MindRecord相关文件的目录。
-        - **seed** (int) - 随机种子。默认值：0。
+        - **seed** (int) - 随机种子。默认值：``0``。
 
     返回：
         - **dataset** (MindDataset) - 保序的数据集。

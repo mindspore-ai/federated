@@ -88,15 +88,16 @@ class FLModel:
         yaml_data (class): Data class containing information on the vertical federated learning process, including
             optimizers, gradient calculators, etc. The information mentioned above is parsed from the yaml file
             provided by the developer.
-        network (Cell): Training network, which outputs the loss. If loss_fn is not specified, the
+        network (Cell): Training network, which outputs the loss. If `loss_fn` is not specified, the
             network will be used as the training network directly. If `loss_fn` is specified, the training network
             will be constructed on the basis of `network` and `loss_fn`.
         loss_fn (Cell): Loss function. If not specified, the input network will be used as the training network.
-            Default: None.
-        optimizers (Cell): Customized optimizer for training the train_network. If `optimizers` is None, FLModel will
-            try to use standard optimizers of MindSpore specified in the yaml file. Default: None.
-        metrics (Metric): Metrics to evaluate the evaluation network. Default: None.
-        eval_network (Cell): Evaluation network of the party, which outputs the predict value. Default: None.
+            Default: ``None``.
+        optimizers (Cell): Customized optimizer for training the train_network. If `optimizers` is ``None``,
+            FLModel will try to use standard optimizers of MindSpore specified in the yaml file.
+            Default: ``None``.
+        metrics (Metric): Metrics to evaluate the evaluation network. Default: ``None``.
+        eval_network (Cell): Evaluation network of the party, which outputs the predict value. Default: ``None``.
 
     Examples:
         >>> from mindspore_federated import FLModel, FLYamlData
@@ -199,9 +200,9 @@ class FLModel:
 
         Args:
             local_data_batch (dict): Data batch read from local server. Key is the name of the data item, Value
-                is the corresponding tensor.
+                is the corresponding tensor. Default: ``None``.
             remote_data_batch (dict): Data batch read from remote server of other parties. Key is the name of
-                the data item, Value is the corresponding tensor.
+                the data item, Value is the corresponding tensor. Default: ``None``.
 
         Returns:
             Dict, outputs of the evaluation network. Key is the name of output, Value is tensors.
@@ -283,9 +284,9 @@ class FLModel:
 
         Args:
             local_data_batch (dict): Data batch read from local server. Key is the name of the data item, Value
-                is the corresponding tensor.
+                is the corresponding tensor. Default: ``None``.
             remote_data_batch (dict): Data batch read from remote server of other parties. Key is the name of
-                the data item, Value is the corresponding tensor.
+                the data item, Value is the corresponding tensor. Default: ``None``.
 
         Returns:
             Dict, outputs of the training network. Key is the name of output, Value is the tensor.
@@ -324,13 +325,14 @@ class FLModel:
 
         Args:
             local_data_batch (dict): Data batch read from local server. Key is the name of the data item, Value
-                is the corresponding tensor.
+                is the corresponding tensor. Default: ``None``.
             remote_data_batch (dict): Data batch read from remote server of other parties. Key is the name of
-                the data item, Value is the corresponding tensor.
+                the data item, Value is the corresponding tensor. Default: ``None``.
             sens (dict): Sense parameters or scale values to calculate the gradient values of the training network.
                 Key is the label name specified in the yaml file. Value is the dict of sense parameters
                 or gradient scale values. the Key of the Value dict is the name of the output of
                 the training network, and the Value of the Value dict is the sense tensor of corresponding output.
+                Default: ``None``.
 
         Returns:
             Dict, sense parameters or gradient scale values sending to other parties. Key is the label name specified
@@ -374,8 +376,8 @@ class FLModel:
         Save checkpoints of the training network.
 
         Args:
-            path (str): Path to save the checkpoint. If not specified, using the ckpt_path specified in the
-                yaml file. Default: None.
+            path (str): Path to save the checkpoint. If not specified, using the `ckpt_path` specified in the
+                yaml file. Default: ``None``.
 
         Examples:
             >>> party_fl_model.save_ckpt("party_fl_model.ckpt")
@@ -399,10 +401,10 @@ class FLModel:
         Load checkpoints for the training network and the evaluation network.
 
         Args:
-            phrase (str): Load checkpoint to either training network (if set 'eval') or evaluation network (if set
-                'train').  Default: 'eval'.
-            path (str): Path to load the checkpoint. If not specified, using the ckpt_path specified in the
-                yaml file. Default: None.
+            phrase (str): Load checkpoint to either training network (if set ``'eval'``) or evaluation network
+                (if set ``'train'``).  Default: ``'eval'``.
+            path (str): Path to load the checkpoint. If not specified, using the `ckpt_path` specified in the
+                yaml file. Default: ``None``.
 
         Examples:
             >>> party_fl_model.load_ckpt(phrase="eval", path="party_fl_model.ckpt")
