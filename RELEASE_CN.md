@@ -13,9 +13,8 @@ MindSpore Federated是面向MindSpore开发者的开源联邦学习工具，支�
 
 ### 贡献者
 
-感谢以下人员做出的贡献:
+感谢以下人员做出的贡献：
 
 Zhang Qi, Pan Shaowu, Tan Weicheng, Wu Tiancheng, Xu Yongfei, Zhang Zhaoju, Zhan Zhan, Xu Qiang, Yang Yuan, Li Hongcheng, Tang Cong, Zhang Zhugucheng.
-
 
 欢迎以任何形式对项目提供贡献！
