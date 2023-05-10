@@ -56,7 +56,7 @@ struct EncryptConfig {
   float dp_eps = 50.0f;
   float dp_delta = 0.01f;
   float dp_norm_clip = 1.0f;
-  // sign ds
+  // SignDS
   float sign_k = 0.01f;
   float sign_eps = 100.0f;
   float sign_thr_ratio = 0.6f;

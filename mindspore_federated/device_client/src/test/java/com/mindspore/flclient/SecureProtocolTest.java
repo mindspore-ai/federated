@@ -33,7 +33,7 @@ public class SecureProtocolTest {
         float signK = 0.2f;
         int inputDim = 800000;
         float signEps = 100f;
-        secureProtocol.setDSParameter(signK, signEps, signThrRatio, 2, 0);
+        secureProtocol.setDSParameter(signK, signEps, signThrRatio, 0);
         int topkDim = (int) (signK * inputDim);
         int signDimOut = secureProtocol.findOptOutputDim(signThrRatio, topkDim, inputDim, signEps);
         assertThat((double) signDimOut, closeTo(40, 70));

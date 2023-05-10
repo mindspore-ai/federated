@@ -67,11 +67,13 @@ class RedisClientBase {
   virtual CacheStatus Get(const std::string &key, std::string *value) = 0;
   virtual CacheStatus SetEx(const std::string &key, const std::string &value, uint64_t seconds) = 0;
   virtual CacheStatus SetNx(const std::string &key, const std::string &value) = 0;
+  virtual CacheStatus Set(const std::string &key, const std::string &value) = 0;
   virtual CacheStatus SetExNx(const std::string &key, const std::string &value, uint64_t seconds) = 0;
   virtual CacheStatus Incr(const std::string &key, uint64_t *new_value) = 0;
   virtual CacheStatus LPush(const std::string &key, const std::string &value) = 0;
   virtual CacheStatus LRange(const std::string &key, size_t start, size_t end, std::vector<std::string> *items) = 0;
   virtual CacheStatus LTrim(const std::string &key, size_t start, size_t end) = 0;
+  virtual CacheStatus LLen(const std::string &key, size_t *length) = 0;
 
   // Set Hash filed and int64 value
   CacheStatus HMSet(const std::string &key, const std::unordered_map<std::string, uint64_t> &items);
@@ -81,6 +83,7 @@ class RedisClientBase {
   CacheStatus HGet(const std::string &key, const std::string &filed, uint64_t default_val, uint64_t *value);
   // Get String value and parse to int64
   CacheStatus Get(const std::string &key, uint64_t default_val, uint64_t *value);
+  CacheStatus GetFloat(const std::string &key, float default_val, float *value);
 };
 
 class DistributedCacheBase {

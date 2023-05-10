@@ -559,6 +559,18 @@ CacheStatus RedisClient::SetNx(const std::string &key, const std::string &value)
   return kCacheSuccess;
 }
 
+CacheStatus RedisClient::Set(const std::string &key, const std::string &value) {
+  RedisReply reply = RunCommand({"SET", key, value});
+  if (!reply.IsValid()) {
+    MS_LOG(WARNING) << "Reply invalid: " << reply.GetError();
+    return kCacheNetErr;
+  }
+  if (reply.IsNil()) {
+    return kCacheExist;
+  }
+  return kCacheSuccess;
+}
+
 CacheStatus RedisClient::SetExNx(const std::string &key, const std::string &value, uint64_t seconds) {
   RedisReply reply = RunCommand({"SET", key, value, "EX", std::to_string(seconds), "NX"});
   if (!reply.IsValid()) {
@@ -620,6 +632,21 @@ CacheStatus RedisClient::LTrim(const std::string &key, size_t start, size_t end)
     MS_LOG(WARNING) << "Reply invalid: " << reply.GetError();
     return kCacheNetErr;
   }
+  return kCacheSuccess;
+}
+
+CacheStatus RedisClient::LLen(const std::string &key, size_t *length) {
+  RedisReply reply = RunCommand({"LLEN", key});
+  if (!reply.IsValid()) {
+    MS_LOG(WARNING) << "Reply invalid: " << reply.GetError();
+    return kCacheNetErr;
+  }
+  uint64_t value = 0;
+  if (!reply.GetInteger(&value)) {
+    MS_LOG(WARNING) << "Failed to call LLEN " << key;
+    return kCacheInnerErr;
+  }
+  *length = value;
   return kCacheSuccess;
 }
 

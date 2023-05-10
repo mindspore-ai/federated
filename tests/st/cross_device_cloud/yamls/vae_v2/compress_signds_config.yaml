@@ -27,7 +27,7 @@ unsupervised:
   eval_type: CALINSKI_HARABASZ_SCORE
 
 encrypt:
-  encrypt_type: SIGNDS
+  encrypt_train_type: SIGNDS
   privacy_eval_type: LAPLACE
   pw_encrypt:
     share_secrets_ratio: 1.0

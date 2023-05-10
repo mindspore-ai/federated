@@ -59,6 +59,20 @@ class DSParams(object):
             return self._tab.Get(flatbuffers.number_types.Int32Flags, o + self._tab.Pos)
         return 0
 
+    # DSParams
+    def SigndsREst(self):
+        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(14))
+        if o != 0:
+            return self._tab.Get(flatbuffers.number_types.Float32Flags, o + self._tab.Pos)
+        return 0.0
+
+    # DSParams
+    def SigndsIsReached(self):
+        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(16))
+        if o != 0:
+            return self._tab.Get(flatbuffers.number_types.Int32Flags, o + self._tab.Pos)
+        return 0
+
 def Start(builder): builder.StartObject(5)
 def DSParamsStart(builder):
     """This method is deprecated. Please switch to Start."""
@@ -83,6 +97,8 @@ def AddSignDimOut(builder, signDimOut): builder.PrependInt32Slot(4, signDimOut, 
 def DSParamsAddSignDimOut(builder, signDimOut):
     """This method is deprecated. Please switch to AddSignDimOut."""
     return AddSignDimOut(builder, signDimOut)
+def DSParamsAddSigndsREst(builder, signdsREst): builder.PrependFloat32Slot(5, signdsREst, 0.0)
+def DSParamsAddSigndsIsReached(builder, signdsIsReached): builder.PrependInt32Slot(6, signdsIsReached, 0)
 def End(builder): return builder.EndObject()
 def DSParamsEnd(builder):
     """This method is deprecated. Please switch to End."""

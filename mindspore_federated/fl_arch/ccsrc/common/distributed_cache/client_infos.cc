@@ -59,13 +59,16 @@ CacheStatus ClientInfos::AddPbItem(const std::string &name, const std::string &f
 CacheStatus ClientInfos::AddPbItemList(const std::string &name, const std::string &value) {
   auto client = GetOneClient();
   if (client == nullptr) {
+    MS_LOG_WARNING << "THROW_CACHE_UNAVAILABLE";
     THROW_CACHE_UNAVAILABLE;
   }
   auto ret = client->LPush(name, value);
   if (ret == kCacheNetErr) {
     THROW_CACHE_UNAVAILABLE;
+    MS_LOG_WARNING << "THROW_CACHE_UNAVAILABLE";
   }
   if (!ret.IsSuccess()) {
+    MS_LOG_WARNING << "AddPbItemList ERROR";
     return ret;
   }
   return client->Expire(name, Timer::unsupervised_data_expire_time_in_seconds());
@@ -398,6 +401,11 @@ CacheStatus ClientInfos::GetClientNoises(ClientNoises *noises) {
 CacheStatus ClientInfos::AddUnsupervisedEvalItem(const UnsupervisedEvalItem &unsupervised_eval_item) {
   auto key = RedisKeys::GetInstance().ClientUnsupervisedEvalHash();
   return AddPbItemList(key, unsupervised_eval_item);
+}
+
+CacheStatus ClientInfos::AddSignDSbHat(const std::string &b_hat) {
+  auto key = RedisKeys::GetInstance().ClientSignDSbHatHash();
+  return AddPbItemList(key, b_hat);
 }
 
 bool ClientInfos::ResetOnNewIteration() {

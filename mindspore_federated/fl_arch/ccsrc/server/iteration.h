@@ -92,7 +92,6 @@ class Iteration {
   void SubmitSummary();
   void GetAllSummaries();
   void SummarizeUnsupervisedEval();
-
   void InitEventTxtFile();
   void LogFailureEvent(const std::string &node_role, const std::string &node_address, const std::string &event);
   void InitConfig();

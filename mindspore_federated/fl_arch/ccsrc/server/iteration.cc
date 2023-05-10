@@ -31,6 +31,7 @@
 #include "distributed_cache/hyper_params.h"
 #include "distributed_cache/summary.h"
 #include "distributed_cache/unsupervised_eval.h"
+#include "armour/secure_protocol/signds.h"
 
 namespace mindspore {
 namespace fl {
@@ -243,6 +244,7 @@ void Iteration::GetAllSummaries() {
     accuracy_ = metrics_accuracy;
   }
   SummarizeUnsupervisedEval();
+  cache::SignDS::Instance().SummarizeSignDS();
 }
 
 void Iteration::SummarizeUnsupervisedEval() {

@@ -29,7 +29,7 @@ summary:
   participation_time_level: "5,15"
 
 encrypt:
-  encrypt_type: DP_ENCRYPT
+  encrypt_train_type: DP_ENCRYPT
   pw_encrypt:
     share_secrets_ratio: 1.0
     cipher_time_window: 3000

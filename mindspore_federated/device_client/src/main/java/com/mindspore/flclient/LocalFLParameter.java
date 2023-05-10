@@ -99,6 +99,11 @@ public class LocalFLParameter {
     // default unsupervised train evaluate enable/disable flg.
     private String unsupervisedEvalFlg = NOT_ENCRYPT;
 
+    // default rEst -> 0.00001f
+    private float rEst = 0.00001f;
+    // default rangeReached -> false
+    private int rangeReached = 0;
+
     private LocalFLParameter() {
     }
 
@@ -278,5 +283,26 @@ public class LocalFLParameter {
 
     public void setUnsupervisedEvalFlg(String unsupervisedEvalFlg) {
         this.unsupervisedEvalFlg = unsupervisedEvalFlg;
+    }
+
+    public float getREst() {
+        return rEst;
+    }
+
+    public void setREst(float rEstServer) {
+        if (rEstServer >= 0 && rEstServer < 1) {
+            rEst = rEstServer;
+        } else {
+            LOGGER.warning("[flParameter] the parameter of <rEst> is " + rEstServer + "use default value: 1");
+            rEst = 1;
+        }
+    }
+
+    public int getRangeReached() {
+        return rangeReached;
+    }
+
+    public void setRangeReached(int rangeReachedServer) {
+        rangeReached = rangeReachedServer;
     }
 }

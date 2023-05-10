@@ -29,7 +29,7 @@ summary:
   participation_time_level: "5,15"
 
 encrypt:
-  encrypt_type: SIGNDS
+  encrypt_train_type: SIGNDS
   pw_encrypt:
     share_secrets_ratio: 1.0
     cipher_time_window: 3000
@@ -39,7 +39,7 @@ encrypt:
     dp_delta: 0.01
     dp_norm_clip: 1.0
   signds:
-    sign_k: 0.01
+    sign_k: 0.2
     sign_eps: 100
     sign_thr_ratio: 0.6
     sign_global_lr: 0.1

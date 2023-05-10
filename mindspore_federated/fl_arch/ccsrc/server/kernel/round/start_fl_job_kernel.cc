@@ -23,6 +23,8 @@
 #include "server/model_store.h"
 #include "server/iteration.h"
 #include "distributed_cache/timer.h"
+#include "armour/secure_protocol/signds.h"
+#include "distributed_cache/redis_keys.h"
 
 namespace mindspore {
 namespace fl {
@@ -356,23 +358,15 @@ void StartFLJobKernel::BuildStartFLJobRsp(const std::shared_ptr<FBBuilder> &fbb,
   auto p = fbb->CreateVector(param->p, SECRET_MAX_LEN);
   int32_t t = param->t;
   int32_t g = param->g;
-  float dp_eps = param->dp_eps;
-  float dp_delta = param->dp_delta;
-  float dp_norm_clip = param->dp_norm_clip;
   auto encrypt_type = fbb->CreateString(FLContext::instance()->encrypt_type());
-  float sign_k = param->sign_k;
-  float sign_eps = param->sign_eps;
-  float sign_thr_ratio = param->sign_thr_ratio;
-  float sign_global_lr = param->sign_global_lr;
-  int sign_dim_out = param->sign_dim_out;
-  auto privacy_eval_type = param->privacy_eval_type;
-  float laplace_eval_eps = param->laplace_eval_eps;
-
+  float sign_r_est = cache::SignDS::Instance().GetREst();
+  uint64_t sign_is_reached = cache::SignDS::Instance().GetIsReached();
   auto pw_params = schema::CreatePWParams(*fbb.get(), t, p, g, prime);
-  auto dp_params = schema::CreateDPParams(*fbb.get(), dp_eps, dp_delta, dp_norm_clip);
-  auto ds_params = schema::CreateDSParams(*fbb.get(), sign_k, sign_eps, sign_thr_ratio, sign_global_lr, sign_dim_out);
-  auto cipher_public_params =
-    schema::CreateCipherPublicParams(*fbb.get(), encrypt_type, pw_params, dp_params, ds_params, laplace_eval_eps);
+  auto dp_params = schema::CreateDPParams(*fbb.get(), param->dp_eps, param->dp_delta, param->dp_norm_clip);
+  auto ds_params = schema::CreateDSParams(*fbb.get(), param->sign_k, param->sign_eps, param->sign_thr_ratio,
+                                          param->sign_global_lr, param->sign_dim_out, sign_r_est, sign_is_reached);
+  auto cipher_public_params = schema::CreateCipherPublicParams(*fbb.get(), encrypt_type, pw_params, dp_params,
+                                                               ds_params, param->laplace_eval_eps);
 
   schema::CompressType upload_compress_type;
   if (FLContext::instance()->compression_config().upload_compress_type == kDiffSparseQuant) {
@@ -381,15 +375,8 @@ void StartFLJobKernel::BuildStartFLJobRsp(const std::shared_ptr<FBBuilder> &fbb,
     upload_compress_type = schema::CompressType_NO_COMPRESS;
   }
 
-  std::string unsupervised_eval_flg;
   auto eval_type = FLContext::instance()->unsupervised_config().eval_type;
-  // There are only three cases of unsupervised_eval_flg: kNotEvalType, eval with no encryption, and eval with
-  // encryption.
-  if (eval_type == kNotEvalType) {
-    unsupervised_eval_flg = kNotEvalType;
-  } else {
-    unsupervised_eval_flg = param->privacy_eval_type;
-  }
+  std::string unsupervised_eval_flg = eval_type == kNotEvalType ? kNotEvalType : param->privacy_eval_type;
   auto fbs_unsupervised_eval_flg = fbb->CreateString(unsupervised_eval_flg);
   schema::FLPlanBuilder fl_plan_builder(*(fbb.get()));
   fl_plan_builder.add_fl_name(fbs_fl_name);

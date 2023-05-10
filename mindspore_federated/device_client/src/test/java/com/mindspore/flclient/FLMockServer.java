@@ -22,8 +22,6 @@ import static mindspore.fl.schema.CompressType.NO_COMPRESS;
 
 /**
  * Using this class to Mock the FL server node
- * @author       : zhangzhaoju
- * @since  : 2022/4/14
  */
 class FLMockServer {
     private static final Logger LOGGER = FLLoggerGenerater.getModelLogger(FLMockServer.class.toString());
@@ -45,11 +43,11 @@ class FLMockServer {
             FLHttpRes curRes = httpRes.get(httpResCnt % httpRes.size());
             httpResCnt++;
 
-            if(!reqMsgCheck(request, curRes)){
+            if (!reqMsgCheck(request, curRes)) {
                 return new MockResponse().setResponseCode(404);
             }
 
-            if(curRes.getContendMode() != 0){
+            if (curRes.getContendMode() != 0) {
                 return new MockResponse().setResponseCode(curRes.getResCode()).setBody(curRes.getContentData());
             }
 
@@ -63,7 +61,7 @@ class FLMockServer {
         httpResCnt = 0;
     }
 
-    private boolean reqMsgCheck(RecordedRequest request, FLHttpRes curRes){
+    private boolean reqMsgCheck(RecordedRequest request, FLHttpRes curRes) {
         // check msg type
         if (!request.getPath().equals("/" + curRes.getResName())) {
             LOGGER.severe("The " + Integer.toString(httpResCnt) + "th expect msg is :" + curRes.getResName() + " but got " + request.getPath());
@@ -84,14 +82,14 @@ class FLMockServer {
             ByteBuffer reqBuffer = ByteBuffer.wrap(reqBody);
             RequestUpdateModel reqUpdateModel = RequestUpdateModel.getRootAsRequestUpdateModel(reqBuffer);
             UnsupervisedEvalItems evalItems = reqUpdateModel.unsupervisedEvalItems();
-            for(int i = 0; i < evalItems.evalItemsLength(); i++){
+            for (int i = 0; i < evalItems.evalItemsLength(); i++) {
                 UnsupervisedEvalItem evalItem = evalItems.evalItems(i);
                 String evalName = evalItem.evalName();
                 ByteBuffer byteBuffer = evalItem.evalDataAsByteBuffer();
-                FloatBuffer floatBuffer =  byteBuffer.asFloatBuffer();
+                FloatBuffer floatBuffer = byteBuffer.asFloatBuffer();
                 float[] dst = new float[evalItem.evalDataLength()];
                 floatBuffer.get(dst);
-                LOGGER.info("Value of "+ evalName +" is:"+ Arrays.toString(dst));
+                LOGGER.info("Value of " + evalName + " is:" + Arrays.toString(dst));
             }
             return true;
         }
@@ -105,25 +103,46 @@ class FLMockServer {
         return false;
     }
 
+    /**
+     * Generate flat buffer data for DSParams
+     *
+     * @param builder
+     * @return the offset of DSParams
+     */
+    private int genDSParamsOffset(FlatBufferBuilder builder) {
+        float sign_k = 0.2f;
+        float sign_eps = 100f;
+        float sign_thr_ratio = 0.6f;
+        float sign_global_lr = 3;
+        int sign_dim_out = 0;
+        float signds_r_est = 0.00001f;
+        int signds_is_reached = 0;
+        return DSParams.createDSParams(builder, sign_k, sign_eps, sign_thr_ratio,
+                sign_global_lr, sign_dim_out, signds_r_est, signds_is_reached);
+    }
 
     /**
      * Generate flat buffer data for CipherPublicParams
+     *
      * @param builder FlatBufferBuilder
      * @return the offset of CipherPublicParams
      */
-    private int genCipherPublicParams(FlatBufferBuilder builder){
-        builder.startTable(4);
-        CipherPublicParams.addDsParams(builder, 0);
+    private int genCipherPublicParams(FlatBufferBuilder builder) {
+        int dsParamsOffset = genDSParamsOffset(builder);
+        builder.startTable(5);
+        CipherPublicParams.addDsParams(builder, dsParamsOffset);
         CipherPublicParams.addDpParams(builder, 0);
         CipherPublicParams.addPwParams(builder, 0);
         CipherPublicParams.addEncryptType(builder, 0);
+        CipherPublicParams.addLaplaceParams(builder, 0);
         return CipherPublicParams.endCipherPublicParams(builder);
     }
 
     /**
      * Generate flat buffer data for FLPlan
+     *
      * @param builder FlatBufferBuilder
-     * @returnf the offset of FLPlan
+     * @return the offset of FLPlan
      */
     private int genFLPlan(FlatBufferBuilder builder) {
         int fl_nameOffset = builder.createString("Lenet");
@@ -146,6 +165,7 @@ class FLMockServer {
 
     /**
      * Generate flat buffer data for ResponseFLJob
+     *
      * @return the ByteBuffer of flat buffer
      */
     private byte[] genResponseFLJob() {
@@ -161,7 +181,7 @@ class FLMockServer {
         int flPlanConfigOffset = genFLPlan(builder);
         int reasonOffset = builder.createString("Success.");
 
-        int evalFlgOffset = builder.createString("NOT_ENCRYPT.");
+        int evalFlgOffset = builder.createString("NOT_ENCRYPT");
 
         builder.startTable(13);
         ResponseFLJob.addCompressFeatureMap(builder, 0);
@@ -205,6 +225,7 @@ class FLMockServer {
 
     /**
      * Generate flat buffer data for ResponseUpdateModel
+     *
      * @return the ByteBuffer of flat buffer
      */
     private byte[] genResponseUpdateModel() {

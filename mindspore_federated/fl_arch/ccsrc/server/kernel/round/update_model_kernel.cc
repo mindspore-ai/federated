@@ -24,6 +24,8 @@
 #include "distributed_cache/server.h"
 #include "server/server.h"
 #include "distributed_cache/timer.h"
+#include "distributed_cache/redis_keys.h"
+#include "armour/secure_protocol/signds.h"
 
 namespace mindspore {
 namespace fl {
@@ -465,6 +467,9 @@ ResultCode UpdateModelKernel::UpdateModel(const schema::RequestUpdateModel *upda
       std::to_string(LocalMetaStore::GetInstance().value<uint64_t>(kCtxIterationNextRequestTimestamp)));
     return ResultCode::kFail;
   }
+  if (FLContext::instance()->encrypt_type() == kDSEncryptType) {
+    UpdateClientSignDSbHat(update_model_req);
+  }
   BuildUpdateModelRsp(fbb, schema::ResponseCode_SUCCEED, "success not ready",
                       std::to_string(LocalMetaStore::GetInstance().value<uint64_t>(kCtxIterationNextRequestTimestamp)));
   return ResultCode::kSuccess;
@@ -531,7 +536,7 @@ std::map<std::string, Address> UpdateModelKernel::ParseSignDSFeatureMap(
   std::map<std::string, std::vector<float>> *weight_map) {
   auto fbs_feature_map = update_model_req->feature_map();
   std::map<std::string, Address> feature_map;
-  auto sign = update_model_req->sign();
+  float sign = static_cast<float>(update_model_req->sign());
   if (sign == 0) {
     feature_map = ParseFeatureMap(update_model_req);
     return feature_map;
@@ -546,7 +551,18 @@ std::map<std::string, Address> UpdateModelKernel::ParseSignDSFeatureMap(
   auto index_array = update_model_req->index_array();
   size_t index_store = 0;
   size_t index_array_j = 0;
-  float signds_grad = sign * FLContext::instance()->encrypt_config().sign_global_lr;
+  float r_est;
+  auto client = cache::DistributedCacheLoader::Instance().GetOneClient();
+  auto redis_key_instance = cache::RedisKeys::GetInstance();
+  auto signds = cache::SignDS::Instance();
+  client->GetFloat(redis_key_instance.ClientSignDSrEstHash(), signds.kSignInitREst, &r_est);
+  uint64_t is_reached;
+  client->GetFloat(redis_key_instance.ClientSignDSrEstHash(), signds.kSignInitREst, &r_est);
+  client->Get(redis_key_instance.ClientSignDSIsReachedHash(), signds.kSignInitIsNotReached, &is_reached);
+  float updatemodel_num = FLContext::instance()->update_model_ratio() * FLContext::instance()->start_fl_job_threshold();
+  float signds_grad = is_reached == 0 ? signds.kSignDSGlobalLRRatioOfNotReached * updatemodel_num * r_est * sign
+                                      : signds.kSignDSGlobalLRRatioOfReached * updatemodel_num * r_est * sign;
+
   for (size_t i = 0; i < fbs_feature_map->size(); i++) {
     std::string weight_full_name = fbs_feature_map->Get(i)->weight_fullname()->str();
     auto weight_info = latest_model->weight_items[weight_full_name];
@@ -758,6 +774,22 @@ bool UpdateModelKernel::UpdateClientUnsupervisedEval(const schema::RequestUpdate
   }
   auto ret = cache::ClientInfos::GetInstance().AddUnsupervisedEvalItem(unsupervised_eval_item_pb);
   if (!ret.IsSuccess()) {
+    return false;
+  }
+  return true;
+}
+
+bool UpdateModelKernel::UpdateClientSignDSbHat(const schema::RequestUpdateModel *update_model_req) {
+  if (update_model_req->signds_bHat() == nullptr) {
+    return false;
+  }
+  std::string b_hat = update_model_req->signds_bHat()->str();
+  if (b_hat != cache::SignDS::Instance().kSignDSbHat0 && b_hat != cache::SignDS::Instance().kSignDSbHat1) {
+    return false;
+  }
+  auto ret = cache::ClientInfos::GetInstance().AddSignDSbHat(b_hat);
+  if (!ret.IsSuccess()) {
+    MS_LOG_INFO << "An error occurred during Redis storage [AddSignDSbHat].";
     return false;
   }
   return true;

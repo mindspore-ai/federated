@@ -45,6 +45,7 @@ DEFINE_HYPER_VAR(total_client_num)
 
 // cipher, for round
 DEFINE_HYPER_VAR(encrypt_type)
+DEFINE_HYPER_VAR(privacy_eval_type)
 DEFINE_HYPER_VAR(share_secrets_ratio)
 DEFINE_HYPER_VAR(cipher_time_window)
 DEFINE_HYPER_VAR(reconstruct_secrets_threshold)
@@ -58,6 +59,7 @@ DEFINE_HYPER_VAR(sign_eps)
 DEFINE_HYPER_VAR(sign_thr_ratio)
 DEFINE_HYPER_VAR(sign_global_lr)
 DEFINE_HYPER_VAR(sign_dim_out)
+DEFINE_HYPER_VAR(laplace_eval_eps)
 
 // compress
 DEFINE_HYPER_VAR(upload_compress_type)
@@ -139,6 +141,7 @@ CacheStatus HyperParams::SyncLocal2Cache(const std::shared_ptr<RedisClientBase> 
   // cipher, for round
   auto &encrypt_config = context->encrypt_config();
   obj[HYPER_VAR(encrypt_type)] = encrypt_config.encrypt_type;
+  obj[HYPER_VAR(privacy_eval_type)] = encrypt_config.privacy_eval_type;
   obj[HYPER_VAR(share_secrets_ratio)] = encrypt_config.share_secrets_ratio;
   obj[HYPER_VAR(cipher_time_window)] = encrypt_config.cipher_time_window;
   obj[HYPER_VAR(reconstruct_secrets_threshold)] = encrypt_config.reconstruct_secrets_threshold;
@@ -151,6 +154,7 @@ CacheStatus HyperParams::SyncLocal2Cache(const std::shared_ptr<RedisClientBase> 
   obj[HYPER_VAR(sign_thr_ratio)] = encrypt_config.sign_thr_ratio;
   obj[HYPER_VAR(sign_global_lr)] = encrypt_config.sign_global_lr;
   obj[HYPER_VAR(sign_dim_out)] = encrypt_config.sign_dim_out;
+  obj[HYPER_VAR(laplace_eval_eps)] = encrypt_config.laplace_eval_eps;
 
   // compress
   auto &compression_config = context->compression_config();
@@ -205,6 +209,7 @@ CacheStatus HyperParams::SyncCache2Local(const std::shared_ptr<RedisClientBase> 
     // cipher, for round
     EncryptConfig encrypt_config;
     encrypt_config.encrypt_type = obj[HYPER_VAR(encrypt_type)];
+    encrypt_config.privacy_eval_type = obj[HYPER_VAR(privacy_eval_type)];
     encrypt_config.share_secrets_ratio = obj[HYPER_VAR(share_secrets_ratio)];
     encrypt_config.cipher_time_window = obj[HYPER_VAR(cipher_time_window)];
     encrypt_config.reconstruct_secrets_threshold = obj[HYPER_VAR(reconstruct_secrets_threshold)];
@@ -218,6 +223,7 @@ CacheStatus HyperParams::SyncCache2Local(const std::shared_ptr<RedisClientBase> 
     encrypt_config.sign_thr_ratio = obj[HYPER_VAR(sign_thr_ratio)];
     encrypt_config.sign_global_lr = obj[HYPER_VAR(sign_global_lr)];
     encrypt_config.sign_dim_out = obj[HYPER_VAR(sign_dim_out)];
+    encrypt_config.laplace_eval_eps = obj[HYPER_VAR(laplace_eval_eps)];
 
     context->set_encrypt_config(encrypt_config);
     context->set_secure_aggregation(obj[HYPER_VAR(secure_aggregation)]);

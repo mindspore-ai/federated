@@ -33,7 +33,7 @@ unsupervised:
   eval_type: NOT_EVAL
 
 encrypt:
-  encrypt_type: NOT_ENCRYPT
+  encrypt_train_type: NOT_ENCRYPT
   privacy_eval_type: LAPLACE
   pw_encrypt:
     share_secrets_ratio: 1.0
