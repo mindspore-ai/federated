@@ -35,6 +35,8 @@ table DSParams {
   sign_thr_ratio:float;
   sign_global_lr:float;
   sign_dim_out:int;
+  signds_r_est:float;
+  signds_is_reached:int;
 }
 
 table CipherPublicParams {

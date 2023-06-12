@@ -226,6 +226,13 @@ class RequestUpdateModel(object):
             return obj
         return None
 
+    # RequestUpdateModel
+    def SigndsBHat(self):
+        o = flatbuffers.number_types.UOffsetTFlags.py_type(self._tab.Offset(34))
+        if o != 0:
+            return self._tab.String(o + self._tab.Pos)
+        return None
+
 def Start(builder): builder.StartObject(15)
 def RequestUpdateModelStart(builder):
     """This method is deprecated. Please switch to Start."""
@@ -310,6 +317,7 @@ def AddUnsupervisedEvalItems(builder, unsupervisedEvalItems): builder.PrependUOf
 def RequestUpdateModelAddUnsupervisedEvalItems(builder, unsupervisedEvalItems):
     """This method is deprecated. Please switch to AddUnsupervisedEvalItems."""
     return AddUnsupervisedEvalItems(builder, unsupervisedEvalItems)
+def RequestUpdateModelAddSigndsBHat(builder, signdsBHat): builder.PrependUOffsetTRelativeSlot(15, flatbuffers.number_types.UOffsetTFlags.py_type(signdsBHat), 0)
 def End(builder): return builder.EndObject()
 def RequestUpdateModelEnd(builder):
     """This method is deprecated. Please switch to End."""

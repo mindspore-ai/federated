@@ -2,62 +2,62 @@
 
 The configuration of the parameters for the existing federation learning is based on the yaml configuration file, and different configurations need to be set on specific roles. For details, check the following table.
 
-| Function classification |Configuration parameters   | Federal Learning Roles       |
-|---------------| ------------------------- |--------|
-| global        | checkpoint_dir            | server |
-|               | fl_name                   | server |
-|               | fl_iteration_num          | server |
-|               | server_mode               | server |
-|               | enable_ssl                | server |
-| distributed_cache | type                      | server |
-|               | address                   | server |
-|               | plugin_lib_path           | server |
-|               | cacert_filename           | server |
-|               | capath                    | server |
-|               | cert_filename             | server |
-|               | private_key_filename      | server |
-|               | server_name               | server |
-| round         | start_fl_job_threshold    | server |
-|               | start_fl_job_time_window  | server |
-|               | update_model_ratio        | server |
-|               | update_model_time_window  | server |
-|               | global_iteration_time_window | server |
-| summary       | metrics_file              | server |
-|               | failure_event_file        | server |
-|               | continuous_failure_times  | server |
-|               | data_rate_dir             | server |
-|               | participation_time_level  | server |
-| encrypt       | encrypt_type              | server |
-|               | pw_encrypt.share_secrets_ratio | server |
-|               | pw_encrypt.cipher_time_window | server |
+| Function classification | Configuration parameters                 | Federal Learning Roles       |
+|---------------|------------------------------------------|--------|
+| global        | checkpoint_dir                           | server |
+|               | fl_name                                  | server |
+|               | fl_iteration_num                         | server |
+|               | server_mode                              | server |
+|               | enable_ssl                               | server |
+| distributed_cache | type                                     | server |
+|               | address                                  | server |
+|               | plugin_lib_path                          | server |
+|               | cacert_filename                          | server |
+|               | capath                                   | server |
+|               | cert_filename                            | server |
+|               | private_key_filename                     | server |
+|               | server_name                              | server |
+| round         | start_fl_job_threshold                   | server |
+|               | start_fl_job_time_window                 | server |
+|               | update_model_ratio                       | server |
+|               | update_model_time_window                 | server |
+|               | global_iteration_time_window             | server |
+| summary       | metrics_file                             | server |
+|               | failure_event_file                       | server |
+|               | continuous_failure_times                 | server |
+|               | data_rate_dir                            | server |
+|               | participation_time_level                 | server |
+| encrypt       | encrypt_train_type                       | server |
+|               | pw_encrypt.share_secrets_ratio           | server |
+|               | pw_encrypt.cipher_time_window            | server |
 |               | pw_encrypt.reconstruct_secrets_threshold | server |
-|               | dp_encrypt.dp_eps         | server |
-|               | dp_encrypt.dp_delta       | server |
-|               | dp_encrypt.dp_norm_clip   | server |
-|               | signds.sign_k             | server |
-|               | signds.sign_eps           | server |
-|               | signds.sign_thr_ratio     | server |
-|               | signds.sign_global_lr     | server |
-|               | signds.sign_dim_out       | server |
-| compression   | upload_compress_type      | server |
-|               | upload_sparse_rate        | server |
-|               | download_compress_type    | server |
-| ssl           | server_cert_path          | server |
-|               | client_cert_path          | server |
-|               | ca_cert_path              | server |
-|               | crl_path                  | server |
-|               | cipher_list               | server |
-|               | cert_expire_warning_time_in_day | server |
-| client_verify | pki_verify                | server |
-|               | root_first_ca_path        | server |
-|               | root_second_ca_path       | server |
-|               | equip_crl_path            | server |
-|               | replay_attack_time_diff   | server |
-| client        | http_url_prefix           | server |
-|               | client_epoch_num          | server |
-|               | client_batch_size         | server |
-|               | client_learning_rate      | server |
-|               | connection_num            | server |
+|               | dp_encrypt.dp_eps                        | server |
+|               | dp_encrypt.dp_delta                      | server |
+|               | dp_encrypt.dp_norm_clip                  | server |
+|               | signds.sign_k                            | server |
+|               | signds.sign_eps                          | server |
+|               | signds.sign_thr_ratio                    | server |
+|               | signds.sign_global_lr                    | server |
+|               | signds.sign_dim_out                      | server |
+| compression   | upload_compress_type                     | server |
+|               | upload_sparse_rate                       | server |
+|               | download_compress_type                   | server |
+| ssl           | server_cert_path                         | server |
+|               | client_cert_path                         | server |
+|               | ca_cert_path                             | server |
+|               | crl_path                                 | server |
+|               | cipher_list                              | server |
+|               | cert_expire_warning_time_in_day          | server |
+| client_verify | pki_verify                               | server |
+|               | root_first_ca_path                       | server |
+|               | root_second_ca_path                      | server |
+|               | equip_crl_path                           | server |
+|               | replay_attack_time_diff                  | server |
+| client        | http_url_prefix                          | server |
+|               | client_epoch_num                         | server |
+|               | client_batch_size                        | server |
+|               | client_learning_rate                     | server |
+|               | connection_num                           | server |
 
 which:
 
@@ -83,7 +83,7 @@ which:
 - **continuous_failure_times** (int) - The number of failed iterations greater than this parameter to count failed events, Default: ``10``.
 - **data_rate_dir** (str) - The path to the cluster traffic statistics file , Default: ``"...". ."``.
 - **participation_time_level** (str) - Traffic statistics time interval, Default: ``"5,15"``.
-- **encrypt_type** (str) - The security policy used for federation learning, can be ``'NOT_ENCRYPT'``, ``'DP_ENCRYPT'``, ``'PW_ENCRYPT'``, ``'STABLE_PW_ENCRYPT'``, or ``'SIGNDS'``. If ``'DP_ENCRYPT'``, the differential privacy mode will be applied to the client and the privacy protection effect will be determined by dp_eps, dp_delta, dp_norm_clip as described above. If ``'PW_ENCRYPT'``, pairwise (PW) security aggregation will be applied to protect the client model from being stolen in cross-device scenarios. If ``'STABLE_PW_ENCRYPT'``, pairwise security aggregation will be applied to protect the client model from theft in a cloud federation scenario. If ``'SIGNDS'``, the SignDS policy will be used on the client. -based Dimension Selection](<https://dl.acm.org/doi/abs/10.1145/3517820>). Default: ``'NOT_ENCRYPT'``.
+- **encrypt_train_type** (str) - The security policy used for federation learning, can be ``'NOT_ENCRYPT'``, ``'DP_ENCRYPT'``, ``'PW_ENCRYPT'``, ``'STABLE_PW_ENCRYPT'``, or ``'SIGNDS'``. If ``'DP_ENCRYPT'``, the differential privacy mode will be applied to the client and the privacy protection effect will be determined by dp_eps, dp_delta, dp_norm_clip as described above. If ``'PW_ENCRYPT'``, pairwise (PW) security aggregation will be applied to protect the client model from being stolen in cross-device scenarios. If ``'STABLE_PW_ENCRYPT'``, pairwise security aggregation will be applied to protect the client model from theft in a cloud federation scenario. If ``'SIGNDS'``, the SignDS policy will be used on the client. -based Dimension Selection](<https://dl.acm.org/doi/abs/10.1145/3517820>). Default: ``'NOT_ENCRYPT'``.
 - **share_secrets_ratio** (float) - PW: The percentage of clients participating in secret sharing. Default: ``1.0``.
 - **cipher_time_window** (int) - PW: duration of the time window for each encryption round in milliseconds. Default: ``300000``.
 - **reconstruct_secrets_threshold** (int) - PW: The threshold for secret reconstruction. Default: ``2000``.
@@ -143,7 +143,7 @@ summary:
   participation_time_level: "5,15"
 
 encrypt:
-  encrypt_type: NOT_ENCRYPT
+  encrypt_train_type: NOT_ENCRYPT
   pw_encrypt:
     share_secrets_ratio: 1.0
     cipher_time_window: 3000

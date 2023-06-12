@@ -129,6 +129,7 @@ table RequestUpdateModel{
   name_vec:[string];
   upload_accuracy:float;
   unsupervised_eval_items:UnsupervisedEvalItems;
+  signds_bHat:string;
 }
 
 table ResponseUpdateModel{

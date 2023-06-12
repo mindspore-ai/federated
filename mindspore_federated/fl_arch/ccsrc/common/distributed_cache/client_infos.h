@@ -97,6 +97,8 @@ class ClientInfos {
   bool ResetOnNewIteration();
   CacheStatus AddUnsupervisedEvalItem(const UnsupervisedEvalItem &unsupervised_eval_item);
 
+  CacheStatus AddSignDSbHat(const std::string &b_hat);
+
  private:
   CacheStatus AddPbItem(const std::string &name, const std::string &fl_id, const google::protobuf::Message &value);
   template <class PbType, typename std::enable_if<std::is_base_of_v<google::protobuf::Message, PbType>, int>::type = 0>

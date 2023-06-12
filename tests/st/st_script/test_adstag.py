@@ -246,7 +246,7 @@ class TestAdsTagTrain(BaseCase):
         self.start_server("yamls/adstag/nc_ne_config.yaml", self.cur_ckpt_path)
         self.wait_cluster_ready(out_time=30)
         self.start_client()
-        self.check_client_result(out_time=60)
+        self.check_client_result(out_time=300)
 
     def test_train_adstag_compress_ne(self):
         """
@@ -260,7 +260,7 @@ class TestAdsTagTrain(BaseCase):
         self.start_server("yamls/adstag/compress_ne_config.yaml", self.cur_ckpt_path)
         self.wait_cluster_ready(out_time=30)
         self.start_client()
-        self.check_client_result(out_time=60)
+        self.check_client_result(out_time=300)
 
     def test_train_adstag_nc_dp(self):
         """

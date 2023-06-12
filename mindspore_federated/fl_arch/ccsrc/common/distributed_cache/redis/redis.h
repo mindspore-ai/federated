@@ -104,6 +104,7 @@ class RedisClient : public RedisClientBase {
   CacheStatus HDel(const std::string &key, const std::string &filed) override;
   //
   CacheStatus Get(const std::string &key, std::string *value) override;
+  CacheStatus Set(const std::string &key, const std::string &value) override;
   CacheStatus SetEx(const std::string &key, const std::string &value, uint64_t seconds) override;
   CacheStatus SetNx(const std::string &key, const std::string &value) override;
   CacheStatus SetExNx(const std::string &key, const std::string &value, uint64_t seconds) override;
@@ -111,6 +112,7 @@ class RedisClient : public RedisClientBase {
   CacheStatus LPush(const std::string &key, const std::string &value) override;
   CacheStatus LRange(const std::string &key, size_t start, size_t end, std::vector<std::string> *items) override;
   CacheStatus LTrim(const std::string &key, size_t start, size_t end) override;
+  CacheStatus LLen(const std::string &key, size_t *length) override;
 
  protected:
   CacheStatus ReconnectInner();

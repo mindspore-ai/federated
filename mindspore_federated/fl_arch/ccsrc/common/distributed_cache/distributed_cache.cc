@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 #include "distributed_cache/distributed_cache.h"
+#include <utility>
 #include "common/common.h"
 #include "distributed_cache/redis/redis.h"
 #include "distributed_cache/redis_keys.h"
@@ -117,6 +118,7 @@ CacheStatus RedisClientBase::HGet(const std::string &key, const std::string &fil
   }
   return kCacheSuccess;
 }
+
 // Get String value and parse to int64
 CacheStatus RedisClientBase::Get(const std::string &key, uint64_t default_val, uint64_t *value) {
   if (value == nullptr) {
@@ -133,6 +135,26 @@ CacheStatus RedisClientBase::Get(const std::string &key, uint64_t default_val, u
   }
   if (!Str2Uint64(value_str, value)) {
     MS_LOG_WARNING << "Expect string value to be int, key: " << key;
+    return kCacheTypeErr;
+  }
+  return kCacheSuccess;
+}
+
+CacheStatus RedisClientBase::GetFloat(const std::string &key, float default_val, float *value) {
+  if (value == nullptr) {
+    return kCacheInnerErr;
+  }
+  std::string value_str;
+  auto status = Get(key, &value_str);
+  if (status == kCacheNil) {
+    *value = default_val;
+    return kCacheSuccess;
+  }
+  if (!status.IsSuccess()) {
+    return status;
+  }
+  if (!Str2Float(value_str, value)) {
+    MS_LOG_WARNING << "Expect string value to be float, key: " << key;
     return kCacheTypeErr;
   }
   return kCacheSuccess;

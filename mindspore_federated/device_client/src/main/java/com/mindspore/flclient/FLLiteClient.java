@@ -155,13 +155,11 @@ public class FLLiteClient {
                 signK = cipherPublicParams.dsParams().signK();
                 signEps = cipherPublicParams.dsParams().signEps();
                 signThrRatio = cipherPublicParams.dsParams().signThrRatio();
-                signGlobalLr = cipherPublicParams.dsParams().signGlobalLr();
                 signDimOut = cipherPublicParams.dsParams().signDimOut();
-                LOGGER.info("[startFLJob] GlobalParameters <signK> from server: " + signK);
-                LOGGER.info("[startFLJob] GlobalParameters <signEps> from server: " + signEps);
-                LOGGER.info("[startFLJob] GlobalParameters <signThrRatio> from server: " + signThrRatio);
-                LOGGER.info("[startFLJob] GlobalParameters <signGlobalLr> from server: " + signGlobalLr);
-                LOGGER.info("[startFLJob] GlobalParameters <SignDimOut> from server: " + signDimOut);
+                LOGGER.info("[startFLJob] GlobalParameters <signK> from server: " + signK
+                        + ", <signEps> from server: " + signEps
+                        + ", <signThrRatio> from server: " + signThrRatio
+                        + ", <SignDimOut> from server: " + signDimOut);
                 break;
             default:
                 LOGGER.info("[startFLJob] NOT_ENCRYPT, do not set parameter for Encrypt");
@@ -526,7 +524,7 @@ public class FLLiteClient {
                 LOGGER.info("[Encrypt] set parameters for DP_ENCRYPT!");
                 return FLClientStatus.SUCCESS;
             case SIGNDS:
-                curStatus = secureProtocol.setDSParameter(signK, signEps, signThrRatio, signGlobalLr, signDimOut);
+                curStatus = secureProtocol.setDSParameter(signK, signEps, signThrRatio, signDimOut);
                 retCode = ResponseCode.SUCCEED;
                 if (curStatus != FLClientStatus.SUCCESS) {
                     LOGGER.severe("---SignDS init failed---");

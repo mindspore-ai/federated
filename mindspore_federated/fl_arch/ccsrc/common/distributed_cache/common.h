@@ -46,6 +46,19 @@ static inline bool Str2Uint64(const std::string &str, uint64_t *value) {
   }
   return true;
 }
+
+static inline bool Str2Float(const std::string &str, float *value) {
+  try {
+    auto val = std::stof(str);
+    *value = static_cast<float>(val);
+  } catch (const std::invalid_argument &e) {
+    return false;
+  } catch (const std::out_of_range &e) {
+    return false;
+  }
+  return true;
+}
+
 static inline bool GetIntValue(const std::unordered_map<std::string, std::string> &items, const std::string &key,
                                int64_t *value) {
   auto it = items.find(key);

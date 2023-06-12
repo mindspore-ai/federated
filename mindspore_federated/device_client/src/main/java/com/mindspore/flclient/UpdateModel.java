@@ -93,11 +93,11 @@ public class UpdateModel {
     /**
      * Get a flatBuffer builder of RequestUpdateModel.
      *
-     * @param iteration      current iteration of federated learning task.
-     * @param secureProtocol the object that defines encryption and decryption methods.
-     * @param trainDataSize  the size of train date set.
-     * @param evaAcc  the evaluated Accuracy.
-     * @param unsupervisedEvalData  the unsupervised train evaluation data used for model evaluation.
+     * @param iteration            current iteration of federated learning task.
+     * @param secureProtocol       the object that defines encryption and decryption methods.
+     * @param trainDataSize        the size of train date set.
+     * @param evaAcc               the evaluated Accuracy.
+     * @param unsupervisedEvalData the unsupervised train evaluation data used for model evaluation.
      * @return the flatBuffer builder of RequestUpdateModel in byte[] format.
      */
     public byte[] getRequestUpdateFLJob(int iteration, SecureProtocol secureProtocol, int trainDataSize, float evaAcc
@@ -160,6 +160,7 @@ public class UpdateModel {
         private int timestampOffset = 0;
         private int signDataOffset = 0;
         private int sign = 0;
+        private int bHatOffset = 0;
         private int indexArrayOffset = 0;
         private int iteration = 0;
         private byte uploadCompressType = 0;
@@ -384,7 +385,7 @@ public class UpdateModel {
         private RequestUpdateModelBuilder featuresMap(SecureProtocol secureProtocol, int trainDataSize) {
             ArrayList<String> updateFeatureName = secureProtocol.getUpdateFeatureName();
 
-            if(encryptLevel == SIGNDS){
+            if (encryptLevel == SIGNDS) {
                 return signDSEncrypt(secureProtocol, updateFeatureName);
             }
 
@@ -392,7 +393,7 @@ public class UpdateModel {
             EncrypterBase encrypterBase = getEncrypter(client, secureProtocol, trainDataSize);
             encrypterBase.init();
             this.uploadCompressType = localFLParameter.getUploadCompressType();
-            if(uploadCompressType == NO_COMPRESS){
+            if (uploadCompressType == NO_COMPRESS) {
                 long startTime = System.currentTimeMillis();
                 int index = 0;
                 int[] fmOffsets = new int[updateFeatureName.size()];
@@ -455,13 +456,16 @@ public class UpdateModel {
         private RequestUpdateModelBuilder signDSEncrypt(SecureProtocol secureProtocol, ArrayList<String> updateFeatureName) {
             long endTime;
             long startTime;
+            String signds_bHat;
             startTime = System.currentTimeMillis();
             Client client = ClientManager.getClient(flParameter.getFlName());
-            // signds alg return indexArray, and package indexArray into flatbuffer.
             SecureRandom secureRandom = Common.getSecureRandom();
             boolean signBool = secureRandom.nextBoolean();
             this.sign = signBool ? 1 : -1;
-            int[] indexArray = secureProtocol.signDSModel(client, signBool);
+            Object[] signds = secureProtocol.signDSModel(client, signBool);
+            signds_bHat = (boolean) signds[0] ? "1" : "0";
+            bHat(signds_bHat);
+            int[] indexArray = (int[]) signds[1];
             if (indexArray == null || indexArray.length == 0) {
                 LOGGER.severe("[Encrypt] the return fmOffsetsSignDS from <secureProtocol.signDSModel> is " +
                         "null, please check");
@@ -561,6 +565,21 @@ public class UpdateModel {
         }
 
         /**
+         * Serialize the element bHat in RequestUpdateModel.
+         *
+         * @param bHat the model name.
+         * @return the RequestUpdateModelBuilder object.
+         */
+        private RequestUpdateModelBuilder bHat(String bHat) {
+            if (bHat == null || bHat.isEmpty()) {
+                LOGGER.severe("[updateModel] the parameter of <bHat> is null or empty, please check!");
+                throw new IllegalArgumentException();
+            }
+            this.bHatOffset = this.builder.createString(bHat);
+            return this;
+        }
+
+        /**
          * Create a flatBuffer builder of RequestUpdateModel.
          *
          * @return the flatBuffer builder of RequestUpdateModel in byte[] format.
@@ -582,6 +601,7 @@ public class UpdateModel {
             RequestUpdateModel.addSign(builder, this.sign);
             RequestUpdateModel.addIndexArray(builder, this.indexArrayOffset);
             RequestUpdateModel.addUnsupervisedEvalItems(builder, this.evalItemsOffset);
+            RequestUpdateModel.addSigndsBHat(builder, bHatOffset);
             int root = RequestUpdateModel.endRequestUpdateModel(builder);
             builder.finish(root);
             return builder.sizedByteArray();

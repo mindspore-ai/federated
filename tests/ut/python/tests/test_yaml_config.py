@@ -13,20 +13,12 @@
 # limitations under the License.
 # ============================================================================
 """Test the functions of server in server mode FEDERATED_LEARNING"""
-import time
 
 import numpy as np
 
-from common import fl_name_with_idx, make_yaml_config, start_fl_server, g_redis_server_address, fl_test
-from common import stop_processes, restart_redis_server, get_default_ssl_config
-from common_client import post_start_fl_job, post_get_model, post_update_model
-from common_client import server_safemode_rsp, server_disabled_finished_rsp
-from common_client import ResponseCode, ResponseFLJob, ResponseGetModel, ResponseUpdateModel
-from common import start_fl_job_expect_success, update_model_expect_success, get_model_expect_success
-from common import check_feature_map, read_metrics
+from common import fl_name_with_idx, make_yaml_config, start_fl_server, fl_test
 
-from mindspore_fl.schema import CompressType
-from mindspore_federated import FeatureMap, SSLConfig
+from mindspore_federated import FeatureMap
 
 start_fl_job_reach_threshold_rsp = "Current amount for startFLJob has reached the threshold"
 update_model_reach_threshold_rsp = "Current amount for updateModel is enough."
@@ -40,6 +32,7 @@ def create_default_feature_map():
     return update_feature_map
 
 
+# pylint: disable=R1710
 def val_type_str(val):
     if isinstance(val, str):
         return "str"
@@ -74,7 +67,6 @@ def test_yaml_config_multi_server_pki_verify_not_match_failed():
 
     start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address)
 
-    _, _, ca_cert_path, server_password, client_password = get_default_ssl_config()
     http_server_address2 = "127.0.0.1:3002"
     try:
         yaml_config_file = f"temp/yaml_{fl_name}_config.yaml"
@@ -225,19 +217,19 @@ def test_yaml_config_invalid_encrypt_config_encrypt_type_failed():
 
     # expect str, got int
     try:
-        make_yaml_config(fl_name, {"encrypt.encrypt_type": 0}, output_yaml_file=yaml_config_file)
+        make_yaml_config(fl_name, {"encrypt.encrypt_train_type": 0}, output_yaml_file=yaml_config_file)
         start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address)
         assert False
     except RuntimeError as e:
-        assert "The parameter 'encrypt.encrypt_type' is expected to be type str" in str(e)
+        assert "The parameter 'encrypt.encrypt_train_type' is expected to be type str" in str(e)
 
-    # encrypt.encrypt_type: NOT_ENCRYPT, PW_ENCRYPT, STABLE_PW_ENCRYPT, DP_ENCRYPT, SIGNDS
+    # encrypt.encrypt_train_type: NOT_ENCRYPT, PW_ENCRYPT, STABLE_PW_ENCRYPT, DP_ENCRYPT, SIGNDS
     try:
-        make_yaml_config(fl_name, {"encrypt.encrypt_type": "ENCRYPT_INVALID"}, output_yaml_file=yaml_config_file)
+        make_yaml_config(fl_name, {"encrypt.encrypt_train_type": "ENCRYPT_INVALID"}, output_yaml_file=yaml_config_file)
         start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address)
         assert False
     except RuntimeError as e:
-        assert "The value of parameter 'encrypt.encrypt_type' can be only one of" in str(e)
+        assert "The value of parameter 'encrypt.encrypt_train_type' can be only one of" in str(e)
 
 
 @fl_test
@@ -259,7 +251,7 @@ def test_yaml_config_encrypt_config_pwe_success():
     feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
 
     # minimum_secret_shares_for_reconstruct == 2 >= clients_threshold_for_reconstruct: reconstruct_secrets_threshold+1
-    make_yaml_config(fl_name, {"encrypt.encrypt_type": "PW_ENCRYPT"}, start_fl_job_threshold=2,
+    make_yaml_config(fl_name, {"encrypt.encrypt_train_type": "PW_ENCRYPT"}, start_fl_job_threshold=2,
                      output_yaml_file=yaml_config_file)
     start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address)
 
@@ -290,7 +282,7 @@ def test_yaml_config_invalid_encrypt_config_pwe_val_type_failed():
     for key, val in check_map.items():
         try:
             make_yaml_config(fl_name,
-                             {"encrypt.encrypt_type": "PW_ENCRYPT", f"{key}": f"{val}"},
+                             {"encrypt.encrypt_train_type": "PW_ENCRYPT", f"{key}": f"{val}"},
                              output_yaml_file=yaml_config_file)
             start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file,
                             http_server_address=http_server_address)
@@ -325,7 +317,7 @@ def test_yaml_config_invalid_encrypt_config_pwe_val_range_failed():
     for key, val in invalid_vals.items():
         for invalid_val in val:
             try:
-                make_yaml_config(fl_name, {"encrypt.encrypt_type": "PW_ENCRYPT", key: invalid_val},
+                make_yaml_config(fl_name, {"encrypt.encrypt_train_type": "PW_ENCRYPT", key: invalid_val},
                                  output_yaml_file=yaml_config_file)
                 start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file,
                                 http_server_address=http_server_address)
@@ -334,7 +326,7 @@ def test_yaml_config_invalid_encrypt_config_pwe_val_range_failed():
                 assert f"Failed to check value of parameter '{key}'" in str(e)
     try:
         # minimum_secret_shares_for_reconstruct >= clients_threshold_for_reconstruct: reconstruct_secrets_threshold+1
-        make_yaml_config(fl_name, {"encrypt.encrypt_type": "PW_ENCRYPT"}, start_fl_job_threshold=1,
+        make_yaml_config(fl_name, {"encrypt.encrypt_train_type": "PW_ENCRYPT"}, start_fl_job_threshold=1,
                          output_yaml_file=yaml_config_file)
         start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address)
         assert False
@@ -362,7 +354,7 @@ def test_yaml_config_missing_encrypt_config_pwe_failed():
 
     # encrypt.pw_encrypt is empty
     try:
-        make_yaml_config(fl_name, {"encrypt.encrypt_type": "PW_ENCRYPT"}, output_yaml_file=yaml_config_file,
+        make_yaml_config(fl_name, {"encrypt.encrypt_train_type": "PW_ENCRYPT"}, output_yaml_file=yaml_config_file,
                          rmv_configs=["encrypt.pw_encrypt"])
         start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address)
         assert False
@@ -374,7 +366,7 @@ def test_yaml_config_missing_encrypt_config_pwe_failed():
                       "encrypt.pw_encrypt.reconstruct_secrets_threshold"]
     for item in require_params:
         try:
-            make_yaml_config(fl_name, {"encrypt.encrypt_type": "PW_ENCRYPT"}, output_yaml_file=yaml_config_file,
+            make_yaml_config(fl_name, {"encrypt.encrypt_train_type": "PW_ENCRYPT"}, output_yaml_file=yaml_config_file,
                              rmv_configs=[item])
             start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file,
                             http_server_address=http_server_address)
@@ -401,7 +393,7 @@ def test_yaml_config_encrypt_config_dp_success():
     feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], require_aggr=True)
     feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
 
-    make_yaml_config(fl_name, {"encrypt.encrypt_type": "DP_ENCRYPT"},  output_yaml_file=yaml_config_file)
+    make_yaml_config(fl_name, {"encrypt.encrypt_train_type": "DP_ENCRYPT"}, output_yaml_file=yaml_config_file)
     start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address)
 
 
@@ -431,7 +423,7 @@ def test_yaml_config_invalid_encrypt_config_dp_val_type_failed():
     for key, val in check_map.items():
         try:
             make_yaml_config(fl_name,
-                             {"encrypt.encrypt_type": "DP_ENCRYPT", f"{key}": f"{val}"},
+                             {"encrypt.encrypt_train_type": "DP_ENCRYPT", f"{key}": f"{val}"},
                              output_yaml_file=yaml_config_file)
             start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file,
                             http_server_address=http_server_address)
@@ -466,7 +458,7 @@ def test_yaml_config_invalid_encrypt_config_dp_val_range_failed():
     for key, val in invalid_vals.items():
         for invalid_val in val:
             try:
-                make_yaml_config(fl_name, {"encrypt.encrypt_type": "DP_ENCRYPT", key: invalid_val},
+                make_yaml_config(fl_name, {"encrypt.encrypt_train_type": "DP_ENCRYPT", key: invalid_val},
                                  output_yaml_file=yaml_config_file)
                 start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file,
                                 http_server_address=http_server_address)
@@ -493,7 +485,7 @@ def test_yaml_config_encrypt_config_signds_success():
     feature_map.add_feature("feature_bn2", init_feature_map["feature_bn2"], require_aggr=True)
     feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
 
-    make_yaml_config(fl_name, {"encrypt.encrypt_type": "SIGNDS"},  output_yaml_file=yaml_config_file)
+    make_yaml_config(fl_name, {"encrypt.encrypt_train_type": "SIGNDS"}, output_yaml_file=yaml_config_file)
     start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file, http_server_address=http_server_address)
 
 
@@ -525,7 +517,7 @@ def test_yaml_config_invalid_encrypt_config_signds_val_type_failed():
     for key, val in check_map.items():
         try:
             make_yaml_config(fl_name,
-                             {"encrypt.encrypt_type": "SIGNDS", f"{key}": f"{val}"},
+                             {"encrypt.encrypt_train_type": "SIGNDS", f"{key}": f"{val}"},
                              output_yaml_file=yaml_config_file)
             start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file,
                             http_server_address=http_server_address)
@@ -553,16 +545,16 @@ def test_yaml_config_invalid_encrypt_config_signds_val_range_failed():
     feature_map.add_feature("feature_conv2", init_feature_map["feature_conv2"], require_aggr=False)
 
     invalid_vals = {
-        "encrypt.signds.sign_k": [0.0, 0.26], # (0, 0.25]
-        "encrypt.signds.sign_eps": [0, 101], # (0, 100]
-        "encrypt.signds.sign_thr_ratio": [0.49, 1.01], # [0.5, 1]
-        "encrypt.signds.sign_global_lr": [0.0], # >0
-        "encrypt.signds.sign_dim_out": [-1, 51] # [0, 50]
+        "encrypt.signds.sign_k": [0.0, 0.26],  # (0, 0.25]
+        "encrypt.signds.sign_eps": [0, 101],  # (0, 100]
+        "encrypt.signds.sign_thr_ratio": [0.49, 1.01],  # [0.5, 1]
+        "encrypt.signds.sign_global_lr": [0.0],  # >0
+        "encrypt.signds.sign_dim_out": [-1, 51]  # [0, 50]
     }
     for key, val in invalid_vals.items():
         for invalid_val in val:
             try:
-                make_yaml_config(fl_name, {"encrypt.encrypt_type": "SIGNDS", key: invalid_val},
+                make_yaml_config(fl_name, {"encrypt.encrypt_train_type": "SIGNDS", key: invalid_val},
                                  output_yaml_file=yaml_config_file)
                 start_fl_server(feature_map=feature_map, yaml_config=yaml_config_file,
                                 http_server_address=http_server_address)

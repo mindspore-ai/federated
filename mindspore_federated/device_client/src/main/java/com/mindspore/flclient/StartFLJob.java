@@ -303,6 +303,11 @@ public class StartFLJob {
             retCode = ResponseCode.SystemError;
             return FLClientStatus.FAILED;
         }
+        if (flPlanConfig.cipher() == null || flPlanConfig.cipher().dsParams() == null) {
+            LOGGER.severe("[startFLJob] the flPlanConfig cipher is null");
+            retCode = ResponseCode.SystemError;
+            return FLClientStatus.FAILED;
+        }
 
         retCode = flJob.retcode();
         LOGGER.info("[startFLJob] ==========the response message of startFLJob is:================");
@@ -311,9 +316,11 @@ public class StartFLJob {
         LOGGER.info("[startFLJob] iteration: " + flJob.iteration());
         LOGGER.info("[startFLJob] is selected: " + flJob.isSelected());
         LOGGER.info("[startFLJob] next request time: " + flJob.nextReqTime());
+        LOGGER.info("[startFLJob] signds rEst: " + flPlanConfig.cipher().dsParams().signdsREst());
+        LOGGER.info("[startFLJob] signds isReached: " + flPlanConfig.cipher().dsParams().signdsIsReached());
         nextRequestTime = flJob.nextReqTime();
         LOGGER.info("[startFLJob] timestamp: " + flJob.timestamp());
-        LOGGER.info("[startFLJob] unsupervised type: " + flJob.unsupervisedEvalFlg());
+        LOGGER.info("[startFLJob] privacy preserving unsupervised type: " + flJob.unsupervisedEvalFlg());
         FLClientStatus status;
         int responseRetCode = flJob.retcode();
 
@@ -325,6 +332,8 @@ public class StartFLJob {
                     return FLClientStatus.FAILED;
                 }
                 localFLParameter.setServerMod(flPlanConfig.serverMode());
+                localFLParameter.setREst(flPlanConfig.cipher().dsParams().signdsREst());
+                localFLParameter.setRangeReached(flPlanConfig.cipher().dsParams().signdsIsReached());
                 if (flPlanConfig.lr() != 0) {
                     lr = flPlanConfig.lr();
                 } else {

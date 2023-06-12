@@ -76,7 +76,7 @@ public class ModelProxy {
         boolean enableFp16 = LocalFLParameter.getInstance().isEnableFp16();
         MSContext msContext = new MSContext();
         // use default param init context
-        if(!msContext.init(threadNum, cpuBindMode)){
+        if (!msContext.init(threadNum, cpuBindMode)) {
             logger.severe("Call msContext.init failed, threadNum " + threadNum + ", cpuBindMode " + cpuBindMode);
             msContext.free();
             return null;
@@ -97,14 +97,14 @@ public class ModelProxy {
      */
     private boolean initModelWithoutShape(String modelPath, MSContext msContext) {
         TrainCfg trainCfg = new TrainCfg();
-        if(!trainCfg.init()){
+        if (!trainCfg.init()) {
             logger.severe("Call trainCfg.init failed ...");
             msContext.free();
             trainCfg.free();
             return false;
         }
         Graph graph = new Graph();
-        if(!graph.load(modelPath)){
+        if (!graph.load(modelPath)) {
             logger.severe("Call graph.load failed, modelPath: " + modelPath);
             graph.free();
             trainCfg.free();
@@ -128,7 +128,7 @@ public class ModelProxy {
             inputsBuffer.add(inputBuffer);
         }
         List<MSTensor> features = model.getFeatureMaps();
-        for(MSTensor item: features){
+        for (MSTensor item : features) {
             featureMap.put(item.tensorName(), item);
         }
         return true;
@@ -161,7 +161,7 @@ public class ModelProxy {
             inputsBuffer.add(inputBuffer);
         }
         List<MSTensor> features = model.getFeatureMaps();
-        for(MSTensor item: features){
+        for (MSTensor item : features) {
             featureMap.put(item.tensorName(), item);
         }
         return true;
@@ -170,7 +170,7 @@ public class ModelProxy {
     /**
      * Init Model.
      *
-     * @param modelPath model file path.
+     * @param modelPath   model file path.
      * @param inputShapes input shape of model.
      * @return execute status.
      */

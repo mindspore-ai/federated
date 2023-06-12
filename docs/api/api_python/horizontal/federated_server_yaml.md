@@ -29,7 +29,7 @@
 |                   | participation_time_level                 | server       |
 | unsupervised      | cluster_client_num                       | server       |
 |                   | eval_type                                | server       |
-| encrypt           | encrypt_type                             | server       |
+| encrypt           | encrypt_train_type                       | server       |
 |                   | pw_encrypt.share_secrets_ratio           | server       |
 |                   | pw_encrypt.cipher_time_window            | server       |
 |                   | pw_encrypt.reconstruct_secrets_threshold | server       |
@@ -85,7 +85,7 @@
 - **continuous_failure_times** (int) - 迭代失败次数大于该参数，统计失败事件，默认值：``10``。
 - **data_rate_dir** (str) - 集群流量统计信息文件路径 ，默认值：``".."``。
 - **participation_time_level** (str) - 流量统计时间区间，默认值：``"5,15"``。
-- **encrypt_type** (str) - 用于联邦学习的安全策略，可以是 ``'NOT_ENCRYPT'``、``'DP_ENCRYPT'``、``'PW_ENCRYPT'``、``'STABLE_PW_ENCRYPT'`` 或 ``'SIGNDS'``。如果是 ``'DP_ENCRYPT'``，则将对客户端应用差分隐私模式，隐私保护效果将由上面所述的 `dp_eps`、`dp_delta`、`dp_norm_clip` 确定。如果 ``'PW_ENCRYPT'``，则将应用成对（pairwise，PW）安全聚合来保护客户端模型在跨设备场景中不被窃取。如果 ``'STABLE_PW_ENCRYPT'``，则将应用成对安全聚合来保护客户端模型在云云联邦场景中免受窃取。如果 ``'SIGNDS'``，则将在于客户端上使用SignDS策略。SignDS的介绍可以参照：[SignDS-FL: Local Differentially Private Federated Learning with Sign-based Dimension Selection](https://dl.acm.org/doi/abs/10.1145/3517820)。默认值：``'NOT_ENCRYPT'``。
+- **encrypt_train_type** (str) - 用于联邦学习的安全策略，可以是 ``'NOT_ENCRYPT'``、``'DP_ENCRYPT'``、``'PW_ENCRYPT'``、``'STABLE_PW_ENCRYPT'`` 或 ``'SIGNDS'``。如果是 ``'DP_ENCRYPT'``，则将对客户端应用差分隐私模式，隐私保护效果将由上面所述的 `dp_eps`、`dp_delta`、`dp_norm_clip` 确定。如果 ``'PW_ENCRYPT'``，则将应用成对（pairwise，PW）安全聚合来保护客户端模型在跨设备场景中不被窃取。如果 ``'STABLE_PW_ENCRYPT'``，则将应用成对安全聚合来保护客户端模型在云云联邦场景中免受窃取。如果 ``'SIGNDS'``，则将在于客户端上使用SignDS策略。SignDS的介绍可以参照：[SignDS-FL: Local Differentially Private Federated Learning with Sign-based Dimension Selection](https://dl.acm.org/doi/abs/10.1145/3517820)。默认值：``'NOT_ENCRYPT'``。
 - **share_secrets_ratio** (float) - PW：参与秘密分享的客户端比例。默认值：``1.0``。
 - **cipher_time_window** (int) - PW：每个加密轮次的时间窗口持续时间，以毫秒为单位。默认值：``300000``。
 - **reconstruct_secrets_threshold** (int) - PW：秘密重建的阈值。默认值：``2000``。
@@ -151,7 +151,7 @@ unsupervised:
   eval_type: SILHOUETTE_SCORE
 
 encrypt:
-  encrypt_type: NOT_ENCRYPT
+  encrypt_train_type: NOT_ENCRYPT
   pw_encrypt:
     share_secrets_ratio: 1.0
     cipher_time_window: 3000

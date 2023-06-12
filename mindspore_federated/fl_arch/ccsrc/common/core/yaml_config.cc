@@ -152,7 +152,7 @@ void YamlConfig::InitUnsupervisedConfig() {
 
 void YamlConfig::InitEncryptConfig() {
   EncryptConfig encrypt_config;
-  Get("encrypt.encrypt_type", &encrypt_config.encrypt_type, false,
+  Get("encrypt.encrypt_train_type", &encrypt_config.encrypt_type, false,
       {kNotEncryptType, kPWEncryptType, kStablePWEncryptType, kDPEncryptType, kDSEncryptType});
   auto &encrypt_type = encrypt_config.encrypt_type;
   if (encrypt_type == kPWEncryptType || encrypt_type == kStablePWEncryptType) {

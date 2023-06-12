@@ -54,7 +54,6 @@ public class SecureProtocol {
     private float signK;
     private float signEps;
     private float signThrRatio;
-    private float signGlobalLr;
     private int signDimOut;
 
 
@@ -121,11 +120,10 @@ public class SecureProtocol {
      * @return
      */
     public FLClientStatus setDSParameter(float signK, float signEps, float signThrRatio,
-                                         float signGlobalLr, int signDimOut) {
+                                         int signDimOut) {
         this.signK = signK;
         this.signEps = signEps;
         this.signThrRatio = signThrRatio;
-        this.signGlobalLr = signGlobalLr;
         this.signDimOut = signDimOut;
         return FLClientStatus.SUCCESS;
     }
@@ -642,13 +640,63 @@ public class SecureProtocol {
     }
 
     /**
+     * Privacy preserving for input Boolean values.
+     *
+     * @param inputBool         Input Boolean values.
+     * @param randomResponseEps Privacy Budget.
+     * @return Boolean value after perturbation.
+     */
+    private static boolean randomResponse(boolean inputBool, double randomResponseEps) {
+        SecureRandom secureRandom = Common.getSecureRandom();
+        double probability = secureRandom.nextDouble();
+        double threshold = Math.exp(randomResponseEps) / (1.0f + Math.exp(randomResponseEps));
+        if (probability < threshold) {
+            return inputBool;
+        } else {
+            return !inputBool;
+        }
+    }
+
+    /**
+     * Magnitude Random Response alg.
+     *
+     * @param originData        origin update data.
+     * @param sortedIdx         sorted index.
+     * @param rEst              global lr which downloaded from server.
+     * @param randomResponseEps privacy budget for magRR.
+     * @return Boolean value after perturbation.
+     */
+    private static boolean magRR(float[] originData, int[] sortedIdx, int topkDim, float rEst, double randomResponseEps, int rangeReached) {
+        float avg = 0;
+        final float MULTIPLE = 2.0f;
+        for (int i = 0; i < topkDim; i++) {
+            avg += originData[sortedIdx[i]];
+        }
+        double rClient = Math.abs(avg / topkDim);
+        Boolean bClient = rangeReached == 0 ? rClient < (MULTIPLE * rEst) : rClient < (rEst / MULTIPLE);
+        LOGGER.info("Actual r is" + rClient + " , actual b is " + bClient);
+        return randomResponse(bClient, randomResponseEps);
+    }
+
+    /**
+     * allocate privacy budget.
+     *
+     * @return privacy budget for magRR alg.
+     */
+    private static double allocateBudget() {
+        final double RREPS = 5.0f;
+        return RREPS;
+    }
+
+    /**
      * SignDS alg.
      *
      * @param client fl client
      * @param sign   random sign value.
-     * @return index list.
+     * @return bool and index list.
      */
-    public int[] signDSModel(Client client, boolean sign) {
+    public Object[] signDSModel(Client client, boolean sign) {
+        double randomResponseEps = allocateBudget();
         int layerNum = updateFeatureName.size();
         int inputDim = 0;
         for (int i = 0; i < layerNum; i++) {
@@ -672,14 +720,14 @@ public class SecureProtocol {
         double denominator = combLessInter + Math.exp(signEps) * combMoreInter;
         if (denominator == 0) {
             LOGGER.severe("[SignDS] denominator is 0, please check");
-            return new int[0];
+            return new Object[]{true, new int[0]};
         }
         int numInter = countInters(thrDim, denominator, topkDim, inputDim, signDimOut, signEps);
         LOGGER.info("[SignDS] numInter is " + numInter);
         int numOuter = signDimOut - numInter;
         if (topkDim < numInter || signDimOut <= 0) {
             LOGGER.severe("[SignDS] topkDim or signDimOut is ERROR! please check");
-            return new int[0];
+            return new Object[]{true, new int[0]};
         }
 
         float[] originData = new float[inputDim];
@@ -696,14 +744,16 @@ public class SecureProtocol {
         }
 
         int[] sortedIdx = mergeShort(originData, sign);
-        int[] outputDimensionIndexList = new int[numInter + numOuter];
+        boolean bHat = magRR(originData, sortedIdx, topkDim, localFLParameter.getREst(), randomResponseEps,
+                localFLParameter.getRangeReached());
+        int[] outputDimensionIndexList = new int[signDimOut];
         SecureRandom secureRandom = Common.getSecureRandom();
         randomSelect(secureRandom, sortedIdx, 0, topkDim, numInter, outputDimensionIndexList, 0);
         randomSelect(secureRandom, sortedIdx, topkDim, inputDim - topkDim,
                 numOuter, outputDimensionIndexList, numInter);
         Arrays.sort(outputDimensionIndexList);
         LOGGER.info("[SignDS] outputDimension size is " + outputDimensionIndexList.length);
-        return outputDimensionIndexList;
+        return new Object[]{bHat, outputDimensionIndexList};
     }
 
     /**

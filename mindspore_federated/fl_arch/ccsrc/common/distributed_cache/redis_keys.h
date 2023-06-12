@@ -104,6 +104,10 @@ class RedisKeys {
   std::string ClientPrimeString() const { return PrefixIteration() + "client:Prime:String"; }
 
   std::string ClientUnsupervisedEvalHash() const { return Prefix() + "client:UnsupervisedEval:Hash"; }
+  std::string ClientSignDSbHatHash() const { return Prefix() + "clinet:SignDSbHat:Hash"; }
+  std::string ClientSignDSrEstHash() const { return Prefix() + "clinet:SignDSrEst:Hash"; }
+  std::string ClientSignDSIsReachedHash() const { return Prefix() + "clinet:SignDSIsReached:Hash"; }
+  std::string ClientSignDSReachedCountHash() const { return Prefix() + "clinet:SignDSReachedCount:Hash"; }
 
   std::string InstanceStatusHash() const {
     auto fl_name = InstanceContext::Instance().fl_name();

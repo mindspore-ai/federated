@@ -42,7 +42,7 @@ public class ClientManager {
     /**
      * Get client object.
      *
-     * @param name clent class name.
+     * @param name client class name.
      * @return client object.
      */
     public static Client getClient(String name) {
