@@ -458,55 +458,55 @@ bool Server::InitCommunicatorWithWorker() {
 void Server::InitIteration() {
   MS_EXCEPTION_IF_NULL(server_node_);
   InitRoundConfigs();
-  std::string encrypt_type = FLContext::instance()->encrypt_type();
-  if (encrypt_type != kNotEncryptType) {
-    InitCipher();
-    MS_LOG(INFO) << "Parameters for secure aggregation have been initiated.";
-  }
+  InitCipher();
   Iteration::GetInstance().InitIteration(server_node_, rounds_config_, communicators_with_worker_);
 }
 
 void Server::InitCipher() {
   cipher_init_ = &armour::CipherInit::GetInstance();
-
-  int cipher_t = SizeToInt(cipher_config_.minimum_secret_shares_for_reconstruct);
-  unsigned char cipher_p[SECRET_MAX_LEN] = {0};
-  const int cipher_g = 1;
-
   armour::CipherPublicPara param;
-  param.g = cipher_g;
-  param.t = cipher_t;
-  int ret = memcpy_s(param.p, SECRET_MAX_LEN, cipher_p, sizeof(cipher_p));
-  if (ret != 0) {
-    MS_LOG(EXCEPTION) << "Memcpy_s error, errorno" << ret;
-  }
   auto encrypt_config = FLContext::instance()->encrypt_config();
-  param.dp_delta = encrypt_config.dp_delta;
-  param.dp_eps = encrypt_config.dp_eps;
-  param.dp_norm_clip = encrypt_config.dp_norm_clip;
   param.encrypt_type = encrypt_config.encrypt_type;
-  param.sign_k = encrypt_config.sign_k;
-  param.sign_eps = encrypt_config.sign_eps;
-  param.sign_thr_ratio = encrypt_config.sign_thr_ratio;
-  param.sign_global_lr = encrypt_config.sign_global_lr;
-  param.sign_dim_out = static_cast<int>(encrypt_config.sign_dim_out);
   param.privacy_eval_type = encrypt_config.privacy_eval_type;
-  param.laplace_eval_eps = encrypt_config.laplace_eval_eps;
+  if (encrypt_config.privacy_eval_type == kLaplacePrivacyEvalType) {
+    param.laplace_eval_eps = encrypt_config.laplace_eval_eps;
+  }
+  if (encrypt_config.encrypt_type == kDPEncryptType) {
+    param.dp_delta = encrypt_config.dp_delta;
+    param.dp_eps = encrypt_config.dp_eps;
+    param.dp_norm_clip = encrypt_config.dp_norm_clip;
+  } else if (encrypt_config.encrypt_type == kPWEncryptType) {
+    int cipher_t = SizeToInt(cipher_config_.minimum_secret_shares_for_reconstruct);
+    unsigned char cipher_p[SECRET_MAX_LEN] = {0};
+    const int cipher_g = 1;
 
-  BIGNUM *prim = BN_new();
-  if (prim == NULL) {
-    MS_LOG(EXCEPTION) << "new bn failed.";
-    ret = -1;
-  } else {
-    ret = armour::GetPrime(prim);
-  }
-  if (ret == 0) {
-    (void)BN_bn2bin(prim, reinterpret_cast<uint8_t *>(param.prime));
-  } else {
-    MS_LOG(EXCEPTION) << "Get prime failed.";
-  }
-  if (prim != NULL) {
-    BN_clear_free(prim);
+    param.g = cipher_g;
+    param.t = cipher_t;
+    int ret = memcpy_s(param.p, SECRET_MAX_LEN, cipher_p, sizeof(cipher_p));
+    if (ret != 0) {
+      MS_LOG(EXCEPTION) << "Memcpy_s error, errorno" << ret;
+    }
+    BIGNUM *prim = BN_new();
+    if (prim == NULL) {
+      ret = -1;
+      MS_LOG(EXCEPTION) << "new bn failed.";
+    } else {
+      ret = armour::GetPrime(prim);
+    }
+    if (ret == 0) {
+      (void)BN_bn2bin(prim, reinterpret_cast<uint8_t *>(param.prime));
+    } else {
+      MS_LOG(EXCEPTION) << "Get prime failed.";
+    }
+    if (prim != NULL) {
+      BN_clear_free(prim);
+    }
+  } else if (encrypt_config.encrypt_type == kDSEncryptType) {
+    param.sign_k = encrypt_config.sign_k;
+    param.sign_eps = encrypt_config.sign_eps;
+    param.sign_thr_ratio = encrypt_config.sign_thr_ratio;
+    param.sign_global_lr = encrypt_config.sign_global_lr;
+    param.sign_dim_out = static_cast<int>(encrypt_config.sign_dim_out);
   }
   if (!cipher_init_->Init(param, 0, cipher_config_)) {
     MS_LOG(EXCEPTION) << "cipher init fail.";
