@@ -115,7 +115,6 @@ public class SecureProtocol {
      * @param signK
      * @param signEps
      * @param signThrRatio
-     * @param signGlobalLr
      * @param signDimOut
      * @return
      */
@@ -766,6 +765,14 @@ public class SecureProtocol {
     float genLaplaceNoise(SecureRandom secureRandom, float beta) {
         float u1 = secureRandom.nextFloat();
         float u2 = secureRandom.nextFloat();
+        int tryTimeLimit = 100;
+        int tryTimeCount = 0;
+        while (u2 == 0) {
+            u2 = secureRandom.nextFloat();
+            if (++tryTimeCount > tryTimeLimit) {
+                return 0;
+            }
+        }
         if (u1 <= 0.5f) {
             return (float) (-beta * log(1. - u2));
         } else {
