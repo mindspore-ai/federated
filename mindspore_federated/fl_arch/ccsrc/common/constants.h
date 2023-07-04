@@ -40,6 +40,7 @@ constexpr char kFedAvgAggregation[] = "FedAvg";
 constexpr char kFedProxAggregation[] = "FedProx";
 constexpr char kScaffoldAggregation[] = "Scaffold";
 constexpr char kFedNovaAggregation[] = "FedNova";
+constexpr char kFedCMAggregation[] = "FedCM";
 
 constexpr char kCommTypeOfIBVerbs[] = "ibverbs";
 constexpr char kRoleOfPServer[] = "server";

@@ -28,7 +28,7 @@ enum ResponseCode: int {
   SystemError=500
 }
 
-enum AggregationType:byte {FedAvg = 0, FedProx = 1, Scaffold = 2, FedNova = 3, qffl = 4}
+enum AggregationType:byte {FedAvg = 0, FedProx = 1, Scaffold = 2, FedNova = 3, qffl = 4, FedCM = 5}
 enum Metrics:byte {accuracy = 0, precision = 1, recall = 2, AUC = 3,f1 = 4, fbeta = 5}
 enum EarlyStopType:byte {loss_diff = 0, loss_abs = 1, weight_diff = 2}
 
