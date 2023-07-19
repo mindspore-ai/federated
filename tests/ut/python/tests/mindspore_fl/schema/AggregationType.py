@@ -8,4 +8,5 @@ class AggregationType(object):
     Scaffold = 2
     FedNova = 3
     qffl = 4
+    FedCM = 5
 

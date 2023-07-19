@@ -17,6 +17,8 @@
 """Interface for start up single core servable"""
 import os.path
 import numpy as np
+
+
 from mindspore_federated._mindspore_federated import Federated_, FLContext, FeatureItem_
 from ..common import _fl_context
 from .feature_map import FeatureMap
@@ -316,6 +318,34 @@ class FLServerJob:
             break
         logger.info(f"Recovery iteration num is: {recovery_iteration}.")
         return recovery_iteration
+
+def get_mdl_params(model_list, n_par=None):
+    """get function parameters"""
+    if n_par is None:
+        exp_mdl = model_list[0]
+        n_par = 0
+        for param in exp_mdl.trainable_params():
+            n_par += len(param.asnumpy().reshape(-1))
+
+    param_mat = np.zeros((len(model_list), n_par)).astype("float32")
+    for i, mdl in enumerate(model_list):
+        idx = 0
+        for param in mdl.trainable_params():
+            temp = param.asnumpy().reshape(-1)
+            param_mat[i, idx : idx + len(temp)] = temp
+            idx += len(temp)
+    return np.copy(param_mat)
+
+def extend_model(networkn):
+    """extend model"""
+    extenednet = networkn
+    local_par_lists = None
+    for param in extenednet.trainable_params():
+        if local_par_lists is None:
+            local_par_lists = param.reshape(-1)
+        else:
+            local_par_lists = Concat()((local_par_lists, param.reshape(-1)))
+    return local_par_lists
 
 
 class FlSchedulerJob:

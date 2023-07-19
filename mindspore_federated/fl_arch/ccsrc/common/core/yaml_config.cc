@@ -61,7 +61,7 @@ void YamlConfig::InitCommonConfig() {
 void YamlConfig::InitAggregationConfig() {
   AggregationConfig aggregation_config;
   Get("aggregation.aggregation_type", &aggregation_config.aggregation_type, false,
-      {kFedAvgAggregation, kFedProxAggregation, kScaffoldAggregation, kFedNovaAggregation});
+      {kFedAvgAggregation, kFedProxAggregation, kScaffoldAggregation, kFedNovaAggregation, kFedCMAggregation});
   Get("aggregation.iid_rate", &aggregation_config.iid_rate, false, CheckFloat(0, 1, INC_RIGHT));
   Get("aggregation.total_client_num", &aggregation_config.total_client_num, false, CheckInt(1, UINT32_MAX, INC_BOTH));
   FLContext::instance()->set_aggregation_config(aggregation_config);

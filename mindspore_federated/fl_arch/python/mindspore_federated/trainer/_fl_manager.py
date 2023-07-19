@@ -18,6 +18,7 @@
 from copy import deepcopy
 import numpy as np
 import mindspore.ops as ops
+
 from mindspore import nn
 from mindspore.nn import Cell
 from mindspore import load_param_into_net
@@ -29,9 +30,13 @@ from mindspore_federated.common import _checkparam as validator
 from mindspore_federated._mindspore_federated import Federated_, FLContext
 from mindspore_federated import log as logger
 
+
+
 from ..startup.ssl_config import init_ssl_config
 from ..startup.yaml_config import load_yaml_config
 from ..common import _fl_context, check_type
+
+
 
 TRAIN_BEGIN_STEP_NUM = 1
 TRAIN_END_STEP_NUM = 0
@@ -127,6 +132,7 @@ class BroadcastNet(Cell):
 
     def construct(self, input_x):
         return self._broadcast((input_x,))
+
 
 
 def _get_fl_param_names(network, fl_param_names, requires_aggr=False):
@@ -673,6 +679,198 @@ class FederatedLearningManager(Callback):
                     self._update_model_with_distribute(weights, weight_infos)
                 else:
                     self._update_model(weights, weight_infos)
+                if self._is_scaffold():
+                    self._scaffold_set_last_params_and_local_control_params(control_params)
+                logger.info("Load params from getting model into net, global step is {}.".format(self._global_step))
+                self._next_end_sync_iter = self._global_step + self._sync_frequency
+                self._next_begin_sync_iter = self._global_step + 1
+                if self._is_adaptive_sync():
+                    self._as_analyze_gradient()
+                    self._round_id += 1
+                    self._as_set_last_param()
+                cb_params = run_context.original_args()
+                logger.info(
+                    "total epoch num:{}, batch num:{}, Current epoch num is: {}, \
+                    Current step num is: {}".format(
+                        cb_params.epoch_num, cb_params.batch_num, cb_params.cur_epoch_num,
+                        cb_params.cur_step_num))
+        elif self._server_mode == _fl_context.SERVER_MODE_HYBRID:
+            self._start_pull_weight()
+            self._start_push_weight()
+
+
+def get_mdl_params(model_list, n_par=None):
+    """get function parameters"""
+    if n_par is None:
+        exp_mdl = model_list[0]
+        n_par = 0
+        for param in exp_mdl.trainable_params():
+            n_par += len(param.asnumpy().reshape(-1))
+
+    param_mat = np.zeros((len(model_list), n_par)).astype("float32")
+    for i, mdl in enumerate(model_list):
+        idx = 0
+        for param in mdl.trainable_params():
+            temp = param.asnumpy().reshape(-1)
+            param_mat[i, idx : idx + len(temp)] = temp
+            idx += len(temp)
+    return np.copy(param_mat)
+
+def extend_model(networkn):
+    """extend model"""
+    extenednet = networkn
+    local_par_lists = None
+    for param in extenednet.trainable_params():
+        if local_par_lists is None:
+            local_par_lists = param.reshape(-1)
+        else:
+            local_par_lists = Concat()((local_par_lists, param.reshape(-1)))
+    return local_par_lists
+
+class FederatedLearningFedCMManager(FederatedLearningManager):
+    def __init__(self, yaml_config, model, fedcm_model, \
+                 sync_frequency, http_server_address="", data_size=1, sync_type='fixed',\
+                 run_distribute=False, ssl_config=None, delta_p=0.1, **kwargs):
+        super(FederatedLearningFedCMManager, self).__init__(yaml_config, model, \
+                                                            sync_frequency, http_server_address, \
+                                                            data_size, sync_type, run_distribute, \
+                                                            ssl_config, **kwargs
+                                                            )
+        self._fedcm_model = fedcm_model
+        self.delta_p = delta_p
+
+
+    def _update_model(self, weights, weight_infos):
+        """
+        Update and get model without distributed training mode.
+        """
+
+        # send weights to server and get the data back from server
+        update_and_get_model = _UpdateAndGetModel(weights)
+
+        feature_map = update_and_get_model.construct()
+        if not feature_map:
+            raise ValueError("Feature map from getting model is empty!")
+
+        delta_dict = {}
+        for name, param in self._model.parameters_and_names():
+            if name not in weight_infos:
+                continue
+            delta_dict[name] = deepcopy(param)
+
+        parameter_dict = {}
+        parameter_dict_global = {}
+        key = None
+        for key, value in feature_map.items():
+            if key not in weight_infos:
+                continue
+            shape, dtype = weight_infos[key]
+            param_data = np.reshape(value, shape).astype(dtype)
+            parameter_dict[key] = Parameter(Tensor(param_data), name=key)
+            parameter_dict_global[self._global_prefix + "." + key] = Parameter(Tensor(param_data), \
+                                                                               name=\
+                                                                                self._global_prefix + "." + key)
+        if self._aggregation_type in (_fl_context.FEDPROX, _fl_context.FEDNOVA):
+            load_param_into_net(self._model, parameter_dict_global)
+
+        for name, param in self._model.parameters_and_names():
+            if name not in weight_infos:
+                continue
+
+            delta_dict[name] = Parameter(parameter_dict[name] - delta_dict[name], name=key)
+
+        load_param_into_net(self._model, delta_dict)
+
+        self._fedcm_model.set_delta(Tensor(get_mdl_params([self._model], self._fedcm_model.n_par)[0]))
+        load_param_into_net(self._model, parameter_dict)
+
+
+    def _model_params_to_weights_dict(self, weights, weight_infos):
+        """Exact trainable params from model, then fill into weights and weights_infos"""
+        for param in self._model.trainable_params():
+            if self._global_prefix not in param.name:
+                param_np = param.asnumpy()
+                if param_np.dtype != np.float32:
+                    continue
+                weight_infos[param.name] = (param_np.shape, param_np.dtype)
+                weights[param.name] = param_np.reshape(-1).tolist()
+
+
+
+    def on_train_step_begin(self, run_context):
+        self._global_step += 1
+        is_cloud = self._server_mode == _fl_context.SERVER_MODE_CLOUD
+        is_sync = self._global_step == self._next_begin_sync_iter
+        is_dist = self._rank_id == 0 if self._run_distribute else not self._run_distribute
+
+
+        delta_tmp = self._fedcm_model.get_delta()
+        self._fedcm_model.set_delta(delta_tmp/self.delta_p)
+        network_tmp = self._fedcm_model.get_network()
+        self._fedcm_model.set_local_par_list(extend_model(network_tmp))
+
+
+        if is_cloud and is_sync and is_dist:
+            # In FedNova mode, the upload _data_size will be reset to the number of training steps
+            if self._is_fednova():
+                cb_params = run_context.original_args()
+                self._data_size = cb_params.batch_num * self._sync_frequency \
+                        if cb_params.dataset_sink_mode else self._sync_frequency
+            start_fl_job = _StartFLJob(self._data_size)
+            # StartFLJobKernelMod -> Launch -> ask for the updated parameters from server.
+            flattened_control_params = start_fl_job.construct()
+            if self._is_scaffold() and self._global_step != 1:
+                self._scaffold_set_global_control_params(flattened_control_params)
+        logger.debug("run_context is %r", run_context)
+
+    def on_train_step_end(self, run_context):
+
+
+        lossnet = self._fedcm_model.get_lossnetwork()
+
+        cb_params = run_context.original_args()
+        cb_params.preloss = lossnet.get_preloss()
+
+
+
+
+        lr = 0.0
+        if self._is_scaffold():
+            cb_params = run_context.original_args()
+            train_network = cb_params.train_network
+            lr = _get_lr(train_network)
+            if lr is None:
+                raise ValueError("Can not find optimizer in train network!")
+            self._scaffold_update_params(lr)
+        if self._server_mode == _fl_context.SERVER_MODE_CLOUD: #
+            if self._global_step == self._next_end_sync_iter:
+                if self._is_adaptive_sync():
+                    self._as_set_grads()
+                if self._encrypt_type == _fl_context.ENCRYPT_STABLE_PW:
+                    exchange_keys = _ExchangeKeys()
+                    exchange_keys.construct()
+                    get_keys = _GetKeys()
+                    get_keys.construct()
+
+                control_params = dict()
+                if self._is_scaffold():
+                    control_params = self._scaffold_get_control_params(lr)
+
+                weights = {}
+                weight_infos = {}
+                if self._is_fednova():
+                    self._model_params_to_weights_diff_dict(weights, weight_infos)
+                else:
+                    self._model_params_to_weights_dict(weights, weight_infos) # fill the updated model into weights and weight_infos
+
+                if self._is_scaffold():
+                    for name in control_params:
+                        delta_control_param = control_params[name] - self._local_control_params[name]
+                        weights[self._scaffold_prefix + name] = delta_control_param.reshape(-1).tolist()
+                if self._run_distribute:
+                    self._update_model_with_distribute(weights, weight_infos)
+                else:
+                    self._update_model(weights, weight_infos) # core function: send model for aggrgagtion and sync
                 if self._is_scaffold():
                     self._scaffold_set_last_params_and_local_control_params(control_params)
                 logger.info("Load params from getting model into net, global step is {}.".format(self._global_step))

@@ -16,14 +16,18 @@
 
 from mindspore import nn
 from mindspore.context import ParallelMode
-from mindspore.train.model import Model
+from mindspore.common.tensor import Tensor
+from mindspore.common import dtype as mstype
 from mindspore.parallel._utils import _get_parallel_mode, _get_device_num, _get_global_rank, \
     _get_parameter_broadcast
 from mindspore.parallel._cost_model_context import _set_multi_subgraphs
-from mindspore_federated._mindspore_federated import FLContext
-from ..aggregation.fedprox import WithFedProxLossCell
-from ..common import _fl_context
+from mindspore.train.model import Model
 
+from mindspore_federated._mindspore_federated import FLContext
+
+from ..aggregation.fedprox import WithFedProxLossCell
+from ..aggregation.fedcm import FedCMWithLossCell
+from ..common import _fl_context
 
 class HFLModel(Model):
     """
@@ -120,6 +124,144 @@ class HFLModel(Model):
             network = nn.TrainOneStepCell(network, self._optimizer, loss_scale).set_train()
 
         # If need to check if loss_fn is not None, but optimizer is None
+
+        if self._parallel_mode in (ParallelMode.SEMI_AUTO_PARALLEL, ParallelMode.AUTO_PARALLEL):
+            network.set_auto_parallel()
+            if self._optimizer is None:
+                # In this case, multiple optimizer(s) is supposed to be included in 'self._network'
+                _set_multi_subgraphs()
+        if net_inputs is not None:
+            network.set_inputs(*net_inputs)
+        return network
+
+
+def get_mdl_params(model_list, n_par=None):
+    """get function parameters"""
+    if n_par is None:
+        exp_mdl = model_list[0]
+        n_par = 0
+        for param in exp_mdl.trainable_params():
+            n_par += len(param.asnumpy().reshape(-1))
+
+    param_mat = np.zeros((len(model_list), n_par)).astype("float32")
+    for i, mdl in enumerate(model_list):
+        idx = 0
+        for param in mdl.trainable_params():
+            temp = param.asnumpy().reshape(-1)
+            param_mat[i, idx : idx + len(temp)] = temp
+            idx += len(temp)
+    return np.copy(param_mat)
+
+def extend_model(networkn):
+    """extend model"""
+    extenednet = networkn
+    local_par_lists = None
+    for param in extenednet.trainable_params():
+        if local_par_lists is None:
+            local_par_lists = param.reshape(-1)
+        else:
+            local_par_lists = Concat()((local_par_lists, param.reshape(-1)))
+    return local_par_lists
+
+
+class FedCMModel(Model):
+    """define fedcm model"""
+    def __init__(self, network, loss_fn=None, optimizer=None, loss_callback=None, \
+                 metrics=None, eval_network=None, eval_indexes=None,
+                 amp_level="O0", boost_level="O0", **kwargs):
+        ctx = FLContext.get_instance()
+        self._server_mode = ctx.server_mode()
+        aggregation_type = ctx.aggregation_type()
+        self._aggregation_type = aggregation_type
+        if self._aggregation_type not in _fl_context.SUPPORT_AGG_TYPES and \
+                self._server_mode == _fl_context.SERVER_MODE_CLOUD:
+            raise ValueError(
+                "aggregation_type must be in {}, but got {}.".format(_fl_context.SUPPORT_AGG_TYPES,
+                                                                     self._aggregation_type))
+        if self._aggregation_type == _fl_context.FEDPROX:
+            self._iid_rate = ctx.iid_rate()
+
+        self._network = network
+        self._loss_fn = loss_fn
+        self._optimizer = optimizer
+        self._loss_scale_manager = None
+        self._loss_scale_manager_set = False
+        self._keep_bn_fp32 = None
+        self._check_kwargs(kwargs)
+        self._amp_level = amp_level
+        self._boost_level = boost_level
+        self._eval_network = eval_network
+        self._process_amp_args(kwargs)
+        self._parallel_mode = _get_parallel_mode()
+        self._device_number = _get_device_num()
+        self._global_rank = _get_global_rank()
+        self._parameter_broadcast = _get_parameter_broadcast()
+        self._metrics = metrics
+        self._lossnetwork = network
+
+        # fedcm
+        self.n_par = len(get_mdl_params([network])[0])
+        self._delta = Tensor(np.zeros(self.n_par).astype("float32"))
+        self._preloss = Tensor(-1, dtype=mstype.float32)
+        self._local_par_list = extend_model(network)
+        self._losscallback = loss_callback
+
+        self._check_amp_level_arg(optimizer, amp_level)
+        self._check_for_graph_cell(kwargs)
+        self._build_boost_network(kwargs)
+        self._train_network = self._build_train_network()
+        self._build_eval_network(metrics, self._eval_network, eval_indexes)
+        self._build_predict_network()
+        self._current_epoch_num = 0
+        self._current_step_num = 0
+        self.epoch_iter = 0
+        self.enable_recovery = False
+        self._backbone_is_train = True
+        self.need_load_ckpt = False
+
+    def set_delta(self, deltain):
+        """set delta"""
+        self._delta = deltain
+
+    def get_delta(self):
+        """get delta"""
+        return self._delta
+
+    def set_local_par_list(self, locallistin):
+        """set local_par_list"""
+        self._local_par_list = locallistin
+
+    def get_network(self):
+        """get network"""
+        return self._network
+
+    def get_loss_network(self):
+        """get loss network"""
+        return self._lossnetwork
+
+
+    def _build_train_network(self):
+        """Build train network"""
+        network = self._network
+
+        net_inputs = network.get_inputs()
+        loss_inputs = [None]
+        if self._loss_fn:
+            if self._loss_fn.get_inputs():
+                loss_inputs = [*self._loss_fn.get_inputs()]
+            loss_inputs.pop(0)
+            if net_inputs:
+                net_inputs = [*net_inputs, *loss_inputs]
+            if self._aggregation_type == _fl_context.FEDPROX:
+                network = WithFedProxLossCell(network, self._loss_fn, self._iid_rate)
+            else:
+                network = FedCMWithLossCell(network, self._local_par_list, self._loss_fn, \
+                                            self._delta, self._losscallback, self._preloss)
+                self._lossnetwork = network
+        if self._optimizer:
+            loss_scale = 1.0
+            network = nn.TrainOneStepCell(network, self._optimizer, loss_scale).set_train()
+
 
         if self._parallel_mode in (ParallelMode.SEMI_AUTO_PARALLEL, ParallelMode.AUTO_PARALLEL):
             network.set_auto_parallel()
