@@ -317,14 +317,3 @@ class InceptionResNetV2(nn.Cell):
         x = self.block8(x)
         x = self.conv2d_7b(x)
         return c2, c3, c4, c5
-
-    # def logits(self, features):
-        # x = self.avgpool_1a(features)
-        # x = ops.Reshape()(x, (ops.Shape()(x)[0], -1,))
-        # x = self.last_linear(x)
-        # return x
-
-    # def construct(self, input):
-        # x = self.features(input)
-        # x = self.logits(x)
-        # return x

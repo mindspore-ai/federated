@@ -169,34 +169,6 @@ class TestLenetTrain(BaseCase):
         self.start_client()
         self.check_client_result(out_time=300)
 
-    # def test_train_lenet_batchsize_16(self):
-    #     """
-    #     Feature: FL train process
-    #     Description: test train lenet no compress, no encrypt
-    #     Expectation: train success
-    #     """
-    #     print("Class:{}, function:{}".format(self.__class__.__name__, inspect.stack()[1][3]), flush=True)
-    #     self.client_num = 1
-    #     self.start_scheduler("yamls/lenet/batchsize_16_config.yaml")
-    #     self.start_server("yamls/lenet/batchsize_16_config.yaml", self.cur_ckpt_path)
-    #     self.wait_cluster_ready(out_time=30)
-    #     self.start_client()
-    #     self.check_client_result(out_time=60)
-    #
-    # def test_train_lenet_batchsize_64(self):
-    #     """
-    #     Feature: FL train process
-    #     Description: test train lenet no compress, no encrypt
-    #     Expectation: train success
-    #     """
-    #     print("Class:{}, function:{}".format(self.__class__.__name__, inspect.stack()[1][3]), flush=True)
-    #     self.client_num = 1
-    #     self.start_scheduler("yamls/lenet/batchsize_64_config.yaml")
-    #     self.start_server("yamls/lenet/batchsize_64_config.yaml", self.cur_ckpt_path)
-    #     self.wait_cluster_ready(out_time=30)
-    #     self.start_client()
-    #     self.check_client_result(out_time=60)
-
 
 @pytest.mark.fl_cluster
 class TestLenetInference(BaseCase):
