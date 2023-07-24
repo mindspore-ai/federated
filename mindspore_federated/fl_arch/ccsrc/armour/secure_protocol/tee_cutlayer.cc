@@ -16,6 +16,7 @@
 #include "armour/secure_protocol/enclave_call.h"
 #include "armour/secure_protocol/secure_channel_host.h"
 #include "armour/secure_protocol/secure_channel_client.h"
+#include "securec/include/securec.h"
 #endif
 
 #ifdef ENABLE_TEE
@@ -101,7 +102,10 @@ int establish_secure_channel() {
         printf("key_exchange_info malloc error!\n");
         return free_tee_cut_layer();
     }
-    memset(ckey_exchange_info, 0, sizeof(key_exchange_t));
+    if (memset_s(ckey_exchange_info, sizeof(key_exchange_t), 0, sizeof(key_exchange_t)) != 0) {
+        printf("set ckey_exchange_info error!\n");
+        return free_tee_cut_layer();
+    }
     res = (cc_enclave_result_t)get_client_ecdhkey(ckey_exchange_info, rsa_pubkey, rsa_pubkey_len, enclave_key,
                                                   enclave_key_len, NULL, 0, &client_key, &client_key_len);
     if (res != CC_SUCCESS) {
@@ -151,7 +155,7 @@ int init_tee_cut_layer(size_t batch_size, size_t featureA_dims, size_t featureB_
     }
     char *final_p = reinterpret_cast<char *>(malloc(strlen(real_p) + strlen("/enclave.signed.so")));
     MS_EXCEPTION_IF_NULL(final_p);
-    (void)snprintf(final_p, PATH_MAX, "%s", real_p);
+    (void)snprintf_s(final_p, strlen(real_p) + strlen("/enclave.signed.so"), PATH_MAX, "%s", real_p);
 
     res = cc_enclave_create(final_p, SGX_ENCLAVE_TYPE, 0, SECGEAR_DEBUG_FLAG, NULL, 0, context);
     if (res != CC_SUCCESS) {
@@ -373,7 +377,8 @@ int free_tee_cut_layer() {
     }
     if (ckey_exchange_info != NULL) {
         EC_KEY_free(ckey_exchange_info->ecdh_key);
-        memset(ckey_exchange_info, 0, sizeof(key_exchange_t));
+        if (memset_s(ckey_exchange_info, sizeof(key_exchange_t), 0, sizeof(key_exchange_t)) != 0)
+            printf("Destroy ckey_exchange_info error\n");
         free(ckey_exchange_info);
         ckey_exchange_info = NULL;
     }
