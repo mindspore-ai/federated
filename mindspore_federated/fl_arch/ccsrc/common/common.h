@@ -104,8 +104,8 @@ struct RoundConfig {
 };
 
 const std::unordered_set<std::string> DataRateKernels = {
-  "startFLJob",   "updateModel", "getModel",      "exchangeKeys",       "getKeys",
-  "shareSecrets", "getSecrets",  "getClientList", "reconstructSecrets", "pushListSign"};
+  "startFLJob", "updateModel",   "getModel",           "exchangeKeys", "getKeys",  "shareSecrets",
+  "getSecrets", "getClientList", "reconstructSecrets", "pushListSign", "getResult"};
 
 using FBBuilder = flatbuffers::FlatBufferBuilder;
 using TimeOutCb = std::function<void(bool, const std::string &)>;
@@ -135,6 +135,9 @@ constexpr auto kUpdateModelRejectClientNum = "updateModelRejectClientNum";
 constexpr auto kGetModelTotalClientNum = "getModelTotalClientNum";
 constexpr auto kGetModelAcceptClientNum = "getModelAcceptClientNum";
 constexpr auto kGetModelRejectClientNum = "getModelRejectClientNum";
+constexpr auto kGetResultTotalClientNum = "getResultTotalClientNum";
+constexpr auto kGetResultAcceptClientNum = "getResultAcceptClientNum";
+constexpr auto kGetResultRejectClientNum = "getResultRejectClientNum";
 constexpr auto kParticipationTimeLevel1 = "participationTimeLevel1";
 constexpr auto kParticipationTimeLevel2 = "participationTimeLevel2";
 constexpr auto kParticipationTimeLevel3 = "participationTimeLevel3";

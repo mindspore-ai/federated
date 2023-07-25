@@ -109,6 +109,9 @@ message IterationSummaryMsg {
   float metrics_accuracy = 16;
   float upload_accuracy = 17;
   uint64 eval_data_size = 18;
+  uint64 getResult_total_client_num = 19;
+  uint64 getResult_accept_client_num = 20;
+  uint64 getResult_reject_client_num = 21;
 }
 
 message UnsupervisedEvalItem {

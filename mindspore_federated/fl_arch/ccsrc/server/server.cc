@@ -101,6 +101,7 @@ void Server::InitRoundConfigs() {
   std::vector<RoundConfig> rounds_config = {
     {"startFLJob", true, start_fl_job_time_window, true, start_fl_job_threshold},
     {"updateModel", true, update_model_time_window, true, update_model_threshold, true},
+    {"getResult"},
     {"getModel"},
     {"pullWeight"},
     {"pushWeight", false, 3000, false, 1},

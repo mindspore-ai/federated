@@ -232,18 +232,29 @@ public class SyncFLJob {
                 break;
             }
 
-            // getModel
-            curStatus = getModel(flLiteClient);
+            // getResult
+            curStatus = getResult(flLiteClient);
             if (curStatus == FLClientStatus.RESTART) {
-                resetContext("[getModel]", flLiteClient.getNextRequestTime(), flLiteClient);
+                resetContext("[getResult]", flLiteClient.getNextRequestTime(), flLiteClient);
                 continue;
             } else if (curStatus != FLClientStatus.SUCCESS) {
-                failed("[getModel] getModel", flLiteClient);
+                failed("[getResult] getResult", flLiteClient);
                 break;
             }
 
             // get the feature map after averaging and update dp_norm_clip
-            flLiteClient.updateDpNormClip();
+            if (localFLParameter.getEncryptLevel() == EncryptLevel.DP_ENCRYPT) {
+                // getModel
+                curStatus = getModel(flLiteClient);
+                if (curStatus == FLClientStatus.RESTART) {
+                    resetContext("[getModel]", flLiteClient.getNextRequestTime(), flLiteClient);
+                    continue;
+                } else if (curStatus != FLClientStatus.SUCCESS) {
+                    failed("[getModel] getModel", flLiteClient);
+                    break;
+                }
+                flLiteClient.updateDpNormClip();
+            }
 
             LOGGER.info("========================================================the total response of "
                     + flLiteClient.getIteration() + ": " + curStatus +
@@ -289,6 +300,25 @@ public class SyncFLJob {
             return true;
         }
         return false;
+    }
+
+    private FLClientStatus getResult(FLLiteClient flLiteClient) {
+        FLClientStatus curStatus = flLiteClient.getResult();
+        waitTryTime = 0;
+        while (curStatus == FLClientStatus.WAIT) {
+            waitTryTime += 1;
+            if (waitTryTimeExceedsLimit()) {
+                curStatus = FLClientStatus.FAILED;
+                break;
+            }
+            if (checkStopJobFlag()) {
+                curStatus = FLClientStatus.FAILED;
+                break;
+            }
+            waitSomeTime();
+            curStatus = flLiteClient.getResult();
+        }
+        return curStatus;
     }
 
     private FLClientStatus getModel(FLLiteClient flLiteClient) {

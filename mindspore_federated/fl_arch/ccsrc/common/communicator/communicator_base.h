@@ -39,6 +39,7 @@ enum class TcpUserCommand {
   kPushMetrics,
   kExchangeKeys,
   kGetKeys,
+  kGetResult,
 };
 
 using VectorPtr = std::shared_ptr<std::vector<uint8_t>>;

@@ -35,8 +35,8 @@ from mindspore import dataset as ds
 from mindspore_federated import FLServerJob, FlSchedulerJob, Callback
 from mindspore_federated import log as logger
 
-from common_client import ResponseCode, ResponseFLJob, ResponseGetModel
-from common_client import post_start_fl_job, post_get_model, post_update_model
+from common_client import ResponseCode, ResponseFLJob, ResponseGetModel, ResponseGetResult
+from common_client import post_start_fl_job, post_get_model, post_update_model, post_get_result
 from common_client import server_safemode_rsp
 from common_data import generate_random_data
 
@@ -621,6 +621,25 @@ def update_model_expect_success(http_server_address, fl_name, fl_id, iteration, 
         raise RuntimeError(
             f"Failed to post updateModel: {update_model_rsp.Retcode()} {update_model_rsp.Reason().decode()}")
     return result, update_model_rsp
+
+
+def get_result_expect_success(http_server_address, fl_name, iteration=1, enable_ssl=None):
+    """get result expect success"""
+    for i in range(60):  # 0.5*60=30s
+        result, get_result_rsp = post_get_result(http_server_address, fl_name, iteration, enable_ssl=enable_ssl)
+        if result is None:
+            if isinstance(get_result_rsp, str) and get_result_rsp != server_safemode_rsp:
+                raise RuntimeError(f"Failed to post getResult: {get_result_rsp}")
+            if isinstance(get_result_rsp, ResponseGetResult.ResponseGetResult) and \
+                    get_result_rsp.Retcode() != ResponseCode.ResponseCode.SucNotReady:
+                raise RuntimeError(
+                    f"Failed to post getResult: {get_result_rsp.Retcode()} {get_result_rsp.Reason().decode()}")
+        else:
+            return result, get_result_rsp
+        time.sleep(0.5)
+    if isinstance(get_result_rsp, str):
+        raise RuntimeError(f"Failed to post getResult: {get_result_rsp}")
+    raise RuntimeError(f"Failed to post getResult: {get_result_rsp.Retcode()} {get_result_rsp.Reason().decode()}")
 
 
 def get_model_expect_success(http_server_address, fl_name, iteration=1, enable_ssl=None):

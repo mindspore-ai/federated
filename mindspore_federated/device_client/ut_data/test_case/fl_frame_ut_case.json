@@ -17,7 +17,7 @@
   'cpuBindMode':'NOT_BINDING_CORE',
   'httpRes':[{'resName':'startFLJob', 'resCode':200, 'contendMode':0, 'contentData':'/test_data/lenet/startFLJob/Res_0'},
              {'resName':'updateModel', 'resCode':200, 'contendMode':0, 'contentData':'/test_data/lenet/updateModel/Res_1'},
-             {'resName':'getModel', 'resCode':200, 'contendMode':0, 'contentData':'/test_data/lenet/getModel/Res_8'}
+             {'resName':'getResult', 'resCode':200, 'contendMode':0, 'contentData':'/test_data/lenet/getResult/Res_7'}
             ],
   'resultCode':200
 },

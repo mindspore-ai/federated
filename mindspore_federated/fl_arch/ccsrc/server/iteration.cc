@@ -173,6 +173,10 @@ void Iteration::SubmitSummary() {
       end_last_iter_rsp.set_participation_time_level1_num(update_model_complete_info[kIndexZero].second);
       end_last_iter_rsp.set_participation_time_level2_num(update_model_complete_info[kIndexOne].second);
       end_last_iter_rsp.set_participation_time_level3_num(update_model_complete_info[kIndexTwo].second);
+    } else if (round->name() == "getResult") {
+      end_last_iter_rsp.set_getresult_total_client_num(round->kernel_total_client_num());
+      end_last_iter_rsp.set_getresult_accept_client_num(round->kernel_accept_client_num());
+      end_last_iter_rsp.set_getresult_reject_client_num(round->kernel_reject_client_num());
     } else if (round->name() == "getModel") {
       end_last_iter_rsp.set_getmodel_total_client_num(round->kernel_total_client_num());
       end_last_iter_rsp.set_getmodel_accept_client_num(round->kernel_accept_client_num());
@@ -211,6 +215,10 @@ void Iteration::GetAllSummaries() {
     round_client_num_map_[kUpdateModelTotalClientNum] += summary.updatemodel_total_client_num();
     round_client_num_map_[kUpdateModelAcceptClientNum] += summary.updatemodel_accept_client_num();
     round_client_num_map_[kUpdateModelRejectClientNum] += summary.updatemodel_reject_client_num();
+
+    round_client_num_map_[kGetResultTotalClientNum] += summary.getresult_total_client_num();
+    round_client_num_map_[kGetResultAcceptClientNum] += summary.getresult_accept_client_num();
+    round_client_num_map_[kGetResultRejectClientNum] += summary.getresult_reject_client_num();
 
     round_client_num_map_[kGetModelTotalClientNum] += summary.getmodel_total_client_num();
     round_client_num_map_[kGetModelAcceptClientNum] += summary.getmodel_accept_client_num();

@@ -136,7 +136,7 @@ void RoundKernel::IncreaseTotalClientNum() { total_client_num_ += 1; }
 void RoundKernel::IncreaseAcceptClientNum() { accept_client_num_ += 1; }
 
 void RoundKernel::Summarize() {
-  if (name_ == "startFLJob" || name_ == "updateModel" || name_ == "getModel") {
+  if (name_ == "startFLJob" || name_ == "updateModel" || name_ == "getResult" || name_ == "getModel") {
     MS_LOG(INFO) << "Round kernel " << name_ << " total client num is: " << total_client_num_
                  << ", accept client num is: " << accept_client_num_
                  << ", reject client num is: " << (total_client_num_ - accept_client_num_);

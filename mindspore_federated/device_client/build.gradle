@@ -21,6 +21,7 @@ buildscript {
 plugins {
     // Apply the java-library plugin to add support for Java Library
     id 'java-library'
+    id 'maven'
 }
 
 apply plugin: "io.netifi.flatbuffers"
@@ -193,6 +194,20 @@ task packFLJarX86(type: Jar, dependsOn: ['compileJava']) {
                     'META-INF/.SF', 'META-INF/.RSA', 'META-INF/*SF'
         }
         ant.checksum file: "./build/libs/jarX86/" + archivesBaseName + '-' + version + '.jar',
+                algorithm: "sha-256", fileext: ".sha256"
+    }
+}
+
+task createPom {
+    pom {
+        project {
+            groupId 'com.mindspore.flclient'
+            artifactId 'mindspore-lite-java-flclient'
+            version version
+        }
+    }.writeTo("build/libs/jarAAR/" + archivesBaseName + "-" + version + ".pom")
+    doLast {
+        ant.checksum file: "./build/libs/jarAAR/" + archivesBaseName + '-' + version + '.pom',
                 algorithm: "sha-256", fileext: ".sha256"
     }
 }

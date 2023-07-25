@@ -94,6 +94,11 @@ class FLMockServer {
             return true;
         }
 
+        if (msgName.equals("getResult")) {
+            // do check for getResult
+            return true;
+        }
+
         if (msgName.equals("getModel")) {
             // do check for getModel
             return true;
@@ -247,6 +252,21 @@ class FLMockServer {
         return builder.sizedByteArray();
     }
 
+    private byte[] genResponseGetResult() {
+        FlatBufferBuilder builder = new FlatBufferBuilder();
+        Date date = new Date();
+        long curTimestamp = date.getTime();
+        int curTimeOffset = builder.createString(String.valueOf(curTimestamp));
+        int reasonOffset = builder.createString("Success.");
+        builder.startTable(4);
+        ResponseGetResult.addTimestamp(builder, curTimeOffset);
+        ResponseGetResult.addIteration(builder, 1);
+        ResponseGetResult.addReason(builder, reasonOffset);
+        ResponseGetResult.addRetcode(builder, 200);
+        int root = ResponseGetResult.endResponseGetResult(builder);
+        builder.finish(root);
+        return builder.sizedByteArray();
+    }
 
     private byte[] genResponseGetModel() {
         FlatBufferBuilder builder = new FlatBufferBuilder();
@@ -289,6 +309,16 @@ class FLMockServer {
             Buffer buffer = new Buffer();
             ByteBuffer resBuffer = ByteBuffer.wrap(msgBody);
             ResponseUpdateModel responseDataBuf = ResponseUpdateModel.getRootAsResponseUpdateModel(resBuffer);
+            buffer.write(responseDataBuf.getByteBuffer().array());
+            return buffer;
+        }
+
+        if (msgName.equals("getResult")) {
+            byte[] msgBody = genResponseGetResult();
+            Buffer buffer = new Buffer();
+            ByteBuffer resBuffer = ByteBuffer.wrap(msgBody);
+            ResponseGetResult responseDataBuf = ResponseGetResult.getRootAsResponseGetResult(resBuffer);
+            responseDataBuf.mutateIteration(curIter);
             buffer.write(responseDataBuf.getByteBuffer().array());
             return buffer;
         }
