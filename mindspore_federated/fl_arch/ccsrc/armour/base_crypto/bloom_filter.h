@@ -83,7 +83,10 @@ struct BloomFilter {
     if (!bit_array.empty()) {
       if (bit_array.size() != bitArrayByteLen())
         MS_LOG(ERROR) << "(BloomFilter) Received bit array size does not match the peer input number.";
-      bit_array_ = reinterpret_cast<uint8_t *>(memcpy(bit_array_, bit_array.c_str(), bit_array.size()));
+      if (memcpy_s(bit_array_, bitArrayByteLen(), bit_array.c_str(), bit_array.size()) != 0)
+        MS_LOG(ERROR) << "(BloomFilter) Copy bit_array failed.";
+      else
+        bit_array_ = reinterpret_cast<uint8_t *>(bit_array_);
     }
   }
 
