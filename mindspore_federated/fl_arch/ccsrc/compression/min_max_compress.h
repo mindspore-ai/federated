@@ -33,6 +33,9 @@ MS_EXPORT TensorItemPy run_min_max_compress(const std::vector<float>& origin_dat
 
   auto temp1 = static_cast<float>(k1 << bit_num) - 1.0f;
   auto temp2 = static_cast<float>(k1 << (bit_num - k1));
+  if (temp1 == 0.0f) {
+    MS_LOG(EXCEPTION) << "temp1 value is zero, please check!";
+  }
 
   float min_val = FLT_MAX;
   float max_val = -FLT_MAX;

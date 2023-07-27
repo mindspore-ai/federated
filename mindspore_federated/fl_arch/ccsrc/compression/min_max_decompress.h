@@ -33,6 +33,9 @@ MS_EXPORT std::vector<float> run_min_max_decompress(const TensorItemPy& tensor_i
 
   auto temp1 = static_cast<float>(k1 << bit_num) - 1.0f;
   auto temp2 = static_cast<float>(k1 << (bit_num - k1));
+  if (temp1 == 0.0f) {
+    MS_LOG(EXCEPTION) << "temp1 value is zero, please check!";
+  }
   float scale_val = static_cast<float>(max_val - min_val) / temp1 + kEps;
   MS_LOG(INFO) << "min_val: " << min_val << " max_val: " << max_val << " scale_val: " << scale_val;
 

@@ -52,6 +52,10 @@ size_t SignDS::ComputRandomResponseB(const std::vector<std::string> &all_b_hat) 
 // If the old client accounts for the majority, then the global learning rate parameter is still used when
 // reconstructing the gradient.
 bool SignDS::CheckOldVersion(const std::vector<std::string> &all_b_hat, uint64_t is_reached, size_t updatemodel_num) {
+  if (updatemodel_num == 0) {
+    MS_LOG_WARNING << "updatemodel num is 0, please check!";
+    return false;
+  }
   MS_LOG_INFO << "The number of bHat is " << all_b_hat.size() << ", the number of updatedemodel is " << updatemodel_num;
   auto enc_config = FLContext::instance()->encrypt_config();
   auto client = cache::DistributedCacheLoader::Instance().GetOneClient();
