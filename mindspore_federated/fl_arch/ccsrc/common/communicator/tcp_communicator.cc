@@ -24,10 +24,11 @@ namespace fl {
 namespace {
 constexpr int kDefaultTcpThreadCount = 3;
 const std::unordered_map<TcpUserCommand, std::string> kUserCommandToMsgType = {
-  {TcpUserCommand::kPullWeight, "pullWeight"}, {TcpUserCommand::kPushWeight, "pushWeight"},
-  {TcpUserCommand::kStartFLJob, "startFLJob"}, {TcpUserCommand::kExchangeKeys, "exchangeKeys"},
-  {TcpUserCommand::kGetKeys, "getKeys"},       {TcpUserCommand::kUpdateModel, "updateModel"},
-  {TcpUserCommand::kGetModel, "getModel"},     {TcpUserCommand::kPushMetrics, "pushMetrics"}};
+  {TcpUserCommand::kPullWeight, "pullWeight"},  {TcpUserCommand::kPushWeight, "pushWeight"},
+  {TcpUserCommand::kStartFLJob, "startFLJob"},  {TcpUserCommand::kExchangeKeys, "exchangeKeys"},
+  {TcpUserCommand::kGetKeys, "getKeys"},        {TcpUserCommand::kUpdateModel, "updateModel"},
+  {TcpUserCommand::kGetResult, "getResult"},    {TcpUserCommand::kGetModel, "getModel"},
+  {TcpUserCommand::kPushMetrics, "pushMetrics"}};
 }  // namespace
 
 bool TcpCommunicator::Start() {

@@ -17,7 +17,7 @@ import requests
 import numpy as np
 from mindspore_fl.schema import (RequestFLJob, ResponseFLJob, ResponseCode, RequestUpdateModel, ResponseUpdateModel,
                                  FeatureMap, RequestGetModel, ResponseGetModel, UnsupervisedEvalItems,
-                                 UnsupervisedEvalItem)
+                                 UnsupervisedEvalItem, RequestGetResult, ResponseGetResult)
 import flatbuffers
 
 server_safemode_rsp = "The cluster is in safemode."
@@ -39,6 +39,21 @@ def build_start_fl_job(fl_name, fl_id, data_size=32, timestamp="2020/11/16/19/18
     RequestFLJob.RequestFLJobAddTimestamp(builder, fb_timestamp)
     fl_job_request = RequestFLJob.RequestFLJobEnd(builder)
     builder.Finish(fl_job_request)
+    return builder.Output()
+
+
+def build_get_result(fl_name, iteration, timestamp="2020/11/16/19/18"):
+    """build get result"""
+    builder = flatbuffers.Builder(1024)
+    fb_fl_name = builder.CreateString(fl_name)
+    fb_timestamp = builder.CreateString(timestamp)
+    RequestGetResult.RequestGetResultStart(builder)
+
+    RequestGetResult.RequestGetResultAddFlName(builder, fb_fl_name)
+    RequestGetResult.RequestGetResultAddTimestamp(builder, fb_timestamp)
+    RequestGetResult.RequestGetResultAddIteration(builder, iteration)
+    get_result_request = RequestGetResult.RequestGetResultEnd(builder)
+    builder.Finish(get_result_request)
     return builder.Output()
 
 
@@ -208,6 +223,21 @@ def post_update_model(http_address, fl_name, fl_id, iteration, feature_map, uplo
         return None, update_model_rsp
 
     return True, update_model_rsp
+
+
+def post_get_result(http_address, fl_name, iteration, enable_ssl=None):
+    """post get result"""
+    buffer = build_get_result(fl_name, iteration)
+    result = post_msg(http_address, "getResult", buffer, enable_ssl)
+    if isinstance(result, Exception):
+        raise result
+    if result.text in server_not_available_rsp:
+        return None, result.text
+
+    get_result_rsp = ResponseGetResult.ResponseGetResult.GetRootAsResponseGetResult(result.content, 0)
+    if get_result_rsp.Retcode() != ResponseCode.ResponseCode.SUCCEED:
+        return None, get_result_rsp
+    return True, get_result_rsp
 
 
 def post_get_model(http_address, fl_name, iteration, enable_ssl=None):

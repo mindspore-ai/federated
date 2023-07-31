@@ -186,7 +186,7 @@ bool Round::IsServerAvailable(std::string *reason) {
   auto &context = cache::InstanceContext::Instance();
   auto state = context.instance_state();
   // After one instance is completed, the model should be accessed by clients.
-  if (state == cache::InstanceState::kStateFinish && name_ == "getModel") {
+  if (state == cache::InstanceState::kStateFinish && (name_ == "getModel" || name_ == "getResult")) {
     return true;
   }
 
@@ -211,7 +211,7 @@ bool Round::IsServerAvailable(std::string *reason) {
     *reason = kClusterSafeMode;
     return false;
   }
-  if (!cache::DistributedCacheLoader::Instance().available() && name_ != "getModel") {
+  if (!cache::DistributedCacheLoader::Instance().available() && !(name_ == "getModel" || name_ == "getResult")) {
     if (kPrintTimes % kPrintTimesThreshold == 0) {
       MS_LOG(WARNING) << "The distributed cache is not available, please retry " << name_ << " later.";
       kPrintTimes = 0;

@@ -20,7 +20,8 @@ from mindspore_federated import FeatureMap
 
 from common import check_feature_map, read_metrics
 from common import fl_name_with_idx, make_yaml_config, start_fl_server, fl_test
-from common import start_fl_job_expect_success, update_model_expect_success, get_model_expect_success
+from common import start_fl_job_expect_success, update_model_expect_success, get_model_expect_success, \
+    get_result_expect_success
 from common import stop_processes
 from common_client import ResponseCode, ResponseFLJob, ResponseUpdateModel
 from common_client import post_start_fl_job, post_update_model
@@ -82,7 +83,11 @@ def test_fl_server_one_server_one_client_multi_iterations_success():
     expect_feature_map = {"feature_conv": update_feature_map["feature_conv"] / data_size,
                           "feature_bn": update_feature_map["feature_bn"] / data_size,
                           "feature_bn2": update_feature_map["feature_bn2"] / data_size}
-    # get model
+
+    # get result
+    get_result_expect_success(http_server_address, fl_name, iteration)
+
+    # get model when encrypt_train_type is DP_ENCRYPT
     client_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
     check_feature_map(expect_feature_map, client_feature_map)
 
@@ -112,7 +117,11 @@ def test_fl_server_one_server_one_client_multi_iterations_success():
                               "feature_bn": update_feature_map["feature_bn"] / data_size,
                               "feature_bn2": update_feature_map["feature_bn2"] / data_size}
         # "feature_conv2": init_feature_map["feature_conv2"]}  # require_aggr = False
-        # get model
+
+        # get result
+        get_result_expect_success(http_server_address, fl_name, iteration)
+
+        # get model when encrypt_train_type is DP_ENCRYPT
         client_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
         check_feature_map(expect_feature_map, client_feature_map)
     # startFLJob when instance is finished
@@ -326,6 +335,7 @@ def test_fl_server_one_server_two_client_all_reduce_success():
     loss1 = 9.0
     update_model_expect_success(http_server_address, fl_name, fl_id2, iteration, update_feature_map2, upload_loss=loss1)
 
+    get_result_expect_success(http_server_address, fl_name, iteration)
     client_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
     expect_feature_map = {}
     for key in ["feature_conv", "feature_bn", "feature_bn2"]:
@@ -439,6 +449,9 @@ def test_fl_server_two_server_two_client_multi_iterations_success():
         for key in ["feature_conv", "feature_bn", "feature_bn2"]:
             expect_feature_map[key] = (update_feature_map[key] + update_feature_map2[key]) / (data_size + data_size2)
 
+        get_result_expect_success(http_server_address, fl_name, iteration)
+        get_result_expect_success(http_server_address2, fl_name, iteration)
+
         # get model from sever1
         client_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
         check_feature_map(expect_feature_map, client_feature_map)
@@ -545,15 +558,10 @@ def test_fl_server_three_server_two_client_one_iterations_success():
     expect_feature_map = {}  # require_aggr = False
     for key in ["feature_conv", "feature_bn", "feature_bn2"]:
         expect_feature_map[key] = (update_feature_map[key] + update_feature_map2[key]) / (data_size + data_size2)
-    # get model from sever1
-    client_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
-    check_feature_map(expect_feature_map, client_feature_map)
-    # get model from sever2
-    client_feature_map, _ = get_model_expect_success(http_server_address2, fl_name, iteration)
-    check_feature_map(expect_feature_map, client_feature_map)
-    # get model from sever3
-    client_feature_map, _ = get_model_expect_success(http_server_address3, fl_name, iteration)
-    check_feature_map(expect_feature_map, client_feature_map)
+
+    get_result_expect_success(http_server_address, fl_name, iteration)
+    get_result_expect_success(http_server_address2, fl_name, iteration)
+    get_result_expect_success(http_server_address3, fl_name, iteration)
 
 
 @fl_test
@@ -711,6 +719,7 @@ def test_fl_server_checkpoint_save_load_success():
     # update model, when weight aggregation is done, checkpoint file will be saved in ./fl_ckpt/
     update_feature_map = create_default_feature_map()
     update_model_expect_success(http_server_address, fl_name, fl_id, iteration, update_feature_map)
+    get_result_expect_success(http_server_address, fl_name, iteration)
     get_model_expect_success(http_server_address, fl_name, iteration)
 
     # start fl job
@@ -734,6 +743,8 @@ def test_fl_server_checkpoint_save_load_success():
     client_feature_map, fl_job_rsp = post_start_fl_job(http_server_address, fl_name, fl_id, data_size)
     assert client_feature_map is None
     assert fl_job_rsp == server_disabled_finished_rsp
+
+    get_result_expect_success(http_server_address, fl_name, iteration)
 
     # get model
     client_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
@@ -915,6 +926,8 @@ def test_fl_server_exit_no_move_next_iteration_with_two_server_success():
     # update model to server2
     update_model_expect_success(http_server_address2, fl_name, fl_id2, iteration, update_feature_map)
 
+    get_result_expect_success(http_server_address2, fl_name, iteration)
+
     # get model
     get_model_expect_success(http_server_address2, fl_name, iteration)
 
@@ -991,7 +1004,7 @@ def test_fl_server_one_server_two_client_unsupervised_eval_success():
     update_model_expect_success(http_server_address, fl_name, fl_id3, iteration, update_feature_map,
                                 unsupervised_eval_data=[3, 4, 5])
 
-    _, _ = get_model_expect_success(http_server_address, fl_name, iteration)
+    get_result_expect_success(http_server_address, fl_name, iteration)
     metrics = read_metrics()
     assert metrics is not None
     last_metrics = metrics[-1]

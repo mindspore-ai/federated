@@ -129,7 +129,7 @@ table RequestUpdateModel{
   name_vec:[string];
   upload_accuracy:float;
   unsupervised_eval_items:UnsupervisedEvalItems;
-  signds_bHat:string;
+  signds_b_hat:string;
 }
 
 table ResponseUpdateModel{
@@ -170,6 +170,7 @@ table RequestGetModel{
   timestamp:string;
   download_compress_types:[CompressType];
 }
+
 table ResponseGetModel{
   retcode:int;
   reason:string;
@@ -178,6 +179,19 @@ table ResponseGetModel{
   timestamp:string;
   download_compress_type:CompressType;
   compress_feature_map:[CompressFeatureMap];
+}
+
+table RequestGetResult{
+  fl_name:string;
+  iteration:int;
+  timestamp:string;
+}
+
+table ResponseGetResult{
+  retcode:int;
+  reason:string;
+  iteration:int;
+  timestamp:string;
 }
 
 table RequestAsyncGetModel{

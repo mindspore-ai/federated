@@ -780,10 +780,10 @@ bool UpdateModelKernel::UpdateClientUnsupervisedEval(const schema::RequestUpdate
 }
 
 bool UpdateModelKernel::UpdateClientSignDSbHat(const schema::RequestUpdateModel *update_model_req) {
-  if (update_model_req->signds_bHat() == nullptr) {
+  if (update_model_req->signds_b_hat() == nullptr) {
     return false;
   }
-  std::string b_hat = update_model_req->signds_bHat()->str();
+  std::string b_hat = update_model_req->signds_b_hat()->str();
   if (b_hat != cache::SignDS::Instance().kSignDSbHat0 && b_hat != cache::SignDS::Instance().kSignDSbHat1) {
     return false;
   }

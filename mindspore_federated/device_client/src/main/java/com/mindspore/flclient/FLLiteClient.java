@@ -29,6 +29,7 @@ import mindspore.fl.schema.FLPlan;
 import mindspore.fl.schema.ResponseCode;
 import mindspore.fl.schema.ResponseFLJob;
 import mindspore.fl.schema.ResponseGetModel;
+import mindspore.fl.schema.ResponseGetResult;
 import mindspore.fl.schema.ResponseUpdateModel;
 
 import java.io.IOException;
@@ -433,6 +434,47 @@ public class FLLiteClient {
     }
 
     /**
+     * Send serialized request message of getResult to server.
+     *
+     * @return the status code corresponding to the response message.
+     */
+    public FLClientStatus getResult() {
+        String url = Common.generateUrl(flParameter.isUseElb(), flParameter.getServerNum(),
+                flParameter.getDomainName());
+        GetResult getResultBuf = GetResult.getInstance();
+        byte[] buffer = getResultBuf.getRequestGetResult(flParameter.getFlName(), iteration);
+        try {
+            long start = Common.startTime("single getResult");
+            LOGGER.info("[getResult] the request message length: " + buffer.length);
+            byte[] message = flCommunication.syncRequest(url + "/getResult", buffer);
+            if (!Common.isSeverReady(message)) {
+                LOGGER.info("[getResult] the server is not ready now, need wait some time and request " +
+                        "again");
+                status = FLClientStatus.WAIT;
+                retCode = ResponseCode.SucNotReady;
+                return status;
+            }
+            if (Common.isSeverJobFinished(message)) {
+                return serverJobFinished("getResult");
+            }
+            LOGGER.info("[getResult] the response message length: " + message.length);
+            Common.endTime(start, "single getResult");
+            LOGGER.info("[getResult] get Result request success");
+            ByteBuffer debugBuffer = ByteBuffer.wrap(message);
+            ResponseGetResult responseDataBuf = ResponseGetResult.getRootAsResponseGetResult(debugBuffer);
+            status = getResultBuf.doResponse(responseDataBuf);
+            retCode = getResultBuf.getRetCode();
+            if (status == FLClientStatus.RESTART) {
+                nextRequestTime = responseDataBuf.timestamp();
+            }
+            LOGGER.info("[getResult] get response from server ok!");
+        } catch (IOException e) {
+            failed("[getResult] unsolved error code: catch IOException: " + e.getMessage(), ResponseCode.RequestError);
+        }
+        return status;
+    }
+
+    /**
      * Send serialized request message of getModel to server.
      *
      * @return the status code corresponding to the response message.
@@ -474,23 +516,20 @@ public class FLLiteClient {
     }
 
     public void updateDpNormClip() {
-        EncryptLevel encryptLevel = localFLParameter.getEncryptLevel();
-        if (encryptLevel == EncryptLevel.DP_ENCRYPT) {
-            client.EnableTrain(true);
-            float fedWeightUpdateNorm = client.getDpWeightNorm(secureProtocol.getUpdateFeatureName());
-            LOGGER.info("[DP] L2-norm of weights' average update is: " + fedWeightUpdateNorm);
-            float newNormCLip = (float) getDpNormClipFactor() * fedWeightUpdateNorm;
-            if (iteration == 1) {
+        client.EnableTrain(true);
+        float fedWeightUpdateNorm = client.getDpWeightNorm(secureProtocol.getUpdateFeatureName());
+        LOGGER.info("[DP] L2-norm of weights' average update is: " + fedWeightUpdateNorm);
+        float newNormCLip = (float) getDpNormClipFactor() * fedWeightUpdateNorm;
+        if (iteration == 1) {
+            setDpNormClipAdapt(newNormCLip);
+            LOGGER.info("[DP] dpNormClip has been updated.");
+        } else {
+            if (newNormCLip < getDpNormClipAdapt()) {
                 setDpNormClipAdapt(newNormCLip);
                 LOGGER.info("[DP] dpNormClip has been updated.");
-            } else {
-                if (newNormCLip < getDpNormClipAdapt()) {
-                    setDpNormClipAdapt(newNormCLip);
-                    LOGGER.info("[DP] dpNormClip has been updated.");
-                }
             }
-            LOGGER.info("[DP] Adaptive dpNormClip is: " + getDpNormClipAdapt());
         }
+        LOGGER.info("[DP] Adaptive dpNormClip is: " + getDpNormClipAdapt());
     }
 
     /**

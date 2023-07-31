@@ -25,10 +25,11 @@ from common import check_feature_map
 from common import fl_name_with_idx, make_yaml_config, fl_test
 from common import post_scheduler_enable_msg, post_scheduler_disable_msg
 from common import post_scheduler_new_instance_msg, post_scheduler_query_instance_msg, post_scheduler_state_msg
-from common import start_fl_job_expect_success, update_model_expect_success, get_model_expect_success
+from common import start_fl_job_expect_success, update_model_expect_success, get_model_expect_success, \
+    get_result_expect_success
 from common import start_fl_server, start_fl_scheduler, stop_processes
 from common_client import ResponseFLJob
-from common_client import post_start_fl_job, post_get_model, post_update_model
+from common_client import post_start_fl_job, post_get_model, post_update_model, post_get_result
 from common_client import server_disabled_finished_rsp
 from mindspore_fl.schema import CompressType
 
@@ -237,6 +238,11 @@ def test_fl_scheduler_post_disable_enable_success():
     assert result is None
     assert update_model_rsp == server_disabled_finished_rsp
 
+    # get result
+    result, get_result_rsp = post_get_result(http_server_address, fl_name, iteration - 1)
+    assert result is None
+    assert get_result_rsp == server_disabled_finished_rsp
+
     # get model
     result, get_model_rsp = post_get_model(http_server_address, fl_name, iteration - 1)
     assert result is None
@@ -282,6 +288,10 @@ def test_fl_scheduler_post_disable_enable_success():
     expect_feature_map = {"feature_conv": update_feature_map["feature_conv"] / data_size,
                           "feature_bn": update_feature_map["feature_bn"] / data_size,
                           "feature_bn2": update_feature_map["feature_bn2"] / data_size}
+
+    # get result
+    get_result_expect_success(http_server_address, fl_name, iteration)
+
     # get model
     client_feature_map, get_model_rsp = get_model_expect_success(http_server_address, fl_name, iteration)
     check_feature_map(expect_feature_map, client_feature_map)
@@ -292,6 +302,7 @@ def test_fl_scheduler_post_disable_enable_success():
         start_fl_job_expect_success(http_server_address, fl_name, fl_id, data_size)
         update_feature_map = create_default_feature_map()
         update_model_expect_success(http_server_address, fl_name, fl_id, iteration, update_feature_map)
+        get_result_expect_success(http_server_address, fl_name, iteration)
         get_model_expect_success(http_server_address, fl_name, iteration)
 
     # post /state message, state is updated to finish
@@ -390,6 +401,9 @@ def test_fl_scheduler_post_new_instance_success():
     update_feature_map = create_default_feature_map()
     update_model_expect_success(http_server_address, fl_name, fl_id2, iteration, update_feature_map)
 
+    # get result
+    get_result_expect_success(http_server_address, fl_name, iteration)
+
     # get model
     new_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
 
@@ -431,6 +445,9 @@ def test_fl_scheduler_post_new_instance_success():
     update_feature_map = create_default_feature_map()
     update_model_expect_success(http_server_address, fl_name, fl_id2, iteration, update_feature_map)
 
+    # get result
+    get_result_expect_success(http_server_address, fl_name, iteration)
+
     # get model
     get_model_expect_success(http_server_address, fl_name, iteration)
 
@@ -444,6 +461,8 @@ def test_fl_scheduler_post_new_instance_success():
         update_model_expect_success(http_server_address, fl_name, fl_id, iteration, update_feature_map)
         update_feature_map = create_default_feature_map()
         update_model_expect_success(http_server_address, fl_name, fl_id2, iteration, update_feature_map)
+        # get result
+        get_result_expect_success(http_server_address, fl_name, iteration)
         # get model
         new_feature_map, _ = get_model_expect_success(http_server_address, fl_name, iteration)
 
