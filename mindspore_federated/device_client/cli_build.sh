@@ -9,7 +9,6 @@ MS_LITE_PKG_VER="1.9.0"
 MS_LITE_PKG_NAME="mindspore-lite-${MS_LITE_PKG_VER}-linux-x64"
 MS_PKG_URL="https://ms-release.obs.cn-north-4.myhuaweicloud.com/${MS_LITE_PKG_VER}/MindSpore/lite/release/linux/x86_64/${MS_LITE_PKG_NAME}.tar.gz"
 LENET_MS_URL="https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/notebook/models/lenet_train.ms"
-export FLAT_EXE_PATH="$FL_THIRD_PKG_PATH/flatbuffers-v2.0.0/build/flatc"
 
 # print usage message
 usage()
@@ -126,6 +125,7 @@ load_third_pkg()
 }
 
 checkopts "$@"
+export FLAT_EXE_PATH="$FL_THIRD_PKG_PATH/flatbuffers-v2.0.0/build/flatc"
 echo "---------------- MindSpore Federated client: build start ----------------"
 load_third_pkg
 

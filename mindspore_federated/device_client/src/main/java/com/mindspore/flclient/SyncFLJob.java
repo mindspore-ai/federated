@@ -52,6 +52,7 @@ public class SyncFLJob {
 
     // mindspore versions compatible for cur version of federated
     private ArrayList<String> msVersions = new ArrayList<>(Arrays.asList(
+            "MindSpore Lite 1.8.1",
             "MindSpore Lite 1.9.0",
             "MindSpore Lite 2.0.0"));
 
