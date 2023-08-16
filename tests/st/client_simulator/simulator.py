@@ -28,10 +28,9 @@ from mindspore import load_checkpoint
 mindspore_fl_path = os.path.abspath(os.path.join(os.getcwd(), "../../ut/python/tests/"))
 sys.path.append(mindspore_fl_path)
 
-from mindspore_fl.schema import (RequestFLJob, ResponseFLJob, ResponseCode,
-                                 RequestUpdateModel, ResponseUpdateModel,
-                                 FeatureMap, RequestGetModel, ResponseGetModel, CompressFeatureMap,
-                                 UnsupervisedEvalItems, UnsupervisedEvalItem)
+from mindspore_fl.schema import (RequestFLJob, ResponseFLJob, ResponseCode, RequestUpdateModel, ResponseUpdateModel,
+                                 RequestGetResult, ResponseGetResult, FeatureMap, RequestGetModel, ResponseGetModel,
+                                 CompressFeatureMap, UnsupervisedEvalItems, UnsupervisedEvalItem)
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--pid", type=int, default=0)
@@ -285,6 +284,22 @@ def build_update_model(iteration, feature_map_temp):
     return buf
 
 
+def build_get_result(iteration):
+    """build get result"""
+    builder_get_result = flatbuffers.Builder(1)
+    fl_name = builder_get_result.CreateString('fl_test_job')
+    timestamp = builder_get_result.CreateString('2020/12/16/19/18')
+    RequestGetResult.RequestGetResultStart(builder_get_result)
+
+    RequestGetResult.RequestGetResultAddFlName(builder_get_result, fl_name)
+    RequestGetResult.RequestGetResultAddTimestamp(builder_get_result, timestamp)
+    RequestGetResult.RequestGetResultAddIteration(builder_get_result, iteration)
+    get_result_request = RequestGetResult.RequestGetResultEnd(builder_get_result)
+    builder_get_result.Finish(get_result_request)
+    buf = builder_get_result.Output()
+    return buf
+
+
 def build_get_model(iteration):
     """
     build getting model
@@ -406,6 +421,38 @@ def update_model(iteration, feature_map_temp, upload_compress_type, upload_spars
     return update_model_result
 
 
+def get_result(iteration):
+    """
+    get result
+    """
+    get_result_result = {}
+
+    url = http_type + "://" + http_server_address + '/getResult'
+    print("Get result url:", url, ", iteration:", iteration)
+    while True:
+        get_result_buf = build_get_result(iteration)
+        x = session.post(url, data=memoryview(get_result_buf).tobytes(), verify=False)
+        if x.text in server_not_available_rsp:
+            print("Get result when safemode.")
+            time.sleep(0.5)
+            continue
+        print("Get result response size:", len(x.content))
+        rsp_get_result = ResponseGetResult.ResponseGetResult.GetRootAsResponseGetResult(x.content, 0)
+        ret_code = rsp_get_result.Retcode()
+        if ret_code == ResponseCode.ResponseCode.SUCCEED:
+            break
+        elif ret_code == ResponseCode.ResponseCode.SucNotReady:
+            time.sleep(0.5)
+            continue
+        else:
+            print("Get result failed, return code is ", rsp_get_result.Retcode())
+            sys.exit()
+    print("")
+    get_result_result['reason'] = "Success"
+    get_result_result['next_ts'] = 0
+    return get_result_result
+
+
 def get_model(iteration):
     """
     get model
@@ -461,6 +508,15 @@ if __name__ == '__main__':
             continue
 
         result = update_model(current_iteration, rsp_feature_maps, compress_type, sparse_rate)
+        sys.stdout.flush()
+        if result['reason'] == "Restart iteration.":
+            current_ts = datetime_to_timestamp(datetime.datetime.now())
+            duration = result['next_ts'] - current_ts
+            if duration >= 0:
+                time.sleep(duration / 1000)
+            continue
+
+        result = get_result(current_iteration)
         sys.stdout.flush()
         if result['reason'] == "Restart iteration.":
             current_ts = datetime_to_timestamp(datetime.datetime.now())
