@@ -359,8 +359,12 @@ void StartFLJobKernel::BuildStartFLJobRsp(const std::shared_ptr<FBBuilder> &fbb,
   int32_t t = param->t;
   int32_t g = param->g;
   auto encrypt_type = fbb->CreateString(FLContext::instance()->encrypt_type());
-  float sign_r_est = cache::SignDS::Instance().GetREst();
-  uint64_t sign_is_reached = cache::SignDS::Instance().GetIsReached();
+  float sign_r_est = 0;
+  uint64_t sign_is_reached = 0;
+  if (is_selected) {
+    sign_r_est = cache::SignDS::Instance().GetREst();
+    sign_is_reached = cache::SignDS::Instance().GetIsReached();
+  }
   auto pw_params = schema::CreatePWParams(*fbb.get(), t, p, g, prime);
   auto dp_params = schema::CreateDPParams(*fbb.get(), param->dp_eps, param->dp_delta, param->dp_norm_clip);
   auto ds_params = schema::CreateDSParams(*fbb.get(), param->sign_k, param->sign_eps, param->sign_thr_ratio,
