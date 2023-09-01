@@ -13,7 +13,7 @@ FM和深度学习部分拥有相同的输入原样特征向量，让DeepFM能从
 
 - [Criteo Kaggle Display Advertising Challenge Dataset](http://go.criteo.net/criteo-research-kaggle-display-advertising-challenge-dataset.tar.gz)
 
-- 数据集处理详见：https://gitee.com/mindspore/models/tree/master/official/recommend/deepfm
+- 数据集处理详见：https://gitee.com/mindspore/models/tree/master/official/recommend/DeepFM
 
 ## 脚本说明
 
@@ -21,24 +21,24 @@ FM和深度学习部分拥有相同的输入原样特征向量，让DeepFM能从
 
 ```bash
 .
-├── FedHuaiwei-baseline						//对比方案代码
+├── FedHuaiwei-baseline                        //对比方案代码
 │   └── deepfm
-│       ├── client.py							//客户端侧代码
-│       ├── data								//数据集文件
-│       ├── default_config.yaml				//默认配置文件
-│       ├── loss.log							//日志文件
-│       ├── requirements.txt					//运行所需环境
-│       ├── server							//服务端侧文件
-│       └── src								//模型文件
-└── FedHuawei-new							//自研方案代码
+│       ├── client.py                            //客户端侧代码
+│       ├── data                                //数据集文件
+│       ├── default_config.yaml                //默认配置文件
+│       ├── loss.log                            //日志文件
+│       ├── requirements.txt                    //运行所需环境
+│       ├── server                            //服务端侧文件
+│       └── src                                //模型文件
+└── FedHuawei-new                            //自研方案代码
     └── deepfm
-        ├── client.py							//客户端侧代码
-        ├── data								//数据集文件
-        ├── default_config.yaml				//默认配置文件
-        ├── loss.log							//日志文件
-        ├── requirements.txt					//运行所需环境
-        ├── server							//服务端侧文件
-        └── src								//模型文件
+        ├── client.py                            //客户端侧代码
+        ├── data                                //数据集文件
+        ├── default_config.yaml                //默认配置文件
+        ├── loss.log                            //日志文件
+        ├── requirements.txt                    //运行所需环境
+        ├── server                            //服务端侧文件
+        └── src                                //模型文件
 
 ```
 
@@ -46,11 +46,10 @@ FM和深度学习部分拥有相同的输入原样特征向量，让DeepFM能从
 
 在`default_config.yaml`中可以配置训练参数
 
-
 ```python
   optional arguments:
   -h, --help            show this help message and exit
-  
+
   "data config"
     data_vocab_size: 184965
     train_num_of_parts: 21
@@ -90,11 +89,9 @@ FM和深度学习部分拥有相同的输入原样特征向量，让DeepFM能从
     dataset_path: "./data/mindrecord"
   ```
 
-
-
 ## 启动脚本
 
 ```bash
-python train.py 
+python train.py
 ```  
 
