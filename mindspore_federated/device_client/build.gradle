@@ -21,7 +21,6 @@ buildscript {
 plugins {
     // Apply the java-library plugin to add support for Java Library
     id 'java-library'
-    id 'maven'
 }
 
 apply plugin: "io.netifi.flatbuffers"
@@ -46,41 +45,23 @@ repositories {
 
 dependencies {
     // https://mvnrepository.com/artifact/com.squareup.okhttp3/okhttp
-    compile('com.squareup.okhttp3:okhttp:4.10.0')
+    implementation('com.squareup.okhttp3:okhttp:4.10.0')
     // https://mvnrepository.com/artifact/com.google.flatbuffers/flatbuffers-java
-    compile('com.google.flatbuffers:flatbuffers-java:2.0.3')
-    compile('org.bouncycastle:bcprov-jdk15to18:1.74')
-    compile files('libs/mindspore-lite-java.jar')
+    implementation('com.google.flatbuffers:flatbuffers-java:2.0.3')
+    implementation('org.bouncycastle:bcprov-jdk15to18:1.74')
+    implementation files('libs/mindspore-lite-java.jar')
 
     // Use JUnit test framework
-    // Using compile to replace Implementation, because we need resolve the path.
-    testCompile('com.squareup.okhttp3:mockwebserver:4.10.0')
-    testCompile('org.jmockit:jmockit:1.49')
-    testCompile('junit:junit:4.10')
-    testCompile('org.hamcrest:hamcrest-all:1.3')
-    testCompile('com.alibaba:fastjson:1.2.58')
-    testCompile('commons-io:commons-io:2.0.1')
+    testImplementation('com.squareup.okhttp3:mockwebserver:4.10.0')
+    testImplementation('org.jmockit:jmockit:1.49')
+    testImplementation('junit:junit:4.10')
+    testImplementation('org.hamcrest:hamcrest-all:1.3')
+    testImplementation('com.alibaba:fastjson:1.2.58')
+    testImplementation('commons-io:commons-io:2.0.1')
     // the module jar for open source model test, need compile example quick_start_flclient
-    testCompile files('libs/quick_start_flclient.jar')
-    // the module jar for inner test
-    // testCompile files('libs/flclient_models.jar')
+    testImplementation files('libs/quick_start_flclient.jar')
 }
 
-test {
-    // need add the frame lib path to LD_LIBRARY_PATH
-    // ref to https://www.mindspore.cn/federated/docs/zh-CN/r1.6/deploy_federated_client.html#id7
-    // environment "LD_LIBRARY_PATH", "~/worker/fl_ut/lite/mindspore-lite-1.9.0-linux-x64/runtime/lib"
-    // need set MS_FL_UT_BASE_PATH the path of ut_data
-    // now ut data on the private repository https://gitee.com/zhangzhaoju/mindspore_fl_test_data
-    // environment "MS_FL_UT_BASE_PATH", "~/worker/fl_ut/ut_data"
-    // set MS_CATCH_MSG we can using real server to catch msg
-    // environment "MS_CATCH_MSG", "True"
-    jvmArgs "-javaagent:${project.configurations.testCompile.find { it.name.startsWith("jmockit") }}"
-    testLogging {
-        events "passed", "failed"
-    }
-    reports { junitXml.outputLocation.set(layout.buildDirectory.dir("ut_test_result")) }
-}
 
 def getFlatVersion(path) {
     def version = new ByteArrayOutputStream()
@@ -166,7 +147,6 @@ task packFLJarAAR(type: Jar, dependsOn: ['compileJava']) {
     }
 }
 
-
 task packFLJarX86(type: Jar, dependsOn: ['compileJava']) {
     doFirst {
         delete('build/libs/jarX86/' + archivesBaseName + '-' + version + '.jar')
@@ -181,7 +161,7 @@ task packFLJarX86(type: Jar, dependsOn: ['compileJava']) {
     }
     from('build/classes/java/main')
     from {
-        configurations.compile.collect {
+        configurations.compileClasspath.collect {
             if (!it.name.contains("mindspore-lite-java.jar")) {
                 it.isDirectory() ? it : zipTree(it)
             }
@@ -198,21 +178,6 @@ task packFLJarX86(type: Jar, dependsOn: ['compileJava']) {
     }
 }
 
-task createPom {
-    pom {
-        project {
-            groupId 'com.mindspore.flclient'
-            artifactId 'mindspore-lite-java-flclient'
-            version version
-        }
-    }.writeTo("build/libs/jarAAR/" + archivesBaseName + "-" + version + ".pom")
-    doLast {
-        ant.checksum file: "./build/libs/jarAAR/" + archivesBaseName + '-' + version + '.pom',
-                algorithm: "sha-256", fileext: ".sha256"
-    }
-}
-
-
 task packFLJarX86UT(type: Jar, dependsOn: ['compileTestJava']) {
     manifest {
         attributes(
@@ -226,10 +191,10 @@ task packFLJarX86UT(type: Jar, dependsOn: ['compileTestJava']) {
     from('../common/build/classes/java/main')
     from('../linux_x86/build/classes/java/main')
     from {
-        configurations.compile.collect {
+        configurations.compileClasspath.collect {
             it.isDirectory() ? it : zipTree(it)
         }
-        configurations.testCompile.collect {
+        configurations.testCompileClasspath.collect {
             it.isDirectory() ? it : zipTree(it)
         }
     }
@@ -240,11 +205,23 @@ task packFLJarX86UT(type: Jar, dependsOn: ['compileTestJava']) {
             commandLine "zip", "-d", "./build/libs/jarX86UT/" + archivesBaseName + '-' + version + '.jar',
                     'META-INF/.SF', 'META-INF/.RSA', 'META-INF/*SF'
         }
-        exec {
-            // Need do -javaagent so we copy the jmockit jar to the release path
-            String jmock_jar = project.configurations.testCompile.find { it.name.startsWith("jmockit") }.toString()
-            commandLine "cp", jmock_jar, './build/libs/jarX86UT/'
-        }
     }
 }
 
+test {
+    // need add the frame lib path to LD_LIBRARY_PATH
+    // ref to https://www.mindspore.cn/federated/docs/zh-CN/r1.6/deploy_federated_client.html#id7
+    // environment "LD_LIBRARY_PATH", "~/worker/fl_ut/lite/mindspore-lite-1.9.0-linux-x64/runtime/lib"
+    // need set MS_FL_UT_BASE_PATH the path of ut_data
+    // now ut data on the private repository https://gitee.com/zhangzhaoju/mindspore_fl_test_data
+    // environment "MS_FL_UT_BASE_PATH", "~/worker/fl_ut/ut_data"
+    // set MS_CATCH_MSG we can using real server to catch msg
+    // environment "MS_CATCH_MSG", "True"
+    doFirst {
+        jvmArgs "-javaagent:${project.configurations.testCompileClasspath.find { it.name.startsWith("jmockit") }}"
+    }
+    testLogging {
+        events "passed", "failed"
+    }
+    reports { junitXml.outputLocation.set(layout.buildDirectory.dir("ut_test_result")) }
+}

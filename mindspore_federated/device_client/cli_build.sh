@@ -156,7 +156,6 @@ build_mindspore_federated_client()
   ${gradle_command} build -x test
   ${gradle_command} packFLJarAAR --rerun-tasks
   ${gradle_command} packFLJarX86 --rerun-tasks
-  ${gradle_command} createPom --rerun-tasks
 
   # compile ut depend jar
   cd ${PROJECT_PATH}/../../example/quick_start_flclient/

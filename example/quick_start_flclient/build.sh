@@ -96,7 +96,7 @@ if [[ ${gradle_version} == '6.6.1' ]]; then
   gradle_command=gradle
 else
   gradle wrapper --gradle-version 6.6.1 --distribution-type all
-  gradle_command="${PROJECT_PATH}"/gradlew
+  gradle_command="${BASEPATH}"/gradlew
 fi
 ${gradle_command} clean
 ${gradle_command} build
