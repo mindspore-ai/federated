@@ -43,7 +43,7 @@ def _mindspore_version_check():
               "the instruction at https://www.mindspore.cn/install")
         raise
 
-    ms_fl_version_match = {'0.1.0': ['1.8', '1.9']}
+    ms_fl_version_match = {'0.2.0': ['2.1']}
 
     ms_version = ms.__version__[:3]
     required_mindspore_version = ms_fl_version_match[__version__]

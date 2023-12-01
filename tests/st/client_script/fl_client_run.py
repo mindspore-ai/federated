@@ -150,6 +150,11 @@ for i in range(client_num):
         train_path = train_dataset
         eval_path = test_dataset
         infer_path = test_dataset
+    elif "DeepFMClient" in fl_name:
+        print("DeepFMClient")
+        train_path = train_dataset
+        eval_path = test_dataset
+        infer_path = test_dataset
     else:
         print("the flname is error")
     print("===========================")
