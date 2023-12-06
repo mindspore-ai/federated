@@ -17,7 +17,7 @@
 BASEPATH=$(cd "$(dirname $0)" || exit; pwd)
 
 FL_THIRD_PKG_PATH="${BASEPATH}/../../mindspore_federated/device_client/third/"
-MS_LITE_PKG_VER="1.9.0"
+MS_LITE_PKG_VER="2.1.0"
 MS_LITE_PKG_NAME="mindspore-lite-${MS_LITE_PKG_VER}-linux-x64"
 MS_PKG_URL="https://ms-release.obs.cn-north-4.myhuaweicloud.com/${MS_LITE_PKG_VER}/MindSpore/lite/release/linux/x86_64/${MS_LITE_PKG_NAME}.tar.gz"
 USE_CACHED_PKG="on"

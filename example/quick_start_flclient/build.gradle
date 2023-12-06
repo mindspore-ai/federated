@@ -16,7 +16,7 @@ repositories {
 
 dependencies {
     implementation files('lib/mindspore-lite-java.jar')
-    implementation files('lib/mindspore-lite-java-flclient-0.1.0.jar')
+    implementation files('lib/mindspore-lite-java-flclient-0.2.0.jar')
 }
 
 group = 'com.mindspore.flclient.demo'

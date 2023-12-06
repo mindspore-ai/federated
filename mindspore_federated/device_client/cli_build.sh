@@ -5,7 +5,7 @@ PROJECT_PATH=$(cd "$(dirname "$0")"; pwd)
 FL_THIRD_PKG_PATH="${PROJECT_PATH}/third/"
 USE_CACHED_PKG="on"
 ENABLE_GITEE="on"
-MS_LITE_PKG_VER="1.9.0"
+MS_LITE_PKG_VER="2.1.0"
 MS_LITE_PKG_NAME="mindspore-lite-${MS_LITE_PKG_VER}-linux-x64"
 MS_PKG_URL="https://ms-release.obs.cn-north-4.myhuaweicloud.com/${MS_LITE_PKG_VER}/MindSpore/lite/release/linux/x86_64/${MS_LITE_PKG_NAME}.tar.gz"
 LENET_MS_URL="https://mindspore-website.obs.cn-north-4.myhuaweicloud.com/notebook/models/lenet_train.ms"
@@ -138,6 +138,7 @@ build_mindspore_federated_client()
   tar -zxf "${FL_THIRD_PKG_PATH}"/${MS_LITE_PKG_NAME}.tar.gz -C "${FL_THIRD_PKG_PATH}"/
   cp "${FL_THIRD_PKG_PATH}"/${MS_LITE_PKG_NAME}/runtime/lib/mindspore-lite-java.jar "${PROJECT_PATH}"/libs
   cp "${FL_THIRD_PKG_PATH}"/${MS_LITE_PKG_NAME}/runtime/third_party/libjpeg-turbo/lib/* "${FL_THIRD_PKG_PATH}"/${MS_LITE_PKG_NAME}/runtime/lib/
+  cp "${FL_THIRD_PKG_PATH}"/${MS_LITE_PKG_NAME}/runtime/third_party/glog/* "${FL_THIRD_PKG_PATH}"/${MS_LITE_PKG_NAME}/runtime/lib/
   cd "${PROJECT_PATH}"
 
   rm -rf gradle .gradle gradlew gradlew.bat
